@@ -1,0 +1,41 @@
+{
+  "id": "builtin.neuterradise.effect.meteors",
+  "kind": "effect",
+  "name": "Meteors",
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  },
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "particles",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "particles",
+            "direction": "diagonal",
+            "particleShape": "line",
+            "count": 8,
+            "opacity": 0.3,
+            "speed": 2,
+            "sizeMin": 1,
+            "sizeMax": 3,
+            "color": "token:accent"
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  }
+}

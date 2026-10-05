@@ -1,0 +1,66 @@
+name: Build (Manual)
+
+# Canonical distributable build. Packaging remains an internal build implementation detail.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 75
+    permissions:
+      contents: read
+    env:
+      NUGET_PACKAGES: ${{ github.workspace }}\.cache\nuget
+      NEUTERRADISE_BUILD_CACHE: ${{ github.workspace }}\.cache\neuterradise-downloads
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+      DOTNET_NOLOGO: '1'
+
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install .NET 10 SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.401
+
+      - name: Restore product NuGet cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: neuterradise-nuget-windows-${{ hashFiles('global.json', 'Directory.Build.props', 'src/**/*.csproj', 'src/**/packages.lock.json') }}
+          restore-keys: |
+            neuterradise-nuget-windows-
+
+      - name: Restore pinned runtime download cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ env.NEUTERRADISE_BUILD_CACHE }}
+          key: neuterradise-runtime-downloads-windows-${{ hashFiles('release-contract.json', 'scripts/packaging/package-win-x64.ps1') }}
+          restore-keys: |
+            neuterradise-runtime-downloads-windows-
+
+      - name: Enforce workflow trust policy
+        shell: pwsh
+        run: ./scripts/verify.ps1 -Scope WorkflowPolicy
+
+      - name: Build canonical product
+        shell: pwsh
+        run: ./scripts/build.ps1
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: NeuTerradise-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7

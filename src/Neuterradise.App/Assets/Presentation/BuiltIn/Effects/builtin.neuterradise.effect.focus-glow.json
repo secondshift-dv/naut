@@ -1,0 +1,54 @@
+{
+  "id": "builtin.neuterradise.effect.focus-glow",
+  "kind": "effect",
+  "name": "Focus Glow",
+  "spec": {
+    "targets": [
+      "effect.controls",
+      "effect.card",
+      "effect.media",
+      "effect.profile.cover",
+      "effect.profile.frame",
+      "effect.profile.banner"
+    ],
+    "channel": "interaction",
+    "interactionOnly": true,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "radial-glow",
+            "opacity": 0.15,
+            "color": "token:focus"
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "radial-glow",
+            "opacity": 0.15,
+            "color": "token:focus",
+            "amplitude": 0
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "radial-glow",
+            "opacity": 0.15,
+            "color": "token:focus",
+            "amplitude": 0
+          }
+        ]
+      }
+    }
+  },
+  "performance": {
+    "tier": "static",
+    "continuousAnimation": false,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 0
+  }
+}

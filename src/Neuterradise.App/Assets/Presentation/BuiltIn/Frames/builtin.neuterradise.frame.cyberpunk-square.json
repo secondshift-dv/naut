@@ -1,0 +1,11 @@
+{
+  "id": "builtin.neuterradise.frame.cyberpunk-square",
+  "kind": "cover-frame",
+  "name": "Cyberpunk \u00b7 Square",
+  "description": "Segmented gunmetal arcs with cyan and magenta neon.",
+  "spec": {
+    "frameId": "cyberpunk-square",
+    "overlayAsset": "frame-cyberpunk-square",
+    "coverInset": 0
+  }
+}

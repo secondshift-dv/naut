@@ -1,0 +1,23 @@
+{
+  "id": "builtin.neuterradise.typography.literary",
+  "kind": "typography",
+  "name": "Literary",
+  "spec": {
+    "display": {
+      "family": "notoserif",
+      "asset": "font-notoserif"
+    },
+    "heading": {
+      "family": "notoserif",
+      "asset": "font-notoserif"
+    },
+    "body": {
+      "family": "notosans",
+      "asset": "font-notosans"
+    },
+    "mono": {
+      "family": "notosansmono",
+      "asset": "font-notosansmono"
+    }
+  }
+}

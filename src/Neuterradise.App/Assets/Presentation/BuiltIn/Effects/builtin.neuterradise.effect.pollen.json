@@ -1,0 +1,41 @@
+{
+  "id": "builtin.neuterradise.effect.pollen",
+  "kind": "effect",
+  "name": "Pollen",
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  },
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "particles",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "particles",
+            "direction": "up",
+            "particleShape": "dot",
+            "count": 28,
+            "opacity": 0.2,
+            "speed": 0.2,
+            "sizeMin": 0.5,
+            "sizeMax": 2,
+            "color": "token:accent"
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  }
+}

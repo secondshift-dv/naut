@@ -1,0 +1,10 @@
+{
+  "id": "builtin.neuterradise.frame.none-flower",
+  "kind": "cover-frame",
+  "name": "Flower",
+  "description": "Flower-shaped Cover without a decoration.",
+  "spec": {
+    "frameId": "none-flower",
+    "coverInset": 0
+  }
+}

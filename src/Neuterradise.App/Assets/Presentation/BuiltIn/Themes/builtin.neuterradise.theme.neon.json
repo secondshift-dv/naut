@@ -1,0 +1,26 @@
+{
+  "id": "builtin.neuterradise.theme.neon",
+  "kind": "theme",
+  "name": "Neon",
+  "description": "Modern electric. Dark energy glass with cyan and magenta edges.",
+  "previewAccent": "#FF65D4DE",
+  "spec": {
+    "themeId": "neon",
+    "material": {
+      "personality": "energy-glass",
+      "atmosphere": "electric",
+      "grain": 0.008,
+      "glassOpacity": 0.98,
+      "glassBlur": 12,
+      "specular": 0.2,
+      "rimLight": 0.22,
+      "ambientPrimary": "token:accent",
+      "ambientSecondary": "token:accentSecondary",
+      "frameAffinity": [
+        "neon-circuit",
+        "cyber",
+        "holographic"
+      ]
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "id": "builtin.neuterradise.gallery.shelves",
+  "kind": "gallery-layout",
+  "name": "Shelves",
+  "description": "Roomier multi-column browsing with larger card envelopes for slower visual scanning.",
+  "spec": {
+    "primitive": "VirtualizedShelves",
+    "itemMinWidth": 280,
+    "itemMaxWidth": 440,
+    "rowHeight": 248,
+    "spacing": 12,
+    "maxColumns": 6
+  }
+}

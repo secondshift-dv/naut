@@ -1,0 +1,44 @@
+{
+  "id": "builtin.neuterradise.home.pulse",
+  "kind": "home-layout",
+  "name": "Dashboard",
+  "description": "A dashboard-forward Home with poster Vault health, active imports, alerts and a compact monthly pulse.",
+  "spec": {
+    "hero": {
+      "placement": "inset",
+      "heightFraction": 0.3,
+      "minHeight": 220,
+      "maxHeight": 340
+    },
+    "rails": [
+      {
+        "id": "statistics",
+        "style": "poster",
+        "maxItems": 4
+      },
+      {
+        "id": "imports",
+        "style": "tile",
+        "maxItems": 4
+      },
+      {
+        "id": "activity",
+        "style": "compact",
+        "maxItems": 6
+      },
+      {
+        "id": "attention",
+        "style": "tile",
+        "maxItems": 3
+      },
+      {
+        "id": "recent",
+        "style": "strip"
+      },
+      {
+        "id": "favorites",
+        "style": "compact"
+      }
+    ]
+  }
+}

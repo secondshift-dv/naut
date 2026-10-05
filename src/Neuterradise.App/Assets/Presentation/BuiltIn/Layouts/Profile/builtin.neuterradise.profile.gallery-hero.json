@@ -1,0 +1,9 @@
+{
+  "id": "builtin.neuterradise.profile.gallery-hero",
+  "kind": "profile-layout",
+  "name": "Gallery Hero",
+  "description": "Legacy gallery-forward hero retained for existing Profile selections.",
+  "spec": {
+    "preset": "gallery-hero"
+  }
+}

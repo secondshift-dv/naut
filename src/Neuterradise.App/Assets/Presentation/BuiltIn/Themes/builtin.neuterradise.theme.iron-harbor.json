@@ -1,0 +1,91 @@
+{
+  "id": "builtin.neuterradise.theme.iron-harbor",
+  "kind": "theme",
+  "name": "Iron Harbor",
+  "description": "Soot, copper and brass instruments.",
+  "spec": {
+    "theme": {
+      "schemaVersion": 1,
+      "id": "iron-harbor",
+      "name": "Iron Harbor",
+      "isDark": true,
+      "colors": {
+        "canvas": "#FF1A1714",
+        "surface1": "#FF24201B",
+        "surface2": "#FF302921",
+        "surface3": "#FF3B3127",
+        "surfaceElevated": "#FF44392E",
+        "surfaceOverlay": "#F224211E",
+        "surfaceHover": "#FF4C3D30",
+        "surfacePressed": "#FF564332",
+        "surfaceSelected": "#FF57432D",
+        "textPrimary": "#FFF2E5D1",
+        "textSecondary": "#FFD0BCA1",
+        "textMuted": "#FFAD957A",
+        "textDisabled": "#FF6F717D",
+        "textInverse": "#FF172026",
+        "textOnAccent": "#FF172026",
+        "textLink": "#FFE0BA78",
+        "borderSubtle": "#18FFFFFF",
+        "borderDefault": "#28FFFFFF",
+        "borderStrong": "#44FFFFFF",
+        "borderInteractive": "#FFE0BA78",
+        "borderSelected": "#FFE0BA78",
+        "focus": "#FFE0BA78",
+        "accent": "#FFE0BA78",
+        "accentHover": "#FFF0D19D",
+        "accentPressed": "#FFC0995E",
+        "accentSecondary": "#FF82B5A7",
+        "selection": "#33E0BA78",
+        "selectionHover": "#4DE0BA78",
+        "info": "#FF8AB9E5",
+        "success": "#FF8DC5A3",
+        "warning": "#FFE1BD7A",
+        "danger": "#FFE7957B",
+        "dangerHover": "#FFF0B2B3"
+      },
+      "typography": {
+        "displayFamily": "Segoe UI Variable Display",
+        "headingFamily": "Segoe UI Variable Display",
+        "bodyFamily": "Segoe UI Variable Text",
+        "monoFamily": "Consolas"
+      },
+      "shape": {
+        "xs": 3,
+        "sm": 5,
+        "md": 8,
+        "lg": 12,
+        "xl": 16
+      },
+      "motion": {
+        "fastMs": 120,
+        "normalMs": 180,
+        "slowMs": 280,
+        "cinematicMs": 500
+      },
+      "background": {
+        "kind": "RadialGlow"
+      },
+      "morphology": {
+        "navigationTreatment": "Underline",
+        "cardPersonality": "Raised",
+        "chromeTreatment": "Elevated",
+        "focusTreatment": "Ring",
+        "borderWeight": 1,
+        "elevationStrength": 0.6,
+        "glowStrength": 0.12,
+        "panelOpacity": 1,
+        "motionIntensity": 0.75,
+        "navigationRadiusScale": 0.65
+      }
+    },
+    "material": {
+      "personality": "brass-metal",
+      "atmosphere": "dust",
+      "grain": 0.045,
+      "glassOpacity": 1,
+      "specular": 0.65,
+      "rimLight": 0.3
+    }
+  }
+}

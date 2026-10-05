@@ -1,0 +1,41 @@
+{
+  "id": "builtin.neuterradise.effect.fountain",
+  "kind": "effect",
+  "name": "Fountain",
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  },
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "particles",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "particles",
+            "direction": "radial",
+            "particleShape": "dot",
+            "count": 40,
+            "opacity": 0.25,
+            "speed": 1,
+            "sizeMin": 1,
+            "sizeMax": 3,
+            "color": "token:accent"
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  }
+}

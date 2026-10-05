@@ -1,0 +1,24 @@
+{
+  "id": "builtin.neuterradise.media-layout.clean",
+  "kind": "profile-media-layout",
+  "name": "Art Only",
+  "description": "Pure square artwork with no metadata panel for the quietest visual browsing.",
+  "spec": {
+    "layoutId": "clean",
+    "cardWidth": 160,
+    "aspect": 1,
+    "mediaWidthFraction": 1,
+    "fit": "fill",
+    "metadataPlacement": "hidden",
+    "metadataFields": [],
+    "metadataLines": 0,
+    "frameStyle": "none",
+    "frameRadius": 10,
+    "frameThickness": 0,
+    "frameColor": "#00000000",
+    "selectedFrameColor": "token:borderSelected",
+    "frameGlow": 0,
+    "hoverStyle": "spotlight",
+    "showTypeBadge": false
+  }
+}

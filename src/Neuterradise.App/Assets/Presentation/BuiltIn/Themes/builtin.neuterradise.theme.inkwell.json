@@ -1,0 +1,26 @@
+{
+  "id": "builtin.neuterradise.theme.inkwell",
+  "kind": "theme",
+  "name": "Inkwell",
+  "description": "Dark elegant ink glass with silver edges and smoke drift.",
+  "previewAccent": "#FFB6C7D7",
+  "spec": {
+    "themeId": "inkwell",
+    "material": {
+      "personality": "ink-glass",
+      "atmosphere": "ink",
+      "grain": 0.008,
+      "glassOpacity": 0.98,
+      "glassBlur": 12,
+      "specular": 0.2,
+      "rimLight": 0.22,
+      "ambientPrimary": "token:accent",
+      "ambientSecondary": "token:accentSecondary",
+      "frameAffinity": [
+        "obsidian",
+        "silver",
+        "arcane"
+      ]
+    }
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "id": "builtin.neuterradise.card.compact",
+  "kind": "profile-card",
+  "name": "Compact",
+  "description": "A dense horizontal identity row for fast list-style scanning.",
+  "spec": {
+    "legacyVariant": "compact",
+    "aspect": 3,
+    "art": "cover",
+    "density": "minimal",
+    "hover": "none",
+    "frame": "lite",
+    "composition": {
+      "type": "stack",
+      "spacing": 3,
+      "children": [
+        {
+          "type": "grid",
+          "children": [
+            {
+              "type": "frame",
+              "size": 40,
+              "column": 0,
+              "vAlign": "center"
+            },
+            {
+              "type": "stack",
+              "spacing": 3,
+              "children": [
+                {
+                  "type": "text",
+                  "slot": "profile.identity.name",
+                  "role": "card-title",
+                  "color": "token:textPrimary",
+                  "maxLines": 1
+                },
+                {
+                  "type": "text",
+                  "slot": "profile.identity.category",
+                  "role": "micro",
+                  "color": "token:textSecondary",
+                  "maxLines": 1,
+                  "visibleWhen": "profile.identity.category"
+                },
+                {
+                  "type": "badge",
+                  "slot": "profile.identity.rating",
+                  "style": "text",
+                  "visibleWhen": "profile.identity.rating",
+                  "hAlign": "left"
+                }
+              ],
+              "column": 1,
+              "vAlign": "center"
+            },
+            {
+              "type": "badge",
+              "slot": "profile.identity.favorite",
+              "style": "text",
+              "visibleWhen": "profile.identity.favorite",
+              "column": 2,
+              "vAlign": "center"
+            }
+          ],
+          "columns": [
+            "40",
+            "*",
+            "auto"
+          ],
+          "spacing": 8
+        }
+      ],
+      "background": "token:surface1",
+      "padding": 8
+    }
+  }
+}

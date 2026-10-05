@@ -1,0 +1,38 @@
+{
+  "id": "builtin.neuterradise.effect.scanner",
+  "kind": "effect",
+  "name": "Scanner",
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  },
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "lighting",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "light-sweep",
+            "opacity": 0.12,
+            "color": "token:accent",
+            "angle": 0,
+            "width": 0.04,
+            "period": 6
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  }
+}

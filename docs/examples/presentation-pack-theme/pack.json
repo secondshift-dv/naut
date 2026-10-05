@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "packId": "example.paper-theme",
+  "version": "1.0.0",
+  "name": "Paper Theme Example",
+  "author": "Example",
+  "description": "A single custom theme with its full validated palette and typography.",
+  "license": "CC0-1.0",
+  "minContractVersion": 1,
+  "assets": [],
+  "definitions": [
+    {
+      "id": "example.paper-theme.paper",
+      "kind": "theme",
+      "name": "Paper Example",
+      "description": "A warm paper palette based on the coordinated Ivory theme.",
+      "spec": {
+        "theme": {
+          "schemaVersion": 1,
+          "id": "paper-example",
+          "name": "Paper Example",
+          "isDark": false,
+          "colors": {
+            "canvas": "#FFF6F2EA",
+            "surface1": "#FFFFFCF6",
+            "surface2": "#FFF0EBE1",
+            "surface3": "#FFE8E1D5",
+            "surfaceElevated": "#FFFFFDF8",
+            "surfaceOverlay": "#F2F0EBE1",
+            "surfaceHover": "#FFE8E1D5",
+            "surfacePressed": "#FFFFFDF8",
+            "surfaceSelected": "#FFEADFD1",
+            "textPrimary": "#FF352F26",
+            "textSecondary": "#FF62584B",
+            "textMuted": "#FF786C5C",
+            "textDisabled": "#FF96999D",
+            "textInverse": "#FFF9FAFC",
+            "textOnAccent": "#FFFFFFFF",
+            "textLink": "#FF87654D",
+            "borderSubtle": "#14202C3A",
+            "borderDefault": "#24202C3A",
+            "borderStrong": "#40202C3A",
+            "borderInteractive": "#8087654D",
+            "borderSelected": "#FF87654D",
+            "focus": "#FF87654D",
+            "accent": "#FF87654D",
+            "accentHover": "#FF71523E",
+            "accentPressed": "#FF604332",
+            "accentSecondary": "#FF8A8065",
+            "selection": "#3387654D",
+            "selectionHover": "#4D87654D",
+            "info": "#FF2E638D",
+            "success": "#FF287044",
+            "warning": "#FF8A5B12",
+            "danger": "#FFA93543",
+            "dangerHover": "#FF902B37"
+          },
+          "typography": {
+            "displayFamily": "Georgia",
+            "headingFamily": "Georgia",
+            "bodyFamily": "Segoe UI Variable Text",
+            "monoFamily": "Cascadia Mono"
+          },
+          "shape": {
+            "xs": 3,
+            "sm": 5,
+            "md": 8,
+            "lg": 12,
+            "xl": 16
+          },
+          "motion": {
+            "fastMs": 120,
+            "normalMs": 180,
+            "slowMs": 280,
+            "cinematicMs": 500
+          },
+          "background": {
+            "kind": "RadialGlow"
+          },
+          "morphology": {
+            "navigationTreatment": "SelectedSurface",
+            "cardPersonality": "Flat",
+            "chromeTreatment": "Elevated",
+            "focusTreatment": "Ring",
+            "borderWeight": 1,
+            "elevationStrength": 0.6,
+            "glowStrength": 0.12,
+            "panelOpacity": 1,
+            "motionIntensity": 0.75,
+            "navigationRadiusScale": 0.65
+          }
+        },
+        "material": {
+          "personality": "milky-paper",
+          "grain": 0.008,
+          "glassOpacity": 0.98,
+          "glassBlur": 12,
+          "specular": 0.2,
+          "rimLight": 0.22
+        }
+      }
+    }
+  ]
+}

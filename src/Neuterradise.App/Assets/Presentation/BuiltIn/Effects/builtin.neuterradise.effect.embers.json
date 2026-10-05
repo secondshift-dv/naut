@@ -1,0 +1,39 @@
+{
+  "id": "builtin.neuterradise.effect.embers",
+  "kind": "effect",
+  "name": "Embers",
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "particles",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "particles",
+            "opacity": 0.25,
+            "color": "#d78a42",
+            "count": 24,
+            "sizeMin": 1,
+            "sizeMax": 3,
+            "speed": 0.6
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  },
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  }
+}

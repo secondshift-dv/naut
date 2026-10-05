@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Framework-neutral application runtime: domain, persistence, Vault authority, import, jobs,
+    ResourceGovernor, caches, and the Presentation Contract (registry, bindings, compiler, snapshots).
+    No WPF, no Uno, no UI objects. The Uno Skia Desktop product (Neuterradise.App) depends on this;
+    this never depends on a renderer. RootNamespace stays Neuterradise.App so embedded runtime
+    resources have stable logical names.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>Neuterradise.Runtime</AssemblyName>
+    <RootNamespace>Neuterradise.App</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Neuterradise.Release.Contracts\Neuterradise.Release.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="NeuTerradise" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Neuterradise.Profiling.Protocol\Neuterradise.Profiling.Protocol.csproj" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+    <PackageReference Include="SkiaSharp" Version="3.119.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="SystemServices\Database\CatalogSchema.sql" />
+    <EmbeddedResource Include="Localization\Strings\*.xml" />
+    <EmbeddedResource Include="..\Neuterradise.App\Assets\Presentation\BuiltIn\Themes\Legacy\*.json" LogicalName="Neuterradise.App.Design.Themes.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\Neuterradise.App\Assets\Presentation\BuiltIn\**\*.json" Exclude="..\Neuterradise.App\Assets\Presentation\BuiltIn\Themes\Legacy\*.json" LogicalName="Neuterradise.App.Presentation.BuiltIn.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\Neuterradise.App\Assets\Presentation\Foundation\*.json" LogicalName="Neuterradise.App.Presentation.Tokens.%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

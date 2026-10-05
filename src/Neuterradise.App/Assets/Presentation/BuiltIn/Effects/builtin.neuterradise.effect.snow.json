@@ -1,0 +1,41 @@
+{
+  "id": "builtin.neuterradise.effect.snow",
+  "kind": "effect",
+  "name": "Snow",
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  },
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "particles",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "particles",
+            "direction": "down",
+            "particleShape": "dot",
+            "count": 56,
+            "opacity": 0.30,
+            "speed": 0.55,
+            "sizeMin": 1,
+            "sizeMax": 3,
+            "color": "token:textPrimary"
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  }
+}

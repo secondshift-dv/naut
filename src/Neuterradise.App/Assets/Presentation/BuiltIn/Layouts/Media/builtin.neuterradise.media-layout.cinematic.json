@@ -1,0 +1,29 @@
+{
+  "id": "builtin.neuterradise.media-layout.cinematic",
+  "kind": "profile-media-layout",
+  "name": "Cinema",
+  "description": "Wide 16:9 media cards with strong hover treatment for video-heavy Profiles.",
+  "spec": {
+    "layoutId": "cinematic",
+    "cardWidth": 200,
+    "aspect": 1.7778,
+    "mediaWidthFraction": 1,
+    "fit": "fill",
+    "metadataPlacement": "hover-overlay",
+    "metadataFields": [
+      "name",
+      "type",
+      "duration",
+      "favorite"
+    ],
+    "metadataLines": 2,
+    "frameStyle": "hairline",
+    "frameRadius": 10,
+    "frameThickness": 1,
+    "frameColor": "token:borderSubtle",
+    "selectedFrameColor": "token:accent",
+    "frameGlow": 0,
+    "hoverStyle": "lift",
+    "showTypeBadge": true
+  }
+}

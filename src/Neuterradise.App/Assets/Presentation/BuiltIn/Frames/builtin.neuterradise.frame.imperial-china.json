@@ -1,0 +1,11 @@
+{
+  "id": "builtin.neuterradise.frame.imperial-china",
+  "kind": "cover-frame",
+  "name": "Imperial",
+  "description": "Jade, gold, cloud scrolls and restrained crimson accents.",
+  "spec": {
+    "frameId": "imperial-china",
+    "overlayAsset": "frame-imperial-china",
+    "coverInset": 0.16
+  }
+}

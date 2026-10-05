@@ -1,0 +1,39 @@
+{
+  "id": "builtin.neuterradise.home.collection",
+  "kind": "home-layout",
+  "name": "Collection",
+  "description": "A shorter inset Spotlight with Profile browsing, tiled Vault health and tiled monthly activity.",
+  "spec": {
+    "hero": {
+      "placement": "inset",
+      "heightFraction": 0.32,
+      "minHeight": 220,
+      "maxHeight": 360
+    },
+    "rails": [
+      {
+        "id": "profiles",
+        "style": "poster"
+      },
+      {
+        "id": "statistics",
+        "style": "tile",
+        "maxItems": 4
+      },
+      {
+        "id": "activity",
+        "style": "tile",
+        "maxItems": 6
+      },
+      {
+        "id": "discovery",
+        "style": "strip",
+        "maxItems": 6
+      },
+      {
+        "id": "recent",
+        "style": "tile"
+      }
+    ]
+  }
+}

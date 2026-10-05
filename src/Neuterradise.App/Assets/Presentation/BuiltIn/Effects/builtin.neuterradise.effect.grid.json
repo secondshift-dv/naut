@@ -1,0 +1,52 @@
+{
+  "id": "builtin.neuterradise.effect.grid",
+  "kind": "effect",
+  "name": "Grid",
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "surface",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "grid-field",
+            "opacity": 0.08,
+            "color": "token:accent",
+            "scale": 1.2
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "grid-field",
+            "opacity": 0.08,
+            "color": "token:accent",
+            "scale": 1.2,
+            "amplitude": 0
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "grid-field",
+            "opacity": 0.08,
+            "color": "token:accent",
+            "scale": 1.2,
+            "amplitude": 0
+          }
+        ]
+      }
+    }
+  },
+  "performance": {
+    "tier": "static",
+    "continuousAnimation": false,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 0
+  }
+}

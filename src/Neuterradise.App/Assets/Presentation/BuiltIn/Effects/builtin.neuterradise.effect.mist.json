@@ -1,0 +1,37 @@
+{
+  "id": "builtin.neuterradise.effect.mist",
+  "kind": "effect",
+  "name": "Mist",
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "environment",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "fog",
+            "opacity": 0.08,
+            "color": "token:accentSecondary",
+            "count": 5,
+            "speed": 0.2
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  },
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  }
+}

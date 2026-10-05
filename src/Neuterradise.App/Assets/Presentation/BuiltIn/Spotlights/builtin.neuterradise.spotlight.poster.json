@@ -1,0 +1,16 @@
+{
+  "id": "builtin.neuterradise.spotlight.poster",
+  "kind": "spotlight-style",
+  "name": "Poster",
+  "description": "A centered framed Cover over drifting artwork.",
+  "spec": {
+    "composition": "centered-poster",
+    "motion": "parallax-drift",
+    "transition": "fade",
+    "rotationSeconds": 14,
+    "showCover": true,
+    "showOverview": false,
+    "pagination": "counter-rail",
+    "scrimStrength": 0.6
+  }
+}

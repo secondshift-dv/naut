@@ -1,0 +1,9 @@
+{
+  "id": "builtin.neuterradise.profile.split-left",
+  "kind": "profile-layout",
+  "name": "Split",
+  "description": "Side-by-side Banner and identity composition with structured sections below.",
+  "spec": {
+    "preset": "split-left"
+  }
+}

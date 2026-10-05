@@ -1,0 +1,39 @@
+{
+  "id": "builtin.neuterradise.effect.starlight",
+  "kind": "effect",
+  "name": "Starlight",
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "particles",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "particles",
+            "opacity": 0.35,
+            "color": "token:accent",
+            "count": 36,
+            "sizeMin": 0.5,
+            "sizeMax": 2,
+            "speed": 0.15
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  },
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "id": "builtin.neuterradise.gallery.adaptive-wall",
+  "kind": "gallery-layout",
+  "name": "Adaptive Wall",
+  "description": "Responsive multi-column browsing that keeps each Profile Card composition intact.",
+  "spec": {
+    "primitive": "VirtualizedAdaptiveWall",
+    "itemMinWidth": 200,
+    "itemMaxWidth": 340,
+    "rowHeight": 220,
+    "spacing": 12,
+    "maxColumns": 10
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "id": "builtin.neuterradise.profile.dock",
+  "kind": "profile-layout",
+  "name": "Dock",
+  "spec": {
+    "layout": {
+      "schemaVersion": 1,
+      "id": "dock",
+      "name": "Dock",
+      "bannerMode": "None",
+      "height": "Medium",
+      "coverPlacement": "InlineCenter",
+      "coverSize": "Medium",
+      "coverDetailLevel": "Full",
+      "identityAlignment": "Center",
+      "contentWidth": "Wide",
+      "overlay": "Medium",
+      "blur": "Off",
+      "fade": "Bottom",
+      "sectionDensity": "Comfortable",
+      "modules": [
+        {
+          "id": "overview",
+          "order": 0,
+          "visible": true,
+          "width": "Full"
+        },
+        {
+          "id": "related",
+          "order": 1,
+          "visible": true,
+          "width": "Full"
+        },
+        {
+          "id": "faces",
+          "order": 2,
+          "visible": true,
+          "width": "Full"
+        },
+        {
+          "id": "recentMedia",
+          "order": 3,
+          "visible": true,
+          "width": "Full"
+        },
+        {
+          "id": "media",
+          "order": 4,
+          "visible": true,
+          "width": "Full"
+        }
+      ]
+    },
+    "surface": {
+      "type": "columns",
+      "columns": [
+        "300",
+        "*"
+      ],
+      "spacing": 18,
+      "children": [
+        {
+          "type": "stack",
+          "spacing": 12,
+          "children": [
+            {
+              "type": "semantic",
+              "id": "identity"
+            },
+            {
+              "type": "semantic",
+              "id": "overview"
+            },
+            {
+              "type": "semantic",
+              "id": "actions"
+            },
+            {
+              "type": "semantic",
+              "id": "related"
+            }
+          ]
+        },
+        {
+          "type": "stack",
+          "spacing": 12,
+          "children": [
+            {
+              "type": "semantic",
+              "id": "review"
+            },
+            {
+              "type": "semantic",
+              "id": "media"
+            },
+            {
+              "type": "semantic",
+              "id": "faces"
+            },
+            {
+              "type": "semantic",
+              "id": "statistics"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

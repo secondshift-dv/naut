@@ -1,0 +1,69 @@
+<Application x:Class="Neuterradise.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+      </ResourceDictionary.MergedDictionaries>
+
+      <!-- Shell-level shortcuts remain active, but Uno must not project the root
+           accelerators into every Button tooltip as synthetic "Ctrl+None" text. -->
+      <Style TargetType="Button">
+        <Setter Property="KeyboardAcceleratorPlacementMode" Value="Hidden" />
+        <Setter Property="MinHeight" Value="{ThemeResource ControlSet.button.Height}" />
+        <Setter Property="Padding" Value="{ThemeResource ControlSet.button.Padding}" />
+        <Setter Property="FontSize" Value="{ThemeResource CompactControlFontSize}" />
+        <Setter Property="FontFamily" Value="{ThemeResource CompactControlFontFamily}" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="CornerRadius" Value="{ThemeResource ControlSet.button.Radius}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource ControlSet.button.BorderWidth}" />
+        <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource ControlSet.button.Focus}" />
+      </Style>
+      <Style TargetType="ToggleButton">
+        <Setter Property="KeyboardAcceleratorPlacementMode" Value="Hidden" />
+        <Setter Property="MinHeight" Value="{ThemeResource ControlSet.toggle.Height}" />
+        <Setter Property="Padding" Value="{ThemeResource ControlSet.toggle.Padding}" />
+        <Setter Property="FontSize" Value="{ThemeResource CompactControlFontSize}" />
+        <Setter Property="FontFamily" Value="{ThemeResource CompactControlFontFamily}" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="CornerRadius" Value="{ThemeResource ControlSet.toggle.Radius}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource ControlSet.toggle.BorderWidth}" />
+        <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource ControlSet.toggle.Focus}" />
+      </Style>
+      <Style TargetType="ComboBox">
+        <Setter Property="KeyboardAcceleratorPlacementMode" Value="Hidden" />
+        <Setter Property="MinHeight" Value="{ThemeResource ControlSet.input.Height}" />
+        <Setter Property="Padding" Value="{ThemeResource ControlSet.input.Padding}" />
+        <Setter Property="FontSize" Value="{ThemeResource CompactControlFontSize}" />
+        <Setter Property="FontFamily" Value="{ThemeResource CompactControlFontFamily}" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="CornerRadius" Value="{ThemeResource ControlSet.input.Radius}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource ControlSet.input.BorderWidth}" />
+        <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource ControlSet.input.Focus}" />
+      </Style>
+      <Style TargetType="TextBox">
+        <Setter Property="KeyboardAcceleratorPlacementMode" Value="Hidden" />
+        <Setter Property="MinHeight" Value="{ThemeResource ControlSet.input.Height}" />
+        <Setter Property="Padding" Value="{ThemeResource ControlSet.input.Padding}" />
+        <Setter Property="FontSize" Value="{ThemeResource CompactControlFontSize}" />
+        <Setter Property="FontFamily" Value="{ThemeResource CompactControlFontFamily}" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="CornerRadius" Value="{ThemeResource ControlSet.input.Radius}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource ControlSet.input.BorderWidth}" />
+        <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource ControlSet.input.Focus}" />
+      </Style>
+      <Style TargetType="AutoSuggestBox">
+        <Setter Property="MinHeight" Value="{ThemeResource ControlSet.input.Height}" />
+        <Setter Property="FontSize" Value="{ThemeResource CompactControlFontSize}" />
+        <Setter Property="FontFamily" Value="{ThemeResource CompactControlFontFamily}" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="CornerRadius" Value="{ThemeResource ControlSet.input.Radius}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource ControlSet.input.BorderWidth}" />
+        <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource ControlSet.input.Focus}" />
+      </Style>
+    </ResourceDictionary>
+  </Application.Resources>
+</Application>

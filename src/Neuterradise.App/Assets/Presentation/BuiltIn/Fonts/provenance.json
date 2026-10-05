@@ -1,0 +1,75 @@
+{
+  "license": "SIL Open Font License 1.1",
+  "fonts": [
+    {
+      "file": "instrument-condensed.ttf",
+      "source": "https://github.com/google/fonts/tree/main/ofl/ibmplexsanscondensed",
+      "license": "ibmplexsanscondensed-OFL.txt",
+      "sha256": "9cc168b4099056401f7121878e7dc2c260c1c807fb066454929dc2f64f0eb6fe",
+      "processing": "Static regular face, all variable axes pinned to defaults except weight 400; modified IBM face renamed to Naut Instrument"
+    },
+    {
+      "file": "instrument-mono.ttf",
+      "source": "https://github.com/google/fonts/tree/main/ofl/ibmplexmono",
+      "license": "ibmplexmono-OFL.txt",
+      "sha256": "4bd8c3821ff90a2f6e4d106e1260b60793bfcd89faab6486715c08690a3eba09",
+      "processing": "Static regular face, all variable axes pinned to defaults except weight 400; modified IBM face renamed to Naut Instrument"
+    },
+    {
+      "file": "instrument-sans.ttf",
+      "source": "https://github.com/google/fonts/tree/main/ofl/ibmplexsans",
+      "license": "ibmplexsans-OFL.txt",
+      "sha256": "f478298d7e98ad105d8f00f00a9aa31ddc2fc66e8bbb18dd5d1439a21d887e1c",
+      "processing": "Static regular face, all variable axes pinned to defaults except weight 400; modified IBM face renamed to Naut Instrument"
+    },
+    {
+      "file": "inter.ttf",
+      "source": "https://github.com/google/fonts/tree/main/ofl/inter",
+      "license": "inter-OFL.txt",
+      "sha256": "af339e1c6cd580b2725d618f363f140995dfd2a304331dd14c25520ec903ca2e",
+      "processing": "Static regular face, all variable axes pinned to defaults except weight 400; modified IBM face renamed to Naut Instrument"
+    },
+    {
+      "file": "notosans.ttf",
+      "source": "https://github.com/google/fonts/tree/main/ofl/notosans",
+      "license": "notosans-OFL.txt",
+      "sha256": "5f0f1dee6f27a2cee0b38f81893f729d5bb88158fee216ba92b09f17e60c9671",
+      "processing": "Static regular face, all variable axes pinned to defaults except weight 400; modified IBM face renamed to Naut Instrument"
+    },
+    {
+      "file": "notosansjp.ttf",
+      "source": "https://github.com/google/fonts/tree/main/ofl/notosansjp",
+      "license": "notosansjp-OFL.txt",
+      "sha256": "a957dd46efdcdebcfefc1f47349a712cd0f53e4cba8d40d4e0bd7eb4c012da11",
+      "processing": "Static regular face, all variable axes pinned to defaults except weight 400; modified IBM face renamed to Naut Instrument"
+    },
+    {
+      "file": "notosanskr.ttf",
+      "source": "https://github.com/google/fonts/tree/main/ofl/notosanskr",
+      "license": "notosanskr-OFL.txt",
+      "sha256": "6eaaa1cec28a5472e4c258d73b5d0ff2d42b54228c95eac04384fe1eacf3bf70",
+      "processing": "Static regular face, all variable axes pinned to defaults except weight 400; modified IBM face renamed to Naut Instrument"
+    },
+    {
+      "file": "notosansmono.ttf",
+      "source": "https://github.com/google/fonts/tree/main/ofl/notosansmono",
+      "license": "notosansmono-OFL.txt",
+      "sha256": "8f4f855a2e162b571085b8a005207279f4fa1e517e7627f3954e53d234d574af",
+      "processing": "Static regular face, all variable axes pinned to defaults except weight 400; modified IBM face renamed to Naut Instrument"
+    },
+    {
+      "file": "notosanssc.ttf",
+      "source": "https://github.com/google/fonts/tree/main/ofl/notosanssc",
+      "license": "notosanssc-OFL.txt",
+      "sha256": "3c6db1391f230afc7d1f540d2905d0f80c112d02918ce377c048d2c60c4acb26",
+      "processing": "Static regular face, all variable axes pinned to defaults except weight 400; modified IBM face renamed to Naut Instrument"
+    },
+    {
+      "file": "notoserif.ttf",
+      "source": "https://github.com/google/fonts/tree/main/ofl/notoserif",
+      "license": "notoserif-OFL.txt",
+      "sha256": "5ac1f2b9d06b3f0594283ca6a702e2f9f968a6bafddd5babe78e42ce27d444bf",
+      "processing": "Static regular face, all variable axes pinned to defaults except weight 400; modified IBM face renamed to Naut Instrument"
+    }
+  ]
+}

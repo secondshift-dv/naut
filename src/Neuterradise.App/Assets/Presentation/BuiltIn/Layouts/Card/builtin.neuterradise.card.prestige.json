@@ -1,0 +1,85 @@
+{
+  "id": "builtin.neuterradise.card.prestige",
+  "kind": "profile-card",
+  "name": "Prestige",
+  "description": "Collectible presentation centered on the Profile frame, rating and identity.",
+  "spec": {
+    "legacyVariant": "prestige",
+    "aspect": 0.75,
+    "art": "cover-over-banner",
+    "density": "detailed",
+    "hover": "spotlight",
+    "frame": "full",
+    "composition": {
+      "type": "overlay",
+      "children": [
+        {
+          "type": "shape",
+          "fill": "token:surface1"
+        },
+        {
+          "type": "image",
+          "slot": "profile.identity.banner",
+          "stretch": "uniform-to-fill",
+          "ambient": true,
+          "opacity": 0.1
+        },
+        {
+          "type": "stack",
+          "spacing": 5,
+          "children": [
+            {
+              "type": "frame",
+              "size": 96,
+              "hAlign": "center"
+            },
+            {
+              "type": "text",
+              "slot": "profile.identity.name",
+              "role": "card-title",
+              "color": "token:textPrimary",
+              "maxLines": 2,
+              "align": "center"
+            },
+            {
+              "type": "text",
+              "slot": "profile.identity.category",
+              "role": "micro",
+              "color": "token:textSecondary",
+              "maxLines": 1,
+              "visibleWhen": "profile.identity.category",
+              "align": "center"
+            },
+            {
+              "type": "text",
+              "slot": "profile.identity.tags",
+              "role": "micro",
+              "color": "token:textSecondary",
+              "maxLines": 1,
+              "visibleWhen": "profile.identity.tags",
+              "align": "center"
+            },
+            {
+              "type": "badge",
+              "slot": "profile.identity.rating",
+              "style": "outline",
+              "visibleWhen": "profile.identity.rating",
+              "hAlign": "center"
+            }
+          ],
+          "padding": 12,
+          "vAlign": "center"
+        },
+        {
+          "type": "badge",
+          "slot": "profile.identity.favorite",
+          "style": "text",
+          "visibleWhen": "profile.identity.favorite",
+          "hAlign": "right",
+          "vAlign": "top",
+          "margin": 8
+        }
+      ]
+    }
+  }
+}

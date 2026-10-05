@@ -1,0 +1,14 @@
+{
+  "id": "builtin.neuterradise.gallery.stream",
+  "kind": "gallery-layout",
+  "name": "Stream",
+  "spec": {
+    "primitive": "VirtualizedSingleColumn",
+    "toolbar": "feed",
+    "itemMinWidth": 540,
+    "itemMaxWidth": 960,
+    "rowHeight": 180,
+    "spacing": 14,
+    "maxColumns": 1
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "id": "builtin.neuterradise.typography.instrument",
+  "kind": "typography",
+  "name": "Instrument",
+  "spec": {
+    "display": {
+      "family": "Naut Instrument Condensed",
+      "asset": "font-instrument-condensed"
+    },
+    "heading": {
+      "family": "Naut Instrument Sans",
+      "asset": "font-instrument-sans"
+    },
+    "body": {
+      "family": "Naut Instrument Sans",
+      "asset": "font-instrument-sans"
+    },
+    "mono": {
+      "family": "Naut Instrument Mono",
+      "asset": "font-instrument-mono"
+    }
+  }
+}

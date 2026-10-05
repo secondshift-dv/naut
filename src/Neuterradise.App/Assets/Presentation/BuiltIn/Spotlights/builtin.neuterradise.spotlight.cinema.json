@@ -1,0 +1,15 @@
+{
+  "id": "builtin.neuterradise.spotlight.cinema",
+  "kind": "spotlight-style",
+  "name": "Cinema",
+  "spec": {
+    "composition": "cinema",
+    "motion": "ken-burns",
+    "transition": "fade",
+    "rotationSeconds": 14,
+    "showCover": false,
+    "showOverview": false,
+    "pagination": "counter",
+    "scrimStrength": 0.65
+  }
+}

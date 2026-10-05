@@ -1,0 +1,26 @@
+{
+  "id": "builtin.neuterradise.theme.ivory",
+  "kind": "theme",
+  "name": "Ivory",
+  "description": "Warm editorial light theme. Milky paper glass and cream reflections.",
+  "previewAccent": "#FF87654D",
+  "spec": {
+    "themeId": "ivory",
+    "material": {
+      "personality": "milky-paper",
+      "atmosphere": "editorial",
+      "grain": 0.008,
+      "glassOpacity": 0.98,
+      "glassBlur": 12,
+      "specular": 0.2,
+      "rimLight": 0.22,
+      "ambientPrimary": "token:accent",
+      "ambientSecondary": "token:accentSecondary",
+      "frameAffinity": [
+        "gold",
+        "floral",
+        "minimal"
+      ]
+    }
+  }
+}

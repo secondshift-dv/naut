@@ -1,0 +1,88 @@
+{
+  "id": "builtin.neuterradise.card.cinematic",
+  "kind": "profile-card",
+  "name": "Cinematic Banner",
+  "description": "Wide Banner-first card for fast visual recognition, with identity protected over the artwork.",
+  "spec": {
+    "legacyVariant": "cinematic",
+    "aspect": 1.7778,
+    "art": "banner",
+    "density": "standard",
+    "hover": "lift",
+    "frame": "lite",
+    "composition": {
+      "type": "overlay",
+      "children": [
+        {
+          "type": "image",
+          "slot": "profile.identity.banner",
+          "stretch": "uniform-to-fill"
+        },
+        {
+          "type": "scrim",
+          "direction": "to-top",
+          "from": "token:heroScrimStrong",
+          "to": "#00000000",
+          "vAlign": "bottom",
+          "height": 112
+        },
+        {
+          "type": "badge",
+          "slot": "profile.identity.favorite",
+          "style": "glass",
+          "visibleWhen": "profile.identity.favorite",
+          "hAlign": "right",
+          "vAlign": "top",
+          "margin": 8
+        },
+        {
+          "type": "grid",
+          "children": [
+            {
+              "type": "frame",
+              "size": 36,
+              "column": 0,
+              "vAlign": "bottom"
+            },
+            {
+              "type": "stack",
+              "spacing": 3,
+              "children": [
+                {
+                  "type": "text",
+                  "slot": "profile.identity.name",
+                  "role": "card-title",
+                  "color": "token:onMediaPrimary",
+                  "maxLines": 1
+                },
+                {
+                  "type": "text",
+                  "slot": "profile.identity.category",
+                  "role": "micro",
+                  "color": "token:onMediaSecondary",
+                  "maxLines": 1,
+                  "visibleWhen": "profile.identity.category"
+                },
+                {
+                  "type": "badge",
+                  "slot": "profile.identity.rating",
+                  "style": "glass",
+                  "visibleWhen": "profile.identity.rating",
+                  "hAlign": "left"
+                }
+              ],
+              "column": 1
+            }
+          ],
+          "columns": [
+            "36",
+            "*"
+          ],
+          "spacing": 8,
+          "vAlign": "bottom",
+          "margin": 12
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+    "schemaVersion":  1,
+    "version":  "8.1.3-naut-330caae0c1",
+    "archiveName":  "ffmpeg-naut-win64-lgpl.zip",
+    "archiveSha256":  "8aeede29b16b528467467d4d86d043b42383736a990b42e04568953e0506b570",
+    "archiveUrl":  "https://github.com/secondshift-dv/naut/releases/download/ffmpeg-runtime-n8.1.3-14-g330caae0c1-naut1/ffmpeg-naut-win64-lgpl.zip",
+    "sourceCompanionName":  "ffmpeg-naut-corresponding-source.zip",
+    "sourceCompanionSha256":  "5b971590413db0f5415a8bfb8925dc35844456c18e9efd02eb04313dd5cd8f69",
+    "sourceCompanionUrl":  "https://github.com/secondshift-dv/naut/releases/download/ffmpeg-runtime-n8.1.3-14-g330caae0c1-naut1/ffmpeg-naut-corresponding-source.zip",
+    "provenanceSha256":  "b059fdb214724b6592f6df5f76caffd3ed5bcb06d7104244912fb96b4bf85a38",
+    "noticesSha256":  "69225428dc0eb47f2a586fc52c53bf372c15fb3a8b474c0510c0f63e1cbb2af6",
+    "sourceCommit":  "330caae0c1acccd2222edc52a05940c574561ce5",
+    "btbnCommit":  "9acad4a9ef1583096af7836cc1e9c8cbcb4d3950",
+    "recipeCommit":  "e48da767cfa34511a5e94e508179330d7225e2d3",
+    "license":  "LGPL-3.0-or-later",
+    "configuration":  "--prefix=/build/prefix --enable-cross-compile --cross-prefix=x86_64-w64-mingw32- --cc=x86_64-w64-mingw32-gcc-posix --cxx=x86_64-w64-mingw32-g++-posix --ar=x86_64-w64-mingw32-ar --ranlib=x86_64-w64-mingw32-ranlib --arch=x86_64 --target-os=mingw32 --pkg-config=pkg-config --pkg-config-flags=--static --disable-autodetect --enable-static --disable-shared --enable-version3 --disable-debug --disable-doc --disable-ffplay --disable-chromaprint --disable-gpl --disable-nonfree --enable-libopenh264 --enable-zlib --enable-libdav1d --extra-version=naut-330caae0c1 --extra-cflags=\u0027-I/opt/naut/include -ffile-prefix-map=/build=.\u0027 --extra-ldflags=\u0027-L/opt/naut/lib -static -static-libgcc -static-libstdc++ -fstack-protector-strong -Wl,--no-insert-timestamp\u0027 --extra-ldexeflags=\u0027-Wl,-Map,/build/link.map\u0027",
+    "recipeHashes":  {
+                         "build-ffmpeg.sh":  "5da253e1bf3948312caf222b770225e2afdba8f45b233f9f3e0171fcc1d04e29",
+                         "ffmpeg-build.py":  "331707cf5e6423bd90516a699bccafeeaa26e690f92336685d567bf075bba0c9",
+                         "ffmpeg-build-inputs.json":  "88484f99c069a7ac9787c2f56de173d1acb53205c7febee5e795e26f3bf90e3f"
+                     },
+    "binaryHashes":  {
+                         "ffmpeg.exe":  "7f07b0494ab5a3e73137261623bbdba03f77285c5c4cad556f6929850603f80d",
+                         "ffprobe.exe":  "8cbf0863e7ab79b12af0210ca89318e3ef68874400b39bc12041d20136c1e358"
+                     }
+}

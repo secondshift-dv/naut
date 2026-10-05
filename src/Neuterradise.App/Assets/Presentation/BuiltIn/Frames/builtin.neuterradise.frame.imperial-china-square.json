@@ -1,0 +1,11 @@
+{
+  "id": "builtin.neuterradise.frame.imperial-china-square",
+  "kind": "cover-frame",
+  "name": "Imperial China \u00b7 Square",
+  "description": "Jade, gold, cloud scrolls and restrained crimson accents.",
+  "spec": {
+    "frameId": "imperial-china-square",
+    "overlayAsset": "frame-imperial-china-square",
+    "coverInset": 0
+  }
+}

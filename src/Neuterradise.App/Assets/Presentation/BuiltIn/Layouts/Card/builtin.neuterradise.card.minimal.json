@@ -1,0 +1,50 @@
+{
+  "id": "builtin.neuterradise.card.minimal",
+  "kind": "profile-card",
+  "name": "Minimal",
+  "description": "Rounded art and a name. Nothing else.",
+  "spec": {
+    "legacyVariant": "minimal",
+    "aspect": 0.86,
+    "art": "cover",
+    "density": "minimal",
+    "hover": "lift",
+    "frame": "none",
+    "composition": {
+      "type": "overlay",
+      "children": [
+        {
+          "type": "image",
+          "slot": "profile.identity.cover",
+          "stretch": "uniform-to-fill"
+        },
+        {
+          "type": "scrim",
+          "direction": "to-top",
+          "from": "token:heroScrimStrong",
+          "to": "#00000000",
+          "vAlign": "bottom",
+          "height": 72
+        },
+        {
+          "type": "text",
+          "slot": "profile.identity.name",
+          "role": "card-title",
+          "color": "token:onMediaPrimary",
+          "maxLines": 1,
+          "vAlign": "bottom",
+          "margin": 10
+        },
+        {
+          "type": "badge",
+          "slot": "profile.identity.favorite",
+          "style": "glass",
+          "visibleWhen": "profile.identity.favorite",
+          "hAlign": "right",
+          "vAlign": "top",
+          "margin": 8
+        }
+      ]
+    }
+  }
+}

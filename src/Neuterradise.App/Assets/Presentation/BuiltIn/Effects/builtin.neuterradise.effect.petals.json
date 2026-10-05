@@ -1,0 +1,41 @@
+{
+  "id": "builtin.neuterradise.effect.petals",
+  "kind": "effect",
+  "name": "Petals",
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  },
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "particles",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "particles",
+            "direction": "down",
+            "particleShape": "petal",
+            "count": 18,
+            "opacity": 0.25,
+            "speed": 0.3,
+            "sizeMin": 3,
+            "sizeMax": 6,
+            "color": "token:accentSecondary"
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  }
+}

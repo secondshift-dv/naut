@@ -1,0 +1,56 @@
+{
+  "id": "builtin.neuterradise.effect.halo",
+  "kind": "effect",
+  "name": "Halo",
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "lighting",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "radial-glow",
+            "opacity": 0.12,
+            "color": "token:accent",
+            "radius": 0.55,
+            "amplitude": 0.06,
+            "speed": 0.25
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "radial-glow",
+            "opacity": 0.12,
+            "color": "token:accent",
+            "radius": 0.55,
+            "amplitude": 0,
+            "speed": 0.25
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "radial-glow",
+            "opacity": 0.12,
+            "color": "token:accent",
+            "radius": 0.55,
+            "amplitude": 0,
+            "speed": 0.25
+          }
+        ]
+      }
+    }
+  },
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  }
+}

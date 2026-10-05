@@ -1,0 +1,26 @@
+{
+  "id": "builtin.neuterradise.backdrop.banner",
+  "kind": "backdrop",
+  "name": "Use Banner",
+  "description": "Reuse this Profile's prepared Banner.",
+  "tags": ["profile-only"],
+  "spec": {
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "video",
+            "source": "media-banner",
+            "opacity": 0.4
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  }
+}

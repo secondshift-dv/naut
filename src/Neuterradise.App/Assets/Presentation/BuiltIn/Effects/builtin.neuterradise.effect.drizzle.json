@@ -1,0 +1,41 @@
+{
+  "id": "builtin.neuterradise.effect.drizzle",
+  "kind": "effect",
+  "name": "Drizzle",
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  },
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "particles",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "particles",
+            "direction": "down",
+            "particleShape": "line",
+            "count": 30,
+            "opacity": 0.14,
+            "speed": 1.2,
+            "sizeMin": 0.4,
+            "sizeMax": 1,
+            "color": "token:accentSecondary"
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  }
+}

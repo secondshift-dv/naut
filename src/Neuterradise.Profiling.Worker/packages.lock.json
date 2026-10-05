@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0-windows7.0": {
+      "OpenCvSharp5": {
+        "type": "Direct",
+        "requested": "[5.0.0.20260905, )",
+        "resolved": "5.0.0.20260905",
+        "contentHash": "if53wZChxF0xrqtjQzGgCkrmhXeXI2ZWVEguE8DOcZmbdfOE+AB3lPOixW/bNZQZmiSCrP+5DWz9q0mWyOo19g=="
+      },
+      "OpenCvSharp5.runtime.win": {
+        "type": "Direct",
+        "requested": "[5.0.0.20260905, )",
+        "resolved": "5.0.0.20260905",
+        "contentHash": "y68UwU660NTG7muim1swkHafwpv4dkLVOBR6yfM05/Lj/H9vDbp+rmFADQVSwhGzDruQ0c4kjN+kNcgYSZnDIQ=="
+      },
+      "neuterradise.profiling.protocol": {
+        "type": "Project"
+      },
+      "neuterradise.release.contracts": {
+        "type": "Project"
+      }
+    },
+    "net10.0-windows7.0/win-x64": {
+      "OpenCvSharp5.runtime.win": {
+        "type": "Direct",
+        "requested": "[5.0.0.20260905, )",
+        "resolved": "5.0.0.20260905",
+        "contentHash": "y68UwU660NTG7muim1swkHafwpv4dkLVOBR6yfM05/Lj/H9vDbp+rmFADQVSwhGzDruQ0c4kjN+kNcgYSZnDIQ=="
+      }
+    }
+  }
+}

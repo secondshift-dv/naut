@@ -1,0 +1,66 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Neuterradise.Profiling.Protocol", "src\Neuterradise.Profiling.Protocol\Neuterradise.Profiling.Protocol.csproj", "{ACF3773C-3A24-4E89-AEA1-31C381CD0AA1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Neuterradise.Profiling.Worker", "src\Neuterradise.Profiling.Worker\Neuterradise.Profiling.Worker.csproj", "{53C4B11B-5D6F-42E0-97F2-91E86ED16820}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Neuterradise.App", "src\Neuterradise.App\Neuterradise.App.csproj", "{22CD7F52-B803-4DBF-B307-34FD555FF192}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Neuterradise.Launcher", "src\Neuterradise.Launcher\Neuterradise.Launcher.csproj", "{2D3D6044-4492-4A77-8FBA-46D725F6D08D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Neuterradise.Updater", "src\Neuterradise.Updater\Neuterradise.Updater.csproj", "{96D46923-D4FE-451A-AE71-8420C64B1396}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Neuterradise.Release.Contracts", "src\Neuterradise.Release.Contracts\Neuterradise.Release.Contracts.csproj", "{A83C21E7-9D5D-4D71-A0A8-4FB45E7904D2}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Neuterradise.Runtime", "src\Neuterradise.Runtime\Neuterradise.Runtime.csproj", "{0C9C87B4-0880-4096-B95C-421E24144C0C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{ACF3773C-3A24-4E89-AEA1-31C381CD0AA1}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{ACF3773C-3A24-4E89-AEA1-31C381CD0AA1}.Debug|x64.Build.0 = Debug|Any CPU
+		{ACF3773C-3A24-4E89-AEA1-31C381CD0AA1}.Release|x64.ActiveCfg = Release|Any CPU
+		{ACF3773C-3A24-4E89-AEA1-31C381CD0AA1}.Release|x64.Build.0 = Release|Any CPU
+		{53C4B11B-5D6F-42E0-97F2-91E86ED16820}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{53C4B11B-5D6F-42E0-97F2-91E86ED16820}.Debug|x64.Build.0 = Debug|Any CPU
+		{53C4B11B-5D6F-42E0-97F2-91E86ED16820}.Release|x64.ActiveCfg = Release|Any CPU
+		{53C4B11B-5D6F-42E0-97F2-91E86ED16820}.Release|x64.Build.0 = Release|Any CPU
+		{22CD7F52-B803-4DBF-B307-34FD555FF192}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{22CD7F52-B803-4DBF-B307-34FD555FF192}.Debug|x64.Build.0 = Debug|Any CPU
+		{22CD7F52-B803-4DBF-B307-34FD555FF192}.Release|x64.ActiveCfg = Release|Any CPU
+		{22CD7F52-B803-4DBF-B307-34FD555FF192}.Release|x64.Build.0 = Release|Any CPU
+		{2D3D6044-4492-4A77-8FBA-46D725F6D08D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{2D3D6044-4492-4A77-8FBA-46D725F6D08D}.Debug|x64.Build.0 = Debug|Any CPU
+		{2D3D6044-4492-4A77-8FBA-46D725F6D08D}.Release|x64.ActiveCfg = Release|Any CPU
+		{2D3D6044-4492-4A77-8FBA-46D725F6D08D}.Release|x64.Build.0 = Release|Any CPU
+		{96D46923-D4FE-451A-AE71-8420C64B1396}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{96D46923-D4FE-451A-AE71-8420C64B1396}.Debug|x64.Build.0 = Debug|Any CPU
+		{96D46923-D4FE-451A-AE71-8420C64B1396}.Release|x64.ActiveCfg = Release|Any CPU
+		{96D46923-D4FE-451A-AE71-8420C64B1396}.Release|x64.Build.0 = Release|Any CPU
+		{A83C21E7-9D5D-4D71-A0A8-4FB45E7904D2}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A83C21E7-9D5D-4D71-A0A8-4FB45E7904D2}.Debug|x64.Build.0 = Debug|Any CPU
+		{A83C21E7-9D5D-4D71-A0A8-4FB45E7904D2}.Release|x64.ActiveCfg = Release|Any CPU
+		{A83C21E7-9D5D-4D71-A0A8-4FB45E7904D2}.Release|x64.Build.0 = Release|Any CPU
+		{0C9C87B4-0880-4096-B95C-421E24144C0C}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{0C9C87B4-0880-4096-B95C-421E24144C0C}.Debug|x64.Build.0 = Debug|Any CPU
+		{0C9C87B4-0880-4096-B95C-421E24144C0C}.Release|x64.ActiveCfg = Release|Any CPU
+		{0C9C87B4-0880-4096-B95C-421E24144C0C}.Release|x64.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{2D3D6044-4492-4A77-8FBA-46D725F6D08D} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{A83C21E7-9D5D-4D71-A0A8-4FB45E7904D2} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{0C9C87B4-0880-4096-B95C-421E24144C0C} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+	EndGlobalSection
+EndGlobal
+

@@ -1,0 +1,11 @@
+{
+  "id": "builtin.neuterradise.frame.sakura-square",
+  "kind": "cover-frame",
+  "name": "Sakura \u00b7 Square",
+  "description": "Soft sakura branches, pearls and champagne-gold accents.",
+  "spec": {
+    "frameId": "sakura-square",
+    "overlayAsset": "frame-sakura-square",
+    "coverInset": 0
+  }
+}

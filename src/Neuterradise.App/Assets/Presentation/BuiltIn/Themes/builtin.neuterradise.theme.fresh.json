@@ -1,0 +1,25 @@
+{
+  "id": "builtin.neuterradise.theme.fresh",
+  "kind": "theme",
+  "name": "Fresh",
+  "description": "Airy white frost with diffuse mint daylight.",
+  "previewAccent": "#FF24704D",
+  "spec": {
+    "themeId": "fresh",
+    "material": {
+      "personality": "white-frost",
+      "atmosphere": "daylight",
+      "grain": 0.008,
+      "glassOpacity": 0.98,
+      "glassBlur": 12,
+      "specular": 0.2,
+      "rimLight": 0.22,
+      "ambientPrimary": "token:accent",
+      "ambientSecondary": "token:accentSecondary",
+      "frameAffinity": [
+        "minimal",
+        "soft-ring"
+      ]
+    }
+  }
+}

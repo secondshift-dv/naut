@@ -1,0 +1,9 @@
+{
+  "id": "builtin.neuterradise.profile.minimal",
+  "kind": "profile-layout",
+  "name": "Minimal",
+  "description": "Quiet Profile view with only identity, Overview and the media Vault.",
+  "spec": {
+    "preset": "minimal"
+  }
+}

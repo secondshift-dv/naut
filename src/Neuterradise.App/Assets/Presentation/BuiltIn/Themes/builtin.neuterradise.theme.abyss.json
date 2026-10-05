@@ -1,0 +1,26 @@
+{
+  "id": "builtin.neuterradise.theme.abyss",
+  "kind": "theme",
+  "name": "Abyss",
+  "description": "Deep cinematic violet. Smoked glass, fog and a cold blue-violet halo.",
+  "previewAccent": "#FFA8A0F4",
+  "spec": {
+    "themeId": "abyss",
+    "material": {
+      "personality": "smoked-glass",
+      "atmosphere": "fog",
+      "grain": 0.008,
+      "glassOpacity": 0.98,
+      "glassBlur": 12,
+      "specular": 0.2,
+      "rimLight": 0.22,
+      "ambientPrimary": "token:accent",
+      "ambientSecondary": "token:accentSecondary",
+      "frameAffinity": [
+        "obsidian",
+        "double-ring",
+        "celestial"
+      ]
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "id": "builtin.neuterradise.home.editorial",
+  "kind": "home-layout",
+  "name": "Editorial",
+  "description": "A restrained editorial hero followed by a poster-like monthly journal and compact Vault pulse.",
+  "spec": {
+    "hero": {
+      "placement": "inset",
+      "heightFraction": 0.34,
+      "minHeight": 220,
+      "maxHeight": 400
+    },
+    "rails": [
+      {
+        "id": "activity",
+        "style": "poster",
+        "maxItems": 6
+      },
+      {
+        "id": "statistics",
+        "style": "compact",
+        "maxItems": 4
+      },
+      {
+        "id": "recent",
+        "style": "strip"
+      },
+      {
+        "id": "discovery",
+        "style": "compact",
+        "maxItems": 4
+      },
+      {
+        "id": "profiles",
+        "style": "tile"
+      }
+    ]
+  }
+}

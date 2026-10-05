@@ -1,0 +1,18 @@
+{
+  "id": "builtin.neuterradise.control-skin.ink",
+  "kind": "control-skin",
+  "name": "Ink",
+  "spec": {
+    "radius": 2,
+    "borderWidth": 1,
+    "height": 30,
+    "horizontalPadding": 10,
+    "verticalPadding": 5,
+    "scrollbarWidth": 8,
+    "fill": "token:surface2",
+    "hoverFill": "token:surfaceHover",
+    "pressedFill": "token:surfacePressed",
+    "border": "token:borderDefault",
+    "focus": "token:focus"
+  }
+}

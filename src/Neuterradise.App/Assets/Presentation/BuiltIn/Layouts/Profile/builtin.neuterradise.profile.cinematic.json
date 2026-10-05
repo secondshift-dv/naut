@@ -1,0 +1,9 @@
+{
+  "id": "builtin.neuterradise.profile.cinematic",
+  "kind": "profile-layout",
+  "name": "Cinematic",
+  "description": "Classic full-bleed hero with Cover overlap, Overview first and the media Vault as the main body.",
+  "spec": {
+    "preset": "cinematic"
+  }
+}

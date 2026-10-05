@@ -1,0 +1,118 @@
+name: Release (Manual)
+
+# Deliberately manual. Release verifies, builds, signs, and then drafts or publishes.
+on:
+  workflow_dispatch:
+    inputs:
+      release_mode:
+        description: Release visibility
+        required: true
+        default: draft
+        type: choice
+        options:
+          - draft
+          - publish
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 100
+    permissions:
+      contents: read
+    env:
+      NUGET_PACKAGES: ${{ github.workspace }}\.cache\nuget
+      NEUTERRADISE_BUILD_CACHE: ${{ github.workspace }}\.cache\neuterradise-downloads
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+      DOTNET_NOLOGO: '1'
+
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install .NET 10 SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.401
+
+      - name: Restore product NuGet cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: neuterradise-nuget-windows-${{ hashFiles('global.json', 'Directory.Build.props', 'src/**/*.csproj', 'src/**/packages.lock.json') }}
+          restore-keys: |
+            neuterradise-nuget-windows-
+
+      - name: Restore pinned runtime download cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ env.NEUTERRADISE_BUILD_CACHE }}
+          key: neuterradise-runtime-downloads-windows-${{ hashFiles('release-contract.json', 'scripts/packaging/package-win-x64.ps1') }}
+          restore-keys: |
+            neuterradise-runtime-downloads-windows-
+
+      - name: Enforce workflow trust policy
+        shell: pwsh
+        run: ./scripts/verify.ps1 -Scope WorkflowPolicy
+
+      - name: Build canonical product
+        shell: pwsh
+        run: ./scripts/build.ps1
+
+      - name: Upload publication payload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: NeuTerradise-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Checkout exact publication authority
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/release.ps1
+            Directory.Build.props
+            release-contract.json
+          sparse-checkout-cone-mode: false
+
+      - name: Download verified publication payload
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: NeuTerradise-${{ github.sha }}
+          path: dist
+
+      - name: Create signed Draft Release
+        if: ${{ inputs.release_mode == 'draft' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEUTERRADISE_UPDATE_SIGNING_KEY_PEM: ${{ secrets.NEUTERRADISE_UPDATE_SIGNING_KEY_PEM }}
+        run: ./scripts/release.ps1 -NoBuild -ArtifactMode -SourceHead "${{ github.sha }}"
+
+      - name: Publish signed GitHub Release
+        if: ${{ inputs.release_mode == 'publish' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEUTERRADISE_UPDATE_SIGNING_KEY_PEM: ${{ secrets.NEUTERRADISE_UPDATE_SIGNING_KEY_PEM }}
+        run: ./scripts/release.ps1 -NoBuild -ArtifactMode -SourceHead "${{ github.sha }}" -Publish

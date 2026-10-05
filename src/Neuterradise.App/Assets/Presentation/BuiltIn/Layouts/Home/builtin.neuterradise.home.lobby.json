@@ -1,0 +1,48 @@
+{
+  "id": "builtin.neuterradise.home.lobby",
+  "kind": "home-layout",
+  "name": "Cinematic Lobby",
+  "description": "A tall cinematic Spotlight with compact Vault health, Continue and a flowing monthly strip.",
+  "spec": {
+    "hero": {
+      "placement": "full-bleed",
+      "heightFraction": 0.36,
+      "minHeight": 240,
+      "maxHeight": 440
+    },
+    "rails": [
+      {
+        "id": "attention",
+        "style": "compact",
+        "maxItems": 3
+      },
+      {
+        "id": "statistics",
+        "style": "compact",
+        "maxItems": 4
+      },
+      {
+        "id": "activity",
+        "style": "strip",
+        "maxItems": 8
+      },
+      {
+        "id": "recent",
+        "style": "tile"
+      },
+      {
+        "id": "favorites",
+        "style": "poster"
+      },
+      {
+        "id": "profiles",
+        "style": "tile"
+      },
+      {
+        "id": "discovery",
+        "style": "strip",
+        "maxItems": 6
+      }
+    ]
+  }
+}

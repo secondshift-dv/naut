@@ -1,0 +1,14 @@
+{
+  "id": "builtin.neuterradise.gallery.bazaar",
+  "kind": "gallery-layout",
+  "name": "Bazaar",
+  "spec": {
+    "primitive": "VirtualizedAdaptiveWall",
+    "toolbar": "catalog",
+    "itemMinWidth": 240,
+    "itemMaxWidth": 360,
+    "rowHeight": 220,
+    "spacing": 14,
+    "maxColumns": 8
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "id": "builtin.neuterradise.spotlight.editorial",
+  "kind": "spotlight-style",
+  "name": "Editorial",
+  "description": "Large display typography over still artwork with a soft fade.",
+  "spec": {
+    "composition": "editorial",
+    "motion": "still",
+    "transition": "fade",
+    "rotationSeconds": 16,
+    "showCover": false,
+    "showOverview": true,
+    "pagination": "counter-rail",
+    "scrimStrength": 0.75
+  }
+}

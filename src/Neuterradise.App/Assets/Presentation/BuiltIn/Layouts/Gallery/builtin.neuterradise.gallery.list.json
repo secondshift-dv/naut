@@ -1,0 +1,14 @@
+{
+  "id": "builtin.neuterradise.gallery.list",
+  "kind": "gallery-layout",
+  "name": "List",
+  "description": "One Profile card envelope per row for deliberate vertical scanning.",
+  "spec": {
+    "primitive": "VirtualizedList",
+    "itemMinWidth": 320,
+    "itemMaxWidth": 960,
+    "rowHeight": 96,
+    "spacing": 8,
+    "maxColumns": 1
+  }
+}

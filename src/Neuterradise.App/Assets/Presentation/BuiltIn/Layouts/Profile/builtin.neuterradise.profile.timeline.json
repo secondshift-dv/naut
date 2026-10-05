@@ -1,0 +1,119 @@
+{
+  "id": "builtin.neuterradise.profile.timeline",
+  "kind": "profile-layout",
+  "name": "Timeline",
+  "spec": {
+    "layout": {
+      "schemaVersion": 1,
+      "id": "timeline",
+      "name": "Timeline",
+      "bannerMode": "FullBleed",
+      "height": "Tall",
+      "coverPlacement": "BottomLeftOverlap",
+      "coverSize": "Medium",
+      "coverDetailLevel": "Full",
+      "identityAlignment": "Left",
+      "contentWidth": "Wide",
+      "overlay": "Medium",
+      "blur": "Off",
+      "fade": "Bottom",
+      "sectionDensity": "Comfortable",
+      "modules": [
+        {
+          "id": "overview",
+          "order": 0,
+          "visible": true,
+          "width": "Full"
+        },
+        {
+          "id": "related",
+          "order": 1,
+          "visible": true,
+          "width": "Full"
+        },
+        {
+          "id": "faces",
+          "order": 2,
+          "visible": true,
+          "width": "Full"
+        },
+        {
+          "id": "recentMedia",
+          "order": 3,
+          "visible": true,
+          "width": "Full"
+        },
+        {
+          "id": "media",
+          "order": 4,
+          "visible": true,
+          "width": "Full"
+        }
+      ]
+    },
+    "surface": {
+      "type": "stack",
+      "spacing": 12,
+      "children": [
+        {
+          "type": "semantic",
+          "id": "identity"
+        },
+        {
+          "type": "semantic",
+          "id": "actions"
+        },
+        {
+          "type": "columns",
+          "columns": [
+            "*",
+            "2*"
+          ],
+          "spacing": 18,
+          "children": [
+            {
+              "type": "stack",
+              "spacing": 12,
+              "children": [
+                {
+                  "type": "semantic",
+                  "id": "overview"
+                },
+                {
+                  "type": "semantic",
+                  "id": "related"
+                },
+                {
+                  "type": "semantic",
+                  "id": "faces"
+                },
+                {
+                  "type": "semantic",
+                  "id": "statistics"
+                }
+              ]
+            },
+            {
+              "type": "stack",
+              "spacing": 12,
+              "children": [
+                {
+                  "type": "semantic",
+                  "id": "recent-media"
+                },
+                {
+                  "type": "semantic",
+                  "id": "review"
+                },
+                {
+                  "type": "semantic",
+                  "id": "media"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

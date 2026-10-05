@@ -1,0 +1,49 @@
+{
+  "id": "builtin.neuterradise.effect.wave",
+  "kind": "effect",
+  "name": "Wave",
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "surface",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "wave-field",
+            "opacity": 0.1,
+            "color": "token:accentSecondary"
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "wave-field",
+            "opacity": 0.1,
+            "color": "token:accentSecondary",
+            "amplitude": 0
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "wave-field",
+            "opacity": 0.1,
+            "color": "token:accentSecondary",
+            "amplitude": 0
+          }
+        ]
+      }
+    }
+  },
+  "performance": {
+    "tier": "static",
+    "continuousAnimation": false,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 0
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "id": "builtin.neuterradise.backdrop.gridwork",
+  "kind": "backdrop",
+  "name": "Gridwork",
+  "description": "Theme-readable environmental field.",
+  "spec": {
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:surface1",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "grid-field",
+            "color": "token:accentSecondary",
+            "opacity": 0.08
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:surface1",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "grid-field",
+            "color": "token:accentSecondary",
+            "opacity": 0.08
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:surface1",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "grid-field",
+            "color": "token:accentSecondary",
+            "opacity": 0.08
+          }
+        ]
+      }
+    }
+  }
+}

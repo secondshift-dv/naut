@@ -1,0 +1,29 @@
+{
+  "id": "builtin.neuterradise.media-layout.reel",
+  "kind": "profile-media-layout",
+  "name": "Reel",
+  "spec": {
+    "layoutId": "editorial",
+    "cardWidth": 480,
+    "aspect": 1.78,
+    "mediaWidthFraction": 1,
+    "fit": "fill",
+    "metadataPlacement": "below",
+    "metadataFields": [
+      "name",
+      "dimensions",
+      "duration",
+      "favorite"
+    ],
+    "metadataLines": 2,
+    "frameStyle": "gallery",
+    "frameRadius": 10,
+    "frameThickness": 2,
+    "frameColor": "token:borderDefault",
+    "selectedFrameColor": "token:accent",
+    "frameGlow": 0,
+    "hoverStyle": "spotlight",
+    "showTypeBadge": false,
+    "browse": "reel"
+  }
+}

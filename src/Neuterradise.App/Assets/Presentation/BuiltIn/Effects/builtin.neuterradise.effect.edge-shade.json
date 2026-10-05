@@ -1,0 +1,46 @@
+{
+  "id": "builtin.neuterradise.effect.edge-shade",
+  "kind": "effect",
+  "name": "Edge Shade",
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "surface",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "vignette",
+            "opacity": 0.25
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "vignette",
+            "opacity": 0.25,
+            "amplitude": 0
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "vignette",
+            "opacity": 0.25,
+            "amplitude": 0
+          }
+        ]
+      }
+    }
+  },
+  "performance": {
+    "tier": "static",
+    "continuousAnimation": false,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 0
+  }
+}

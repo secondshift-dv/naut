@@ -1,0 +1,111 @@
+{
+  "id": "builtin.neuterradise.backdrop.precision",
+  "kind": "backdrop",
+  "name": "Precision",
+  "description": "Near-static steel light with a thin tactical scan.",
+  "previewAccent": "#FF3B82F6",
+  "performance": {
+    "tier": "cinematic",
+    "continuousAnimation": true,
+    "offscreenPolicy": "suspend",
+    "maxAnimatedLayers": 2
+  },
+  "spec": {
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "angle": 180,
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:backgroundCinematic",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "radial-glow",
+            "color": "token:ambientPrimary",
+            "opacity": 0.18,
+            "centerX": 0.5,
+            "centerY": -0.1,
+            "radius": 1
+          },
+          {
+            "kind": "light-sweep",
+            "color": "token:ambientPrimary",
+            "opacity": 0.06,
+            "period": 16,
+            "width": 0.04,
+            "angle": 90
+          },
+          {
+            "kind": "noise",
+            "opacity": 0.01
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.24
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "angle": 180,
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:backgroundCinematic",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "radial-glow",
+            "color": "token:ambientPrimary",
+            "opacity": 0.18,
+            "centerX": 0.5,
+            "centerY": -0.1,
+            "radius": 1
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.24
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "angle": 180,
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:backgroundCinematic",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.24
+          }
+        ]
+      }
+    }
+  }
+}

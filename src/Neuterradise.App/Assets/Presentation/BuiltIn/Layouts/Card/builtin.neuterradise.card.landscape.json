@@ -1,0 +1,98 @@
+{
+  "id": "builtin.neuterradise.card.landscape",
+  "kind": "profile-card",
+  "name": "Landscape",
+  "description": "Wide Banner with a grounded information strip.",
+  "spec": {
+    "legacyVariant": "landscape",
+    "aspect": 1.5,
+    "art": "banner",
+    "density": "standard",
+    "hover": "lift",
+    "frame": "lite",
+    "composition": {
+      "type": "grid",
+      "children": [
+        {
+          "type": "overlay",
+          "children": [
+            {
+              "type": "image",
+              "slot": "profile.identity.banner",
+              "stretch": "uniform-to-fill"
+            },
+            {
+              "type": "badge",
+              "slot": "profile.identity.favorite",
+              "style": "glass",
+              "visibleWhen": "profile.identity.favorite",
+              "hAlign": "right",
+              "vAlign": "top",
+              "margin": 8
+            }
+          ]
+        },
+        {
+          "type": "stack",
+          "spacing": 3,
+          "children": [
+            {
+              "type": "grid",
+              "children": [
+                {
+                  "type": "frame",
+                  "size": 32,
+                  "column": 0,
+                  "vAlign": "center"
+                },
+                {
+                  "type": "stack",
+                  "spacing": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "slot": "profile.identity.name",
+                      "role": "card-title",
+                      "color": "token:textPrimary",
+                      "maxLines": 1
+                    },
+                    {
+                      "type": "text",
+                      "slot": "profile.identity.category",
+                      "role": "micro",
+                      "color": "token:textSecondary",
+                      "maxLines": 1,
+                      "visibleWhen": "profile.identity.category"
+                    }
+                  ],
+                  "column": 1
+                },
+                {
+                  "type": "badge",
+                  "slot": "profile.identity.rating",
+                  "style": "text",
+                  "visibleWhen": "profile.identity.rating",
+                  "column": 2,
+                  "vAlign": "center"
+                }
+              ],
+              "columns": [
+                "32",
+                "*",
+                "auto"
+              ],
+              "spacing": 8
+            }
+          ],
+          "background": "token:surface1",
+          "padding": 8,
+          "row": 1
+        }
+      ],
+      "rows": [
+        "*",
+        "auto"
+      ]
+    }
+  }
+}

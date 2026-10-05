@@ -1,0 +1,156 @@
+{
+  "id": "builtin.neuterradise.backdrop.neon",
+  "kind": "backdrop",
+  "name": "Neon Pulse",
+  "description": "Cyan and magenta energy that breathes behind dark glass.",
+  "previewAccent": "#FF22D3EE",
+  "performance": {
+    "tier": "cinematic",
+    "continuousAnimation": true,
+    "offscreenPolicy": "suspend",
+    "maxAnimatedLayers": 5
+  },
+  "spec": {
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "angle": 150,
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:backgroundCinematic",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "radial-glow",
+            "color": "token:ambientPrimary",
+            "opacity": 0.18,
+            "centerX": 0.15,
+            "centerY": 0.15,
+            "radius": 0.55,
+            "amplitude": 0.05,
+            "period": 8,
+            "blend": "screen"
+          },
+          {
+            "kind": "radial-glow",
+            "color": "token:ambientSecondary",
+            "opacity": 0.18,
+            "centerX": 0.88,
+            "centerY": 0.4,
+            "radius": 0.55,
+            "amplitude": 0.05,
+            "period": 10,
+            "blend": "screen"
+          },
+          {
+            "kind": "particles",
+            "count": 30,
+            "color": "token:ambientPrimary",
+            "sizeMin": 0.8,
+            "sizeMax": 2,
+            "speed": 0.5,
+            "opacity": 0.2
+          },
+          {
+            "kind": "light-sweep",
+            "color": "token:ambientPrimary",
+            "opacity": 0.06,
+            "period": 9,
+            "width": 0.08,
+            "angle": 105
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.24
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "angle": 150,
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:backgroundCinematic",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "radial-glow",
+            "color": "token:ambientPrimary",
+            "opacity": 0.18,
+            "centerX": 0.15,
+            "centerY": 0.15,
+            "radius": 0.55,
+            "amplitude": 0.05,
+            "period": 30
+          },
+          {
+            "kind": "radial-glow",
+            "color": "token:ambientSecondary",
+            "opacity": 0.18,
+            "centerX": 0.88,
+            "centerY": 0.4,
+            "radius": 0.55
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.24
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "angle": 150,
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:backgroundCinematic",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "radial-glow",
+            "color": "token:ambientPrimary",
+            "opacity": 0.18,
+            "centerX": 0.15,
+            "centerY": 0.15,
+            "radius": 0.55
+          },
+          {
+            "kind": "radial-glow",
+            "color": "token:ambientSecondary",
+            "opacity": 0.18,
+            "centerX": 0.88,
+            "centerY": 0.4,
+            "radius": 0.55
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.24
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "id": "builtin.neuterradise.home.archive",
+  "kind": "home-layout",
+  "name": "Quiet Archive",
+  "description": "A calm archive view with compact Vault state, Profile posters and a subdued monthly record.",
+  "spec": {
+    "hero": {
+      "placement": "inset",
+      "heightFraction": 0.28,
+      "minHeight": 200,
+      "maxHeight": 320
+    },
+    "rails": [
+      {
+        "id": "statistics",
+        "style": "compact",
+        "maxItems": 4
+      },
+      {
+        "id": "profiles",
+        "style": "poster"
+      },
+      {
+        "id": "activity",
+        "style": "compact",
+        "maxItems": 8
+      },
+      {
+        "id": "recent",
+        "style": "tile"
+      },
+      {
+        "id": "favorites",
+        "style": "poster"
+      }
+    ]
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "id": "builtin.neuterradise.effect.focus-pulse",
+  "kind": "effect",
+  "name": "Focus Pulse",
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  },
+  "spec": {
+    "targets": [
+      "effect.controls",
+      "effect.card",
+      "effect.media",
+      "effect.profile.cover",
+      "effect.profile.frame",
+      "effect.profile.banner"
+    ],
+    "channel": "interaction",
+    "interactionOnly": true,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "radial-glow",
+            "opacity": 0.2,
+            "color": "token:focus",
+            "amplitude": 0.08,
+            "period": 3
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "radial-glow",
+            "opacity": 0.2,
+            "color": "token:focus",
+            "amplitude": 0,
+            "period": 3
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "radial-glow",
+            "opacity": 0.2,
+            "color": "token:focus",
+            "amplitude": 0,
+            "period": 3
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>Neuterradise.Release.Contracts</AssemblyName>
+    <RootNamespace>Neuterradise.Release.Contracts</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\release-contract.json"
+                      Link="release-contract.json"
+                      LogicalName="Neuterradise.Release.Contracts.release-contract.json" />
+  </ItemGroup>
+</Project>

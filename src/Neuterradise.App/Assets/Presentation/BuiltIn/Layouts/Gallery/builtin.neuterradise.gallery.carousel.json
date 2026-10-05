@@ -1,0 +1,14 @@
+{
+  "id": "builtin.neuterradise.gallery.carousel",
+  "kind": "gallery-layout",
+  "name": "Carousel",
+  "description": "A horizontal shell that preserves each Profile card's own composition.",
+  "spec": {
+    "primitive": "VirtualizedCarousel",
+    "itemMinWidth": 240,
+    "itemMaxWidth": 340,
+    "spacing": 12,
+    "maxColumns": 1,
+    "rowHeight": 240
+  }
+}

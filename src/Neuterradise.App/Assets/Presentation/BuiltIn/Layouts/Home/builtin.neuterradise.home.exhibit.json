@@ -1,0 +1,87 @@
+{
+  "id": "builtin.neuterradise.home.exhibit",
+  "kind": "home-layout",
+  "name": "Exhibit",
+  "spec": {
+    "hero": {
+      "placement": "inset",
+      "heightFraction": 0.5,
+      "minHeight": 240,
+      "maxHeight": 620
+    },
+    "rails": [
+      {
+        "id": "statistics",
+        "style": "strip",
+        "maxItems": 4
+      },
+      {
+        "id": "recent",
+        "style": "tile"
+      },
+      {
+        "id": "activity",
+        "style": "compact",
+        "maxItems": 6
+      },
+      {
+        "id": "favorites",
+        "style": "poster"
+      },
+      {
+        "id": "attention",
+        "style": "compact",
+        "maxItems": 3
+      }
+    ],
+    "surface": {
+      "type": "stack",
+      "spacing": 28,
+      "children": [
+        {
+          "type": "spacer",
+          "padding": 24
+        },
+        {
+          "type": "columns",
+          "columns": [
+            "3*",
+            "*"
+          ],
+          "spacing": 18,
+          "children": [
+            {
+              "type": "semantic",
+              "id": "featured"
+            },
+            {
+              "type": "stack",
+              "spacing": 28,
+              "children": [
+                {
+                  "type": "semantic",
+                  "id": "statistics"
+                },
+                {
+                  "type": "semantic",
+                  "id": "activity"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "divider"
+        },
+        {
+          "type": "semantic",
+          "id": "favorites"
+        },
+        {
+          "type": "semantic",
+          "id": "recent"
+        }
+      ]
+    }
+  }
+}

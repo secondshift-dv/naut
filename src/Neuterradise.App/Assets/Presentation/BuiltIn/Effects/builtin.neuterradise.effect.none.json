@@ -1,0 +1,28 @@
+{
+  "id": "builtin.neuterradise.effect.none",
+  "kind": "effect",
+  "name": "None",
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "environment",
+    "variants": {
+      "full": {
+        "layers": []
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  },
+  "performance": {
+    "tier": "static",
+    "continuousAnimation": false,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 0
+  }
+}

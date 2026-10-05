@@ -1,0 +1,9 @@
+{
+  "id": "builtin.neuterradise.profile.cinematic-wide",
+  "kind": "profile-layout",
+  "name": "Center Stage",
+  "description": "Centered hero composition that gives recent media a prominent early section before the full Vault.",
+  "spec": {
+    "preset": "cinematic-wide"
+  }
+}

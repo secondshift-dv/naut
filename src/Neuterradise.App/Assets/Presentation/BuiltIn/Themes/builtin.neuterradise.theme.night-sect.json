@@ -1,0 +1,91 @@
+{
+  "id": "builtin.neuterradise.theme.night-sect",
+  "kind": "theme",
+  "name": "Night Sect",
+  "description": "Ink, jade and moon silver.",
+  "spec": {
+    "theme": {
+      "schemaVersion": 1,
+      "id": "night-sect",
+      "name": "Night Sect",
+      "isDark": true,
+      "colors": {
+        "canvas": "#FF10171E",
+        "surface1": "#FF17222B",
+        "surface2": "#FF1E2D37",
+        "surface3": "#FF263A43",
+        "surfaceElevated": "#FF2C4149",
+        "surfaceOverlay": "#F222202C",
+        "surfaceHover": "#FF304851",
+        "surfacePressed": "#FF37505A",
+        "surfaceSelected": "#FF2B4E4C",
+        "textPrimary": "#FFE5EDE8",
+        "textSecondary": "#FFB4C6C2",
+        "textMuted": "#FF8DA4A3",
+        "textDisabled": "#FF6F717D",
+        "textInverse": "#FF172026",
+        "textOnAccent": "#FF172026",
+        "textLink": "#FF86CDB5",
+        "borderSubtle": "#18FFFFFF",
+        "borderDefault": "#28FFFFFF",
+        "borderStrong": "#44FFFFFF",
+        "borderInteractive": "#FF86CDB5",
+        "borderSelected": "#FF86CDB5",
+        "focus": "#FF86CDB5",
+        "accent": "#FF86CDB5",
+        "accentHover": "#FFA3E2CF",
+        "accentPressed": "#FF65AF98",
+        "accentSecondary": "#FFBBCBDD",
+        "selection": "#3386CDB5",
+        "selectionHover": "#4D86CDB5",
+        "info": "#FF8AB9E5",
+        "success": "#FF8DC5A3",
+        "warning": "#FFE1BD7A",
+        "danger": "#FFE89B9D",
+        "dangerHover": "#FFF0B2B3"
+      },
+      "typography": {
+        "displayFamily": "Segoe UI Variable Display",
+        "headingFamily": "Segoe UI Variable Display",
+        "bodyFamily": "Segoe UI Variable Text",
+        "monoFamily": "Cascadia Mono"
+      },
+      "shape": {
+        "xs": 3,
+        "sm": 5,
+        "md": 8,
+        "lg": 12,
+        "xl": 16
+      },
+      "motion": {
+        "fastMs": 120,
+        "normalMs": 180,
+        "slowMs": 280,
+        "cinematicMs": 500
+      },
+      "background": {
+        "kind": "RadialGlow"
+      },
+      "morphology": {
+        "navigationTreatment": "Underline",
+        "cardPersonality": "Glass",
+        "chromeTreatment": "Elevated",
+        "focusTreatment": "Ring",
+        "borderWeight": 1,
+        "elevationStrength": 0.6,
+        "glowStrength": 0.25,
+        "panelOpacity": 1,
+        "motionIntensity": 0.75,
+        "navigationRadiusScale": 0.65
+      }
+    },
+    "material": {
+      "personality": "ink-glass",
+      "atmosphere": "ink",
+      "grain": 0.025,
+      "glassOpacity": 0.97,
+      "specular": 0.45,
+      "rimLight": 0.18
+    }
+  }
+}

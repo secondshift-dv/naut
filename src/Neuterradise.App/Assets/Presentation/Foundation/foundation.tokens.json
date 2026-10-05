@@ -1,0 +1,83 @@
+{
+  "$comment": "Canonical naut foundation tokens. TokenAuthority (C#) owns every derivation; the Uno resources, Presentation defaults and the Claude Design CSS are projections of this file plus the theme JSONs.",
+  "schemaVersion": 1,
+  "space": { "00": 0, "02": 2, "04": 4, "06": 6, "08": 8, "12": 12, "16": 16, "20": 20, "24": 24, "32": 32, "40": 40, "48": 48, "64": 64 },
+  "sizing": {
+    "chromeHeight": 38,
+    "topNavHeight": 30,
+    "controlHeightCompact": 26,
+    "controlHeightDefault": 28,
+    "controlHeightLarge": 34,
+    "iconButtonSizeSmall": 26,
+    "iconButtonSizeDefault": 28,
+    "iconButtonSizeLarge": 34,
+    "searchHeight": 28,
+    "chipHeight": 22,
+    "interactiveChipHeight": 26,
+    "badgeHeight": 18,
+    "dialogWidthSmall": 360,
+    "dialogWidthDefault": 480,
+    "dialogWidthLarge": 720,
+    "profileCardWidthSmall": 156,
+    "profileCardWidthDefault": 208,
+    "profileCardWidthLarge": 280,
+    "mediaTileMinWidth": 136,
+    "scrollbarHitWidth": 10,
+    "scrollbarContentGutter": 12,
+    "breadcrumbHeight": 28,
+    "scrollbarThumbWidth": 6,
+    "scrollbarThumbMinLength": 40
+  },
+  "radius": { "control": 6, "card": 10, "surface": 12, "hero": 16, "pill": 999, "scrollThumb": 3, "small": 4 },
+  "opacity": { "enabled": 1, "secondary": 0.78, "muted": 0.55, "disabled": 0.38, "scrim": 0.6, "backdrop": 0.85 },
+  "scrims": {
+    "scrimSoft": "#4D000000",
+    "scrimMedium": "#99000000",
+    "scrimStrong": "#CC000000",
+    "mediaOverlay": "#B3000000",
+    "mediaOverlayHover": "#D9000000"
+  },
+  "motion": {
+    "instantMs": 0,
+    "cardLiftScale": 1.015,
+    "pageTranslate": 12,
+    "easing": {
+      "standard": [0.65, 0, 0.35, 1],
+      "decelerate": [0.33, 1, 0.68, 1],
+      "accelerate": [0.32, 0, 0.67, 0],
+      "emphasized": [0.22, 1, 0.36, 1]
+    }
+  },
+  "focus": { "thickness": 2, "offset": 2, "radius": 4 },
+  "elevation": [
+    { "name": "flat", "blur": 0, "depth": 0, "opacity": 0 },
+    { "name": "low", "blur": 6, "depth": 1, "opacity": 0.18 },
+    { "name": "card", "blur": 12, "depth": 2, "opacity": 0.22 },
+    { "name": "raised", "blur": 20, "depth": 4, "opacity": 0.26 },
+    { "name": "flyout", "blur": 28, "depth": 6, "opacity": 0.32 },
+    { "name": "dialog", "blur": 40, "depth": 10, "opacity": 0.38 },
+    { "name": "hero", "blur": 56, "depth": 14, "opacity": 0.42 }
+  ],
+  "density": { "controlHeight": 32, "controlPaddingHorizontal": 9, "controlPaddingVertical": 4, "rowHeight": 32, "chipSpacing": 4, "cardMetadataSpacing": 2, "sectionSpacing": 12, "gridGap": 8 },
+  "typography": {
+    "fallbackUi": "Segoe UI, Tahoma",
+    "fallbackMono": "Consolas, Courier New",
+    "styles": {
+      "display":       { "font": "display",  "size": 30, "weight": 600, "lineHeight": 38, "color": "textPrimary",   "trim": true },
+      "hero":          { "font": "display",  "size": 28, "weight": 650, "lineHeight": 34, "color": "textPrimary",   "trim": false, "wrap": true },
+      "page-title":    { "font": "heading",  "size": 19, "weight": 600, "lineHeight": 24, "color": "textPrimary",   "trim": true },
+      "section-title": { "font": "heading",  "size": 15, "weight": 600, "lineHeight": 20, "color": "textPrimary",   "trim": true },
+      "card-title":    { "font": "heading",  "size": 14, "weight": 600, "lineHeight": 18, "color": "textPrimary",   "trim": true },
+      "body":          { "font": "body",     "size": 13, "weight": 400, "lineHeight": 18, "color": "textPrimary",   "wrap": true },
+      "body-muted":    { "font": "body",     "size": 13, "weight": 400, "lineHeight": 18, "color": "textMuted",     "wrap": true },
+      "body-strong":   { "font": "body",     "size": 13, "weight": 600, "lineHeight": 18, "color": "textPrimary",   "wrap": true },
+      "control":       { "font": "body",     "size": 12, "weight": 500, "lineHeight": 16, "color": "textPrimary",   "trim": true },
+      "metadata":      { "font": "metadata", "size": 12, "weight": 400, "lineHeight": 16, "color": "textSecondary", "trim": true },
+      "caption":       { "font": "metadata", "size": 12, "weight": 400, "lineHeight": 16, "color": "textMuted",     "trim": true },
+      "micro":         { "font": "metadata", "size": 11, "weight": 500, "lineHeight": 15, "color": "textMuted",     "trim": true },
+      "badge":         { "font": "metadata", "size": 11, "weight": 600, "lineHeight": 15, "color": "textMuted",     "trim": true },
+      "numeric":       { "font": "body",     "size": 14, "weight": 500, "lineHeight": 20, "color": "textPrimary" },
+      "mono":          { "font": "mono",     "size": 13, "weight": 400, "lineHeight": 18, "color": "textSecondary" }
+    }
+  }
+}

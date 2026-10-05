@@ -1,0 +1,29 @@
+{
+  "id": "builtin.neuterradise.media-layout.wall",
+  "kind": "profile-media-layout",
+  "name": "Wall",
+  "spec": {
+    "layoutId": "editorial",
+    "cardWidth": 190,
+    "aspect": 1,
+    "mediaWidthFraction": 1,
+    "fit": "fill",
+    "metadataPlacement": "hover-overlay",
+    "metadataFields": [
+      "name",
+      "dimensions",
+      "duration",
+      "favorite"
+    ],
+    "metadataLines": 2,
+    "frameStyle": "gallery",
+    "frameRadius": 10,
+    "frameThickness": 2,
+    "frameColor": "token:borderDefault",
+    "selectedFrameColor": "token:accent",
+    "frameGlow": 0,
+    "hoverStyle": "spotlight",
+    "showTypeBadge": false,
+    "browse": "wall"
+  }
+}

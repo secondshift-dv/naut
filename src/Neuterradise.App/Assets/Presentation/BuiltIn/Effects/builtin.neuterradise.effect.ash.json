@@ -1,0 +1,41 @@
+{
+  "id": "builtin.neuterradise.effect.ash",
+  "kind": "effect",
+  "name": "Ash",
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  },
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "particles",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "particles",
+            "direction": "down",
+            "particleShape": "dot",
+            "count": 24,
+            "opacity": 0.15,
+            "speed": 0.3,
+            "sizeMin": 1,
+            "sizeMax": 3,
+            "color": "token:textMuted"
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  }
+}

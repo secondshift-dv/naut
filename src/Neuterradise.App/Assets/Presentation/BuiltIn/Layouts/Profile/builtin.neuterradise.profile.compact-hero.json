@@ -1,0 +1,9 @@
+{
+  "id": "builtin.neuterradise.profile.compact-hero",
+  "kind": "profile-layout",
+  "name": "Compact Hero",
+  "description": "Legacy compact dashboard layout retained for existing Profile selections.",
+  "spec": {
+    "preset": "compact-hero"
+  }
+}
