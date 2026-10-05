@@ -1,0 +1,41 @@
+{
+  "id": "builtin.neuterradise.effect.bubbles",
+  "kind": "effect",
+  "name": "Bubbles",
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  },
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "particles",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "particles",
+            "direction": "up",
+            "particleShape": "ring",
+            "count": 22,
+            "opacity": 0.30,
+            "speed": 0.60,
+            "sizeMin": 3,
+            "sizeMax": 8,
+            "color": "token:accentSecondary"
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  }
+}

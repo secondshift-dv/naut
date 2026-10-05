@@ -1,0 +1,9 @@
+{
+  "id": "builtin.neuterradise.profile.showcase",
+  "kind": "profile-layout",
+  "name": "Media First",
+  "description": "Starts directly with the media Vault, then reveals Overview and relationship context.",
+  "spec": {
+    "preset": "showcase"
+  }
+}

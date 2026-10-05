@@ -1,0 +1,41 @@
+{
+  "id": "builtin.neuterradise.effect.leaves",
+  "kind": "effect",
+  "name": "Leaves",
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  },
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "particles",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "particles",
+            "direction": "diagonal",
+            "particleShape": "leaf",
+            "count": 14,
+            "opacity": 0.2,
+            "speed": 0.3,
+            "sizeMin": 3,
+            "sizeMax": 6,
+            "color": "token:accentSecondary"
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  }
+}

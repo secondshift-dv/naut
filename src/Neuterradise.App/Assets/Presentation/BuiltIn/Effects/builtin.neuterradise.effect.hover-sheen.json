@@ -1,0 +1,41 @@
+{
+  "id": "builtin.neuterradise.effect.hover-sheen",
+  "kind": "effect",
+  "name": "Hover Sheen",
+  "spec": {
+    "targets": [
+      "effect.controls",
+      "effect.card",
+      "effect.media",
+      "effect.profile.cover",
+      "effect.profile.frame",
+      "effect.profile.banner"
+    ],
+    "channel": "interaction",
+    "interactionOnly": true,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "light-sweep",
+            "opacity": 0.12,
+            "color": "token:accent",
+            "speed": 0.7
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  },
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  }
+}

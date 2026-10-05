@@ -1,0 +1,14 @@
+{
+  "id": "builtin.neuterradise.gallery.single-column",
+  "kind": "gallery-layout",
+  "name": "Single Column",
+  "description": "One readable intrinsic Profile Card per row for deliberate vertical browsing.",
+  "spec": {
+    "primitive": "VirtualizedSingleColumn",
+    "itemMinWidth": 320,
+    "itemMaxWidth": 760,
+    "spacing": 14,
+    "maxColumns": 1,
+    "rowHeight": 240
+  }
+}

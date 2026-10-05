@@ -1,0 +1,37 @@
+{
+  "id": "builtin.neuterradise.effect.smoke",
+  "kind": "effect",
+  "name": "Smoke",
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  },
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "environment",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "fog",
+            "opacity": 0.14,
+            "color": "token:textMuted",
+            "scale": 2,
+            "speed": 0.15
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  }
+}

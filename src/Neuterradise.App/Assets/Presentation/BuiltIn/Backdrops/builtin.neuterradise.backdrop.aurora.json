@@ -1,0 +1,144 @@
+{
+  "id": "builtin.neuterradise.backdrop.aurora",
+  "kind": "backdrop",
+  "name": "Aurora Veil",
+  "description": "A slow chroma flow across the field with a soft sweeping highlight.",
+  "previewAccent": "#FFEC4899",
+  "performance": {
+    "tier": "cinematic",
+    "continuousAnimation": true,
+    "offscreenPolicy": "suspend",
+    "maxAnimatedLayers": 5
+  },
+  "spec": {
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "angle": 120,
+            "amplitude": 0.05,
+            "period": 30,
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:ambientPrimary",
+                "offset": 0.55
+              },
+              {
+                "color": "token:ambientSecondary",
+                "offset": 1
+              }
+            ],
+            "opacity": 0.18
+          },
+          {
+            "kind": "radial-glow",
+            "color": "token:ambientSecondary",
+            "opacity": 0.18,
+            "centerX": 0.7,
+            "centerY": 0.1,
+            "radius": 0.8,
+            "amplitude": 0.05,
+            "period": 22,
+            "blend": "screen"
+          },
+          {
+            "kind": "radial-glow",
+            "color": "token:ambientPrimary",
+            "opacity": 0.18,
+            "centerX": 0.15,
+            "centerY": 0.6,
+            "radius": 0.7,
+            "amplitude": 0.05,
+            "period": 28,
+            "blend": "screen"
+          },
+          {
+            "kind": "light-sweep",
+            "color": "token:lightSpecular",
+            "opacity": 0.06,
+            "period": 18,
+            "width": 0.25,
+            "angle": 100
+          },
+          {
+            "kind": "noise",
+            "opacity": 0.012
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.24
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "angle": 120,
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:ambientPrimary",
+                "offset": 0.55
+              },
+              {
+                "color": "token:ambientSecondary",
+                "offset": 1
+              }
+            ],
+            "opacity": 0.18
+          },
+          {
+            "kind": "radial-glow",
+            "color": "token:ambientSecondary",
+            "opacity": 0.18,
+            "centerX": 0.7,
+            "centerY": 0.1,
+            "radius": 0.8,
+            "amplitude": 0.05,
+            "period": 60
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.24
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "angle": 120,
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:ambientPrimary",
+                "offset": 0.55
+              },
+              {
+                "color": "token:ambientSecondary",
+                "offset": 1
+              }
+            ],
+            "opacity": 0.18
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.24
+          }
+        ]
+      }
+    }
+  }
+}

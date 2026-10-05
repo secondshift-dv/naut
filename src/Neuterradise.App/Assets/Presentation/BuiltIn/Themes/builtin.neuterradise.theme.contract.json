@@ -1,0 +1,26 @@
+{
+  "id": "builtin.neuterradise.theme.contract",
+  "kind": "theme",
+  "name": "Contract",
+  "description": "Dossier precision. Tactical acrylic, steel-blue edges, near-static light.",
+  "previewAccent": "#FF315E8B",
+  "spec": {
+    "themeId": "contract",
+    "material": {
+      "personality": "tactical-acrylic",
+      "atmosphere": "precision",
+      "grain": 0.008,
+      "glassOpacity": 0.98,
+      "glassBlur": 12,
+      "specular": 0.2,
+      "rimLight": 0.22,
+      "ambientPrimary": "token:accent",
+      "ambientSecondary": "token:accentSecondary",
+      "frameAffinity": [
+        "hud",
+        "minimal",
+        "silver"
+      ]
+    }
+  }
+}

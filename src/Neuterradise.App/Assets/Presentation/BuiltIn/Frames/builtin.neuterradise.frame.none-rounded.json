@@ -1,0 +1,17 @@
+{
+  "id": "builtin.neuterradise.frame.none-rounded",
+  "kind": "cover-frame",
+  "name": "Square",
+  "description": "Square Cover without a decoration.",
+  "spec": {
+    "family": "None",
+    "shapes": [
+      "Square"
+    ],
+    "scale": 1,
+    "tint": false,
+    "animated": false,
+    "category": "Plain",
+    "coverInset": 0
+  }
+}

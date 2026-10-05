@@ -1,0 +1,27 @@
+{
+  "id": "builtin.neuterradise.theme.brass",
+  "kind": "theme",
+  "name": "Brass",
+  "description": "Warm collector. Brushed metal, amber specular and drifting dust.",
+  "previewAccent": "#FFD4B278",
+  "spec": {
+    "themeId": "brass",
+    "material": {
+      "personality": "brass-metal",
+      "atmosphere": "dust",
+      "grain": 0.008,
+      "glassOpacity": 0.98,
+      "glassBlur": 12,
+      "specular": 0.2,
+      "rimLight": 0.22,
+      "ambientPrimary": "token:accent",
+      "ambientSecondary": "token:accentSecondary",
+      "frameAffinity": [
+        "brass",
+        "gold",
+        "champion",
+        "royal"
+      ]
+    }
+  }
+}

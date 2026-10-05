@@ -1,0 +1,37 @@
+{
+  "id": "builtin.neuterradise.effect.sweep",
+  "kind": "effect",
+  "name": "Sweep",
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "lighting",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "light-sweep",
+            "opacity": 0.1,
+            "color": "token:accent",
+            "width": 0.15,
+            "speed": 0.25
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  },
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  }
+}

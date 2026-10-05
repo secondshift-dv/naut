@@ -1,0 +1,9 @@
+{
+  "id": "builtin.neuterradise.profile.immersive",
+  "kind": "profile-layout",
+  "name": "Immersive",
+  "description": "Legacy media-first full-bleed layout retained for existing Profile selections.",
+  "spec": {
+    "preset": "immersive"
+  }
+}

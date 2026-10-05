@@ -1,0 +1,43 @@
+{
+  "id": "builtin.neuterradise.backdrop.calm-blue",
+  "kind": "backdrop",
+  "name": "Calm Blue",
+  "description": "A soft, theme-readable blue background.",
+  "performance": {
+    "tier": "utility",
+    "continuousAnimation": false,
+    "offscreenPolicy": "suspend",
+    "maxAnimatedLayers": 0
+  },
+  "spec": {
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "calm-tint",
+            "color": "#FF89B7DC",
+            "opacity": 1.0
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "calm-tint",
+            "color": "#FF89B7DC",
+            "opacity": 1.0
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "calm-tint",
+            "color": "#FF89B7DC",
+            "opacity": 1.0
+          }
+        ]
+      }
+    }
+  }
+}

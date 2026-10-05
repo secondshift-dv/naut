@@ -1,0 +1,9 @@
+{
+  "id": "builtin.neuterradise.profile.editorial",
+  "kind": "profile-layout",
+  "name": "Editorial",
+  "description": "Contained header and balanced information sections for reading Profile context before browsing media.",
+  "spec": {
+    "preset": "editorial"
+  }
+}

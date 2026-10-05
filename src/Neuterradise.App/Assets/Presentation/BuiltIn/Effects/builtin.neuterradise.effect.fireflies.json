@@ -1,0 +1,39 @@
+{
+  "id": "builtin.neuterradise.effect.fireflies",
+  "kind": "effect",
+  "name": "Fireflies",
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "particles",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "particles",
+            "opacity": 0.3,
+            "color": "token:accentSecondary",
+            "count": 12,
+            "sizeMin": 2,
+            "sizeMax": 4,
+            "speed": 0.3
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  },
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  }
+}

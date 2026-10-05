@@ -1,0 +1,43 @@
+{
+  "id": "builtin.neuterradise.backdrop.gray",
+  "kind": "backdrop",
+  "name": "Calm Gray",
+  "description": "A quiet neutral background.",
+  "performance": {
+    "tier": "utility",
+    "continuousAnimation": false,
+    "offscreenPolicy": "suspend",
+    "maxAnimatedLayers": 0
+  },
+  "spec": {
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "calm-tint",
+            "color": "#FF8D94A0",
+            "opacity": 1.0
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "calm-tint",
+            "color": "#FF8D94A0",
+            "opacity": 1.0
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "calm-tint",
+            "color": "#FF8D94A0",
+            "opacity": 1.0
+          }
+        ]
+      }
+    }
+  }
+}

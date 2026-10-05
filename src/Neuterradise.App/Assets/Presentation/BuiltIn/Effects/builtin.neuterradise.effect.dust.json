@@ -1,0 +1,41 @@
+{
+  "id": "builtin.neuterradise.effect.dust",
+  "kind": "effect",
+  "name": "Dust",
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  },
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "particles",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "particles",
+            "direction": "still",
+            "particleShape": "dot",
+            "count": 32,
+            "opacity": 0.12,
+            "speed": 0.1,
+            "sizeMin": 0.3,
+            "sizeMax": 1,
+            "color": "token:textSecondary"
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  }
+}

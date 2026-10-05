@@ -1,0 +1,23 @@
+{
+  "id": "builtin.neuterradise.typography.clear",
+  "kind": "typography",
+  "name": "Clear",
+  "spec": {
+    "display": {
+      "family": "inter",
+      "asset": "font-inter"
+    },
+    "heading": {
+      "family": "inter",
+      "asset": "font-inter"
+    },
+    "body": {
+      "family": "notosans",
+      "asset": "font-notosans"
+    },
+    "mono": {
+      "family": "notosansmono",
+      "asset": "font-notosansmono"
+    }
+  }
+}

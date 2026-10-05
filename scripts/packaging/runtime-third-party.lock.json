@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "opencvFfmpeg": {
+    "packageId": "OpenCvSharp5.runtime.win",
+    "packageVersion": "5.0.0.20260905",
+    "packageRepositoryCommit": "1611da5a4124dfc4de910a580ef6e8fa876c5d3c",
+    "consumerOpenCvCommit": "40738fb16ceddb5fb3fea747585f7ce6abb0605b",
+    "buildOpenCvCommit": "a0a660fcb1e58a295e6caa6aee64ed4d369b0181",
+    "opencvThirdPartyCommit": "06dc20cad65dc7fcf784f70c95d46750520889a7",
+    "deployedName": "opencv_videoio_ffmpeg500_64.dll",
+    "upstreamName": "opencv_videoio_ffmpeg_64.dll",
+    "upstreamUrl": "https://raw.githubusercontent.com/opencv/opencv_3rdparty/06dc20cad65dc7fcf784f70c95d46750520889a7/ffmpeg/opencv_videoio_ffmpeg_64.dll",
+    "sha256": "7aabff029d1fa47cf56ede4dbbe05dc62da3208f07cd16471d4c966a33f9aa31",
+    "md5": "a821a1135251859655090c795af05789",
+    "license": "LGPL-2.1-or-later",
+    "licenseFile": "OpenCV-FFmpeg-LGPL-2.1.txt",
+    "licenseSha256": "1f9d4168b4a9a2bdd1851023735a41d0ab09ffa5fcc1a721a99ebc1d7d35a9c5",
+    "sourceCompanionName": "opencv-ffmpeg-corresponding-source.zip",
+    "sourceCompanionUrl": "https://github.com/secondshift-dv/naut/releases/download/opencv-ffmpeg-5.0.0-20260602-naut1/opencv-ffmpeg-corresponding-source.zip",
+    "sourceCompanionSha256": "117b6f87396f6fe64bede1baa04f430d63e4fe056f4cc965c2b6df88a5d48c2e"
+  },
+  "icu": {
+    "packageId": "Uno.icu-win",
+    "packageVersion": "77.2.1",
+    "sourceRelease": "77.1",
+    "sourceUrl": "https://github.com/unicode-org/icu/archive/refs/tags/release-77-1.zip",
+    "licenseFile": "ICU-77.1-LICENSE.txt",
+    "licenseSha256": "451167c55c0fa447cc2d5632714f5e3c567fe4f1e1badefab2c1333852198aca",
+    "binaryHashes": {
+      "icudt77.dll": "011b8ddd65d5682dc64f3440a36d61da372568d57f1b61f29d281f12fad26dae",
+      "icuuc77.dll": "ff75472dde10e72d8041b2a21c1141e0bdb2317ef221dd69026159a15117ffbf"
+    }
+  },
+  "skiaSharp": {
+    "packageId": "SkiaSharp.NativeAssets.Win32",
+    "packageVersion": "3.119.2",
+    "binaryName": "libSkiaSharp.dll",
+    "binarySha256": "8b097d433db94fe61aba85213184938fb36118afd542d33252dd83794fdd9afc",
+    "licenseSha256": "89101e35a8c66fd4d6dffc1763259161d35cb564c169714ec227a768c89f2938",
+    "noticesSha256": "21504c46c4c58aa64c1055bd2dcbc5f9a136b4b8c412ed3cc6740e22c5b127f5"
+  },
+  "harfBuzzSharp": {
+    "packageId": "HarfBuzzSharp.NativeAssets.Win32",
+    "packageVersion": "8.3.1.1",
+    "binaryName": "libHarfBuzzSharp.dll",
+    "binarySha256": "eb76238c9e8e41d44b5a5b18167c4c5b39ca5db4277af5dbe92d730f0fc14a7d",
+    "licenseSha256": "89101e35a8c66fd4d6dffc1763259161d35cb564c169714ec227a768c89f2938",
+    "noticesSha256": "21504c46c4c58aa64c1055bd2dcbc5f9a136b4b8c412ed3cc6740e22c5b127f5"
+  },
+  "dotnetRuntime": {
+    "packageId": "Microsoft.NETCore.App.Runtime.win-x64",
+    "packageVersion": "10.0.12",
+    "licenseSha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b",
+    "noticesSha256": "6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21"
+  },
+  "unoFonts": {
+    "licenseFile": "Uno-Fonts-Apache-2.0.txt",
+    "licenseSha256": "7afed34064d93afd447bb2ef72398f68789792e302b0792d1bcc3217b204f88e",
+    "packages": [
+      {
+        "id": "Uno.Fonts.OpenSans",
+        "version": "2.8.1",
+        "repositoryCommit": "8cc45f9901538563082b38de9b5eb2f413d083dd"
+      },
+      {
+        "id": "Uno.Fonts.Fluent",
+        "version": "2.6.1",
+        "repositoryCommit": "257665e95a75fe43240f7bfdbe25260360682093"
+      }
+    ]
+  }
+}

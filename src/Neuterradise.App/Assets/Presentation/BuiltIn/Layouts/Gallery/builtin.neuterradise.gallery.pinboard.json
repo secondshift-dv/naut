@@ -1,0 +1,21 @@
+{
+  "id": "builtin.neuterradise.gallery.pinboard",
+  "kind": "gallery-layout",
+  "name": "Pinboard",
+  "spec": {
+    "primitive": "VirtualizedAdaptiveWall",
+    "toolbar": "drawer",
+    "itemMinWidth": 210,
+    "itemMaxWidth": 360,
+    "rowHeight": 320,
+    "spacing": 14,
+    "maxColumns": 8,
+    "heightPattern": [
+      0.66,
+      0.9,
+      0.76,
+      1.1,
+      0.6
+    ]
+  }
+}

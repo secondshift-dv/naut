@@ -1,0 +1,8 @@
+{
+  "id": "builtin.neuterradise.frame.none",
+  "kind": "cover-frame",
+  "name": "None",
+  "spec": {
+    "frameId": "none"
+  }
+}

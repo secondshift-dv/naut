@@ -1,0 +1,29 @@
+{
+  "id": "builtin.neuterradise.media-layout.editorial",
+  "kind": "profile-media-layout",
+  "name": "Gallery Print",
+  "description": "Portrait-oriented media with persistent information below, like labeled prints in an archive.",
+  "spec": {
+    "layoutId": "editorial",
+    "cardWidth": 156,
+    "aspect": 0.8,
+    "mediaWidthFraction": 1,
+    "fit": "fill",
+    "metadataPlacement": "below",
+    "metadataFields": [
+      "name",
+      "dimensions",
+      "duration",
+      "favorite"
+    ],
+    "metadataLines": 2,
+    "frameStyle": "gallery",
+    "frameRadius": 10,
+    "frameThickness": 2,
+    "frameColor": "token:borderDefault",
+    "selectedFrameColor": "token:accent",
+    "frameGlow": 0,
+    "hoverStyle": "spotlight",
+    "showTypeBadge": false
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "id": "builtin.neuterradise.media-layout.immersive",
+  "kind": "profile-media-layout",
+  "name": "Grid",
+  "description": "Balanced square media grid: artwork stays primary and useful metadata appears only on hover.",
+  "spec": {
+    "layoutId": "immersive",
+    "cardWidth": 160,
+    "aspect": 1,
+    "mediaWidthFraction": 1,
+    "fit": "fill",
+    "metadataPlacement": "hover-overlay",
+    "metadataFields": [
+      "name",
+      "type",
+      "duration",
+      "favorite"
+    ],
+    "metadataLines": 2,
+    "frameStyle": "hairline",
+    "frameRadius": 10,
+    "frameThickness": 1,
+    "frameColor": "token:borderSubtle",
+    "selectedFrameColor": "token:borderSelected",
+    "frameGlow": 0,
+    "hoverStyle": "lift",
+    "showTypeBadge": true
+  }
+}

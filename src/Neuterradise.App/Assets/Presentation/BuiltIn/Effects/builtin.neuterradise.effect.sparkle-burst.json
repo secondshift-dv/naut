@@ -1,0 +1,46 @@
+{
+  "id": "builtin.neuterradise.effect.sparkle-burst",
+  "kind": "effect",
+  "name": "Sparkle Burst",
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  },
+  "spec": {
+    "targets": [
+      "effect.controls",
+      "effect.card",
+      "effect.media",
+      "effect.profile.cover",
+      "effect.profile.frame",
+      "effect.profile.banner"
+    ],
+    "channel": "interaction",
+    "interactionOnly": true,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "particles",
+            "direction": "radial",
+            "particleShape": "diamond",
+            "count": 24,
+            "opacity": 0.3,
+            "speed": 2,
+            "sizeMin": 1,
+            "sizeMax": 3,
+            "color": "token:accent"
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  }
+}

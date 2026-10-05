@@ -1,0 +1,14 @@
+{
+  "id": "builtin.neuterradise.gallery.grid",
+  "kind": "gallery-layout",
+  "name": "Adaptive Grid",
+  "description": "Legacy fixed-cell Gallery retained for existing selections.",
+  "spec": {
+    "primitive": "VirtualizedGrid",
+    "itemMinWidth": 200,
+    "itemMaxWidth": 320,
+    "spacing": 12,
+    "maxColumns": 10,
+    "rowHeight": 220
+  }
+}

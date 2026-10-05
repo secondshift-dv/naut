@@ -1,0 +1,16 @@
+{
+  "id": "builtin.neuterradise.spotlight.split",
+  "kind": "spotlight-style",
+  "name": "Split Glass",
+  "description": "Artwork and a glass identity panel share the field; slide transitions.",
+  "spec": {
+    "composition": "split-glass",
+    "motion": "parallax-drift",
+    "transition": "slide",
+    "rotationSeconds": 12,
+    "showCover": true,
+    "showOverview": true,
+    "pagination": "counter",
+    "scrimStrength": 0.55
+  }
+}

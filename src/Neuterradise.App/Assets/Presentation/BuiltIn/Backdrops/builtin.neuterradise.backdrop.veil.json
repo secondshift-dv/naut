@@ -1,0 +1,68 @@
+{
+  "id": "builtin.neuterradise.backdrop.veil",
+  "kind": "backdrop",
+  "name": "Veil",
+  "description": "Theme-readable environmental field.",
+  "spec": {
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:surface2",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "fog",
+            "color": "token:accentSecondary",
+            "opacity": 0.12,
+            "count": 5,
+            "speed": 0.2
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:surface2",
+                "offset": 1
+              }
+            ]
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:surface2",
+                "offset": 1
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

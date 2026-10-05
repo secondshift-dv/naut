@@ -1,0 +1,16 @@
+{
+  "id": "builtin.neuterradise.spotlight.cinematic",
+  "kind": "spotlight-style",
+  "name": "Cinematic",
+  "description": "Identity on deep glass at the left; slow Ken Burns artwork; depth crossfade.",
+  "spec": {
+    "composition": "cinematic-left",
+    "motion": "ken-burns",
+    "transition": "crossfade-depth",
+    "rotationSeconds": 12,
+    "showCover": true,
+    "showOverview": true,
+    "pagination": "counter-rail",
+    "scrimStrength": 0.7
+  }
+}

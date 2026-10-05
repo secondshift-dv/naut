@@ -1,0 +1,15 @@
+{
+  "id": "builtin.neuterradise.spotlight.snapshot",
+  "kind": "spotlight-style",
+  "name": "Snapshot",
+  "spec": {
+    "composition": "snapshot",
+    "motion": "still",
+    "transition": "fade",
+    "rotationSeconds": 14,
+    "showCover": true,
+    "showOverview": true,
+    "pagination": "counter",
+    "scrimStrength": 0.65
+  }
+}

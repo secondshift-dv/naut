@@ -1,0 +1,66 @@
+naut v0.0.1 - Third-Party Runtime Notices
+
+This runtime package contains third-party runtime artifacts pinned by exact source/version and verified before packaging.
+
+1. YuNet face detector model
+   Source: OpenCV Zoo commit 47534e27c9851bb1128ccc0102f1145e27f23f98
+   Source file: models/face_detection_yunet/face_detection_yunet_2023mar.onnx
+   Deployed file: workers/models/yunet/face_detection_yunet_2023mar.onnx
+   SHA-256: 8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4
+   License: MIT
+   License copy: LICENSES/YuNet-MIT.txt
+
+2. SFace face recognition model
+   Source: OpenCV Zoo commit 47534e27c9851bb1128ccc0102f1145e27f23f98
+   Source file: models/face_recognition_sface/face_recognition_sface_2021dec.onnx
+   Deployed file: workers/models/sface/face_recognition_sface_2021dec.onnx
+   SHA-256: 0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79
+   License: Apache-2.0
+   License copy: LICENSES/SFace-Apache-2.0.txt
+
+3. FFmpeg and ffprobe
+   Reproducible Naut runtime archive: ffmpeg-naut-win64-lgpl.zip
+   Runtime archive SHA-256: 8aeede29b16b528467467d4d86d043b42383736a990b42e04568953e0506b570
+   Corresponding source: ffmpeg-naut-corresponding-source.zip
+   Corresponding-source SHA-256: 5b971590413db0f5415a8bfb8925dc35844456c18e9efd02eb04313dd5cd8f69
+   FFmpeg source revision: 330caae0c1acccd2222edc52a05940c574561ce5
+   BtbN recipe reference revision: 9acad4a9ef1583096af7836cc1e9c8cbcb4d3950
+   Naut recipe authority revision: e48da767cfa34511a5e94e508179330d7225e2d3
+   Build configuration is pinned in scripts/packaging/ffmpeg/ffmpeg-runtime.lock.json
+   License: LGPL-3.0-or-later
+   License copy: LICENSES/FFmpeg-LGPL-3.0.txt
+   Component/build notices: LICENSES/FFmpeg-THIRD-PARTY-NOTICES.txt
+   Open-source copyright compliance does not establish a patent grant for this locally compiled static OpenH264 build. Cisco separately distributed binary terms are not claimed to apply.
+
+4. OpenCvSharp native runtime
+   NuGet package: OpenCvSharp5.runtime.win 5.0.0.20260905
+   Package repository commit: 1611da5a4124dfc4de910a580ef6e8fa876c5d3c
+   Deployed file: workers/OpenCvSharpExtern.dll
+   License: Apache-2.0
+   License copy: LICENSES/OpenCvSharp-Apache-2.0.txt
+
+5. OpenCV videoio FFmpeg plugin
+   Deployed file: workers/opencv_videoio_ffmpeg500_64.dll
+   SHA-256: 7aabff029d1fa47cf56ede4dbbe05dc62da3208f07cd16471d4c966a33f9aa31
+   Upstream binary commit: 06dc20cad65dc7fcf784f70c95d46750520889a7
+   License: LGPL-2.1-or-later
+   License copy: LICENSES/OpenCV-FFmpeg-LGPL-2.1.txt
+   Corresponding source: opencv-ffmpeg-corresponding-source.zip
+   Corresponding-source SHA-256: 117b6f87396f6fe64bede1baa04f430d63e4fe056f4cc965c2b6df88a5d48c2e
+
+6. ICU native runtime
+   NuGet package: Uno.icu-win 77.2.1
+   Source release: 77.1
+   License: Unicode License V3
+   License copy: LICENSES/ICU-77.1-LICENSE.txt
+
+7. SkiaSharp, HarfBuzzSharp, and self-contained .NET runtime
+   Exact package versions and binary/license hashes are pinned by scripts/packaging/runtime-third-party.lock.json.
+   License/notices copies: LICENSES/SkiaSharp-*, LICENSES/HarfBuzzSharp-*, LICENSES/DotNet-Runtime-*.
+
+8. Fonts
+   Built-in presentation fonts retain file-level provenance and OFL texts under Assets/Presentation/BuiltIn/Fonts/.
+   Uno OpenSans and Fluent font assets are verified byte-for-byte against their locked NuGet packages.
+   Uno package license copy: LICENSES/Uno-Fonts-Apache-2.0.txt
+
+The deployment/artifacts.json manifest remains the operational authority for model/tool/native capabilities explicitly resolved by Naut. The runtime-third-party lock and packaged license inventory are the compliance authority for the remaining bundled runtime libraries. A missing file or SHA-256 mismatch fails the canonical build.

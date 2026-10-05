@@ -1,0 +1,28 @@
+{
+  "id": "builtin.neuterradise.media-layout.showcase",
+  "kind": "profile-media-layout",
+  "name": "Contact Sheet",
+  "description": "Small dense cards with one-line metadata always visible for rapid scanning of large Profile libraries.",
+  "spec": {
+    "layoutId": "showcase",
+    "cardWidth": 160,
+    "aspect": 1,
+    "mediaWidthFraction": 1,
+    "fit": "fill",
+    "metadataPlacement": "persistent-overlay",
+    "metadataFields": [
+      "name",
+      "type",
+      "favorite"
+    ],
+    "metadataLines": 1,
+    "frameStyle": "hairline",
+    "frameRadius": 8,
+    "frameThickness": 1,
+    "frameColor": "token:borderSubtle",
+    "selectedFrameColor": "token:borderSelected",
+    "frameGlow": 0,
+    "hoverStyle": "none",
+    "showTypeBadge": true
+  }
+}

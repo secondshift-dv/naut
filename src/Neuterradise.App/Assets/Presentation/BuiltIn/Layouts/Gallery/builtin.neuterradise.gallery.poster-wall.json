@@ -1,0 +1,14 @@
+{
+  "id": "builtin.neuterradise.gallery.poster-wall",
+  "kind": "gallery-layout",
+  "name": "Dense Grid",
+  "description": "A tighter shell that fits more Profile cards per row without changing their card style.",
+  "spec": {
+    "primitive": "VirtualizedUniformGrid",
+    "itemMinWidth": 160,
+    "itemMaxWidth": 220,
+    "spacing": 8,
+    "maxColumns": 12,
+    "rowHeight": 196
+  }
+}

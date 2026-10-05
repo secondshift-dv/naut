@@ -1,0 +1,56 @@
+{
+  "id": "builtin.neuterradise.effect.neon-pulse",
+  "kind": "effect",
+  "name": "Neon Pulse",
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  },
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "lighting",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "radial-glow",
+            "opacity": 0.18,
+            "color": "token:accent",
+            "radius": 0.7,
+            "amplitude": 0.2,
+            "period": 4
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "radial-glow",
+            "opacity": 0.18,
+            "color": "token:accent",
+            "radius": 0.7,
+            "amplitude": 0,
+            "period": 4
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "radial-glow",
+            "opacity": 0.18,
+            "color": "token:accent",
+            "radius": 0.7,
+            "amplitude": 0,
+            "period": 4
+          }
+        ]
+      }
+    }
+  }
+}

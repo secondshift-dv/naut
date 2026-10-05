@@ -1,0 +1,100 @@
+{
+  "id": "builtin.neuterradise.backdrop.media",
+  "kind": "backdrop",
+  "name": "Living Media",
+  "description": "The featured Profile's own artwork becomes the atmosphere.",
+  "previewAccent": "#FF0EA5E9",
+  "performance": {
+    "tier": "cinematic",
+    "continuousAnimation": true,
+    "offscreenPolicy": "suspend",
+    "maxAnimatedLayers": 3
+  },
+  "spec": {
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:canvas",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "image",
+            "source": "media-ambient",
+            "opacity": 0.07,
+            "blur": 36,
+            "scale": 1.3,
+            "amplitude": 0.05,
+            "period": 24,
+            "depth": 0.6
+          },
+          {
+            "kind": "media-tint",
+            "opacity": 0.45
+          },
+          {
+            "kind": "noise",
+            "opacity": 0.012
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.24
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "image",
+            "source": "media-ambient",
+            "opacity": 0.07,
+            "blur": 36,
+            "scale": 1.25
+          },
+          {
+            "kind": "media-tint",
+            "opacity": 0.4
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.24
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:backgroundCinematic",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "media-tint",
+            "opacity": 0.35
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.24
+          }
+        ]
+      }
+    }
+  }
+}

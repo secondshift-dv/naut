@@ -1,0 +1,9 @@
+{
+  "id": "builtin.neuterradise.profile.profile-focus",
+  "kind": "profile-layout",
+  "name": "Portrait",
+  "description": "No Banner: the framed Cover, identity, faces and relationships carry the Profile.",
+  "spec": {
+    "preset": "profile-focus"
+  }
+}

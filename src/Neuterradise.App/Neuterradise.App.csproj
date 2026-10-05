@@ -1,0 +1,77 @@
+<Project Sdk="Uno.Sdk">
+  <!--
+    naut product executable: C# / .NET 10, Uno Platform 6.6 (stable), Skia Desktop renderer,
+    net10.0-desktop, Win32 host. The runtime (domain, persistence, Vault, jobs, ResourceGovernor and the
+    Presentation Contract) lives in Neuterradise.Runtime and never references a UI framework.
+    Vulkan is not forced: the default supported Skia backend is the correctness baseline.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net10.0-desktop</TargetFrameworks>
+    <OutputType>WinExe</OutputType>
+    <UnoSingleProject>true</UnoSingleProject>
+    <UnoDisableHotDesign>true</UnoDisableHotDesign>
+    <UnoDisableMCPSupport>true</UnoDisableMCPSupport>
+    <AssemblyName>NeuTerradise</AssemblyName>
+    <RootNamespace>Neuterradise.App</RootNamespace>
+    <ApplicationTitle>naut</ApplicationTitle>
+    <ApplicationId>com.neuterradise.app</ApplicationId>
+    <ApplicationDisplayVersion>$(ProductVersion)</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationPublisher>naut</ApplicationPublisher>
+    <ApplicationIcon>Assets\Brand\app-icon.ico</ApplicationIcon>
+    <Product>naut</Product>
+    <AssemblyTitle>naut</AssemblyTitle>
+    <Description>naut — a local-first personal media Vault.</Description>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <UnoFeatures>
+      SkiaRenderer;
+      Lottie;
+    </UnoFeatures>
+    <NoWarn>$(NoWarn);NU1507;NETSDK1201;PRI257;Uno0001</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Neuterradise.Runtime\Neuterradise.Runtime.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Product brand assets and built-in Presentation Pack assets ship with the application payload (never the Vault). -->
+    <Content Update="Assets\Brand\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <Content Update="Assets\Flags\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <Content Update="Assets\Presentation\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!--
+    The product runs only on the Win32 Skia host (Program.cs: UseWin32) and is RID-locked to win-x64.
+    Remove desktop hosts and native assets for other operating systems before UnoImplicitPackages turns
+    implicit references into real PackageReferences, so unsupported hosts do not enter restore or payloads.
+  -->
+  <Target Name="NeuterradiseExcludeNonWin32Hosts" BeforeTargets="UnoImplicitPackages">
+    <ItemGroup>
+      <_UnoProjectSystemPackageReference Remove="Uno.WinUI.Runtime.Skia.Wpf" />
+      <_UnoProjectSystemPackageReference Remove="Uno.WinUI.Runtime.Skia.X11" />
+      <_UnoProjectSystemPackageReference Remove="Uno.WinUI.Runtime.Skia.Linux.FrameBuffer" />
+      <_UnoProjectSystemPackageReference Remove="Uno.WinUI.Runtime.Skia.MacOS" />
+      <_UnoProjectSystemPackageReference Remove="SkiaSharp.NativeAssets.Linux" />
+      <_UnoProjectSystemPackageReference Remove="Uno.Resizetizer" />
+      <_UnoProjectSystemPackageReference Remove="Uno.UI.HotDesign" />
+      <_UnoProjectSystemPackageReference Remove="Uno.UI.App.Mcp" />
+      <_UnoProjectSystemPackageReference Remove="Uno.WinUI.DevServer" />
+      <_UnoProjectSystemPackageReference Remove="Uno.Settings.DevServer" />
+      <PackageReference Remove="Uno.WinUI.Runtime.Skia.Wpf" />
+      <PackageReference Remove="Uno.WinUI.Runtime.Skia.X11" />
+      <PackageReference Remove="Uno.WinUI.Runtime.Skia.Linux.FrameBuffer" />
+      <PackageReference Remove="Uno.WinUI.Runtime.Skia.MacOS" />
+      <PackageReference Remove="SkiaSharp.NativeAssets.Linux" />
+      <PackageReference Remove="Uno.Resizetizer" />
+      <PackageReference Remove="Uno.UI.HotDesign" />
+      <PackageReference Remove="Uno.UI.App.Mcp" />
+      <PackageReference Remove="Uno.WinUI.DevServer" />
+      <PackageReference Remove="Uno.Settings.DevServer" />
+      <RuntimeHostConfigurationOption Remove="Switch.System.Windows.Media.EnableHardwareAccelerationInRdp" />
+    </ItemGroup>
+  </Target>
+</Project>

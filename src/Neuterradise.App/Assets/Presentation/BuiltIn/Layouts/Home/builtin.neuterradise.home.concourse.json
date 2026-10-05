@@ -1,0 +1,88 @@
+{
+  "id": "builtin.neuterradise.home.concourse",
+  "kind": "home-layout",
+  "name": "Concourse",
+  "spec": {
+    "hero": {
+      "placement": "inset",
+      "heightFraction": 0.38,
+      "minHeight": 240,
+      "maxHeight": 620
+    },
+    "rails": [
+      {
+        "id": "statistics",
+        "style": "strip",
+        "maxItems": 4
+      },
+      {
+        "id": "recent",
+        "style": "tile"
+      },
+      {
+        "id": "activity",
+        "style": "compact",
+        "maxItems": 6
+      },
+      {
+        "id": "favorites",
+        "style": "poster"
+      },
+      {
+        "id": "attention",
+        "style": "compact",
+        "maxItems": 3
+      }
+    ],
+    "surface": {
+      "type": "stack",
+      "spacing": 12,
+      "children": [
+        {
+          "type": "semantic",
+          "id": "featured"
+        },
+        {
+          "type": "semantic",
+          "id": "recent"
+        },
+        {
+          "type": "semantic",
+          "id": "favorites"
+        },
+        {
+          "type": "columns",
+          "columns": [
+            "2*",
+            "*"
+          ],
+          "spacing": 18,
+          "children": [
+            {
+              "type": "semantic",
+              "id": "activity"
+            },
+            {
+              "type": "stack",
+              "spacing": 12,
+              "children": [
+                {
+                  "type": "semantic",
+                  "id": "statistics"
+                },
+                {
+                  "type": "semantic",
+                  "id": "attention"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "semantic",
+          "id": "imports"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "id": "builtin.neuterradise.theme.pulse",
+  "kind": "theme",
+  "name": "Pulse",
+  "description": "Energetic chroma glass with a slow flowing aura.",
+  "previewAccent": "#FFDAB4CA",
+  "spec": {
+    "themeId": "pulse",
+    "material": {
+      "personality": "chroma-glass",
+      "atmosphere": "chroma",
+      "grain": 0.008,
+      "glassOpacity": 0.98,
+      "glassBlur": 12,
+      "specular": 0.2,
+      "rimLight": 0.22,
+      "ambientPrimary": "token:accent",
+      "ambientSecondary": "token:accentSecondary",
+      "frameAffinity": [
+        "soft-ring",
+        "holographic"
+      ]
+    }
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "id": "builtin.neuterradise.card.editorial-v2",
+  "kind": "profile-card",
+  "name": "Editorial",
+  "description": "Cover and a persistent reading column.",
+  "spec": {
+    "aspect": 1.55,
+    "art": "cover",
+    "density": "detailed",
+    "hover": "banner",
+    "frame": "none",
+    "composition": {
+      "type": "grid",
+      "children": [
+        {
+          "type": "image",
+          "slot": "profile.identity.cover",
+          "stretch": "uniform-to-fill"
+        },
+        {
+          "type": "stack",
+          "spacing": 5,
+          "children": [
+            {
+              "type": "text",
+              "slot": "profile.identity.category",
+              "role": "micro",
+              "color": "token:textSecondary",
+              "maxLines": 1,
+              "visibleWhen": "profile.identity.category"
+            },
+            {
+              "type": "text",
+              "slot": "profile.identity.name",
+              "role": "card-title",
+              "color": "token:textPrimary",
+              "maxLines": 2
+            },
+            {
+              "type": "text",
+              "slot": "profile.identity.tags",
+              "role": "micro",
+              "color": "token:textSecondary",
+              "maxLines": 1,
+              "visibleWhen": "profile.identity.tags"
+            },
+            {
+              "type": "text",
+              "slot": "profile.overview",
+              "role": "micro",
+              "color": "token:textSecondary",
+              "maxLines": 2,
+              "visibleWhen": "profile.overview"
+            },
+            {
+              "type": "badge",
+              "slot": "profile.identity.rating",
+              "style": "text",
+              "visibleWhen": "profile.identity.rating",
+              "hAlign": "left"
+            },
+            {
+              "type": "badge",
+              "slot": "profile.identity.favorite",
+              "style": "text",
+              "visibleWhen": "profile.identity.favorite",
+              "hAlign": "left"
+            }
+          ],
+          "background": "token:surface1",
+          "padding": 12,
+          "column": 1
+        }
+      ],
+      "columns": [
+        "0.85*",
+        "1.15*"
+      ]
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": "builtin.neuterradise.frame.sakura",
+  "kind": "cover-frame",
+  "name": "Sakura",
+  "description": "Soft sakura branches, pearls and champagne-gold accents.",
+  "spec": {
+    "frameId": "sakura",
+    "overlayAsset": "frame-sakura",
+    "coverInset": 0.12
+  }
+}

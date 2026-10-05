@@ -1,0 +1,29 @@
+{
+  "id": "builtin.neuterradise.media-layout.compact",
+  "kind": "profile-media-layout",
+  "name": "Details",
+  "description": "Wide cards with media on the left and persistent metadata beside it for deliberate inspection.",
+  "spec": {
+    "layoutId": "compact",
+    "cardWidth": 264,
+    "aspect": 1,
+    "mediaWidthFraction": 0.42,
+    "fit": "fill",
+    "metadataPlacement": "side",
+    "metadataFields": [
+      "name",
+      "type",
+      "duration",
+      "favorite"
+    ],
+    "metadataLines": 2,
+    "frameStyle": "hairline",
+    "frameRadius": 8,
+    "frameThickness": 1,
+    "frameColor": "token:borderDefault",
+    "selectedFrameColor": "token:borderSelected",
+    "frameGlow": 0,
+    "hoverStyle": "none",
+    "showTypeBadge": true
+  }
+}

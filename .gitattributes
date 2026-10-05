@@ -1,0 +1,9 @@
+.gitattributes text eol=lf
+
+# Files whose exact bytes participate in packaging/licensing authority stay LF on every platform.
+scripts/packaging/ffmpeg/* text eol=lf
+scripts/packaging/**/*.ps1 text eol=lf
+scripts/packaging/**/*.sh text eol=lf
+scripts/packaging/**/*.py text eol=lf
+scripts/packaging/**/*.json text eol=lf
+scripts/packaging/**/*.txt text eol=lf

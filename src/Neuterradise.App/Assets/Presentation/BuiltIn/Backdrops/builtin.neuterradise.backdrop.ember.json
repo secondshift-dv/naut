@@ -1,0 +1,147 @@
+{
+  "id": "builtin.neuterradise.backdrop.ember",
+  "kind": "backdrop",
+  "name": "Ember Dust",
+  "description": "Warm amber light with drifting dust and brushed-metal grain.",
+  "previewAccent": "#FFB7791F",
+  "performance": {
+    "tier": "cinematic",
+    "continuousAnimation": true,
+    "offscreenPolicy": "suspend",
+    "maxAnimatedLayers": 4
+  },
+  "spec": {
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "angle": 180,
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:backgroundCinematic",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "radial-glow",
+            "color": "token:ambientPrimary",
+            "opacity": 0.18,
+            "centerX": 0.3,
+            "centerY": 0.05,
+            "radius": 0.9,
+            "amplitude": 0.05,
+            "period": 12,
+            "blend": "screen"
+          },
+          {
+            "kind": "image",
+            "source": "media-ambient",
+            "opacity": 0.07,
+            "blur": 24,
+            "scale": 1.12,
+            "amplitude": 0.03,
+            "period": 34,
+            "depth": 0.4,
+            "blend": "soft-light"
+          },
+          {
+            "kind": "particles",
+            "count": 30,
+            "color": "token:ambientPrimary",
+            "sizeMin": 0.5,
+            "sizeMax": 1.6,
+            "speed": 0.2,
+            "opacity": 0.2
+          },
+          {
+            "kind": "noise",
+            "opacity": 0.012
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.24
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "angle": 180,
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:backgroundCinematic",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "radial-glow",
+            "color": "token:ambientPrimary",
+            "opacity": 0.18,
+            "centerX": 0.3,
+            "centerY": 0.05,
+            "radius": 0.9
+          },
+          {
+            "kind": "particles",
+            "count": 20,
+            "color": "token:ambientPrimary",
+            "sizeMin": 0.5,
+            "sizeMax": 1.2,
+            "speed": 0.1,
+            "opacity": 0.2
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.24
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "angle": 180,
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:backgroundCinematic",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "radial-glow",
+            "color": "token:ambientPrimary",
+            "opacity": 0.18,
+            "centerX": 0.3,
+            "centerY": 0.05,
+            "radius": 0.9
+          },
+          {
+            "kind": "noise",
+            "opacity": 0.012
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.24
+          }
+        ]
+      }
+    }
+  }
+}

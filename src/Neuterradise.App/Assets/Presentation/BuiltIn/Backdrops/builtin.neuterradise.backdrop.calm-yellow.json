@@ -1,0 +1,43 @@
+{
+  "id": "builtin.neuterradise.backdrop.calm-yellow",
+  "kind": "backdrop",
+  "name": "Calm Yellow",
+  "description": "A soft, theme-readable yellow background.",
+  "performance": {
+    "tier": "utility",
+    "continuousAnimation": false,
+    "offscreenPolicy": "suspend",
+    "maxAnimatedLayers": 0
+  },
+  "spec": {
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "calm-tint",
+            "color": "#FFE4CE88",
+            "opacity": 1.0
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "calm-tint",
+            "color": "#FFE4CE88",
+            "opacity": 1.0
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "calm-tint",
+            "color": "#FFE4CE88",
+            "opacity": 1.0
+          }
+        ]
+      }
+    }
+  }
+}

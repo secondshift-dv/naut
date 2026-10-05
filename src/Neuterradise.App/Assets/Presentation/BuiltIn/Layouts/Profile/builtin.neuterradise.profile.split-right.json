@@ -1,0 +1,9 @@
+{
+  "id": "builtin.neuterradise.profile.split-right",
+  "kind": "profile-layout",
+  "name": "Split Right",
+  "description": "Legacy mirrored split retained for existing Profile selections.",
+  "spec": {
+    "preset": "split-right"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "id": "builtin.neuterradise.effect.silk",
+  "kind": "effect",
+  "name": "Silk",
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  },
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "surface",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "wave-field",
+            "opacity": 0.18,
+            "color": "token:accentSecondary",
+            "scale": 0.8,
+            "amplitude": 0.2,
+            "speed": 0.9
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "wave-field",
+            "opacity": 0.18,
+            "color": "token:accentSecondary",
+            "scale": 0.8,
+            "amplitude": 0
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "wave-field",
+            "opacity": 0.18,
+            "color": "token:accentSecondary",
+            "scale": 0.8,
+            "amplitude": 0
+          }
+        ]
+      }
+    }
+  }
+}

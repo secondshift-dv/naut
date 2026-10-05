@@ -1,0 +1,49 @@
+{
+  "id": "builtin.neuterradise.effect.grain",
+  "kind": "effect",
+  "name": "Grain",
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "surface",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "noise",
+            "opacity": 0.04,
+            "scale": 1
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "noise",
+            "opacity": 0.04,
+            "scale": 1,
+            "amplitude": 0
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "noise",
+            "opacity": 0.04,
+            "scale": 1,
+            "amplitude": 0
+          }
+        ]
+      }
+    }
+  },
+  "performance": {
+    "tier": "static",
+    "continuousAnimation": false,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 0
+  }
+}

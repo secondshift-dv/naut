@@ -1,0 +1,41 @@
+{
+  "id": "builtin.neuterradise.effect.rain",
+  "kind": "effect",
+  "name": "Rain",
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  },
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "particles",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "particles",
+            "direction": "down",
+            "particleShape": "line",
+            "count": 56,
+            "opacity": 0.30,
+            "speed": 2.8,
+            "sizeMin": 1,
+            "sizeMax": 2,
+            "color": "token:accentSecondary"
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  }
+}

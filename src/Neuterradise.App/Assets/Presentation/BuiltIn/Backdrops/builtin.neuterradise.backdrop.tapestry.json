@@ -1,0 +1,76 @@
+{
+  "id": "builtin.neuterradise.backdrop.tapestry",
+  "kind": "backdrop",
+  "name": "Tapestry",
+  "description": "Theme-readable environmental field.",
+  "spec": {
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "stops": [
+              {
+                "color": "token:surface1",
+                "offset": 0
+              },
+              {
+                "color": "token:canvas",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "wave-field",
+            "color": "token:accentSecondary",
+            "opacity": 0.08
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "stops": [
+              {
+                "color": "token:surface1",
+                "offset": 0
+              },
+              {
+                "color": "token:canvas",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "wave-field",
+            "color": "token:accentSecondary",
+            "opacity": 0.08
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "stops": [
+              {
+                "color": "token:surface1",
+                "offset": 0
+              },
+              {
+                "color": "token:canvas",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "wave-field",
+            "color": "token:accentSecondary",
+            "opacity": 0.08
+          }
+        ]
+      }
+    }
+  }
+}

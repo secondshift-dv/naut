@@ -1,0 +1,19 @@
+{
+  "id": "builtin.neuterradise.backdrop.none",
+  "kind": "backdrop",
+  "name": "None",
+  "description": "No backdrop decoration.",
+  "spec": {
+    "variants": {
+      "full": {
+        "layers": []
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  }
+}

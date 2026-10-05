@@ -1,0 +1,87 @@
+{
+  "id": "builtin.neuterradise.card.identity-plate",
+  "kind": "profile-card",
+  "name": "Identity Plate",
+  "description": "Banner-led identity with Cover, rating and collection context.",
+  "spec": {
+    "aspect": 2.15,
+    "art": "cover-over-banner",
+    "density": "detailed",
+    "hover": "sheen",
+    "frame": "full",
+    "composition": {
+      "type": "overlay",
+      "children": [
+        {
+          "type": "image",
+          "slot": "profile.identity.banner"
+        },
+        {
+          "type": "scrim",
+          "direction": "to-top",
+          "from": "#E610171E",
+          "to": "#4010171E"
+        },
+        {
+          "type": "grid",
+          "columns": [
+            "76",
+            "*"
+          ],
+          "margin": 12,
+          "vAlign": "bottom",
+          "spacing": 12,
+          "children": [
+            {
+              "type": "frame",
+              "size": 72
+            },
+            {
+              "type": "stack",
+              "column": 1,
+              "spacing": 4,
+              "children": [
+                {
+                  "type": "text",
+                  "slot": "profile.identity.name",
+                  "role": "card-title",
+                  "maxLines": 2,
+                  "color": "token:onMediaPrimary",
+                  "onMedia": true
+                },
+                {
+                  "type": "text",
+                  "slot": "profile.identity.category",
+                  "role": "metadata",
+                  "maxLines": 2,
+                  "color": "token:onMediaPrimary",
+                  "onMedia": true
+                },
+                {
+                  "type": "stack",
+                  "orientation": "horizontal",
+                  "spacing": 8,
+                  "children": [
+                    {
+                      "type": "badge",
+                      "slot": "profile.identity.rating",
+                      "style": "glass"
+                    },
+                    {
+                      "type": "text",
+                      "slot": "profile.statistics.media-count",
+                      "role": "caption",
+                      "maxLines": 2,
+                      "color": "token:onMediaPrimary",
+                      "onMedia": true
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

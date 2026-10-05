@@ -1,0 +1,123 @@
+{
+  "id": "builtin.neuterradise.backdrop.ink",
+  "kind": "backdrop",
+  "name": "Ink Smoke",
+  "description": "Charcoal ink drift in two slow layers with a cool silver edge.",
+  "previewAccent": "#FF94A3B8",
+  "performance": {
+    "tier": "cinematic",
+    "continuousAnimation": true,
+    "offscreenPolicy": "suspend",
+    "maxAnimatedLayers": 4
+  },
+  "spec": {
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "angle": 200,
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:backgroundCinematic",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "fog",
+            "color": "token:ambientPrimary",
+            "opacity": 0.1,
+            "scale": 1.6,
+            "speed": 0.35,
+            "period": 80
+          },
+          {
+            "kind": "fog",
+            "color": "token:lightAmbient",
+            "opacity": 0.1,
+            "scale": 1,
+            "speed": 0.7,
+            "period": 50
+          },
+          {
+            "kind": "light-sweep",
+            "color": "token:lightRim",
+            "opacity": 0.06,
+            "period": 22,
+            "width": 0.1,
+            "angle": 125
+          },
+          {
+            "kind": "noise",
+            "opacity": 0.012
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.24
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "angle": 200,
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:backgroundCinematic",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "fog",
+            "color": "token:lightAmbient",
+            "opacity": 0.1,
+            "scale": 1.2,
+            "speed": 0.2,
+            "period": 90
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.24
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "angle": 200,
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:backgroundCinematic",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "noise",
+            "opacity": 0.012
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.24
+          }
+        ]
+      }
+    }
+  }
+}

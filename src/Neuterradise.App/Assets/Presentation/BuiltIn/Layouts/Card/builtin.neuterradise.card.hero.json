@@ -1,0 +1,82 @@
+{
+  "id": "builtin.neuterradise.card.hero",
+  "kind": "profile-card",
+  "name": "Feature",
+  "description": "Ultra-wide Banner with an editorial identity panel and short Overview for featured Profiles.",
+  "spec": {
+    "legacyVariant": "hero-card",
+    "aspect": 1.6,
+    "art": "banner",
+    "density": "detailed",
+    "hover": "lift",
+    "frame": "lite",
+    "composition": {
+      "type": "overlay",
+      "children": [
+        {
+          "type": "image",
+          "slot": "profile.identity.banner",
+          "stretch": "uniform-to-fill"
+        },
+        {
+          "type": "scrim",
+          "direction": "to-right",
+          "from": "token:heroScrimStrong",
+          "to": "#00000000"
+        },
+        {
+          "type": "badge",
+          "slot": "profile.identity.favorite",
+          "style": "glass",
+          "visibleWhen": "profile.identity.favorite",
+          "hAlign": "right",
+          "vAlign": "top",
+          "margin": 8
+        },
+        {
+          "type": "stack",
+          "spacing": 4,
+          "children": [
+            {
+              "type": "text",
+              "slot": "profile.identity.category",
+              "role": "micro",
+              "color": "token:onMediaSecondary",
+              "maxLines": 1,
+              "visibleWhen": "profile.identity.category"
+            },
+            {
+              "type": "text",
+              "slot": "profile.identity.name",
+              "role": "section-title",
+              "color": "token:onMediaPrimary",
+              "maxLines": 2
+            },
+            {
+              "type": "text",
+              "slot": "profile.overview",
+              "role": "micro",
+              "color": "token:onMediaSecondary",
+              "maxLines": 2,
+              "visibleWhen": "profile.overview"
+            },
+            {
+              "type": "badge",
+              "slot": "profile.identity.rating",
+              "style": "glass",
+              "visibleWhen": "profile.identity.rating",
+              "hAlign": "left"
+            }
+          ],
+          "margin": [
+            12,
+            12,
+            36,
+            12
+          ],
+          "vAlign": "bottom"
+        }
+      ]
+    }
+  }
+}

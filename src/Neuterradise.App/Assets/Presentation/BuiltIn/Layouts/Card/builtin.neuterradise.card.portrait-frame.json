@@ -1,0 +1,68 @@
+{
+  "id": "builtin.neuterradise.card.portrait-frame",
+  "kind": "profile-card",
+  "name": "Portrait Frame",
+  "description": "A framed Cover becomes the identity anchor, with centered supporting metadata.",
+  "spec": {
+    "legacyVariant": "portrait-frame",
+    "aspect": 0.75,
+    "art": "cover",
+    "density": "standard",
+    "hover": "spotlight",
+    "frame": "lite",
+    "composition": {
+      "type": "stack",
+      "spacing": 4,
+      "children": [
+        {
+          "type": "frame",
+          "size": 80,
+          "hAlign": "center"
+        },
+        {
+          "type": "text",
+          "slot": "profile.identity.name",
+          "role": "card-title",
+          "color": "token:textPrimary",
+          "maxLines": 2,
+          "align": "center"
+        },
+        {
+          "type": "text",
+          "slot": "profile.identity.category",
+          "role": "micro",
+          "color": "token:textSecondary",
+          "maxLines": 1,
+          "visibleWhen": "profile.identity.category",
+          "align": "center"
+        },
+        {
+          "type": "text",
+          "slot": "profile.identity.tags",
+          "role": "micro",
+          "color": "token:textSecondary",
+          "maxLines": 1,
+          "visibleWhen": "profile.identity.tags",
+          "align": "center"
+        },
+        {
+          "type": "badge",
+          "slot": "profile.identity.rating",
+          "style": "text",
+          "visibleWhen": "profile.identity.rating",
+          "hAlign": "center"
+        },
+        {
+          "type": "badge",
+          "slot": "profile.identity.favorite",
+          "style": "text",
+          "visibleWhen": "profile.identity.favorite",
+          "hAlign": "center"
+        }
+      ],
+      "padding": 12,
+      "background": "token:surface1",
+      "vAlign": "center"
+    }
+  }
+}

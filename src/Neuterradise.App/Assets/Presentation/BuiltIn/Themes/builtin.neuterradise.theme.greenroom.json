@@ -1,0 +1,91 @@
+{
+  "id": "builtin.neuterradise.theme.greenroom",
+  "kind": "theme",
+  "name": "Greenroom",
+  "description": "Fresh green on warm paper.",
+  "spec": {
+    "theme": {
+      "schemaVersion": 1,
+      "id": "greenroom",
+      "name": "Greenroom",
+      "isDark": false,
+      "colors": {
+        "canvas": "#FFF3F7F2",
+        "surface1": "#FFFAFCF8",
+        "surface2": "#FFE8F1E6",
+        "surface3": "#FFDDEBDD",
+        "surfaceElevated": "#FFFFFFFF",
+        "surfaceOverlay": "#F2EDF3EF",
+        "surfaceHover": "#FFDCEEDB",
+        "surfacePressed": "#FFC8DEC8",
+        "surfaceSelected": "#FFCBE8D2",
+        "textPrimary": "#FF173A28",
+        "textSecondary": "#FF3A5D47",
+        "textMuted": "#FF597260",
+        "textDisabled": "#FF96999D",
+        "textInverse": "#FFF9FAFC",
+        "textOnAccent": "#FFFFFFFF",
+        "textLink": "#FF236E48",
+        "borderSubtle": "#14202C3A",
+        "borderDefault": "#24202C3A",
+        "borderStrong": "#40202C3A",
+        "borderInteractive": "#FF236E48",
+        "borderSelected": "#FF236E48",
+        "focus": "#FF236E48",
+        "accent": "#FF236E48",
+        "accentHover": "#FF1A573A",
+        "accentPressed": "#FF12402A",
+        "accentSecondary": "#FF47786C",
+        "selection": "#33236E48",
+        "selectionHover": "#4D236E48",
+        "info": "#FF2E638D",
+        "success": "#FF287044",
+        "warning": "#FF8A5B12",
+        "danger": "#FFA93543",
+        "dangerHover": "#FF902B37"
+      },
+      "typography": {
+        "displayFamily": "Segoe UI Variable Display",
+        "headingFamily": "Segoe UI Variable Display",
+        "bodyFamily": "Segoe UI Variable Text",
+        "monoFamily": "Cascadia Mono"
+      },
+      "shape": {
+        "xs": 3,
+        "sm": 5,
+        "md": 8,
+        "lg": 12,
+        "xl": 16
+      },
+      "motion": {
+        "fastMs": 120,
+        "normalMs": 180,
+        "slowMs": 280,
+        "cinematicMs": 500
+      },
+      "background": {
+        "kind": "RadialGlow"
+      },
+      "morphology": {
+        "navigationTreatment": "SelectedSurface",
+        "cardPersonality": "Glass",
+        "chromeTreatment": "Elevated",
+        "focusTreatment": "Ring",
+        "borderWeight": 1,
+        "elevationStrength": 0.6,
+        "glowStrength": 0.12,
+        "panelOpacity": 1,
+        "motionIntensity": 0.75,
+        "navigationRadiusScale": 0.65
+      }
+    },
+    "material": {
+      "personality": "milky-paper",
+      "atmosphere": "daylight",
+      "grain": 0.01,
+      "glassOpacity": 1,
+      "specular": 0.08,
+      "rimLight": 0.1
+    }
+  }
+}

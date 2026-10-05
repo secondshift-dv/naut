@@ -1,0 +1,41 @@
+{
+  "id": "builtin.neuterradise.effect.confetti",
+  "kind": "effect",
+  "name": "Confetti",
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  },
+  "spec": {
+    "targets": [
+      "all"
+    ],
+    "channel": "particles",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "particles",
+            "direction": "down",
+            "particleShape": "diamond",
+            "count": 30,
+            "opacity": 0.3,
+            "speed": 0.75,
+            "sizeMin": 2,
+            "sizeMax": 4,
+            "color": "token:accentSecondary"
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  }
+}

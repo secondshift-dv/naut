@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "packId": "example.single-layout",
+  "version": "1.0.0",
+  "name": "Single Gallery Layout Example",
+  "author": "Example",
+  "description": "A minimal Presentation Pack containing exactly one gallery layout definition.",
+  "license": "CC0-1.0",
+  "minContractVersion": 1,
+  "assets": [],
+  "definitions": [
+    {
+      "id": "example.single-layout.gallery-grid",
+      "kind": "gallery-layout",
+      "name": "Compact Grid Example",
+      "description": "A responsive grid with slightly denser spacing.",
+      "tags": [
+        "example",
+        "grid"
+      ],
+      "spec": {
+        "primitive": "VirtualizedGrid",
+        "itemMinWidth": 220,
+        "itemMaxWidth": 360,
+        "spacing": 12,
+        "maxColumns": 10
+      }
+    }
+  ]
+}

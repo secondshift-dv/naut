@@ -1,0 +1,15 @@
+{
+  "id": "builtin.neuterradise.spotlight.storefront",
+  "kind": "spotlight-style",
+  "name": "Storefront",
+  "spec": {
+    "composition": "storefront",
+    "motion": "still",
+    "transition": "slide",
+    "rotationSeconds": 14,
+    "showCover": true,
+    "showOverview": true,
+    "pagination": "counter-rail",
+    "scrimStrength": 0.65
+  }
+}

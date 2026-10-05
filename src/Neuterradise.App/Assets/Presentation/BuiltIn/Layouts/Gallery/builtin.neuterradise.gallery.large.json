@@ -1,0 +1,14 @@
+{
+  "id": "builtin.neuterradise.gallery.large",
+  "kind": "gallery-layout",
+  "name": "Showcase Grid",
+  "description": "Fewer, larger card envelopes for browsing Profile cards at higher visual prominence.",
+  "spec": {
+    "primitive": "VirtualizedGrid",
+    "itemMinWidth": 300,
+    "itemMaxWidth": 440,
+    "spacing": 14,
+    "maxColumns": 6,
+    "rowHeight": 280
+  }
+}
