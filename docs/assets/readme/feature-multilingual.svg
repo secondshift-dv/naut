@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="title desc">
+<title id="title">Naut eight interface languages</title>
+<desc id="desc">A language settings illustration surrounded by the eight interface languages shipped with Naut.</desc>
+<defs>
+<linearGradient id="bg6" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0B1017"/><stop offset="1" stop-color="#111822"/></linearGradient>
+<linearGradient id="gold6" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#F4D35E"/><stop offset="1" stop-color="#E79A39"/></linearGradient>
+<style>.t{font:700 34px "Segoe UI",Arial,sans-serif;fill:#F7F9FC}.s{font:500 18px "Segoe UI",Arial,sans-serif;fill:#9AA8BA}.l{font:700 17px "Segoe UI",Arial,sans-serif;fill:#F7F9FC}.m{font:500 15px "Segoe UI",Arial,sans-serif;fill:#AAB5C5}.tag{font:700 12px "Segoe UI",Arial,sans-serif;fill:#0B1017;letter-spacing:1.4px}</style>
+</defs>
+<rect width="1200" height="560" rx="34" fill="url(#bg6)"/>
+<rect x="52" y="42" width="124" height="28" rx="14" fill="url(#gold6)"/><text x="114" y="61" text-anchor="middle" class="tag">NAUT FEATURE</text>
+<text x="52" y="112" class="t">Eight interface languages, one collection</text>
+<text x="52" y="145" class="s">Language changes the UI — not your Vault or media</text>
+<rect x="412" y="205" width="376" height="258" rx="30" fill="#121B27" stroke="#263548" stroke-width="2"/>
+<text x="446" y="247" class="m">SETTINGS</text><text x="446" y="287" class="l">Interface language</text>
+<rect x="446" y="315" width="308" height="58" rx="18" fill="#182838" stroke="#F4D35E"/>
+<circle cx="478" cy="344" r="12" fill="#F4D35E"/><text x="507" y="351" class="l">Bahasa Indonesia</text>
+<path d="M720 338l8 8 8-8" fill="none" stroke="#9AA8BA" stroke-width="3" stroke-linecap="round"/>
+<text x="446" y="414" class="m">Your Profile names, tags and media stay intact.</text>
+<g class="l"><rect x="70" y="215" width="230" height="54" rx="20" fill="#152131" stroke="#33445B"/><text x="185" y="248" text-anchor="middle">English</text><rect x="70" y="292" width="230" height="54" rx="20" fill="#152131" stroke="#33445B"/><text x="185" y="325" text-anchor="middle">Deutsch</text><rect x="70" y="369" width="230" height="54" rx="20" fill="#152131" stroke="#33445B"/><text x="185" y="402" text-anchor="middle">Español</text><rect x="70" y="446" width="230" height="54" rx="20" fill="#152131" stroke="#33445B"/><text x="185" y="479" text-anchor="middle">Français</text><rect x="900" y="215" width="230" height="54" rx="20" fill="#152131" stroke="#33445B"/><text x="1015" y="248" text-anchor="middle">Bahasa Indonesia</text><rect x="900" y="292" width="230" height="54" rx="20" fill="#152131" stroke="#33445B"/><text x="1015" y="325" text-anchor="middle">日本語</text><rect x="900" y="369" width="230" height="54" rx="20" fill="#152131" stroke="#33445B"/><text x="1015" y="402" text-anchor="middle">한국어</text><rect x="900" y="446" width="230" height="54" rx="20" fill="#152131" stroke="#33445B"/><text x="1015" y="479" text-anchor="middle">简体中文</text></g>
+<path d="M300 242C355 242 355 260 412 260M300 319C355 319 355 306 412 306M300 396C355 396 355 352 412 352M300 473C355 473 355 398 412 398" fill="none" stroke="#2B4058" stroke-width="2"/>
+<path d="M788 260C845 260 845 242 900 242M788 306C845 306 845 319 900 319M788 352C845 352 845 396 900 396M788 398C845 398 845 473 900 473" fill="none" stroke="#2B4058" stroke-width="2"/>
+</svg>

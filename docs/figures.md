@@ -1,12 +1,12 @@
 # 3D Figures
 
-Interactive **Figure** presentation is optional. Naut's normal collection experience does not require a high-end discrete GPU.
+A compatible 3D model can become an optional interactive **Figure** inside a Profile. Figure presentation extends the normal collection experience; it is not required to use Naut.
 
 ## What a Figure is
 
-A suitable 3D model in a Profile can be prepared into Naut's durable Figure representation and displayed in the Profile identity region.
+A suitable model can be prepared into Naut's durable Figure representation and displayed in the Profile identity region.
 
-The Figure viewer supports direct interaction such as rotate, pan, and zoom while Naut keeps camera, framing, pedestal, texture policy, and renderer behavior under the application engine.
+The Figure viewer supports direct interaction such as **rotate, pan, and zoom** while Naut keeps camera behavior, framing, pedestal presentation, texture policy, and renderer behavior under the application engine.
 
 ## Hardware tier
 
@@ -23,4 +23,4 @@ See [System Requirements](system-requirements.md) for the v0.0.1 minimum and rec
 
 ## If a Figure is not available
 
-A Profile can still use all normal image/video and collection features. Figure eligibility and preparation are separate from whether the Profile itself is usable.
+A Profile can still use all normal image/video, presentation, and collection features. Figure eligibility and preparation are separate from whether the Profile itself is usable.

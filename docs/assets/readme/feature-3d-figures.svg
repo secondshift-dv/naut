@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="title desc">
+<title id="title">Naut interactive 3D Figures</title>
+<desc id="desc">Stylized interactive 3D Figure on a pedestal with rotate, pan, and zoom controls.</desc>
+<defs>
+<linearGradient id="bg3" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0B1017"/><stop offset="1" stop-color="#151624"/></linearGradient>
+<linearGradient id="gold3" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#F4D35E"/><stop offset="1" stop-color="#E79A39"/></linearGradient>
+<radialGradient id="halo3"><stop stop-color="#7C6CFF" stop-opacity=".28"/><stop offset="1" stop-color="#7C6CFF" stop-opacity="0"/></radialGradient>
+<style>.t{font:700 34px "Segoe UI",Arial,sans-serif;fill:#F7F9FC}.s{font:500 18px "Segoe UI",Arial,sans-serif;fill:#9AA8BA}.l{font:700 18px "Segoe UI",Arial,sans-serif;fill:#F7F9FC}.m{font:500 15px "Segoe UI",Arial,sans-serif;fill:#AAB5C5}.tag{font:700 12px "Segoe UI",Arial,sans-serif;fill:#0B1017;letter-spacing:1.4px}</style>
+</defs>
+<rect width="1200" height="560" rx="34" fill="url(#bg3)"/>
+<rect x="52" y="42" width="124" height="28" rx="14" fill="url(#gold3)"/><text x="114" y="61" text-anchor="middle" class="tag">NAUT FEATURE</text>
+<text x="52" y="112" class="t">Bring your collection into 3D</text>
+<text x="52" y="145" class="s">Compatible models become interactive Figures inside a Profile</text>
+<circle cx="388" cy="333" r="230" fill="url(#halo3)"/>
+<ellipse cx="400" cy="458" rx="190" ry="38" fill="#0A0F16" stroke="#2B3445" stroke-width="2"/>
+<ellipse cx="400" cy="445" rx="146" ry="27" fill="#1C2430" stroke="#F4D35E" stroke-opacity=".55"/>
+<path d="M400 187l-48 58 19 104 29 52 29-52 19-104z" fill="#24354A" stroke="#7C8EAA" stroke-width="3"/>
+<circle cx="400" cy="155" r="42" fill="#26384C" stroke="#7C8EAA" stroke-width="3"/>
+<path d="M356 245l-74 80M444 245l74 80M372 346l-48 90M428 346l48 90" fill="none" stroke="#7C8EAA" stroke-width="20" stroke-linecap="round"/>
+<path d="M356 245l-74 80M444 245l74 80M372 346l-48 90M428 346l48 90" fill="none" stroke="#B4C2D6" stroke-width="3" stroke-linecap="round"/>
+<ellipse cx="400" cy="280" rx="214" ry="102" fill="none" stroke="#5BC0EB" stroke-width="3" stroke-dasharray="10 10"/>
+<path d="M594 270l21 11-20 13" fill="none" stroke="#5BC0EB" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="700" y="190" width="430" height="295" rx="28" fill="#121B27" stroke="#263548" stroke-width="2"/>
+<text x="735" y="232" class="l">Interactive Figure controls</text>
+<g transform="translate(735 266)"><rect width="116" height="48" rx="24" fill="#182838" stroke="#5BC0EB"/><text x="58" y="30" text-anchor="middle" class="m">Rotate</text><rect x="132" width="116" height="48" rx="24" fill="#182838" stroke="#5BC0EB"/><text x="190" y="30" text-anchor="middle" class="m">Pan</text><rect x="264" width="116" height="48" rx="24" fill="#182838" stroke="#5BC0EB"/><text x="322" y="30" text-anchor="middle" class="m">Zoom</text></g>
+<path d="M735 350h360" stroke="#263548"/>
+<text x="735" y="390" class="m">• Direct3D 11 presentation path</text>
+<text x="735" y="424" class="m">• Naut-managed camera, framing and pedestal</text>
+<text x="735" y="458" class="m">• Runtime textures bounded for predictable load</text>
+</svg>

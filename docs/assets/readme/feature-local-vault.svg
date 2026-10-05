@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="title desc">
+<title id="title">Naut portable local Vault</title>
+<desc id="desc">The Naut application package and local Vault shown as separate boundaries, with media copied into the Vault.</desc>
+<defs>
+<linearGradient id="bg7" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0B1017"/><stop offset="1" stop-color="#111A1D"/></linearGradient>
+<linearGradient id="gold7" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#F4D35E"/><stop offset="1" stop-color="#E79A39"/></linearGradient>
+<marker id="a7" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#67D391"/></marker>
+<style>.t{font:700 34px "Segoe UI",Arial,sans-serif;fill:#F7F9FC}.s{font:500 18px "Segoe UI",Arial,sans-serif;fill:#9AA8BA}.l{font:700 18px "Segoe UI",Arial,sans-serif;fill:#F7F9FC}.m{font:500 15px "Segoe UI",Arial,sans-serif;fill:#AAB5C5}.tag{font:700 12px "Segoe UI",Arial,sans-serif;fill:#0B1017;letter-spacing:1.4px}</style>
+</defs>
+<rect width="1200" height="560" rx="34" fill="url(#bg7)"/>
+<rect x="52" y="42" width="124" height="28" rx="14" fill="url(#gold7)"/><text x="114" y="61" text-anchor="middle" class="tag">NAUT FEATURE</text>
+<text x="52" y="112" class="t">Your app can move. Your collection stays yours.</text>
+<text x="52" y="145" class="s">The portable application package and Vault are intentionally separate boundaries</text>
+<rect x="68" y="214" width="350" height="238" rx="30" fill="#121B27" stroke="#263548" stroke-width="2"/>
+<rect x="96" y="242" width="294" height="58" rx="17" fill="#182838"/><rect x="118" y="259" width="28" height="24" rx="6" fill="#F4D35E"/><text x="162" y="278" class="l">Naut application</text>
+<text x="100" y="341" class="m">naut.exe</text><text x="100" y="374" class="m">runtime/</text><text x="100" y="407" class="m">release-manifest.json</text><text x="100" y="435" class="m">Replaceable by an app update</text>
+<path d="M442 333H578" stroke="#67D391" stroke-width="4" stroke-dasharray="9 9" marker-end="url(#a7)"/>
+<rect x="467" y="286" width="86" height="31" rx="15" fill="#14231F"/><text x="510" y="307" text-anchor="middle" class="m">separate</text>
+<rect x="606" y="194" width="526" height="298" rx="30" fill="#13201C" stroke="#3C765F" stroke-width="2"/>
+<path d="M646 236h120l18 20h302v198H646z" fill="#182B25" stroke="#67D391" stroke-width="2"/>
+<text x="670" y="285" class="l">Vault</text><text x="670" y="314" class="m">local durable collection boundary</text>
+<rect x="670" y="342" width="124" height="70" rx="16" fill="#1F342D"/><text x="732" y="372" text-anchor="middle" class="m">catalog.db</text><text x="732" y="394" text-anchor="middle" class="m">catalog</text>
+<rect x="814" y="342" width="124" height="70" rx="16" fill="#1F342D"/><text x="876" y="372" text-anchor="middle" class="m">Media</text><text x="876" y="394" text-anchor="middle" class="m">copied files</text>
+<rect x="958" y="342" width="128" height="70" rx="16" fill="#1F342D"/><text x="1022" y="372" text-anchor="middle" class="m">Prepared</text><text x="1022" y="394" text-anchor="middle" class="m">derivatives</text>
+<text x="670" y="454" class="m">Back up the Vault as one unit after closing Naut.</text>
+<rect x="68" y="480" width="350" height="42" rx="21" fill="#182838"/><text x="243" y="506" text-anchor="middle" class="m">Import = copy · source files remain in place</text>
+</svg>

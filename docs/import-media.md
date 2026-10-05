@@ -9,16 +9,28 @@ Naut imports by **copying** media into the active Vault. Original files stay whe
 
 Both paths use the same media preparation pipeline; Profile-scoped import simply skips the step of choosing a destination Profile.
 
-## What Naut prepares
+## Type-specific preparation
 
-Depending on media type, Naut can prepare metadata, thumbnails, video hover media, face-aware suggestions, and 3D Figure derivatives. Processing is type-specific; a media type is not sent through irrelevant preparation.
+Naut does not send every media type through every processor. Depending on the input and its eligibility, the preparation pipeline can produce:
+
+- metadata used by the catalog;
+- thumbnails for browsing;
+- bounded hover/banner presentation media for video;
+- [local face analysis](face-intelligence.md) for applicable image/video content;
+- durable Figure preparation for supported 3D models.
+
+A duplicate with identical content can reuse compatible preparation that already exists in the Vault instead of repeating unnecessary work.
 
 The import review can suggest presentation media, but **Cover and Banner can always be changed later**.
 
-## Duplicates and originals
+## Originals and prepared media
 
-Identical content may reuse preparation that already exists in the Vault. Import remains a copy operation: Naut does not cut the source file from its original location.
+Import remains a copy operation. The source file outside Naut is not cut or replaced. Prepared derivatives exist to make Naut responsive and presentation-aware; they are not destructive edits to the original file.
+
+Opening an original media item still uses the normal Windows application associated with that file type.
 
 ## If an import needs attention
 
 Open the Import surface and check **Needs attention**. Keep the original file available until the import has completed successfully.
+
+Face-analysis availability is separate from whether an image or video can belong to a Profile. Figure eligibility is likewise separate from normal Profile use.

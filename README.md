@@ -13,6 +13,7 @@
 </p>
 
 <p align="center">
+  <sub><strong>README:</strong>
   <a href="README.md">English</a> ·
   <a href="README.de.md">Deutsch</a> ·
   <a href="README.es.md">Español</a> ·
@@ -21,31 +22,76 @@
   <a href="README.ja.md">日本語</a> ·
   <a href="README.ko.md">한국어</a> ·
   <a href="README.zh-Hans.md">简体中文</a>
+  </sub>
 </p>
 
 <p align="center">
-  <img src="docs/assets/naut-showcase.gif" alt="Naut interactive showcase" width="960">
+  <img src="docs/assets/readme/naut-showcase.gif" alt="Naut interactive showcase" width="682">
 </p>
 
-Naut is a **local-first media collection manager for Windows**. It organizes images, videos, and optional interactive 3D Figures around Profiles inside a portable Vault, while keeping the collection under the user's control.
+## Your collection, made worth exploring.
 
-## What Naut is built for
+Naut is a **local-first media collection manager for Windows**. It turns images, videos, and supported 3D models into Profile-centered collections that can be recognized, presented, and explored without moving ownership into a cloud service.
 
-- **Profiles, not folders first.** Give a collection identity with Covers, Banners, categories, tags, ratings, notes, and relationships.
-- **Media that stays yours.** Import copies files into a local Vault; originals remain where they are.
-- **Presentation without changing the originals.** Customize Home, Gallery, Cards, Profile layouts, frames, backdrops, effects, and themes.
-- **Video-aware.** Naut prepares bounded hover/banner media while original videos still open with the Windows default player.
-- **Optional interactive 3D.** Figure presentation uses Direct3D 11 but is not required for normal Naut use.
-- **Portable by design.** The application package and Vault are separate, so application updates do not replace the collection.
+## Feature highlights
 
 <table>
 <tr>
-<td width="50%"><img src="docs/assets/showcase-home.png" alt="Naut Home"></td>
-<td width="50%"><img src="docs/assets/showcase-profile.png" alt="Naut Profile with interactive Figure"></td>
+<td width="50%" valign="top">
+<a href="docs/face-intelligence.md"><img src="docs/assets/readme/feature-face-intelligence.svg" alt="Face intelligence" width="100%"></a><br>
+<strong>Face intelligence</strong><br>
+YuNet detects applicable faces, SFace produces embeddings, and Naut can surface Profile candidates from confirmed identity samples. Processing stays local and suggestions remain reviewable.
+</td>
+<td width="50%" valign="top">
+<a href="docs/figures.md"><img src="docs/assets/readme/feature-3d-figures.svg" alt="Interactive 3D Figures" width="100%"></a><br>
+<strong>Interactive 3D Figures</strong><br>
+Compatible models can become interactive Figures with rotate, pan, zoom, Naut-managed framing, and a bounded runtime texture policy.
+</td>
 </tr>
 <tr>
-<td><strong>Home</strong> — featured Profiles, activity, and collection context.</td>
-<td><strong>Profile</strong> — identity, media, presentation, and optional interactive Figure.</td>
+<td width="50%" valign="top">
+<a href="docs/import-media.md"><img src="docs/assets/readme/feature-smart-import.svg" alt="Smart media import" width="100%"></a><br>
+<strong>Smart media import</strong><br>
+The same import path prepares only what each media type needs: metadata, thumbnails, bounded video presentation media, face analysis when applicable, and Figure derivatives for supported models.
+</td>
+<td width="50%" valign="top">
+<a href="docs/customization.md"><img src="docs/assets/readme/feature-customization.svg" alt="Presentation without destructive edits" width="100%"></a><br>
+<strong>Presentation without destructive edits</strong><br>
+Customize Home, Gallery, Cards, Profiles, Covers, Banners, Frames, Backdrops, layouts, effects, and themes while leaving the original media intact.
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<a href="docs/languages.md"><img src="docs/assets/readme/feature-multilingual.svg" alt="8 interface languages" width="100%"></a><br>
+<strong>8 interface languages</strong><br>
+Naut ships with English, Bahasa Indonesia, 日本語, 한국어, 简体中文, Deutsch, Français, and Español. Interface language does not rewrite your Vault or media metadata.
+</td>
+<td width="50%" valign="top">
+<a href="docs/vault.md"><img src="docs/assets/readme/feature-local-vault.svg" alt="Portable local Vault" width="100%"></a><br>
+<strong>Portable local Vault</strong><br>
+The portable app package and the Vault are separate boundaries. Imports copy files into the Vault while the source files remain where they were.
+</td>
+</tr>
+</table>
+
+## Why Naut
+
+- **Profiles, not folders first.** A Profile can represent a person, character, project, object, subject, or any collection identity.
+- **Local control by design.** The authoritative collection lives in the Vault you choose.
+- **Prepared for browsing.** Naut generates bounded presentation derivatives instead of modifying original media.
+- **3D is additive, not mandatory.** Normal Naut use does not require a discrete GPU or a Figure.
+- **Portable application, durable collection.** Updating the app package does not replace the Vault.
+
+## See it in action
+
+<table>
+<tr>
+<td width="50%"><img src="docs/assets/readme/showcase-home.png" alt="Home — featured Profiles, activity, and collection context." width="100%"><br><sub>Home — featured Profiles, activity, and collection context.</sub></td>
+<td width="50%"><img src="docs/assets/readme/showcase-profile.png" alt="Profile — identity, media, presentation, and optional interactive Figure." width="100%"><br><sub>Profile — identity, media, presentation, and optional interactive Figure.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/assets/readme/showcase-gallery.png" alt="Gallery — collection browsing, search, filters, and card presentation." width="100%"><br><sub>Gallery — collection browsing, search, filters, and card presentation.</sub></td>
+<td width="50%"><img src="docs/assets/readme/showcase-settings.png" alt="Settings — Theme, language, Vault controls, and system-facing options." width="100%"><br><sub>Settings — Theme, language, Vault controls, and system-facing options.</sub></td>
 </tr>
 </table>
 
@@ -57,11 +103,11 @@ Naut is a **local-first media collection manager for Windows**. It organizes ima
 4. Choose **where to keep** your Vault.
 5. Import media or create a Profile and use **Add media**.
 
-The portable package must keep `runtime/` and `release-manifest.json` beside `naut.exe`.
-
-For a browser preview that does not touch local files or a Vault, open the [Interactive Showcase](https://secondshift-dv.github.io/naut/).
+The portable package must keep `runtime/` and `release-manifest.json` beside `naut.exe`. For a browser preview that does not touch local files or a Vault, open the [Interactive Showcase](https://secondshift-dv.github.io/naut/).
 
 ## System Requirements
+
+Naut's normal collection experience is intentionally lighter than its optional Figure workload.
 
 | | Minimum | Recommended |
 | --- | --- | --- |
@@ -72,15 +118,11 @@ For a browser preview that does not touch local files or a Vault, open the [Inte
 | **Display** | 1280 × 720 | 1920 × 1080 or higher |
 | **Free app/update space** | 1.5 GB | 1.5 GB+ on SSD |
 
-Vault storage is **separate** and depends on the size of your collection. Interactive 3D Figure is an optional workload tier; a discrete GPU is not a minimum requirement.
-
-See the full [Naut v0.0.1 System Requirements](docs/system-requirements.md), including video playback and Figure notes.
+Vault storage is separate and depends on the size of your collection. See the full [Naut v0.0.1 System Requirements](docs/system-requirements.md).
 
 ## Documentation
 
-Start with the [Naut Documentation](docs/README.md):
-
-**Getting Started** · **Import Media** · **Profiles** · **Vault** · **Customization** · **3D Figures** · **System Requirements** · **FAQ & Troubleshooting**
+Start with the [Naut Documentation](docs/README.md): **Getting Started** · **Import Media** · **Face Intelligence** · **Profiles** · **Vault** · **Customization** · **Languages** · **3D Figures** · **System Requirements** · **FAQ & Troubleshooting**.
 
 Contributor-facing build, licensing, and Presentation Pack material lives under [docs/development](docs/development/).
 

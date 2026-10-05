@@ -9,3 +9,18 @@ Upstream license text: https://github.com/polyformproject/polyform-licenses/blob
 Required Notice: Copyright 2026 Second Shift (@secondshift-dv), https://github.com/secondshift-dv/naut
 
 Naut brand use is governed separately by [BRAND-POLICY.md](../../BRAND-POLICY.md). Third-party materials retain their original licenses, copyright notices, attribution, modification disclosures and applicable source obligations. See [THIRD-PARTY-NOTICES.txt](../../THIRD-PARTY-NOTICES.txt) for the distribution inventory.
+
+## Face-model provenance
+
+The bundled face-analysis runtime uses exact pinned YuNet and SFace artifacts listed in [THIRD-PARTY-NOTICES.txt](../../THIRD-PARTY-NOTICES.txt):
+
+- YuNet face detector model — **MIT**;
+- SFace face recognition model — **Apache-2.0**.
+
+Their upstream licenses and notices apply to those third-party runtime artifacts. Naut does not claim those models as Naut-owned source.
+
+## Documentation artwork
+
+Feature illustrations under `docs/assets/readme/` are Naut-authored vector artwork created for the public repository. They do not copy OpenCV Zoo demo images or use the OpenCV logo as Naut branding.
+
+This separation keeps README marketing artwork provenance independent from the third-party model/runtime licensing inventory.

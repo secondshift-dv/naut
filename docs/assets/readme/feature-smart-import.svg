@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="title desc">
+<title id="title">Naut smart import pipeline</title>
+<desc id="desc">Image, video and 3D model inputs flow through type-specific preparation into a Naut Vault.</desc>
+<defs>
+<linearGradient id="bg4" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0B1017"/><stop offset="1" stop-color="#101A20"/></linearGradient>
+<linearGradient id="g4" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#F4D35E"/><stop offset="1" stop-color="#E79A39"/></linearGradient>
+<marker id="a4" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#67D391"/></marker>
+<style>.t{font:700 34px "Segoe UI",Arial,sans-serif;fill:#F7F9FC}.s{font:500 18px "Segoe UI",Arial,sans-serif;fill:#9AA8BA}.l{font:700 17px "Segoe UI",Arial,sans-serif;fill:#F7F9FC}.m{font:500 14px "Segoe UI",Arial,sans-serif;fill:#AAB5C5}.tag{font:700 12px "Segoe UI",Arial,sans-serif;fill:#0B1017;letter-spacing:1.4px}</style>
+</defs>
+<rect width="1200" height="560" rx="34" fill="url(#bg4)"/>
+<rect x="52" y="42" width="124" height="28" rx="14" fill="url(#g4)"/><text x="114" y="61" text-anchor="middle" class="tag">NAUT FEATURE</text>
+<text x="52" y="112" class="t">Import once. Prepare what each media type needs.</text>
+<text x="52" y="145" class="s">One intake path, type-specific work, reusable derivatives</text>
+<g transform="translate(58 212)"><rect width="175" height="76" rx="20" fill="#121B27" stroke="#263548" stroke-width="2"/><rect x="20" y="18" width="42" height="40" rx="7" fill="#25364A"/><circle cx="47" cy="31" r="6" fill="#F4D35E"/><path d="M25 54l12-14 9 8 8-10 5 16z" fill="#6F829B"/><text x="80" y="35" class="l">Images</text><text x="80" y="56" class="m">photo media</text></g>
+<g transform="translate(58 310)"><rect width="175" height="76" rx="20" fill="#121B27" stroke="#263548" stroke-width="2"/><rect x="20" y="18" width="42" height="40" rx="7" fill="#25364A"/><path d="M37 28l16 10-16 10z" fill="#5BC0EB"/><text x="80" y="35" class="l">Videos</text><text x="80" y="56" class="m">motion media</text></g>
+<g transform="translate(58 408)"><rect width="175" height="76" rx="20" fill="#121B27" stroke="#263548" stroke-width="2"/><path d="M42 17l22 13v25L42 68 20 55V30z" fill="#25364A" stroke="#D986F7"/><path d="M20 30l22 13 22-13M42 43v25" fill="none" stroke="#D986F7"/><text x="80" y="35" class="l">3D models</text><text x="80" y="56" class="m">eligible Figure input</text></g>
+<path d="M250 250H355M250 348H355M250 446H355" stroke="#67D391" stroke-width="4" marker-end="url(#a4)"/>
+<rect x="377" y="248" width="238" height="204" rx="28" fill="#14231F" stroke="#3C765F" stroke-width="2"/>
+<circle cx="496" cy="317" r="45" fill="#1E3A31" stroke="#67D391" stroke-width="3"/><path d="M475 317h42M496 296v42" stroke="#67D391" stroke-width="5" stroke-linecap="round"/>
+<text x="496" y="389" text-anchor="middle" class="l">Naut import</text><text x="496" y="416" text-anchor="middle" class="m">inspect → prepare → store</text>
+<path d="M633 350H718" stroke="#67D391" stroke-width="4" marker-end="url(#a4)"/>
+<rect x="742" y="202" width="400" height="292" rx="28" fill="#121B27" stroke="#263548" stroke-width="2"/>
+<text x="776" y="238" class="l">Prepared only when applicable</text>
+<g class="m"><rect x="776" y="266" width="150" height="44" rx="16" fill="#182838"/><text x="851" y="293" text-anchor="middle">Metadata</text><rect x="944" y="266" width="162" height="44" rx="16" fill="#182838"/><text x="1025" y="293" text-anchor="middle">Thumbnail</text><rect x="776" y="326" width="150" height="44" rx="16" fill="#182838"/><text x="851" y="353" text-anchor="middle">Face analysis</text><rect x="944" y="326" width="162" height="44" rx="16" fill="#182838"/><text x="1025" y="353" text-anchor="middle">Hover / Banner</text><rect x="776" y="386" width="330" height="44" rx="16" fill="#182838"/><text x="941" y="413" text-anchor="middle">Figure derivative for supported models</text></g>
+<text x="776" y="463" class="m">Import copies source media; originals stay where they are.</text>
+</svg>

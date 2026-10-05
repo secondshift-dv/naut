@@ -12,6 +12,16 @@ No. Import copies media into the Vault. Originals remain at their original paths
 
 Yes. Import suggestions are not permanent presentation decisions.
 
+## Why is there no face suggestion for a media item?
+
+Face analysis is type-specific and depends on applicable content, usable detections, model availability, compatible embeddings, and an identity index with confirmed samples. A media item can still belong to a Profile even when face analysis produces no candidate.
+
+See [Face Intelligence](face-intelligence.md) for the detection → embedding → candidate → confirmation distinction.
+
+## Does a face candidate automatically identify someone?
+
+No. A candidate is a reviewable model suggestion. Naut keeps confirmation as a separate durable decision.
+
 ## Why does an original video open outside Naut?
 
 Opening an original media item uses the Windows default application for that file. For original video playback, the available Windows player/codecs therefore matter.
@@ -23,6 +33,10 @@ No. Integrated graphics are sufficient for normal Naut use. Interactive 3D Figur
 ## A Figure is unavailable. Can I still use the Profile?
 
 Yes. Figure is optional and independent from the rest of the Profile experience.
+
+## Which interface languages are included?
+
+Naut v0.0.1 includes English, Bahasa Indonesia, 日本語, 한국어, 简体中文, Deutsch, Français, and Español. See [Languages](languages.md).
 
 ## Where should I put the Vault?
 

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="title desc">
+<title id="title">Naut face intelligence</title>
+<desc id="desc">Illustration of local YuNet face detection, SFace embeddings, and reviewable Profile candidates.</desc>
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0B1017"/><stop offset="1" stop-color="#111A26"/></linearGradient>
+<linearGradient id="accent" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#F4D35E"/><stop offset="1" stop-color="#E8A93A"/></linearGradient>
+<filter id="glow"><feGaussianBlur stdDeviation="16"/></filter>
+<marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#5BC0EB"/></marker>
+<style>.title{font:700 34px "Segoe UI",Arial,sans-serif;fill:#F7F9FC}.sub{font:500 18px "Segoe UI",Arial,sans-serif;fill:#9AA8BA}.label{font:700 18px "Segoe UI",Arial,sans-serif;fill:#F7F9FC}.small{font:500 15px "Segoe UI",Arial,sans-serif;fill:#9AA8BA}.micro{font:700 12px "Segoe UI",Arial,sans-serif;fill:#0B1017;letter-spacing:1.4px}.panel{fill:#121B27;stroke:#263548;stroke-width:2}</style>
+</defs>
+<rect width="1200" height="560" rx="34" fill="url(#bg)"/>
+<circle cx="180" cy="150" r="105" fill="#F4D35E" opacity=".09" filter="url(#glow)"/>
+<circle cx="955" cy="365" r="130" fill="#5BC0EB" opacity=".08" filter="url(#glow)"/>
+<rect x="52" y="42" width="124" height="28" rx="14" fill="url(#accent)"/><text x="114" y="61" text-anchor="middle" class="micro">NAUT FEATURE</text>
+<text x="52" y="112" class="title">Know who is in your collection</text>
+<text x="52" y="145" class="sub">Local face detection → embedding → reviewable Profile candidates</text>
+<rect x="58" y="185" width="292" height="315" rx="28" class="panel"/>
+<rect x="84" y="211" width="240" height="214" rx="20" fill="#0D141E"/>
+<circle cx="204" cy="282" r="52" fill="#2B3B50"/>
+<path d="M139 394c10-53 38-79 65-79s55 26 65 79" fill="#2B3B50"/>
+<rect x="138" y="236" width="132" height="128" rx="18" fill="none" stroke="#F4D35E" stroke-width="4"/>
+<path d="M138 258v-22h22M248 236h22v22M138 342v22h22M248 364h22v-22" fill="none" stroke="#F4D35E" stroke-width="5" stroke-linecap="round"/>
+<circle cx="182" cy="282" r="4" fill="#F4D35E"/><circle cx="226" cy="282" r="4" fill="#F4D35E"/><circle cx="204" cy="307" r="4" fill="#F4D35E"/>
+<text x="84" y="458" class="label">1 · Detect</text><text x="84" y="483" class="small">YuNet finds applicable faces</text>
+<path d="M370 342H462" stroke="#5BC0EB" stroke-width="4" marker-end="url(#arrow)"/>
+<rect x="477" y="225" width="194" height="90" rx="22" class="panel"/>
+<circle cx="510" cy="270" r="16" fill="#F4D35E"/><text x="542" y="264" class="label">YuNet</text><text x="542" y="288" class="small">face detector</text>
+<rect x="477" y="338" width="194" height="90" rx="22" class="panel"/>
+<circle cx="510" cy="383" r="16" fill="#5BC0EB"/><text x="542" y="377" class="label">SFace</text><text x="542" y="401" class="small">embedding model</text>
+<path d="M688 342H757" stroke="#5BC0EB" stroke-width="4" marker-end="url(#arrow)"/>
+<rect x="775" y="190" width="367" height="302" rx="28" class="panel"/>
+<text x="809" y="230" class="small">PROFILE CANDIDATE</text>
+<circle cx="845" cy="301" r="48" fill="#263548"/><circle cx="845" cy="286" r="17" fill="#91A1B5"/><path d="M815 335c6-23 18-34 30-34s24 11 30 34" fill="#91A1B5"/>
+<text x="916" y="286" class="label">Candidate 01</text><text x="916" y="315" class="small">local similarity signal</text>
+<rect x="809" y="372" width="154" height="42" rx="21" fill="#182838" stroke="#5BC0EB"/><text x="886" y="399" text-anchor="middle" class="small">Review suggestion</text>
+<rect x="979" y="372" width="129" height="42" rx="21" fill="url(#accent)"/><text x="1044" y="399" text-anchor="middle" class="small" fill="#0B1017">Confirm</text>
+<text x="809" y="454" class="small">Suggestions are not silent identity decisions.</text>
+</svg>

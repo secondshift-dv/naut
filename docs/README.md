@@ -6,12 +6,14 @@ Naut is a local-first media collection manager for Windows. Start here if you ar
 
 - [Getting Started](getting-started.md) — download, extract, create or pick a Vault, and start using Naut.
 - [Import Media](import-media.md) — bring images, videos, folders, and supported 3D models into a Vault.
-- [Profiles](profiles.md) — organize media around Profiles, Covers, Banners, relationships, ratings, and notes.
-- [Vault](vault.md) — understand where Naut keeps your collection and how Vault selection works.
+- [Face Intelligence](face-intelligence.md) — how YuNet, SFace, local identity samples, and reviewable Profile candidates fit together.
+- [Profiles](profiles.md) — organize media around Profiles, Covers, Banners, relationships, ratings, notes, and optional Figures.
+- [Vault](vault.md) — understand where Naut keeps the durable collection and how Vault selection works.
 - [Customization](customization.md) — themes, layouts, frames, backdrops, effects, and presentation choices.
+- [Languages](languages.md) — the eight interface languages and what changing language does and does not affect.
 - [3D Figures](figures.md) — optional interactive 3D presentation and its performance tier.
 - [System Requirements](system-requirements.md) — minimum and recommended requirements for Naut v0.0.1.
-- [FAQ & Troubleshooting](troubleshooting.md) — common installation, media, video, Figure, and update questions.
+- [FAQ & Troubleshooting](troubleshooting.md) — common installation, media, face analysis, video, Figure, and update questions.
 
 ## Developers and contributors
 

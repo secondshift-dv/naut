@@ -17,25 +17,40 @@ function Verify-PublicTree {
         'docs/README.md',
         'docs/getting-started.md',
         'docs/import-media.md',
+        'docs/face-intelligence.md',
         'docs/profiles.md',
         'docs/vault.md',
         'docs/customization.md',
+        'docs/languages.md',
         'docs/figures.md',
         'docs/system-requirements.md',
         'docs/troubleshooting.md'
     )
-    foreach ($required in @('LICENSE','BRAND-POLICY.md','CONTRIBUTING.md','SECURITY.md','THIRD-PARTY-NOTICES.txt','docs/assets/naut-showcase.gif') + $readmes + $userDocs) {
+    $readmeAssets=@(
+        'docs/assets/readme/naut-showcase.gif',
+        'docs/assets/readme/showcase-home.png',
+        'docs/assets/readme/showcase-profile.png',
+        'docs/assets/readme/showcase-gallery.png',
+        'docs/assets/readme/showcase-settings.png',
+        'docs/assets/readme/feature-face-intelligence.svg',
+        'docs/assets/readme/feature-3d-figures.svg',
+        'docs/assets/readme/feature-smart-import.svg',
+        'docs/assets/readme/feature-customization.svg',
+        'docs/assets/readme/feature-multilingual.svg',
+        'docs/assets/readme/feature-local-vault.svg'
+    )
+    foreach ($required in @('LICENSE','BRAND-POLICY.md','CONTRIBUTING.md','SECURITY.md','THIRD-PARTY-NOTICES.txt') + $readmeAssets + $readmes + $userDocs) {
         if (-not (Test-Path -LiteralPath (Join-Path $repo $required) -PathType Leaf)) { throw "Missing public contract: $required" }
     }
     foreach ($readme in $readmes) {
         $text=Get-Content -LiteralPath (Join-Path $repo $readme) -Raw
         foreach ($link in $readmes) { if ($text -notmatch [regex]::Escape($link)) { throw "README locale navigation incomplete: $readme -> $link" } }
-        foreach ($requiredText in @('wordmark-lockup.png','docs/assets/naut-showcase.gif','GitHub Releases','Source Available')) {
+        foreach ($requiredText in @('wordmark-lockup.png','docs/assets/readme/naut-showcase.gif','feature-face-intelligence.svg','feature-multilingual.svg','GitHub Releases','Source Available')) {
             if ($text -notmatch [regex]::Escape($requiredText)) { throw "README public positioning incomplete: $readme missing $requiredText" }
         }
     }
     $primaryReadme=Get-Content -LiteralPath (Join-Path $repo 'README.md') -Raw
-    foreach ($requiredText in @('Download Naut v0.0.1','View Live Demo','Documentation','System Requirements','Quick Start')) {
+    foreach ($requiredText in @('Download Naut v0.0.1','View Live Demo','Documentation','Feature highlights','Why Naut','System Requirements','Quick Start')) {
         if ($primaryReadme -notmatch [regex]::Escape($requiredText)) { throw "Primary README landing contract missing: $requiredText" }
     }
     $requirements=Get-Content -LiteralPath (Join-Path $repo 'docs/system-requirements.md') -Raw
