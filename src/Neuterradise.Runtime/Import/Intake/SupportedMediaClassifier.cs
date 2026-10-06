@@ -12,7 +12,7 @@ public static class SupportedMediaClassifier
 
     private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".mp4", ".mov", ".mkv", ".webm", ".avi", ".wmv", ".m4v", ".flv", ".3gp", ".ts"
+        ".mp4", ".mov", ".mkv", ".webm", ".avi", ".wmv", ".m4v", ".flv", ".3gp", ".ts", ".mpg", ".mpeg"
     };
 
     private static readonly HashSet<string> ModelExtensions = new(StringComparer.OrdinalIgnoreCase)

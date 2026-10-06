@@ -1,4 +1,4 @@
-naut v0.0.1 - Third-Party Runtime Notices
+naut v0.0.2 - Third-Party Runtime Notices
 
 This runtime package contains third-party runtime artifacts pinned by exact source/version and verified before packaging.
 

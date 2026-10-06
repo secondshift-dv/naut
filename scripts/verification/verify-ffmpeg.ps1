@@ -58,6 +58,10 @@ finally { $zip.Dispose() }
 if ([string]::IsNullOrWhiteSpace($FixtureRoot)) { $FixtureRoot = Join-Path $repoRoot 'out/ffmpeg-check' }
 New-Item -ItemType Directory -Path $FixtureRoot -Force | Out-Null
 $inputPath = Join-Path $FixtureRoot 'input.mp4'
+$mpegPath = Join-Path $FixtureRoot 'input.mpg'
+$mpegAliasPath = Join-Path $FixtureRoot 'input.mpeg'
+$mpegJpegPath = Join-Path $FixtureRoot 'mpeg-frame.jpg'
+$mpegHoverPath = Join-Path $FixtureRoot 'mpeg-hover.mp4'
 $jpegPath = Join-Path $FixtureRoot 'frame.jpg'
 $hoverPath = Join-Path $FixtureRoot 'hover.mp4'
 function Invoke-FfmpegChecked([string[]]$Arguments) {
@@ -65,6 +69,19 @@ function Invoke-FfmpegChecked([string[]]$Arguments) {
     if ($LASTEXITCODE -ne 0) { throw 'FFmpeg capability command failed.' }
 }
 Invoke-FfmpegChecked @('-nostdin','-hide_banner','-v','error','-y','-f','lavfi','-i','testsrc2=size=160x90:rate=10:duration=2','-an','-c:v','mpeg4','-pix_fmt','yuv420p',$inputPath)
+Invoke-FfmpegChecked @('-nostdin','-hide_banner','-v','error','-y','-f','lavfi','-i','testsrc2=size=160x90:rate=25:duration=2','-an','-c:v','mpeg2video','-pix_fmt','yuv420p','-f','mpeg',$mpegPath)
+Copy-Item -LiteralPath $mpegPath -Destination $mpegAliasPath -Force
+foreach ($mpegInput in @($mpegPath, $mpegAliasPath)) {
+    $mpegProbe = (& $ffprobe -v error -show_streams -show_format -of json $mpegInput | Out-String)
+    if ($LASTEXITCODE -ne 0) { throw "FFprobe MPEG capability failed for $([IO.Path]::GetExtension($mpegInput))." }
+    $mpegMetadata = $mpegProbe | ConvertFrom-Json
+    $mpegVideo = @($mpegMetadata.streams | Where-Object codec_type -eq 'video' | Select-Object -First 1)
+    if ($mpegVideo.Count -ne 1 -or $mpegVideo[0].codec_name -ne 'mpeg2video' -or $mpegMetadata.format.format_name -notmatch 'mpeg') {
+        throw "MPEG source contract failed for $([IO.Path]::GetExtension($mpegInput))."
+    }
+}
+Invoke-FfmpegChecked @('-nostdin','-hide_banner','-v','error','-y','-i',$mpegPath,'-frames:v','1','-an','-c:v','mjpeg','-threads','2',$mpegJpegPath)
+Invoke-FfmpegChecked @('-nostdin','-hide_banner','-v','error','-y','-i',$mpegAliasPath,'-t','1.8','-map','0:v:0','-an','-c:v','libopenh264','-threads','2','-pix_fmt','yuv420p','-movflags','+faststart',$mpegHoverPath)
 Invoke-FfmpegChecked @('-nostdin','-hide_banner','-v','error','-y','-i',$inputPath,'-frames:v','1','-an','-c:v','mjpeg','-threads','2',$jpegPath)
 Invoke-FfmpegChecked @('-nostdin','-hide_banner','-v','error','-y','-i',$inputPath,'-t','5.8','-map','0:v:0','-an','-c:v','libopenh264','-threads','2','-pix_fmt','yuv420p','-movflags','+faststart',$hoverPath)
 $combinedJpeg = Join-Path $FixtureRoot 'combined.jpg'
@@ -76,13 +93,15 @@ if ($LASTEXITCODE -ne 0) { throw 'FFprobe metadata capability failed.' }
 $metadata = $probeOutput | ConvertFrom-Json
 if (@($metadata.streams).Count -ne 1 -or $metadata.streams[0].codec_name -ne 'h264' -or [double]$metadata.format.duration -gt 6) { throw 'Hover metadata violates Naut encoder contract.' }
 Invoke-FfmpegChecked @('-nostdin','-hide_banner','-v','error','-i',$hoverPath,'-f','null','-')
-if ((Get-Item -LiteralPath $jpegPath).Length -le 0) { throw 'MJPEG frame encoding produced no image.' }
+if ((Get-Item -LiteralPath $jpegPath).Length -le 0 -or (Get-Item -LiteralPath $mpegJpegPath).Length -le 0) { throw 'MJPEG frame encoding produced no image.' }
+Invoke-FfmpegChecked @('-nostdin','-hide_banner','-v','error','-i',$mpegHoverPath,'-f','null','-')
 $bmpPipe = Join-Path $FixtureRoot 'decode-pipe.bmp'
 Invoke-FfmpegChecked @('-nostdin','-hide_banner','-v','error','-y','-i',$hoverPath,'-an','-vf','fps=30','-frames:v','1','-f','image2pipe','-vcodec','bmp',$bmpPipe)
 $bmpBytes = [IO.File]::ReadAllBytes($bmpPipe)
 if ($bmpBytes.Length -le 54 -or $bmpBytes[0] -ne 0x42 -or $bmpBytes[1] -ne 0x4d -or
     [BitConverter]::ToUInt32($bmpBytes,2) -ne $bmpBytes.Length) { throw 'Live decode BMP/image2pipe contract produced an invalid frame.' }
 
+Write-Host 'FFMPEG_MPG_MPEG_SOURCE_PIPELINE=PASS'
 Write-Host 'FFMPEG_PROBE_DECODE_BMP_MJPEG_OPENH264=PASS'
 Write-Host 'FFMPEG_COPYRIGHT_SOURCE_COMPLIANCE=PASS'
 Write-Host 'OPENH264_PATENT_SCOPE=NO_CISCO_BINARY_PATENT_GRANT_CLAIMED'

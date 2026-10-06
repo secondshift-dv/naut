@@ -5,7 +5,7 @@
 <p align="center"><strong>A Navigator for Your Things Worth Keeping</strong></p>
 
 <p align="center">
-  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.1"><strong>Download Naut v0.0.1</strong></a>
+  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.2"><strong>Download Naut v0.0.2</strong></a>
   ·
   <a href="https://secondshift-dv.github.io/naut/"><strong>View Live Demo</strong></a>
   ·
@@ -97,7 +97,7 @@ The portable app package and the Vault are separate boundaries. Imports copy fil
 
 ## Quick Start
 
-1. Download **Naut v0.0.1** from the official [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.1).
+1. Download **Naut v0.0.2** from the official [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.2).
 2. Extract the complete ZIP to a normal folder.
 3. Run `naut.exe`.
 4. Choose **where to keep** your Vault.
@@ -118,7 +118,7 @@ Naut's normal collection experience is intentionally lighter than its optional F
 | **Display** | 1280 × 720 | 1920 × 1080 or higher |
 | **Free app/update space** | 1.5 GB | 1.5 GB+ on SSD |
 
-Vault storage is separate and depends on the size of your collection. See the full [Naut v0.0.1 System Requirements](docs/system-requirements.md).
+Vault storage is separate and depends on the size of your collection. See the full [Naut v0.0.2 System Requirements](docs/system-requirements.md).
 
 ## Documentation
 

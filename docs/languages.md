@@ -1,6 +1,6 @@
 # Languages
 
-Naut v0.0.1 ships with **eight interface languages**:
+Naut v0.0.2 ships with **eight interface languages**:
 
 - English
 - Bahasa Indonesia

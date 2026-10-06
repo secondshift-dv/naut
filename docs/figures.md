@@ -19,7 +19,7 @@ The Figure renderer uses **Direct3D 11**.
 
 Runtime Figure textures are bounded to **2048 × 2048**, including when imported source textures are larger.
 
-See [System Requirements](system-requirements.md) for the v0.0.1 minimum and recommended tiers.
+See [System Requirements](system-requirements.md) for the v0.0.2 minimum and recommended tiers.
 
 ## If a Figure is not available
 

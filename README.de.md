@@ -5,7 +5,7 @@
 <p align="center"><strong>A Navigator for Your Things Worth Keeping</strong></p>
 
 <p align="center">
-  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.1"><strong>Naut v0.0.1 herunterladen</strong></a>
+  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.2"><strong>Naut v0.0.2 herunterladen</strong></a>
   ·
   <a href="https://secondshift-dv.github.io/naut/"><strong>Live-Demo ansehen</strong></a>
   ·
@@ -97,7 +97,7 @@ Anwendungspaket und Vault sind getrennte Bereiche. Imports kopieren Dateien in d
 
 ## Schnellstart
 
-1. **Naut v0.0.1** aus dem offiziellen [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.1) herunterladen.
+1. **Naut v0.0.2** aus dem offiziellen [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.2) herunterladen.
 2. Das vollständige ZIP in einen normalen Ordner entpacken.
 3. `naut.exe` starten.
 4. Den Speicherort für den Vault wählen.
@@ -118,7 +118,7 @@ Die normale Naut-Nutzung ist bewusst leichter als die optionale Figure-Arbeitsla
 | **Display** | 1280 × 720 | 1920 × 1080 oder höher |
 | **Freier App-/Update-Speicher** | 1,5 GB | 1,5 GB+ auf SSD |
 
-Vault-Speicher ist separat und hängt von der Sammlung ab. Siehe [Naut v0.0.1 System Requirements](docs/system-requirements.md).
+Vault-Speicher ist separat und hängt von der Sammlung ab. Siehe [Naut v0.0.2 System Requirements](docs/system-requirements.md).
 
 ## Dokumentation
 

@@ -79,9 +79,12 @@ public sealed class VerificationValidator
                 blockers.Add(new VerificationBlocker(null, "INVALID_RATING", "Profile rating must be between 0 and 5."));
             }
 
-            if (draft.Destination.NewProfile?.Overview?.Length > 4000)
+            if (!ProfileRules.IsOverviewValid(draft.Destination.NewProfile?.Overview))
             {
-                blockers.Add(new VerificationBlocker(null, "OVERVIEW_TOO_LONG", "Profile overview cannot exceed 4000 characters."));
+                blockers.Add(new VerificationBlocker(
+                    null,
+                    "OVERVIEW_TOO_LONG",
+                    $"Profile overview cannot exceed {ProfileRules.MaximumOverviewLength} characters."));
             }
         }
         else if (draft.Destination.Kind == DestinationKind.ExistingNormal)

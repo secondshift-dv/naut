@@ -109,7 +109,7 @@ public static class RootPathRules
     }
 
     /// <summary>
-    /// Validates the v0.0.1 writable-Vault location without creating or modifying it.
+    /// Validates the supported writable-Vault location without creating or modifying it.
     /// Network/UNC and known cloud-sync roots are rejected because catalog locking and atomic rename
     /// cannot be assumed there.
     /// </summary>

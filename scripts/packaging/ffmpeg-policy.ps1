@@ -84,8 +84,12 @@ function Assert-FfmpegPolicy {
         $encoders -notmatch '(?m)^\s*V[^\r\n]*\bbmp\b') { throw 'FFmpeg required hover/MJPEG/BMP/rawvideo encoder absent.' }
     $decoders = (& $FfmpegPath -hide_banner -decoders 2>&1 | Out-String)
     if ($LASTEXITCODE -ne 0) { throw 'FFmpeg decoder inventory query failed.' }
-    foreach ($decoder in @('h264', 'hevc', 'mpeg4', 'mjpeg', 'vp8', 'vp9', 'libdav1d')) {
+    foreach ($decoder in @('h264', 'hevc', 'mpeg1video', 'mpeg2video', 'mpeg4', 'mjpeg', 'vp8', 'vp9', 'libdav1d')) {
         if ($decoders -notmatch ('(?m)^\s*V[^\r\n]*\b' + [regex]::Escape($decoder) + '\b')) { throw "Required FFmpeg decoder absent: $decoder" }
+    }
+    $demuxers = (& $FfmpegPath -hide_banner -demuxers 2>&1 | Out-String)
+    if ($LASTEXITCODE -ne 0 -or $demuxers -notmatch '(?m)^\s*D\s+mpeg\b') {
+        throw 'Required FFmpeg MPEG-PS demuxer absent.'
     }
     $muxers = (& $FfmpegPath -hide_banner -muxers 2>&1 | Out-String)
     if ($LASTEXITCODE -ne 0 -or $muxers -match '(?m)^\s*E\s+chromaprint\b') { throw 'FFmpeg Chromaprint muxer is forbidden.' }

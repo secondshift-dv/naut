@@ -1,4 +1,4 @@
-# Naut v0.0.1 System Requirements
+# Naut v0.0.2 System Requirements
 
 These requirements describe the current Windows x64 implementation and build target. Figure / interactive 3D is an optional workload tier; Naut is intended to remain usable without high-end discrete GPU hardware.
 
@@ -30,4 +30,4 @@ Runtime Figure textures are bounded to **2048 × 2048**. More capable graphics h
 
 ## Release assumptions
 
-Windows x64, the self-contained v0.0.1 package, and Direct3D 11 Figure rendering are implementation constraints. The 2-core CPU, 8/16 GB RAM, and 1280×720/1920×1080 tiers are conservative release-support boundaries; Naut v0.0.1 does not enforce explicit CPU-core, RAM, or display-resolution checks in code.
+Windows x64, the self-contained v0.0.2 package, and Direct3D 11 Figure rendering are implementation constraints. The 2-core CPU, 8/16 GB RAM, and 1280×720/1920×1080 tiers are conservative release-support boundaries; Naut v0.0.2 does not enforce explicit CPU-core, RAM, or display-resolution checks in code.

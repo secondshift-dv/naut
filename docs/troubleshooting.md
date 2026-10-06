@@ -36,7 +36,7 @@ Yes. Figure is optional and independent from the rest of the Profile experience.
 
 ## Which interface languages are included?
 
-Naut v0.0.1 includes English, Bahasa Indonesia, 日本語, 한국어, 简体中文, Deutsch, Français, and Español. See [Languages](languages.md).
+Naut v0.0.2 includes English, Bahasa Indonesia, 日本語, 한국어, 简体中文, Deutsch, Français, and Español. See [Languages](languages.md).
 
 ## Where should I put the Vault?
 

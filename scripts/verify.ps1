@@ -50,7 +50,7 @@ function Verify-PublicTree {
         }
     }
     $primaryReadme=Get-Content -LiteralPath (Join-Path $repo 'README.md') -Raw
-    foreach ($requiredText in @('Download Naut v0.0.1','View Live Demo','Documentation','Feature highlights','Why Naut','System Requirements','Quick Start')) {
+    foreach ($requiredText in @('Download Naut v0.0.2','View Live Demo','Documentation','Feature highlights','Why Naut','System Requirements','Quick Start')) {
         if ($primaryReadme -notmatch [regex]::Escape($requiredText)) { throw "Primary README landing contract missing: $requiredText" }
     }
     $requirements=Get-Content -LiteralPath (Join-Path $repo 'docs/system-requirements.md') -Raw

@@ -5,7 +5,7 @@
 <p align="center"><strong>A Navigator for Your Things Worth Keeping</strong></p>
 
 <p align="center">
-  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.1"><strong>下载 Naut v0.0.1</strong></a>
+  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.2"><strong>下载 Naut v0.0.2</strong></a>
   ·
   <a href="https://secondshift-dv.github.io/naut/"><strong>查看在线演示</strong></a>
   ·
@@ -97,7 +97,7 @@ Naut 提供 English、Bahasa Indonesia、日本語、한국어、简体中文、
 
 ## 快速开始
 
-1. 从官方 [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.1) 下载 **Naut v0.0.1**。
+1. 从官方 [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.2) 下载 **Naut v0.0.2**。
 2. 将完整 ZIP 解压到普通文件夹。
 3. 运行 `naut.exe`。
 4. 选择 Vault 的保存位置。
@@ -118,7 +118,7 @@ Naut 的普通收藏体验刻意保持轻量，可选 Figure workload 需要更�
 | **Display** | 1280 × 720 | 1920 × 1080 或更高 |
 | **App/update 可用空间** | 1.5 GB | SSD 上 1.5 GB+ |
 
-Vault 存储空间独立计算，取决于收藏规模。详见 [Naut v0.0.1 System Requirements](docs/system-requirements.md)。
+Vault 存储空间独立计算，取决于收藏规模。详见 [Naut v0.0.2 System Requirements](docs/system-requirements.md)。
 
 ## 文档
 
