@@ -5,6 +5,8 @@ param([Parameter(Mandatory=$true)][string]$LegacyRepository,
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $repositoryRoot=(Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+[xml]$buildProps=Get-Content -LiteralPath (Join-Path $repositoryRoot 'Directory.Build.props') -Raw
+$targetVersion=$buildProps.SelectSingleNode('/Project/PropertyGroup/ProductVersion').InnerText
 $sourceFiles=@(
     'src/Neuterradise.Profiling.Protocol/ProfilingRuntimeEnvironment.cs',
     'src/Neuterradise.Runtime/SystemServices/ProductIdentity.cs',
@@ -59,6 +61,8 @@ foreach ($version in @('0.0.1','0.0.2')) {
     $arguments=@('run','--project',(Join-Path $probeRoot 'check.csproj'),'-c','Release','-r','win-x64','--no-build','--no-restore','--',$DistributionRoot,(Join-Path $probeRoot ('fixtures-'+[Guid]::NewGuid().ToString('N'))))
     if ($Preflight) { $arguments += '--preflight' }
     elseif ($SignaturePath) { $arguments += $SignaturePath }
+    else { $arguments += (Join-Path $DistributionRoot 'update-signature.json') }
+    $arguments += $targetVersion
     & dotnet @arguments
     if ($LASTEXITCODE -ne 0) { throw "Direct legacy compatibility failed: $version" }
 }

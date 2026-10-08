@@ -9,7 +9,8 @@ var dist = Path.GetFullPath(args[0]);
 var fixture = Path.GetFullPath(args[1]);
 var feed = new Uri("https://github.com/secondshift-dv/naut/releases/latest/download/update.json");
 var manifest = UpdateManifest.Parse(File.ReadAllText(Path.Combine(dist,"update.json")));
-if (manifest.ProductVersion != "0.0.3") throw new Exception("Legacy contract requires exact target 0.0.3");
+if (args.Length < 4 || !Version.TryParse(args[3], out _) || manifest.ProductVersion != args[3])
+    throw new Exception("Legacy contract target must match the current version authority");
 var signature = Path.Combine(dist,"update-signature.json");
 var preflight = args.Length > 2 && args[2] == "--preflight";
 if (args.Length > 2 && !preflight) signature = Path.GetFullPath(args[2]);
@@ -41,8 +42,8 @@ if (!preflight)
         throw new Exception("Legacy publisher validation accepted tampering");
 }
 Console.WriteLine(preflight
-    ? $"DIRECT_{ProductIdentity.Version}_TO_0.0.3_TARGET_LAYOUT_PAYLOAD=PASS;TARGET_SIGNATURE=DEFERRED_TO_SIGNING_GATE"
-    : $"DIRECT_{ProductIdentity.Version}_TO_0.0.3_CHECK_SIGNATURE_ZIP_STAGING=PASS");
+    ? $"DIRECT_{ProductIdentity.Version}_TO_{manifest.ProductVersion}_TARGET_LAYOUT_PAYLOAD=PASS;TARGET_SIGNATURE=DEFERRED_TO_SIGNING_GATE"
+    : $"DIRECT_{ProductIdentity.Version}_TO_{manifest.ProductVersion}_CHECK_SIGNATURE_ZIP_STAGING=PASS");
 
 sealed class AssetHandler(string dist,string signature) : HttpMessageHandler
 {

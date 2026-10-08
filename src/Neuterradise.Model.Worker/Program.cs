@@ -12,14 +12,12 @@ try
         ?? throw new InvalidDataException("Model manifest is missing.");
     if (input.Files.Length is < 1 or > 256) throw new InvalidDataException("Model component budget exceeded.");
     var virtualRoot = Path.Combine(Path.GetDirectoryName(args[0])!, "input");
-    using var io = new VerifiedModelIO(virtualRoot, input.Files);
+    var io = new VerifiedModelIO(virtualRoot, input.Files);
     var native = Path.Combine(AppContext.BaseDirectory, "assimp.dll");
     if (!File.Exists(native)
         || Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(native))) != "253e2b63978a3ad42cc32ce7659dc078e9ccc64392dfa42e7ae3d08322922ec1")
         throw new InvalidDataException("The approved Assimp native library is missing or changed.");
     SharpAssimp.Unmanaged.AssimpLibrary.Instance.LoadLibrary(native);
-    using var importer = new AssimpContext();
-    importer.SetIOSystem(io);
     var primary = io.Resolve(input.Primary);
     var extension = Path.GetExtension(primary).ToLowerInvariant();
     if (extension is not (".fbx" or ".obj" or ".stl" or ".3mf"))
@@ -30,9 +28,15 @@ try
         if (archive.Entries.Count > 1024 || archive.Entries.Sum(entry => entry.Length) > 256 * 1024 * 1024)
             throw new InvalidDataException("3MF expanded package budget exceeded.");
     }
-    var scene = importer.ImportFile(primary, PostProcessSteps.Triangulate
+    using var nativeIO = new Utf8ModelIO(io.ReadTexture);
+    var library = SharpAssimp.Unmanaged.AssimpLibrary.Instance;
+    var pointer = library.ImportFile(primary, PostProcessSteps.Triangulate
         | PostProcessSteps.GenerateSmoothNormals | PostProcessSteps.CalculateTangentSpace
-        | PostProcessSteps.PreTransformVertices | PostProcessSteps.ValidateDataStructure);
+        | PostProcessSteps.PreTransformVertices | PostProcessSteps.ValidateDataStructure, nativeIO.Pointer, IntPtr.Zero);
+    if (pointer == IntPtr.Zero) throw new InvalidDataException("Native model parser rejected the declared package.");
+    Scene scene;
+    try { scene = Scene.FromUnmanagedScene(pointer) ?? throw new InvalidDataException("Model scene is missing."); }
+    finally { library.ReleaseImport(pointer); }
     if (scene is null || scene.MeshCount is < 1 or > 256
         || scene.Meshes.Sum(mesh => (long)mesh.VertexCount) > 2_000_000
         || scene.Meshes.Sum(mesh => (long)mesh.FaceCount) > 4_000_000
@@ -83,7 +87,7 @@ catch (Exception exception)
 sealed record ModelInput(string Primary, ModelFile[] Files);
 sealed record ModelFile(string Name, string Path, string Sha256);
 
-sealed class VerifiedModelIO : IOSystem
+sealed class VerifiedModelIO
 {
     private readonly string _root;
     private readonly Dictionary<string, byte[]> _files = new(StringComparer.OrdinalIgnoreCase);
@@ -123,42 +127,4 @@ sealed class VerifiedModelIO : IOSystem
         return bytes;
     }
 
-    public override IOStream OpenFile(string path, FileIOMode mode)
-    {
-        try
-        {
-            if (mode is not (FileIOMode.Read or FileIOMode.ReadBinary or FileIOMode.ReadText))
-                return null!;
-            return _files.TryGetValue(Resolve(path), out var bytes) ? new ModelStream(path, mode, bytes) : null!;
-        }
-        catch (ArgumentException) { return null!; }
-        catch (InvalidDataException) { return null!; }
-    }
-}
-
-sealed class ModelStream(string path, FileIOMode mode, byte[] bytes) : IOStream(path, mode)
-{
-    private readonly MemoryStream _stream = new(bytes, false);
-    public override bool IsValid => true;
-    public override long Read(byte[] buffer, long count) => _stream.Read(buffer, 0, checked((int)Math.Min(count, buffer.Length)));
-    public override long Write(byte[] buffer, long count) => 0;
-    public override long GetPosition() => _stream.Position;
-    public override long GetFileSize() => _stream.Length;
-    public override void Flush() { }
-    public override ReturnCode Seek(long offset, Origin origin)
-    {
-        try
-        {
-            var next = origin switch { Origin.Set => offset, Origin.Current => _stream.Position + offset, Origin.End => _stream.Length + offset, _ => -1 };
-            if (next < 0 || next > _stream.Length) return ReturnCode.Failure;
-            _stream.Position = next;
-            return ReturnCode.Success;
-        }
-        catch (OverflowException) { return ReturnCode.Failure; }
-    }
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing) _stream.Dispose();
-        base.Dispose(disposing);
-    }
 }
