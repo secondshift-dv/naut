@@ -4,6 +4,8 @@
 
 <p align="center"><strong>A Navigator for Your Things Worth Keeping</strong></p>
 
+<p align="center">Koleksi media lokal untuk Windows — pengenalan wajah offline, Figure 3D interaktif, dan Vault portabel milikmu sendiri.</p>
+
 <p align="center">
   <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.3"><strong>Download Naut v0.0.3</strong></a>
   ·
@@ -32,6 +34,14 @@
 ## Koleksimu, dibuat layak untuk dijelajahi.
 
 Naut adalah **pengelola koleksi media local-first untuk Windows**. Gambar, video, dan model 3D yang didukung diolah menjadi koleksi berbasis Profile yang dapat dikenali, dipresentasikan, dan dijelajahi tanpa memindahkan kepemilikan koleksi ke layanan cloud.
+
+## Optional pack collection
+
+Make Naut yours with reviewed, independently versioned customization packs.
+Download a pack, import it in **Settings → Presentation → Packs / Advanced**,
+then choose its components and save. Application code stays unchanged.
+
+**[Browse and download packs](packs/README.md) · [Install or update a pack](docs/pack-collection.md) · [Contribute your own](docs/contributing-packs.md)**
 
 ## Fitur unggulan
 
@@ -97,7 +107,7 @@ Paket aplikasi portabel dan Vault adalah batas yang terpisah. Import menyalin fi
 
 ## Mulai cepat
 
-1. Download **Naut v0.0.3** dari [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.3) resmi.
+1. Buka [unduhan resmi Naut v0.0.3](https://github.com/secondshift-dv/naut/releases/tag/v0.0.3), lalu pilih **`naut-v0.0.3-win-x64.zip`** pada bagian Assets.
 2. Extract seluruh ZIP ke folder biasa.
 3. Jalankan `naut.exe`.
 4. Pilih **lokasi penyimpanan** Vault.

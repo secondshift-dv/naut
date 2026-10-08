@@ -30,3 +30,7 @@ Naut ships built-in frames, backdrops, effects, typography, and layouts. Advance
 ## Motion and performance
 
 Effects and animated presentation are bounded by Naut's renderer and reduced or suspended when appropriate. Presentation Packs are data/art definitions; they do not execute arbitrary scripts or shaders.
+
+## Optional curated packs
+
+[Browse and download the collection](../packs/README.md), [install a pack](pack-collection.md), or [contribute your own](contributing-packs.md).

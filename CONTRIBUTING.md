@@ -19,3 +19,11 @@ Run `pwsh ./scripts/verify.ps1 -Scope Source` for source changes. Use `pwsh ./sc
 README, translations and ordinary public copy are usually low risk. Ordinary UI, presentation runtime and build configuration are usually medium risk. Persistence, schema, Vault, Import, Updater, release/signing, security, the native renderer, ModelRender, runtime dependencies, package layout and licensed assets are high risk. High-risk changes require maintainer review and never auto-merge.
 
 Report security vulnerabilities privately using the repository's Security reporting surface rather than a public issue.
+
+## Optional pack contributions
+
+Customization packs have their own source collection, licenses and versions.
+For a pack-only PR, follow [Contribute a pack](docs/contributing-packs.md) and
+run `pwsh ./scripts/verify.ps1 -Scope Packs`. Submit source art/definitions and
+preview/provenance, not generated archives. Maintainer review determines
+official collection membership; a successful check never auto-publishes a pack.

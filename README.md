@@ -4,6 +4,8 @@
 
 <p align="center"><strong>A Navigator for Your Things Worth Keeping</strong></p>
 
+<p align="center">Local-first media collections for Windows — offline face intelligence, interactive 3D Figures, and your own portable Vault.</p>
+
 <p align="center">
   <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.3"><strong>Download Naut v0.0.3</strong></a>
   ·
@@ -97,7 +99,7 @@ The portable app package and the Vault are separate boundaries. Imports copy fil
 
 ## Quick Start
 
-1. Download **Naut v0.0.3** from the official [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.3).
+1. Open the official [Naut v0.0.3 download](https://github.com/secondshift-dv/naut/releases/tag/v0.0.3) and choose **`naut-v0.0.3-win-x64.zip`** under Assets.
 2. Extract the complete ZIP to a normal folder.
 3. Run `naut.exe`.
 4. Choose **where to keep** your Vault.
@@ -119,6 +121,14 @@ Naut's normal collection experience is intentionally lighter than its optional F
 | **Free app/update space** | 1.5 GB | 1.5 GB+ on SSD |
 
 Vault storage is separate and depends on the size of your collection. See the full [Naut v0.0.3 System Requirements](docs/system-requirements.md).
+
+## Optional pack collection
+
+Make Naut yours with reviewed, independently versioned customization packs.
+Download a pack, import it in **Settings → Presentation → Packs / Advanced**,
+then choose its components and save. Application code stays unchanged.
+
+**[Browse and download packs](packs/README.md) · [Install or update a pack](docs/pack-collection.md) · [Contribute your own](docs/contributing-packs.md)**
 
 ## Documentation
 

@@ -7,3 +7,10 @@ scripts/packaging/**/*.sh text eol=lf
 scripts/packaging/**/*.py text eol=lf
 scripts/packaging/**/*.json text eol=lf
 scripts/packaging/**/*.txt text eol=lf
+
+# Optional pack text has stable bytes across authoring and download builds.
+packs/**/*.json text eol=lf
+packs/**/*.txt text eol=lf
+packs/**/*.md text eol=lf
+packs/*.json text eol=lf
+packs/*.md text eol=lf

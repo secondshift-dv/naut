@@ -1,0 +1,22 @@
+name: Pack contribution
+description: Propose an optional customization pack for the curated collection
+title: "[Pack] "
+body:
+  - type: textarea
+    attributes:
+      label: Pack concept and components
+      description: Include author, stable pack id, version and intended appearance.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Preview and validation
+      description: Share your own-media screenshots, compatibility evidence and reduced-motion behavior.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: License and provenance
+      description: Identify original work, AI-assisted art, third-party references and redistribution permissions.
+    validations:
+      required: true

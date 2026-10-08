@@ -4,6 +4,8 @@
 
 <p align="center"><strong>A Navigator for Your Things Worth Keeping</strong></p>
 
+<p align="center">Lokale Mediensammlungen für Windows — Offline-Gesichtserkennung, interaktive 3D-Figures und dein eigenes portables Vault.</p>
+
 <p align="center">
   <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.3"><strong>Naut v0.0.3 herunterladen</strong></a>
   ·
@@ -32,6 +34,14 @@
 ## Eine Sammlung, die es wert ist, erkundet zu werden.
 
 Naut ist ein **local-first Medien-Sammlungsmanager für Windows**. Bilder, Videos und unterstützte 3D-Modelle werden zu Profile-zentrierten Sammlungen, die sich erkennen, präsentieren und erkunden lassen, ohne die Kontrolle an einen Cloud-Dienst abzugeben.
+
+## Optional pack collection
+
+Make Naut yours with reviewed, independently versioned customization packs.
+Download a pack, import it in **Settings → Presentation → Packs / Advanced**,
+then choose its components and save. Application code stays unchanged.
+
+**[Browse and download packs](packs/README.md) · [Install or update a pack](docs/pack-collection.md) · [Contribute your own](docs/contributing-packs.md)**
 
 ## Highlights
 

@@ -25,3 +25,9 @@ Technical material is intentionally separated from user documentation:
 - [Presentation Pack examples](development/examples/)
 
 Naut-owned source is **Source Available** under PolyForm Shield 1.0.0. Third-party components retain their own licenses.
+
+## Optional pack collection
+
+- [Browse and download packs](../packs/README.md)
+- [Installation and updates](pack-collection.md)
+- [Contribute a customization pack](contributing-packs.md)

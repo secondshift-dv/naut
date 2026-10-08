@@ -4,6 +4,8 @@
 
 <p align="center"><strong>A Navigator for Your Things Worth Keeping</strong></p>
 
+<p align="center">面向 Windows 的本地媒体收藏 — 离线人脸识别、交互式 3D Figure，以及属于你的便携 Vault。</p>
+
 <p align="center">
   <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.3"><strong>下载 Naut v0.0.3</strong></a>
   ·
@@ -32,6 +34,14 @@
 ## 让你的收藏更值得探索。
 
 Naut 是一款面向 Windows 的 **local-first 媒体收藏管理器**。它将图片、视频和受支持的 3D 模型组织成以 Profile 为中心的收藏，无需把所有权交给云服务即可识别、展示和探索。
+
+## Optional pack collection
+
+Make Naut yours with reviewed, independently versioned customization packs.
+Download a pack, import it in **Settings → Presentation → Packs / Advanced**,
+then choose its components and save. Application code stays unchanged.
+
+**[Browse and download packs](packs/README.md) · [Install or update a pack](docs/pack-collection.md) · [Contribute your own](docs/contributing-packs.md)**
 
 ## 核心功能
 

@@ -1,0 +1,1023 @@
+{
+  "schemaVersion": 1,
+  "packId": "neuterradise.celestial",
+  "version": "1.2.0",
+  "name": "Neu Terradise · Celestial Collection",
+  "author": "Anas",
+  "description": "Curated celestial atmosphere, collectible portraits and a compact archive composition.",
+  "license": "CC-BY-4.0 (original definitions/artwork); SIL-OFL-1.1 (fonts)",
+  "minContractVersion": 1,
+  "assets": [
+    {
+      "id": "palace",
+      "kind": "Image",
+      "path": "assets/violet-palace.jpg",
+      "bytes": 1299161
+    },
+    {
+      "id": "citadel",
+      "kind": "Image",
+      "path": "assets/moonlit-citadel.jpg",
+      "bytes": 766709
+    },
+    {
+      "id": "frame-astral-sovereign",
+      "kind": "Image",
+      "path": "assets/frame-astral-sovereign.png",
+      "bytes": 2049107
+    },
+    {
+      "id": "frame-imperial-phoenix",
+      "kind": "Image",
+      "path": "assets/frame-imperial-phoenix.png",
+      "bytes": 2423254
+    },
+    {
+      "id": "frame-lunar-seraph",
+      "kind": "Image",
+      "path": "assets/frame-lunar-seraph.png",
+      "bytes": 2387149
+    },
+    {
+      "id": "font-inter",
+      "kind": "Font",
+      "path": "assets/inter.ttf",
+      "bytes": 341396
+    },
+    {
+      "id": "font-display",
+      "kind": "Font",
+      "path": "assets/instrument-condensed.ttf",
+      "bytes": 111184
+    },
+    {
+      "id": "font-mono",
+      "kind": "Font",
+      "path": "assets/notosansmono.ttf",
+      "bytes": 405760
+    }
+  ],
+  "definitions": [
+    {
+      "id": "neuterradise.celestial.theme-violet",
+      "kind": "theme",
+      "name": "Celestial Violet",
+      "description": "Deep coordinated surfaces with luminous, readable accents.",
+      "previewAccent": "#FFA78BFA",
+      "spec": {
+        "theme": {
+          "schemaVersion": 1,
+          "id": "celestial-violet",
+          "name": "Celestial Violet",
+          "isDark": true,
+          "colors": {
+            "canvas": "#FF0C0918",
+            "surface1": "#FF171126",
+            "surface2": "#FF211A35",
+            "surface3": "#FF2A2142",
+            "surfaceElevated": "#FF211A35",
+            "surfaceOverlay": "#F2171126",
+            "surfaceHover": "#FF2A2142",
+            "surfacePressed": "#FF211A35",
+            "surfaceSelected": "#FF2A2142",
+            "textPrimary": "#FFF5F1FC",
+            "textSecondary": "#FFD1C9DE",
+            "textMuted": "#FFA59CB6",
+            "textDisabled": "#FF777080",
+            "textInverse": "#FF0C0918",
+            "textOnAccent": "#FF0C0918",
+            "textLink": "#FFA78BFA",
+            "borderSubtle": "#18A78BFA",
+            "borderDefault": "#35A78BFA",
+            "borderStrong": "#70A78BFA",
+            "borderInteractive": "#A0A78BFA",
+            "borderSelected": "#FFA78BFA",
+            "focus": "#FFA78BFA",
+            "accent": "#FFA78BFA",
+            "accentHover": "#FF60A5FA",
+            "accentPressed": "#FF8B5CF6",
+            "accentSecondary": "#FF60A5FA",
+            "selection": "#30A78BFA",
+            "selectionHover": "#48A78BFA",
+            "info": "#FF7DD3FC",
+            "success": "#FF86EFAC",
+            "warning": "#FFFCD34D",
+            "danger": "#FFFDA4AF",
+            "dangerHover": "#FFFB7185"
+          },
+          "typography": {
+            "displayFamily": "Naut Instrument Condensed",
+            "headingFamily": "Inter",
+            "bodyFamily": "Inter",
+            "monoFamily": "Noto Sans Mono"
+          },
+          "shape": {
+            "xs": 3,
+            "sm": 5,
+            "md": 9,
+            "lg": 14,
+            "xl": 18
+          },
+          "motion": {
+            "fastMs": 110,
+            "normalMs": 170,
+            "slowMs": 260,
+            "cinematicMs": 480
+          },
+          "background": {
+            "kind": "RadialGlow"
+          },
+          "morphology": {
+            "navigationTreatment": "SelectedSurface",
+            "cardPersonality": "Flat",
+            "chromeTreatment": "Elevated",
+            "focusTreatment": "Ring",
+            "borderWeight": 1,
+            "elevationStrength": 0.55,
+            "glowStrength": 0.16,
+            "panelOpacity": 0.96,
+            "motionIntensity": 0.65,
+            "navigationRadiusScale": 0.65
+          }
+        },
+        "material": {
+          "personality": "smoked-glass",
+          "atmosphere": "electric",
+          "grain": 0.008,
+          "glassOpacity": 0.94,
+          "glassBlur": 16,
+          "specular": 0.22,
+          "rimLight": 0.28,
+          "ambientPrimary": "#FFA78BFA",
+          "ambientSecondary": "#FF60A5FA"
+        }
+      }
+    },
+    {
+      "id": "neuterradise.celestial.theme-azure",
+      "kind": "theme",
+      "name": "Moonlit Azure",
+      "description": "Deep coordinated surfaces with luminous, readable accents.",
+      "previewAccent": "#FF7DD3FC",
+      "spec": {
+        "theme": {
+          "schemaVersion": 1,
+          "id": "celestial-azure",
+          "name": "Moonlit Azure",
+          "isDark": true,
+          "colors": {
+            "canvas": "#FF080F1C",
+            "surface1": "#FF111D2D",
+            "surface2": "#FF19283B",
+            "surface3": "#FF223449",
+            "surfaceElevated": "#FF19283B",
+            "surfaceOverlay": "#F2111D2D",
+            "surfaceHover": "#FF223449",
+            "surfacePressed": "#FF19283B",
+            "surfaceSelected": "#FF223449",
+            "textPrimary": "#FFF5F1FC",
+            "textSecondary": "#FFD1C9DE",
+            "textMuted": "#FFA59CB6",
+            "textDisabled": "#FF777080",
+            "textInverse": "#FF080F1C",
+            "textOnAccent": "#FF080F1C",
+            "textLink": "#FF7DD3FC",
+            "borderSubtle": "#187DD3FC",
+            "borderDefault": "#357DD3FC",
+            "borderStrong": "#707DD3FC",
+            "borderInteractive": "#A07DD3FC",
+            "borderSelected": "#FF7DD3FC",
+            "focus": "#FF7DD3FC",
+            "accent": "#FF7DD3FC",
+            "accentHover": "#FFA5B4FC",
+            "accentPressed": "#FF38BDF8",
+            "accentSecondary": "#FFA5B4FC",
+            "selection": "#307DD3FC",
+            "selectionHover": "#487DD3FC",
+            "info": "#FF7DD3FC",
+            "success": "#FF86EFAC",
+            "warning": "#FFFCD34D",
+            "danger": "#FFFDA4AF",
+            "dangerHover": "#FFFB7185"
+          },
+          "typography": {
+            "displayFamily": "Naut Instrument Condensed",
+            "headingFamily": "Inter",
+            "bodyFamily": "Inter",
+            "monoFamily": "Noto Sans Mono"
+          },
+          "shape": {
+            "xs": 3,
+            "sm": 5,
+            "md": 9,
+            "lg": 14,
+            "xl": 18
+          },
+          "motion": {
+            "fastMs": 110,
+            "normalMs": 170,
+            "slowMs": 260,
+            "cinematicMs": 480
+          },
+          "background": {
+            "kind": "RadialGlow"
+          },
+          "morphology": {
+            "navigationTreatment": "SelectedSurface",
+            "cardPersonality": "Flat",
+            "chromeTreatment": "Elevated",
+            "focusTreatment": "Ring",
+            "borderWeight": 1,
+            "elevationStrength": 0.55,
+            "glowStrength": 0.16,
+            "panelOpacity": 0.96,
+            "motionIntensity": 0.65,
+            "navigationRadiusScale": 0.65
+          }
+        },
+        "material": {
+          "personality": "smoked-glass",
+          "atmosphere": "electric",
+          "grain": 0.008,
+          "glassOpacity": 0.94,
+          "glassBlur": 16,
+          "specular": 0.22,
+          "rimLight": 0.28,
+          "ambientPrimary": "#FF7DD3FC",
+          "ambientSecondary": "#FFA5B4FC"
+        }
+      }
+    },
+    {
+      "id": "neuterradise.celestial.home-observatory",
+      "kind": "home-layout",
+      "name": "Observatory",
+      "description": "Compact cinematic hero, collection rails and a quiet activity column.",
+      "previewAccent": "#FFA78BFA",
+      "spec": {
+        "hero": {
+          "placement": "inset",
+          "heightFraction": 0.34,
+          "minHeight": 200,
+          "maxHeight": 360
+        },
+        "rails": [
+          {
+            "id": "statistics",
+            "style": "strip",
+            "maxItems": 4
+          },
+          {
+            "id": "favorites",
+            "style": "poster",
+            "maxItems": 8
+          },
+          {
+            "id": "recent",
+            "style": "tile",
+            "maxItems": 8
+          },
+          {
+            "id": "activity",
+            "style": "compact",
+            "maxItems": 5
+          },
+          {
+            "id": "attention",
+            "style": "compact",
+            "maxItems": 3
+          }
+        ],
+        "surface": {
+          "type": "stack",
+          "spacing": 16,
+          "children": [
+            {
+              "type": "semantic",
+              "id": "featured"
+            },
+            {
+              "type": "semantic",
+              "id": "statistics"
+            },
+            {
+              "type": "semantic",
+              "id": "favorites"
+            },
+            {
+              "type": "columns",
+              "columns": [
+                "2*",
+                "*"
+              ],
+              "spacing": 16,
+              "children": [
+                {
+                  "type": "semantic",
+                  "id": "recent"
+                },
+                {
+                  "type": "stack",
+                  "spacing": 12,
+                  "children": [
+                    {
+                      "type": "semantic",
+                      "id": "activity"
+                    },
+                    {
+                      "type": "semantic",
+                      "id": "attention"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "neuterradise.celestial.gallery-constellation",
+      "kind": "gallery-layout",
+      "name": "Constellation Wall",
+      "description": "A balanced portrait wall with close spacing; each Profile keeps its own card.",
+      "previewAccent": "#FFA78BFA",
+      "spec": {
+        "primitive": "VirtualizedUniformGrid",
+        "itemMinWidth": 180,
+        "itemMaxWidth": 236,
+        "spacing": 12,
+        "maxColumns": 10,
+        "rowHeight": 288
+      }
+    },
+    {
+      "id": "neuterradise.celestial.card-relic",
+      "kind": "profile-card",
+      "name": "Celestial Relic",
+      "description": "Centered portrait and frame, readable identity, compact tags and rating.",
+      "previewAccent": "#FFA78BFA",
+      "spec": {
+        "legacyVariant": "prestige",
+        "aspect": 0.78,
+        "art": "cover-over-banner",
+        "density": "detailed",
+        "hover": "spotlight",
+        "frame": "full",
+        "composition": {
+          "type": "overlay",
+          "children": [
+            {
+              "type": "shape",
+              "fill": "token:surface1"
+            },
+            {
+              "type": "image",
+              "slot": "profile.identity.banner",
+              "stretch": "uniform-to-fill",
+              "ambient": true,
+              "opacity": 0.1
+            },
+            {
+              "type": "stack",
+              "spacing": 6,
+              "children": [
+                {
+                  "type": "frame",
+                  "size": 104,
+                  "hAlign": "center"
+                },
+                {
+                  "type": "text",
+                  "slot": "profile.identity.name",
+                  "role": "card-title",
+                  "color": "token:textPrimary",
+                  "maxLines": 2,
+                  "align": "center"
+                },
+                {
+                  "type": "text",
+                  "slot": "profile.identity.category",
+                  "role": "micro",
+                  "color": "token:textSecondary",
+                  "maxLines": 1,
+                  "visibleWhen": "profile.identity.category",
+                  "align": "center"
+                },
+                {
+                  "type": "text",
+                  "slot": "profile.identity.tags",
+                  "role": "micro",
+                  "color": "token:textSecondary",
+                  "maxLines": 1,
+                  "visibleWhen": "profile.identity.tags",
+                  "align": "center"
+                },
+                {
+                  "type": "badge",
+                  "slot": "profile.identity.rating",
+                  "style": "outline",
+                  "visibleWhen": "profile.identity.rating",
+                  "hAlign": "center"
+                }
+              ],
+              "padding": 12,
+              "vAlign": "center"
+            },
+            {
+              "type": "badge",
+              "slot": "profile.identity.favorite",
+              "style": "text",
+              "visibleWhen": "profile.identity.favorite",
+              "hAlign": "right",
+              "vAlign": "top",
+              "margin": 8
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "neuterradise.celestial.profile-sanctuary",
+      "kind": "profile-layout",
+      "name": "Sanctuary",
+      "description": "Identity and actions first, balanced context columns, then the media collection.",
+      "previewAccent": "#FFA78BFA",
+      "spec": {
+        "preset": "cinematic",
+        "surface": {
+          "type": "stack",
+          "spacing": 16,
+          "children": [
+            {
+              "type": "semantic",
+              "id": "identity"
+            },
+            {
+              "type": "semantic",
+              "id": "actions"
+            },
+            {
+              "type": "columns",
+              "columns": [
+                "2*",
+                "*"
+              ],
+              "spacing": 16,
+              "children": [
+                {
+                  "type": "semantic",
+                  "id": "overview"
+                },
+                {
+                  "type": "stack",
+                  "spacing": 12,
+                  "children": [
+                    {
+                      "type": "semantic",
+                      "id": "related"
+                    },
+                    {
+                      "type": "semantic",
+                      "id": "faces"
+                    },
+                    {
+                      "type": "semantic",
+                      "id": "review"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "semantic",
+              "id": "media"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "neuterradise.celestial.media-archive",
+      "kind": "profile-media-layout",
+      "name": "Moonlit Archive",
+      "description": "Framed prints with useful metadata below the artwork.",
+      "previewAccent": "#FFA78BFA",
+      "spec": {
+        "layoutId": "editorial",
+        "cardWidth": 176,
+        "aspect": 0.82,
+        "mediaWidthFraction": 1,
+        "fit": "fill",
+        "metadataPlacement": "below",
+        "metadataFields": [
+          "name",
+          "dimensions",
+          "duration",
+          "favorite"
+        ],
+        "metadataLines": 2,
+        "frameStyle": "gallery",
+        "frameRadius": 8,
+        "frameThickness": 1,
+        "frameColor": "token:borderDefault",
+        "selectedFrameColor": "token:accent",
+        "frameGlow": 0.12,
+        "hoverStyle": "spotlight",
+        "showTypeBadge": false
+      }
+    },
+    {
+      "id": "neuterradise.celestial.backdrop-palace",
+      "kind": "backdrop",
+      "name": "Violet Palace",
+      "description": "Original ZIP artwork with a restrained scrim and vignette.",
+      "previewAccent": "#FFA78BFA",
+      "spec": {
+        "variants": {
+          "full": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "palace",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FF070A14",
+                "opacity": 0.34
+              },
+              {
+                "kind": "vignette",
+                "opacity": 0.3
+              }
+            ]
+          },
+          "reduced": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "palace",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FF070A14",
+                "opacity": 0.34
+              },
+              {
+                "kind": "vignette",
+                "opacity": 0.3
+              }
+            ]
+          },
+          "fallback": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "palace",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FF070A14",
+                "opacity": 0.34
+              },
+              {
+                "kind": "vignette",
+                "opacity": 0.3
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "neuterradise.celestial.backdrop-citadel",
+      "kind": "backdrop",
+      "name": "Moonlit Citadel",
+      "description": "Original ZIP artwork with a restrained scrim and vignette.",
+      "previewAccent": "#FFE4BD75",
+      "spec": {
+        "variants": {
+          "full": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "citadel",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FF070A14",
+                "opacity": 0.34
+              },
+              {
+                "kind": "vignette",
+                "opacity": 0.3
+              }
+            ]
+          },
+          "reduced": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "citadel",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FF070A14",
+                "opacity": 0.34
+              },
+              {
+                "kind": "vignette",
+                "opacity": 0.3
+              }
+            ]
+          },
+          "fallback": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "citadel",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FF070A14",
+                "opacity": 0.34
+              },
+              {
+                "kind": "vignette",
+                "opacity": 0.3
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "neuterradise.celestial.backdrop-astral",
+      "kind": "backdrop",
+      "name": "Astral Glass",
+      "description": "A quiet violet and azure atmosphere for minimal compositions.",
+      "previewAccent": "#FFA78BFA",
+      "spec": {
+        "variants": {
+          "full": {
+            "layers": [
+              {
+                "kind": "gradient",
+                "angle": 135,
+                "stops": [
+                  {
+                    "color": "#FF0C0918",
+                    "offset": 0
+                  },
+                  {
+                    "color": "#FF18243E",
+                    "offset": 1
+                  }
+                ]
+              },
+              {
+                "kind": "radial-glow",
+                "color": "#FFA78BFA",
+                "opacity": 0.2,
+                "centerX": 0.2,
+                "centerY": 0.2,
+                "radius": 0.85
+              },
+              {
+                "kind": "radial-glow",
+                "color": "#FF7DD3FC",
+                "opacity": 0.12,
+                "centerX": 0.85,
+                "centerY": 0.65,
+                "radius": 0.7
+              },
+              {
+                "kind": "vignette",
+                "opacity": 0.22
+              }
+            ]
+          },
+          "reduced": {
+            "layers": [
+              {
+                "kind": "gradient",
+                "angle": 135,
+                "stops": [
+                  {
+                    "color": "#FF0C0918",
+                    "offset": 0
+                  },
+                  {
+                    "color": "#FF18243E",
+                    "offset": 1
+                  }
+                ]
+              },
+              {
+                "kind": "radial-glow",
+                "color": "#FFA78BFA",
+                "opacity": 0.2,
+                "centerX": 0.2,
+                "centerY": 0.2,
+                "radius": 0.85
+              },
+              {
+                "kind": "radial-glow",
+                "color": "#FF7DD3FC",
+                "opacity": 0.12,
+                "centerX": 0.85,
+                "centerY": 0.65,
+                "radius": 0.7
+              },
+              {
+                "kind": "vignette",
+                "opacity": 0.22
+              }
+            ]
+          },
+          "fallback": {
+            "layers": [
+              {
+                "kind": "gradient",
+                "angle": 135,
+                "stops": [
+                  {
+                    "color": "#FF0C0918",
+                    "offset": 0
+                  },
+                  {
+                    "color": "#FF18243E",
+                    "offset": 1
+                  }
+                ]
+              },
+              {
+                "kind": "radial-glow",
+                "color": "#FFA78BFA",
+                "opacity": 0.2,
+                "centerX": 0.2,
+                "centerY": 0.2,
+                "radius": 0.85
+              },
+              {
+                "kind": "radial-glow",
+                "color": "#FF7DD3FC",
+                "opacity": 0.12,
+                "centerX": 0.85,
+                "centerY": 0.65,
+                "radius": 0.7
+              },
+              {
+                "kind": "vignette",
+                "opacity": 0.22
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "neuterradise.celestial.effect-stardust",
+      "kind": "effect",
+      "name": "Celestial Stardust",
+      "description": "Sparse floating stars inspired by the archive celestial particles.",
+      "previewAccent": "#FFA78BFA",
+      "spec": {
+        "targets": [
+          "all"
+        ],
+        "channel": "particles",
+        "interactionOnly": false,
+        "variants": {
+          "full": {
+            "layers": [
+              {
+                "kind": "particles",
+                "count": 26,
+                "color": "#FFEDE9FE",
+                "sizeMin": 0.6,
+                "sizeMax": 1.8,
+                "speed": 0.18,
+                "opacity": 0.22,
+                "direction": "up",
+                "particleShape": "dot"
+              },
+              {
+                "kind": "particles",
+                "count": 7,
+                "color": "#FFA78BFA",
+                "sizeMin": 1,
+                "sizeMax": 2.8,
+                "speed": 0.12,
+                "opacity": 0.13,
+                "direction": "up",
+                "particleShape": "diamond"
+              }
+            ]
+          },
+          "reduced": {
+            "layers": [
+              {
+                "kind": "particles",
+                "count": 12,
+                "color": "#FFEDE9FE",
+                "sizeMin": 0.6,
+                "sizeMax": 1.8,
+                "speed": 0.08,
+                "opacity": 0.16,
+                "direction": "up",
+                "particleShape": "dot"
+              }
+            ]
+          },
+          "fallback": {
+            "layers": [
+              {
+                "kind": "radial-glow",
+                "color": "#FFA78BFA",
+                "opacity": 0.08,
+                "radius": 0.8
+              }
+            ]
+          }
+        }
+      },
+      "performance": {
+        "tier": "light",
+        "continuousAnimation": true,
+        "offscreenPolicy": "pause",
+        "maxAnimatedLayers": 2
+      }
+    },
+    {
+      "id": "neuterradise.celestial.spotlight-celestial",
+      "kind": "spotlight-style",
+      "name": "Celestial Showcase",
+      "description": "Centered framed portrait, name and metadata over drifting artwork; no overview or side panel.",
+      "previewAccent": "#FFA78BFA",
+      "spec": {
+        "composition": "centered-poster",
+        "motion": "parallax-drift",
+        "transition": "fade",
+        "rotationSeconds": 18,
+        "showCover": true,
+        "showOverview": false,
+        "pagination": "counter-rail",
+        "scrimStrength": 0.68
+      }
+    },
+    {
+      "id": "neuterradise.celestial.frame-astral-sovereign",
+      "kind": "cover-frame",
+      "name": "Astral Sovereign",
+      "description": "Sculpted fantasy artwork with a clear transparent circular portrait opening.",
+      "previewAccent": "#FFA78BFA",
+      "spec": {
+        "family": "Arcane",
+        "shapes": [
+          "Circle"
+        ],
+        "scale": 1,
+        "tint": false,
+        "animated": false,
+        "category": "Ornate",
+        "overlayAsset": "frame-astral-sovereign",
+        "coverInset": 0.16
+      }
+    },
+    {
+      "id": "neuterradise.celestial.frame-imperial-phoenix",
+      "kind": "cover-frame",
+      "name": "Imperial Phoenix",
+      "description": "Sculpted fantasy artwork with a clear transparent circular portrait opening.",
+      "previewAccent": "#FFE4BD75",
+      "spec": {
+        "family": "Royal",
+        "shapes": [
+          "Circle"
+        ],
+        "scale": 1,
+        "tint": false,
+        "animated": false,
+        "category": "Ornate",
+        "overlayAsset": "frame-imperial-phoenix",
+        "coverInset": 0.16
+      }
+    },
+    {
+      "id": "neuterradise.celestial.frame-lunar-seraph",
+      "kind": "cover-frame",
+      "name": "Lunar Seraph",
+      "description": "Sculpted fantasy artwork with a clear transparent circular portrait opening.",
+      "previewAccent": "#FF7DD3FC",
+      "spec": {
+        "family": "Celestial",
+        "shapes": [
+          "Circle"
+        ],
+        "scale": 1,
+        "tint": false,
+        "animated": false,
+        "category": "Ornate",
+        "overlayAsset": "frame-lunar-seraph",
+        "coverInset": 0.16
+      }
+    },
+    {
+      "id": "neuterradise.celestial.font-display",
+      "kind": "typography",
+      "name": "Celestial Display",
+      "description": "Condensed sans-serif display with clear Inter interface text, suited to Violet and Azure.",
+      "previewAccent": "#FFA78BFA",
+      "spec": {
+        "display": {
+          "family": "Naut Instrument Condensed",
+          "asset": "font-display"
+        },
+        "heading": {
+          "family": "Inter",
+          "asset": "font-inter"
+        },
+        "body": {
+          "family": "Inter",
+          "asset": "font-inter"
+        },
+        "mono": {
+          "family": "Noto Sans Mono",
+          "asset": "font-mono"
+        }
+      }
+    },
+    {
+      "id": "neuterradise.celestial.font-modern",
+      "kind": "typography",
+      "name": "Celestial Modern",
+      "description": "A compact, clear sans-serif system with a matching mono companion.",
+      "previewAccent": "#FFA78BFA",
+      "spec": {
+        "display": {
+          "family": "Inter",
+          "asset": "font-inter"
+        },
+        "heading": {
+          "family": "Inter",
+          "asset": "font-inter"
+        },
+        "body": {
+          "family": "Inter",
+          "asset": "font-inter"
+        },
+        "mono": {
+          "family": "Noto Sans Mono",
+          "asset": "font-mono"
+        }
+      }
+    },
+    {
+      "id": "neuterradise.celestial.controls-glass",
+      "kind": "control-skin",
+      "name": "Astral Controls",
+      "description": "Compact controls with distinct focus and coordinated theme tokens.",
+      "previewAccent": "#FFA78BFA",
+      "spec": {
+        "radius": 8,
+        "borderWidth": 1,
+        "horizontalPadding": 10,
+        "verticalPadding": 4,
+        "height": 30,
+        "scrollbarWidth": 7,
+        "fill": "token:surface2",
+        "hoverFill": "token:surfaceHover",
+        "pressedFill": "token:surfacePressed",
+        "border": "token:borderDefault",
+        "focus": "token:focus"
+      }
+    },
+    {
+      "id": "neuterradise.celestial.controls-seal",
+      "kind": "control-skin",
+      "name": "Imperial Controls",
+      "description": "Compact controls with distinct focus and coordinated theme tokens.",
+      "previewAccent": "#FFA78BFA",
+      "spec": {
+        "radius": 4,
+        "borderWidth": 1,
+        "horizontalPadding": 10,
+        "verticalPadding": 4,
+        "height": 30,
+        "scrollbarWidth": 7,
+        "fill": "token:surface2",
+        "hoverFill": "token:surfaceHover",
+        "pressedFill": "token:surfacePressed",
+        "border": "token:borderDefault",
+        "focus": "token:focus"
+      }
+    }
+  ]
+}

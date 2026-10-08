@@ -4,6 +4,8 @@
 
 <p align="center"><strong>A Navigator for Your Things Worth Keeping</strong></p>
 
+<p align="center">Des collections multimédias locales pour Windows — reconnaissance faciale hors ligne, Figures 3D interactives et votre propre Vault portable.</p>
+
 <p align="center">
   <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.3"><strong>Télécharger Naut v0.0.3</strong></a>
   ·
@@ -119,6 +121,14 @@ L'expérience Naut normale est volontairement plus légère que la charge option
 | **Espace app/update** | 1.5 GB | 1.5 GB+ sur SSD |
 
 Le stockage du Vault est séparé et dépend de la collection. Voir [Naut v0.0.3 System Requirements](docs/system-requirements.md).
+
+## Optional pack collection
+
+Make Naut yours with reviewed, independently versioned customization packs.
+Download a pack, import it in **Settings → Presentation → Packs / Advanced**,
+then choose its components and save. Application code stays unchanged.
+
+**[Browse and download packs](packs/README.md) · [Install or update a pack](docs/pack-collection.md) · [Contribute your own](docs/contributing-packs.md)**
 
 ## Documentation
 

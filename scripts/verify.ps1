@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([ValidateSet('Source','Compile','Hygiene','Closure','WorkflowPolicy','Updater','ReleaseLayout')][string]$Scope='Source',[switch]$Offline,[switch]$RequireBuild)
+param([ValidateSet('Source','Compile','Hygiene','Closure','WorkflowPolicy','Updater','ReleaseLayout','Packs')][string]$Scope='Source',[switch]$Offline,[switch]$RequireBuild)
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $repo=(Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -88,5 +88,6 @@ if ($Scope -eq 'Closure') {
         if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne $provenance.zipSha256) { throw 'Package checksum mismatch' }
     }
 }
+if ($Scope -eq 'Packs') { & (Join-Path $PSScriptRoot 'verification/verify-packs.ps1') -Offline:$Offline }
 Write-Host "VERIFY_SCOPE=$Scope"
 Write-Host 'VERIFY=PASS'

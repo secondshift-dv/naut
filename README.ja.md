@@ -4,6 +4,8 @@
 
 <p align="center"><strong>A Navigator for Your Things Worth Keeping</strong></p>
 
+<p align="center">Windows 向けのローカルメディアコレクション — オフライン顔認識、インタラクティブな 3D Figure、自分だけのポータブル Vault。</p>
+
 <p align="center">
   <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.3"><strong>Naut v0.0.3 をダウンロード</strong></a>
   ·
@@ -32,6 +34,14 @@
 ## 大切なコレクションを、探索したくなる形へ。
 
 Naut は Windows 向けの **local-first メディアコレクション管理アプリ**です。画像、動画、対応 3D モデルを Profile 中心のコレクションとして整理し、クラウドサービスに所有権を渡すことなく認識・表示・探索できます。
+
+## Optional pack collection
+
+Make Naut yours with reviewed, independently versioned customization packs.
+Download a pack, import it in **Settings → Presentation → Packs / Advanced**,
+then choose its components and save. Application code stays unchanged.
+
+**[Browse and download packs](packs/README.md) · [Install or update a pack](docs/pack-collection.md) · [Contribute your own](docs/contributing-packs.md)**
 
 ## 主な機能
 

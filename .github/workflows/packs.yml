@@ -1,0 +1,32 @@
+name: Optional Packs
+on:
+  pull_request:
+    branches: [main]
+    paths: ['packs/**', 'scripts/verification/verify-packs.ps1', 'scripts/verification/diagnostics/CuratedPacksProbe.cs', 'scripts/utilities/package-packs.ps1', '.github/workflows/packs.yml']
+  push:
+    branches: [main]
+    paths: ['packs/**', 'scripts/verification/verify-packs.ps1', 'scripts/verification/diagnostics/CuratedPacksProbe.cs', 'scripts/utilities/package-packs.ps1', '.github/workflows/packs.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  packs:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.401
+      - name: Validate and package optional collection
+        shell: pwsh
+        run: ./scripts/verify.ps1 -Scope Packs
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: optional-packs-${{ github.sha }}
+          path: |
+            out/pack-downloads/*.ntpack
+            out/pack-downloads/checksums.json
+          if-no-files-found: error

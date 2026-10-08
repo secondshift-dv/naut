@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "packs": [
+    {
+      "slug": "celestial",
+      "packId": "neuterradise.celestial",
+      "version": "1.2.0",
+      "name": "Celestial Collection",
+      "author": "Anas / Second Shift",
+      "preview": "preview.png"
+    }
+  ]
+}
