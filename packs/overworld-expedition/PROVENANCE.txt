@@ -1,4 +1,4 @@
-Overworld Expedition 1.0.0
+Overworld Expedition 1.0.1
 Author: Anas / Second Shift. Original definitions and commissioned artwork: CC BY 4.0.
 Six original AI-assisted bitmap assets were generated for this pack with the
 built-in OpenAI image generator on 2026-10-09. No reference image was supplied.

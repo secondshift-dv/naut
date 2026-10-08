@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "packId": "naut.overworld-expedition",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "name": "Overworld Expedition",
   "author": "Anas / Second Shift",
   "description": "A calm voxel expedition: collection shelves, cozy landscapes and cute portrait companions.",
@@ -318,14 +318,14 @@
       "id": "naut.overworld-expedition.card-keepsake",
       "kind": "profile-card",
       "name": "Keepsake Card",
-      "description": "Large framed portrait over a readable name, compact tags and rating.",
+      "description": "Framed portrait over a quiet banner; video banner plays on hover, with readable identity below.",
       "previewAccent": "#FF476338",
       "spec": {
         "legacyVariant": "prestige",
         "aspect": 0.7,
         "art": "cover-over-banner",
         "density": "detailed",
-        "hover": "lift",
+        "hover": "banner",
         "frame": "full",
         "composition": {
           "type": "overlay",
@@ -336,6 +336,13 @@
               "fill": "token:surfaceElevated",
               "strokeThickness": 2,
               "type": "shape"
+            },
+            {
+              "ambient": true,
+              "opacity": 0.3,
+              "type": "image",
+              "slot": "profile.identity.banner",
+              "stretch": "uniform-to-fill"
             },
             {
               "spacing": 6,

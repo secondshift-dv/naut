@@ -4,7 +4,7 @@ Give your collection another atmosphere. These packs are reviewed by Naut's
 maintainer and installed only when you choose them. They are customization
 content with independent versions; they do not replace the application.
 
-## Overworld Expedition — 1.0.0
+## Overworld Expedition — 1.0.1
 
 ![Overworld Expedition](overworld-expedition/preview.png)
 
@@ -15,7 +15,7 @@ before context and moves Delete to the bottom; the spotlight omits overview.
 Sparse effects drift slowly and provide reduced-motion/static variants.
 The preview is an asset composition, not a live app screenshot.
 
-**[Download Overworld Expedition 1.0.0](https://secondshift-dv.github.io/naut/packs/overworld-expedition-1.0.0.ntpack)**
+**[Download Overworld Expedition 1.0.1](https://secondshift-dv.github.io/naut/packs/overworld-expedition-1.0.1.ntpack)**
 · [Checksums](https://secondshift-dv.github.io/naut/packs/checksums.json)
 · [Setup and recommended components](overworld-expedition/README.md)
 · [Pack source](overworld-expedition/pack.json)

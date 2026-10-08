@@ -1,4 +1,4 @@
-# Overworld Expedition — 1.0.0
+# Overworld Expedition — 1.0.1
 
 A calm voxel expedition for your collection, by **Anas / Second Shift**.
 17 independently selectable components. Install as an optional custom pack;
@@ -10,7 +10,7 @@ The preview combines pack assets; it is not a screenshot of Naut.
 
 ## Install and explore
 
-Download [Overworld Expedition 1.0.0](https://secondshift-dv.github.io/naut/packs/overworld-expedition-1.0.0.ntpack).
+Download [Overworld Expedition 1.0.1](https://secondshift-dv.github.io/naut/packs/overworld-expedition-1.0.1.ntpack).
 Open **Settings → Presentation → Packs / Advanced → Install from file**.
 Choose the archive, select components in Appearance or the corresponding
 Customize screen, and **Save changes**. Use **Replace** when updating this pack.
@@ -30,7 +30,9 @@ Recommended combination:
 
 Use a **Square** Cover shape for these frames. The portrait opening follows
 Naut's frame stage: the ornament fills the stage and the Cover fits its opening.
-The Keepsake Card shows the selected Cover frame, including on Home and Gallery;
+Keepsake Card retains its framed portrait over a quiet banner background.
+Hover plays the Profile video banner in that background when one is available.
+The selected Cover frame appears on Home and Gallery;
 this does not add ornament around the entire page or media grid.
 
 Collection Lodge puts identity first, the full-width media wall second,
@@ -62,3 +64,8 @@ Voxel-world inspiration is expressed through original artwork. No Minecraft
 assets, logos or source files are included; this is an independent Naut pack.
 
 [Collection](../README.md) · [Checksums](https://secondshift-dv.github.io/naut/packs/checksums.json)
+
+## Changes in 1.0.1
+
+Keepsake Card now supplies a banner media host and requests banner hover playback.
+Original artwork, component ids and Profile/media ordering are preserved.
