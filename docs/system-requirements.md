@@ -22,6 +22,10 @@ Naut packages its own FFmpeg/ffprobe toolchain for media inspection and prepared
 
 Opening an **original video** from Naut uses the Windows default media player. Playback of that original file therefore also depends on the player and codecs available on the Windows installation.
 
+## Native model conversion
+
+FBX, OBJ, STL and 3MF preparation requires the **Microsoft Visual C++ v14 Redistributable (x64)**. If conversion reports that its native library cannot load, install the current x64 runtime from [Microsoft's official download page](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist/), restart Naut, and retry preparation. The .NET runtime is included in the Naut package; this C++ runtime is a separate Windows prerequisite.
+
 ## Figure / interactive 3D
 
 Figure uses Direct3D 11 and is optional. Normal Home, Gallery, Profile, Import, Settings, image/video management, and Vault operation do not require a discrete GPU.

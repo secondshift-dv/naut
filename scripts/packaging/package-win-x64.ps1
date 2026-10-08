@@ -820,7 +820,8 @@ $deploymentManifest = [ordered]@{
             kind = 'file'
             url = "https://github.com/secondshift-dv/naut/blob/v$ProductVersion/src/Neuterradise.Model.Worker/Program.cs"
             sha256 = Get-Sha256Lower -Path (Join-Path $RepositoryRoot 'src/Neuterradise.Model.Worker/Program.cs')
-            license = 'MIT'
+            license = 'PolyForm-Shield-1.0.0'
+            licenseUrl = "https://github.com/secondshift-dv/naut/blob/v$ProductVersion/LICENSE"
             provenance = "Naut v$ProductVersion source-built isolated model conversion worker."
         },
         [ordered]@{
@@ -880,7 +881,7 @@ $deploymentManifest = [ordered]@{
             sourceEntryPath = 'src/Neuterradise.Model.Worker/Program.cs'
             deployedRelativePath = 'tools/model/NeuTerradise.Model.Worker.exe'
             sha256 = Get-Sha256Lower -Path (Join-Path $RuntimeInstallRoot 'tools/model/NeuTerradise.Model.Worker.exe')
-            license = 'MIT'
+            license = 'PolyForm-Shield-1.0.0'
             provenance = 'Built from the approved Naut source snapshot; original model bytes are preserved.'
             consumers = @('app')
             distribution = 'build'

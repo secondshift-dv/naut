@@ -14,6 +14,8 @@ Naut v0.0.4 can prepare **GLB, FBX, OBJ, STL and 3MF** as Figures. They display 
 
 Import the model into a Profile, wait for preparation, then choose it in **Customize > 3D Figure**. Keep OBJ material and texture files together when importing. For FBX, use embedded textures; unrecorded external texture dependencies cannot be loaded.
 
+FBX, OBJ, STL and 3MF conversion also requires the [Microsoft Visual C++ v14 x64 runtime](system-requirements.md#native-model-conversion).
+
 See [Model formats](model-formats.md) for supported materials, package dependencies and preparation limits.
 
 ## Hardware tier
