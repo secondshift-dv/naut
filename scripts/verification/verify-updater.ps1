@@ -25,6 +25,7 @@ $project = @"
 "@
 [IO.File]::WriteAllText((Join-Path $probeRoot 'check.csproj'), $project)
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'diagnostics/UpdaterProbe.cs') -Destination (Join-Path $probeRoot 'Program.cs')
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'diagnostics/UpdateResponsivenessProbe.cs') -Destination (Join-Path $probeRoot 'UpdateResponsivenessProbe.cs')
 $buildArguments = @('build', (Join-Path $probeRoot 'check.csproj'), '-c', 'Release', '-r', 'win-x64', '-m:1', '-p:NuGetAudit=false')
 if ($Offline) {
     $offlineSource = Join-Path $probeRoot 'offline-source'

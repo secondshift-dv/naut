@@ -42,6 +42,8 @@ public sealed class UpdateCoordinator : IDisposable
     private UpdateManifest? _acceptedManifest;
     private Uri? _acceptedFeed;
     private bool _disposed;
+    private long _lastProgressTimestamp;
+    private UpdatePhase? _lastProgressPhase;
 
     public UpdateCoordinator(
         CatalogMutationAdmissionGate mutationAdmission,
@@ -645,6 +647,19 @@ public sealed class UpdateCoordinator : IDisposable
 
     private void ReportProgress(UpdateProgress progress, string? version)
     {
+        var now = Stopwatch.GetTimestamp();
+        lock (_stateGate)
+        {
+            if (_lastProgressPhase == progress.Phase && progress.Phase == UpdatePhase.Downloading
+                && progress.TotalBytes is long totalBytes && progress.CompletedBytes < totalBytes
+                && Stopwatch.GetElapsedTime(_lastProgressTimestamp, now) < TimeSpan.FromMilliseconds(100))
+            {
+                return;
+            }
+            _lastProgressPhase = progress.Phase;
+            _lastProgressTimestamp = now;
+        }
+
         var status = progress.Phase switch
         {
             UpdatePhase.Checking => StatusChecking,

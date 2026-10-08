@@ -1226,11 +1226,15 @@ public partial class App : Application
             "App.ControlledShutdown",
             exception => _crash?.Capture(exception, CrashOrigin.ControlledShutdownFailure)));
 
-    private void RequestUpdateShutdown(DateTimeOffset shutdownDeadlineUtc) =>
+    private void RequestUpdateShutdown(DateTimeOffset shutdownDeadlineUtc)
+    {
+        // Seal new user writes at the handoff, before the UI dispatch consumes the shared deadline.
+        _context?.Catalog.MutationAdmission.Close();
         UiDispatch.Post(() => TaskObserver.Observe(
             ControlledShutdownAsync(0, shutdownDeadlineUtc),
             "App.UpdateShutdown",
             exception => _crash?.Capture(exception, CrashOrigin.ControlledShutdownFailure)));
+    }
 
     private async Task ControlledShutdownAsync(
         int exitCode,

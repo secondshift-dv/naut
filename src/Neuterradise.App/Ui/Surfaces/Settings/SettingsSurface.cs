@@ -80,10 +80,6 @@ public sealed class SettingsSurface : Surface
             nameof(SettingsViewModel.TotalProfilesCount),
             nameof(SettingsViewModel.ActiveMediaCount),
             nameof(SettingsViewModel.UnresolvedFaceCount),
-            nameof(SettingsViewModel.UpdateStatusText),
-            nameof(SettingsViewModel.UpdateErrorText),
-            nameof(SettingsViewModel.UpdateCandidateVersion),
-            nameof(SettingsViewModel.CanInstallUpdate),
             nameof(SettingsViewModel.UpdateFeedUrl),
             nameof(SettingsViewModel.PublishedRelease),
             nameof(SettingsViewModel.ThirdPartyComponents),
@@ -666,7 +662,7 @@ public sealed class SettingsSurface : Surface
         SystemHealthSummary(),
         new VaultSettingsPanel(Services, _vm).Build());
 
-    private UIElement About() => SettingsInformationView.Build(_vm, () => Services.RunUserAction(
+    private UIElement About() => SettingsInformationView.Build(_vm, _sectionBag, () => Services.RunUserAction(
         InstallFromZipAsync(), "Settings.InstallFromZip", UI.T("Settings.Update.LocalFailed", "The local update could not be installed.")));
 
     private async Task InstallFromZipAsync()

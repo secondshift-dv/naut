@@ -19,7 +19,7 @@ internal static class SettingsInformationView
         UI.WrappedText(label, "caption", "textSecondary").Margin(0, 6, 12, 6).At(0, 0),
         UI.WrappedText(value, "body").Margin(0, 6, 0, 6).At(0, 1));
 
-    public static FrameworkElement Build(SettingsViewModel vm, Action installFromZip)
+    public static FrameworkElement Build(SettingsViewModel vm, Disposables subscriptions, Action installFromZip)
     {
         var technicalDetails = UI.Surface(UI.V(0,
             InformationRow(UI.T("Settings.About.Runtime", "Runtime"), vm.RuntimeInfo),
@@ -57,17 +57,38 @@ internal static class SettingsInformationView
             Link(UI.T("Settings.About.Releases", "GitHub releases"), vm.PublishedRelease?.Page ?? new Uri(GitHubReleaseInformation.ReleasesUrl)).Align(HorizontalAlignment.Center));
         product.Margin = new Thickness(0, 8, 0, 12);
 
+        var updateStatus = UI.Text(vm.UpdateStatusText, "body-muted");
+        var updateCandidate = UI.Text(string.Empty, "body-strong");
+        var updateError = UI.WrappedText(string.Empty, "caption", "danger");
+        subscriptions.Add(Observe.Props(vm, () => updateStatus.Text = vm.UpdateStatusText,
+            nameof(SettingsViewModel.UpdateStatusText)));
+        subscriptions.Add(Observe.Props(vm, () =>
+        {
+            updateCandidate.Text = string.IsNullOrWhiteSpace(vm.UpdateCandidateVersion)
+                ? string.Empty : UI.F("Settings.Update.Candidate", "Available version: {0}", vm.UpdateCandidateVersion);
+            updateCandidate.Visibility = string.IsNullOrWhiteSpace(vm.UpdateCandidateVersion) ? Visibility.Collapsed : Visibility.Visible;
+        }, nameof(SettingsViewModel.UpdateCandidateVersion)));
+        subscriptions.Add(Observe.Props(vm, () =>
+        {
+            updateError.Text = vm.UpdateErrorText ?? string.Empty;
+            updateError.Visibility = string.IsNullOrWhiteSpace(vm.UpdateErrorText) ? Visibility.Collapsed : Visibility.Visible;
+        }, nameof(SettingsViewModel.UpdateErrorText)));
+
+        var installZip = UI.Button(UI.T("Settings.Update.InstallZip", "Install from ZIP…"), installFromZip, ButtonKind.Ghost);
+        subscriptions.Add(Observe.Props(vm, () => installZip.IsEnabled = vm.CanManageUpdates,
+            nameof(SettingsViewModel.CanManageUpdates)));
+
         var updates = DetailLayout.Section(
             UI.T("Settings.Update.SectionTitle", "Updates"),
             UI.T("Settings.Update.Desc", "Keep naut current without changing Vault data."),
             "icon.navigation.import",
-            UI.Text(vm.UpdateStatusText, "body-muted"),
-            string.IsNullOrWhiteSpace(vm.UpdateCandidateVersion) ? null : UI.Text(UI.F("Settings.Update.Candidate", "Available version: {0}", vm.UpdateCandidateVersion), "body-strong"),
-            string.IsNullOrWhiteSpace(vm.UpdateErrorText) ? null : UI.WrappedText(vm.UpdateErrorText, "caption", "danger"),
+            updateStatus,
+            updateCandidate,
+            updateError,
             UI.Wrap(8,
                 UI.Button(UI.T("Settings.Update.Check", "Check for updates"), null, ButtonKind.Secondary, command: vm.CheckForUpdatesCommand),
                 UI.Button(UI.T("Settings.Update.DownloadInstall", "Download & Install"), null, ButtonKind.Primary, command: vm.InstallUpdateCommand),
-                UI.Button(UI.T("Settings.Update.InstallZip", "Install from ZIP…"), installFromZip, ButtonKind.Ghost)));
+                installZip));
 
         var information = DetailLayout.Section(
             UI.T("Settings.About.Information", "Information"),

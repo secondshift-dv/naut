@@ -162,6 +162,9 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
     private SettingsSubsection? _activeSubsection;
     private string _updateFeedUrl = string.Empty;
     private UpdatePresentationState _updateState = UpdatePresentationState.Idle;
+    private readonly object _updatePresentationGate = new();
+    private UpdatePresentationState? _pendingUpdateState;
+    private bool _updatePresentationQueued;
 
     private string _newCategoryName = string.Empty;
     private string _newTagName = string.Empty;
@@ -260,10 +263,10 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
 
         SaveUpdateFeedCommand = new AsyncRelayCommand(
             SaveUpdateFeedAsync,
-            () => _updateCoordinator is not null);
+            () => _updateCoordinator is not null && CanManageUpdates);
         CheckForUpdatesCommand = new AsyncRelayCommand(
             CheckForUpdatesAsync,
-            () => _updateCoordinator is not null);
+            () => _updateCoordinator is not null && CanManageUpdates);
         InstallUpdateCommand = new AsyncRelayCommand(
             InstallUpdateAsync,
             () => CanInstallUpdate);
@@ -362,7 +365,11 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
         }
 
         RetireRoute();
-        _isDisposed = true;
+        lock (_updatePresentationGate)
+        {
+            _isDisposed = true;
+            _pendingUpdateState = null;
+        }
         Interlocked.Increment(ref _initializeGeneration);
 
         // Settings is recreated on every visit; a static-event subscription left behind kept each old
@@ -484,7 +491,9 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
 
     public string? UpdateCandidateVersion => _updateState.CandidateVersion;
 
-    public bool CanInstallUpdate => _updateCoordinator?.HasAcceptedCandidate == true;
+    public bool CanManageUpdates => !_updateState.IsDownloading && !_updateState.RestartRequired;
+
+    public bool CanInstallUpdate => CanManageUpdates && _updateCoordinator?.HasAcceptedCandidate == true;
 
     private ThirdPartyNoticesReadModel _thirdPartyNotices = ThirdPartyNoticesReadModel.Missing("Third-party notices are unavailable in this deployment.");
 
@@ -721,17 +730,48 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
 
     private void OnUpdateStateChanged(UpdatePresentationState state)
     {
-        RunOnUi(() =>
+        lock (_updatePresentationGate)
         {
-            _updateState = state;
-            RaisePropertyChanged(nameof(UpdateStatusText));
-            RaisePropertyChanged(nameof(UpdateErrorText));
-            RaisePropertyChanged(nameof(UpdateCandidateVersion));
+            if (_isDisposed) return;
+            _pendingUpdateState = state;
+            if (_updatePresentationQueued) return;
+            _updatePresentationQueued = true;
+        }
+
+        // A slow UI retains only the latest progress, not one closure per downloaded chunk.
+        UiDispatch.Post(ApplyPendingUpdateState);
+    }
+
+    private void ApplyPendingUpdateState()
+    {
+        UpdatePresentationState? state;
+        lock (_updatePresentationGate)
+        {
+            state = _pendingUpdateState;
+            _pendingUpdateState = null;
+            _updatePresentationQueued = false;
+            if (_isDisposed || state is null) return;
+        }
+
+        var previousPhase = _updateState.Status;
+        var previousStatus = UpdateStatusText;
+        var previousError = UpdateErrorText;
+        var previousVersion = UpdateCandidateVersion;
+        var previousBusy = _updateState.IsDownloading;
+        var previousManageUpdates = CanManageUpdates;
+        _updateState = state;
+        if (UpdateStatusText != previousStatus) RaisePropertyChanged(nameof(UpdateStatusText));
+        if (CanManageUpdates != previousManageUpdates) RaisePropertyChanged(nameof(CanManageUpdates));
+        if (UpdateErrorText != previousError) RaisePropertyChanged(nameof(UpdateErrorText));
+        if (UpdateCandidateVersion != previousVersion) RaisePropertyChanged(nameof(UpdateCandidateVersion));
+        if (previousPhase != state.Status || previousBusy != state.IsDownloading
+            || UpdateCandidateVersion != previousVersion || UpdateErrorText != previousError)
+        {
             RaisePropertyChanged(nameof(CanInstallUpdate));
             SaveUpdateFeedCommand.RaiseCanExecuteChanged();
             CheckForUpdatesCommand.RaiseCanExecuteChanged();
             InstallUpdateCommand.RaiseCanExecuteChanged();
-        });
+        }
     }
 
     public async Task ApplyLanguageAsync(string languageCode, CancellationToken cancellationToken = default)

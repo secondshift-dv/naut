@@ -10,7 +10,7 @@ The Figure viewer supports direct interaction such as **rotate, pan, and zoom** 
 
 ## Supported formats
 
-Naut v0.0.4 can prepare **GLB, FBX, OBJ, STL and 3MF** as Figures. They display a static scene with rotation, pan and zoom. Animation playback and rig editing are not included; your original file is preserved.
+Naut v0.0.5 can prepare **GLB, FBX, OBJ, STL and 3MF** as Figures. They display a static scene with rotation, pan and zoom. Animation playback and rig editing are not included; your original file is preserved.
 
 Import the model into a Profile, wait for preparation, then choose it in **Customize > 3D Figure**. Keep OBJ material and texture files together when importing. For FBX, use embedded textures; unrecorded external texture dependencies cannot be loaded.
 
@@ -29,7 +29,7 @@ The Figure renderer uses **Direct3D 11**.
 
 Normal viewing uses textures up to **2048 × 2048**. Close zoom can refine to **4096 × 4096**; the Reduced tier uses up to **1024 × 1024**. Larger imported textures are prepared into these bounded runtime sizes.
 
-See [System Requirements](system-requirements.md) for the v0.0.4 minimum and recommended tiers.
+See [System Requirements](system-requirements.md) for the v0.0.5 minimum and recommended tiers.
 
 ## If a Figure is not available
 

@@ -23,6 +23,7 @@ if (args.Length > 1)
     Console.WriteLine("PACKAGED_MPG_MPEG=PASS");
     return;
 }
+UpdateResponsivenessProbe.Run(root);
 foreach (var extension in new[] { ".mpg", ".mpeg", ".MPG", ".MPEG" })
     Require(SupportedMediaClassifier.Classify(extension) == MediaType.Video && SupportedMediaClassifier.BuildFileDialogFilter().Contains("*" + extension.ToLowerInvariant()), "MPEG classifier or picker regression");
 var installRoot = Path.Combine(root, "install");
@@ -164,7 +165,17 @@ async Task<ReplacementResult> Replace(UpdateHandoff handoff, string? authority =
 var handoff = new UpdateHandoff(op, payload, installRoot, manifest, vaultRoot, DateTimeOffset.UtcNow.AddMinutes(1));
 Require(!(await Replace(handoff, new string('1',64))).Success, "Manifest authority mismatch accepted");
 Require(!(await Replace(handoff with { VaultRoot=installRoot })).Success, "Vault overlap replacement accepted");
-Require((await Replace(handoff)).Success, "Replacement failed");
+var deferredHandoff = handoff with { ShutdownDeadlineUtc = DateTimeOffset.UtcNow.AddMilliseconds(100) };
+var deferredBytes = JsonSerializer.SerializeToUtf8Bytes(deferredHandoff, new JsonSerializerOptions { PropertyNamingPolicy=JsonNamingPolicy.CamelCase });
+await File.WriteAllBytesAsync(handoffPath, deferredBytes);
+var deferred = await ReplacementEngine.ExecuteAsync(handoffPath, Hash(deferredBytes),
+    manifest.ComputeAuthoritySha256(), Environment.ProcessId, false);
+Require(!deferred.Success && File.Exists(Path.Combine(installRoot, "runtime/obsolete.dll"))
+    && !Directory.Exists(installRoot + ".backup." + op.ToString("N")),
+    "Updater mutated InstallRoot before the live parent exited.");
+Require(File.ReadAllText(Path.Combine(vaultRoot, "sentinel")) == "protected", "Deferred update touched Vault.");
+Console.WriteLine("UPDATE_SHUTDOWN_DEADLINE_DEFERS_WITHOUT_MUTATION=PASS");
+Require((await Replace(handoff with { ShutdownDeadlineUtc = DateTimeOffset.UtcNow.AddMinutes(1) })).Success, "Replacement failed");
 var backup = installRoot + ".backup." + op.ToString("N");
 Require(File.Exists(Path.Combine(backup,"runtime/obsolete.dll")) && !File.Exists(Path.Combine(installRoot,"runtime/obsolete.dll")), "Backup/replacement membership failed");
 Require(File.ReadAllText(Path.Combine(vaultRoot,"sentinel")) == "protected" && Directory.GetFiles(vaultRoot).Length == 1, "Vault touched");
