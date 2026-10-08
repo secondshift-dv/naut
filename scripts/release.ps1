@@ -238,6 +238,9 @@ try {
     $runtimeIdentifier = [string]$identity.ProductRuntimeIdentifier
     $tag = "v$productVersion"
     $zipName = "naut-v$productVersion-$runtimeIdentifier.zip"
+    $notesPath = Join-Path $RepositoryRoot "docs/releases/$tag.md"
+    & (Join-Path $RepositoryRoot 'scripts/verification/verify-release-notes.ps1') -RepositoryRoot $RepositoryRoot -NotesPath $notesPath
+    $notesText = [IO.File]::ReadAllText($notesPath).Replace("`r`n", "`n").Trim()
 
     if ($env:GITHUB_REF_TYPE -eq 'tag' -and
         -not [string]::Equals($env:GITHUB_REF_NAME, $tag, [StringComparison]::Ordinal)) {
@@ -397,6 +400,7 @@ try {
             'release', 'edit', $tag,
             '--repo', $Repository,
             '--target', $head,
+            '--notes-file', $notesPath,
             '--draft'
         )
         Invoke-GhChecked -Arguments (@(
@@ -417,7 +421,7 @@ try {
             '--repo', $Repository,
             '--target', $head,
             '--title', "naut $tag",
-            '--generate-notes',
+            '--notes-file', $notesPath,
             '--draft'
         ) + $releaseAssets)
     }
@@ -427,9 +431,15 @@ try {
         Invoke-GhChecked -Arguments (@('release', 'upload', $tag, '--repo', $Repository, '--clobber') + $incrementalAssets[$offset..$last])
     }
 
-    $candidateJson = & gh release view $tag --repo $Repository --json isDraft,targetCommitish,assets
+    $candidateJson = & gh release view $tag --repo $Repository --json isDraft,targetCommitish,assets,body
     if ($LASTEXITCODE -ne 0) { throw 'Could not verify uploaded canonical draft.' }
     $candidate = $candidateJson | ConvertFrom-Json
+    if ([string]$candidate.body -and ([string]$candidate.body).Replace("`r`n", "`n").Trim() -ceq $notesText) {
+        Write-Host 'DRAFT_RELEASE_NOTES=PASS'
+    }
+    else {
+        throw 'Uploaded draft release notes differ from the reviewed versioned notes.'
+    }
     $expectedPaths = @($releaseAssets + $incrementalAssets)
     if (-not $candidate.isDraft -or $candidate.targetCommitish -ne $head -or
         $candidate.assets.Count -ne $expectedPaths.Count) { throw 'Draft source or exact asset membership mismatch.' }

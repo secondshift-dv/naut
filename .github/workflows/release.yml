@@ -62,6 +62,10 @@ jobs:
         shell: pwsh
         run: ./scripts/verify.ps1 -Scope WorkflowPolicy
 
+      - name: Validate reviewed release notes
+        shell: pwsh
+        run: ./scripts/verification/verify-release-notes.ps1
+
       - name: Build canonical product
         shell: pwsh
         run: ./scripts/build.ps1
@@ -91,6 +95,8 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             scripts/release.ps1
+            scripts/verification/verify-release-notes.ps1
+            docs/releases/
             scripts/verification/verify-legacy-updates.ps1
             scripts/verification/diagnostics/LegacyUpdateProbe.cs
             global.json

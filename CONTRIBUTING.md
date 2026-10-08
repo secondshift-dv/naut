@@ -20,6 +20,10 @@ README, translations and ordinary public copy are usually low risk. Ordinary UI,
 
 Report security vulnerabilities privately using the repository's Security reporting surface rather than a public issue.
 
+## Release notes
+
+Product releases require reviewed, versioned user-facing notes. Follow the [Release notes policy](docs/release-notes.md) and run `pwsh ./scripts/verification/verify-release-notes.ps1` before release preparation. A Full Changelog link alone is insufficient.
+
 ## Optional pack contributions
 
 Customization packs have their own source collection, licenses and versions.
