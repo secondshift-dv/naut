@@ -8,6 +8,14 @@
       "file": "celestial-1.2.0.ntpack",
       "sha256": "1ac09158c7ae7d7a07e3b5418c5972cb3ab58dbc7b9cf7e562b8c7fa6082f59d",
       "bytes": 9767114
+    },
+    {
+      "slug": "overworld-expedition",
+      "packId": "naut.overworld-expedition",
+      "version": "1.0.0",
+      "file": "overworld-expedition-1.0.0.ntpack",
+      "sha256": "97d855e28ceb72f483d7dccea8c6222d885c956b245a3b054ab8457d73ab4497",
+      "bytes": 12051663
     }
   ]
 }
