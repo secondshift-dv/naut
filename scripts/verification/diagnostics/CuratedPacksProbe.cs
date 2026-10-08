@@ -43,8 +43,16 @@ foreach (var entry in catalog.RootElement.GetProperty("packs").EnumerateArray())
             var item = zip.CreateEntry(Path.GetRelativePath(root, file).Replace(Path.DirectorySeparatorChar, '/'), CompressionLevel.Optimal);
             item.LastWriteTime = new DateTimeOffset(1980, 1, 1, 0, 0, 0, TimeSpan.Zero);
             using var target = item.Open();
-            using var source = File.OpenRead(file);
-            source.CopyTo(target);
+            if (Path.GetExtension(file) is ".json" or ".txt" or ".md")
+            {
+                var text = File.ReadAllText(file).Replace("\r\n", "\n").Replace("\r", "\n");
+                target.Write(System.Text.Encoding.UTF8.GetBytes(text));
+            }
+            else
+            {
+                using var source = File.OpenRead(file);
+                source.CopyTo(target);
+            }
         }
     }
     var sandbox = Path.Combine(output, ".validation", Guid.NewGuid().ToString("N"));
