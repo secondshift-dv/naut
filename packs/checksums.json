@@ -12,10 +12,10 @@
     {
       "slug": "overworld-expedition",
       "packId": "naut.overworld-expedition",
-      "version": "1.0.0",
-      "file": "overworld-expedition-1.0.0.ntpack",
-      "sha256": "97d855e28ceb72f483d7dccea8c6222d885c956b245a3b054ab8457d73ab4497",
-      "bytes": 12051663
+      "version": "1.0.1",
+      "file": "overworld-expedition-1.0.1.ntpack",
+      "sha256": "ff6009e84c5815da02190743458a16d938a118079b6d521399a58ad3aa8b0821",
+      "bytes": 12051836
     }
   ]
 }
