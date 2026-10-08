@@ -87,6 +87,18 @@ public static class CapabilityApplicability
     public static IReadOnlyList<MediaCapability> GetRequired(MediaType mediaType) =>
         GetAll(mediaType).Where(x => x.Required).Select(x => x.Capability).ToList();
 
+    // Candidate preparation cannot wait for derivatives that only exist after domain commit.
+    public static IReadOnlyList<(MediaCapability Capability, bool Required)> GetForImportPhase(
+        MediaType mediaType, bool domainCommitted) => domainCommitted
+        ? GetAll(mediaType)
+        : GetAll(mediaType).Where(x => x.Capability is MediaCapability.Metadata
+            or MediaCapability.FaceDetection or MediaCapability.FaceEmbedding
+            or MediaCapability.SimilarityRelated).ToArray();
+
+    public static IReadOnlyList<MediaCapability> GetRequiredForImportPhase(
+        MediaType mediaType, bool domainCommitted) => GetForImportPhase(mediaType, domainCommitted)
+            .Where(x => x.Required).Select(x => x.Capability).ToArray();
+
     /// <summary>
     /// Whether FaceEmbedding is applicable. It is only applicable when FaceDetection produces
     /// at least one face candidate. This is evaluated dynamically after FaceDetection completes.

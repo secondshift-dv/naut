@@ -5,8 +5,13 @@ namespace Neuterradise.App.Media.Model;
 public static class ModelRenderEligibility
 {
     public static bool IsEligible(string? fileName, string dependencyStatus) =>
-        string.Equals(Path.GetExtension(fileName), ".glb", StringComparison.OrdinalIgnoreCase)
-        && dependencyStatus == "SELF_CONTAINED";
+        Path.GetExtension(fileName)?.ToLowerInvariant() switch
+        {
+            ".glb" => dependencyStatus == "SELF_CONTAINED",
+            ".obj" or ".stl" or ".3mf" => dependencyStatus is "SELF_CONTAINED" or "COMPLETE",
+            ".fbx" => dependencyStatus is "SELF_CONTAINED" or "COMPLETE" or "DEPENDENCIES_UNKNOWN",
+            _ => false,
+        };
 
     public static async Task<bool> IsEligibleAsync(CatalogDb catalog, Guid mediaId, CancellationToken ct = default)
     {

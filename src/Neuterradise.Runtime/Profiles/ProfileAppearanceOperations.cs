@@ -403,7 +403,7 @@ public sealed class ProfileAppearanceOperations
                 check.Parameters.AddWithValue("$profile",DbGuid.Format(profileId)); check.Parameters.AddWithValue("$media",DbGuid.Format(figure));
                 await using var reader = await check.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
                 if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false) || !ModelRenderEligibility.IsEligible(reader.GetString(0),reader.GetString(1)))
-                    return (OperationResult<ProfileAppearanceOutcome>.Validation(OperationErrorCode.AppearanceMediaInvalid,"Figure requires a ready eligible GLB publicly linked to this Profile."),overrides);
+                    return (OperationResult<ProfileAppearanceOutcome>.Validation(OperationErrorCode.AppearanceMediaInvalid,"Figure requires a ready supported Model publicly linked to this Profile."),overrides);
             }
             await using var selection = transaction.CreateCommand("UPDATE profile_appearance SET figure_media_id = $figure WHERE profile_id = $profile;");
             selection.Parameters.AddWithValue("$profile",DbGuid.Format(profileId));

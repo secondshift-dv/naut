@@ -10,7 +10,8 @@ namespace Neuterradise.App.SystemServices.Database;
 ///
 /// There is intentionally no database upgrade history or upgrade loop. A catalog is either empty
 /// (Catalog Schema v1 is created atomically) or it already matches the current schema exactly.
-/// Existing incompatible catalogs are rejected instead of being modified in place.
+/// Existing incompatible catalogs are rejected. The supported Model Figure trigger predicate
+/// transition is reconciled atomically within v1; no tables or user data are rewritten.
 /// </summary>
 public sealed class CatalogSchemaInitializer
 {
@@ -68,6 +69,7 @@ public sealed class CatalogSchemaInitializer
         }
 
         await ValidateSchemaAsync(connection, schemaSql, cancellationToken).ConfigureAwait(false);
+        await ModelFigureSchemaAuthority.ReconcileAsync(connection, schemaSql, cancellationToken).ConfigureAwait(false);
         return new CatalogInitializationResult(created, SchemaVersion);
     }
 

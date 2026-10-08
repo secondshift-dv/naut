@@ -375,6 +375,9 @@ public sealed class ImportActivityService : IAsyncDisposable
         var attentionCount = setAside + unit.CleanupFailedCount;
         var profileChosen = draft?.Destination.Kind is not null || requested;
 
+        var candidateReadyForReview = !requested && !unit.LibraryCommitState.HasReachedDomainCommit()
+            && unit.State == ImportUnitState.Preparing && admitted > 0 && prepared >= admitted;
+
         ImportActivityStage stage;
         if (cancelled)
         {
@@ -400,7 +403,7 @@ public sealed class ImportActivityService : IAsyncDisposable
         {
             stage = ImportActivityStage.Saving;
         }
-        else if (unit.State == ImportUnitState.ReadyForVerification)
+        else if (unit.State == ImportUnitState.ReadyForVerification || candidateReadyForReview)
         {
             stage = ImportActivityStage.ReadyToVerify;
         }
@@ -418,7 +421,7 @@ public sealed class ImportActivityService : IAsyncDisposable
         }
 
         var operationalStage = unit.State == ImportUnitState.Committing ? ImportActivityStage.Saving
-            : unit.State == ImportUnitState.ReadyForVerification ? ImportActivityStage.ReadyToVerify
+            : unit.State == ImportUnitState.ReadyForVerification || candidateReadyForReview ? ImportActivityStage.ReadyToVerify
             : profileChosen ? ImportActivityStage.Checking
             : unit.State == ImportUnitState.Intake ? ImportActivityStage.Reading : ImportActivityStage.WaitingForProfile;
         var timelineStage = stage is ImportActivityStage.Paused or ImportActivityStage.Cancelled or ImportActivityStage.NeedsAttention

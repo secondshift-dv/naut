@@ -64,16 +64,28 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
         var path = source.ResolveManagedPath(_paths);
         if (path is null || source.Sha256 is null)
             return Invalid("MODEL_SOURCE_MISSING", "Canonical Model bytes or provenance are unavailable.");
-        var thumbnail = await ExecuteRoleAsync(context, MediaAssetRole.Thumbnail, ct).ConfigureAwait(false);
-        if (!thumbnail.IsSucceeded || !await ModelRenderEligibility.IsEligibleAsync(_catalog, source.MediaId, ct).ConfigureAwait(false))
-            return thumbnail;
-        if (!await NeedsGenerationAsync(source.MediaId, MediaAssetRole.ModelRender, ct).ConfigureAwait(false))
+        if (!await ModelRenderEligibility.IsEligibleAsync(_catalog, source.MediaId, ct).ConfigureAwait(false))
+            return await ExecuteRoleAsync(context, MediaAssetRole.Thumbnail, ct).ConfigureAwait(false);
+        if (!await NeedsGenerationAsync(source.MediaId, MediaAssetRole.Thumbnail, ct).ConfigureAwait(false)
+            && !await NeedsGenerationAsync(source.MediaId, MediaAssetRole.ModelRender, ct).ConfigureAwait(false))
             return JobExecutionResult.Succeeded;
-        var temp = _paths.ResolveContainedPath(VaultPathArea.TempMediaAssets, $"{source.MediaId:N}/{Guid.NewGuid():N}.nfig");
-        Directory.CreateDirectory(Path.GetDirectoryName(temp)!);
+        var tempDirectory = _paths.ResolveContainedPath(VaultPathArea.TempMediaAssets, $"{source.MediaId:N}/{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDirectory);
+        var temp = Path.Combine(tempDirectory, "scene.nfig");
         try
         {
-            await GlbThumbnailPreviewAdapter.BuildModelRenderAsync(path, source.Sha256, temp, ct).ConfigureAwait(false);
+            string? inputHash = null;
+            if (!string.Equals(Path.GetExtension(path), ".glb", StringComparison.OrdinalIgnoreCase))
+            {
+                path = await ModelFigureConversion.ConvertAsync(source, _media, _paths, _tools, _launcher, tempDirectory, ct).ConfigureAwait(false);
+                await using var converted = File.OpenRead(path);
+                inputHash = Convert.ToHexStringLower(await System.Security.Cryptography.SHA256.HashDataAsync(converted, ct).ConfigureAwait(false));
+            }
+            var thumbnail = await ExecuteRoleAsync(context, MediaAssetRole.Thumbnail, ct, path).ConfigureAwait(false);
+            if (!thumbnail.IsSucceeded) return thumbnail;
+            if (!await NeedsGenerationAsync(source.MediaId, MediaAssetRole.ModelRender, ct).ConfigureAwait(false))
+                return JobExecutionResult.Succeeded;
+            await GlbThumbnailPreviewAdapter.BuildModelRenderAsync(path, source.Sha256, temp, ct, inputHash).ConfigureAwait(false);
             await _writes.PublishMediaAssetAsync(source.MediaId, MediaAssetRole.ModelRender, ContractVersion, temp, ct: ct).ConfigureAwait(false);
             return JobExecutionResult.Succeeded;
         }
@@ -88,7 +100,7 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
         }
         finally
         {
-            try { if (File.Exists(temp)) File.Delete(temp); }
+            try { if (Directory.Exists(tempDirectory)) Directory.Delete(tempDirectory, recursive: true); }
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
         }
@@ -269,7 +281,7 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
     }
 
     private async Task<JobExecutionResult> ExecuteRoleAsync(JobExecutionContext context,
-        MediaAssetRole role, CancellationToken ct)
+        MediaAssetRole role, CancellationToken ct, string? preparedModelPath = null)
     {
         var source = await _media.GetMediaSourceAsync(context.OwnerId, ct).ConfigureAwait(false);
         if (source is null || source.IsRetired)
@@ -299,6 +311,7 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
         {
             if (source.MediaType == MediaType.Model)
             {
+                path = preparedModelPath ?? path;
                 var extension = Path.GetExtension(path);
                 var adapter = _models.ResolveAdapter(new ModelProbeInput(path, extension));
                 if (!adapter.Capabilities.HasFlag(ModelAdapterCapabilities.StaticThumbnail))

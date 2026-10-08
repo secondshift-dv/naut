@@ -17,7 +17,7 @@ Naut does not send every media type through every processor. Depending on the in
 - thumbnails for browsing;
 - bounded hover/banner presentation media for video;
 - [local face analysis](face-intelligence.md) for applicable image/video content;
-- durable Figure preparation for supported 3D models.
+- durable Figure preparation for [GLB, FBX, OBJ, STL and 3MF models](model-formats.md).
 
 A duplicate with identical content can reuse compatible preparation that already exists in the Vault instead of repeating unnecessary work.
 

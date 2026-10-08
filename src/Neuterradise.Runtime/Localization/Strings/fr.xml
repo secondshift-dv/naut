@@ -2060,8 +2060,8 @@
     <sys:String x:Key="Customize.Figure.Show">Afficher une figurine 3D sur ce Profil.</sys:String>
     <sys:String x:Key="Customize.Figure.Loading">Chargement des options de Figurine 3D…</sys:String>
     <sys:String x:Key="Customize.Figure.NoCandidateTitle">Aucune Figurine 3D disponible</sys:String>
-    <sys:String x:Key="Customize.Figure.NoCandidate">Ajoutez d'abord un modèle GLB à ce Profil.</sys:String>
-    <sys:String x:Key="Customize.Figure.ChoosePrompt">Choisissez le modèle GLB à afficher comme Figurine 3D de ce Profil.</sys:String>
+    <sys:String x:Key="Customize.Figure.NoCandidate">Ajoutez d'abord un modèle 3D à ce Profil.</sys:String>
+    <sys:String x:Key="Customize.Figure.ChoosePrompt">Choisissez le modèle 3D à afficher comme Figurine 3D de ce Profil.</sys:String>
     <sys:String x:Key="Customize.Figure.Choose">Choisir la Figurine 3D</sys:String>
     <sys:String x:Key="Customize.Figure.Change">Modifier</sys:String>
     <sys:String x:Key="Customize.Figure.Hide">Désactiver la Figurine 3D</sys:String>

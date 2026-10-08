@@ -8,13 +8,13 @@ namespace Neuterradise.App.Media.Model;
 public sealed partial class GlbThumbnailPreviewAdapter
 {
     public static async Task BuildModelRenderAsync(string canonicalPath, string sourceSha256,
-        string outputPath, CancellationToken ct = default)
+        string outputPath, CancellationToken ct = default, string? inputSha256 = null)
     {
         try
         {
             var (data, document, binary) = await ReadSceneAsync(canonicalPath, ct).ConfigureAwait(false);
             using var ownedDocument = document;
-            if (Convert.ToHexStringLower(SHA256.HashData(data)) != sourceSha256)
+            if (Convert.ToHexStringLower(SHA256.HashData(data)) != (inputSha256 ?? sourceSha256))
                 throw new InvalidDataException("Canonical GLB source hash changed during preparation.");
             using var scene = new Scene(document.RootElement, binary);
             var (header, payloads) = scene.Prepare(sourceSha256, ct);

@@ -2060,8 +2060,8 @@
     <sys:String x:Key="Customize.Figure.Show">在此个人资料中显示 3D 手办。</sys:String>
     <sys:String x:Key="Customize.Figure.Loading">正在加载 3D 手办选项…</sys:String>
     <sys:String x:Key="Customize.Figure.NoCandidateTitle">没有可用的 3D 手办</sys:String>
-    <sys:String x:Key="Customize.Figure.NoCandidate">请先向此个人资料添加 GLB 模型。</sys:String>
-    <sys:String x:Key="Customize.Figure.ChoosePrompt">选择要作为此个人资料 3D 手办显示的 GLB 模型。</sys:String>
+    <sys:String x:Key="Customize.Figure.NoCandidate">请先向此个人资料添加 3D 模型。</sys:String>
+    <sys:String x:Key="Customize.Figure.ChoosePrompt">选择要作为此个人资料 3D 手办显示的 3D 模型。</sys:String>
     <sys:String x:Key="Customize.Figure.Choose">选择 3D 手办</sys:String>
     <sys:String x:Key="Customize.Figure.Change">更改</sys:String>
     <sys:String x:Key="Customize.Figure.Hide">关闭 3D 手办</sys:String>

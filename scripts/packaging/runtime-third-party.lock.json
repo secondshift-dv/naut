@@ -1,5 +1,14 @@
 {
   "schemaVersion": 1,
+  "sharpAssimp": {
+    "packageId": "SharpAssimp",
+    "packageVersion": "6.0.12",
+    "binaryName": "assimp.dll",
+    "binarySha256": "253e2b63978a3ad42cc32ce7659dc078e9ccc64392dfa42e7ae3d08322922ec1",
+    "licenseSha256": "7e31002a7f8b326ede5a18cd2cb72b18e71dbe4a09b84b386b5329f4dc48dce0",
+    "sourceUrl": "https://github.com/JeremyAnsel/SharpAssimp",
+    "license": "MIT AND BSD-3-Clause"
+  },
   "opencvFfmpeg": {
     "packageId": "OpenCvSharp5.runtime.win",
     "packageVersion": "5.0.0.20260905",

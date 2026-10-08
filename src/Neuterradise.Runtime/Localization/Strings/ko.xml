@@ -2060,8 +2060,8 @@
     <sys:String x:Key="Customize.Figure.Show">이 프로필에 3D 피규어를 표시합니다.</sys:String>
     <sys:String x:Key="Customize.Figure.Loading">3D 피규어 옵션 불러오는 중…</sys:String>
     <sys:String x:Key="Customize.Figure.NoCandidateTitle">사용 가능한 3D 피규어 없음</sys:String>
-    <sys:String x:Key="Customize.Figure.NoCandidate">먼저 이 프로필에 GLB 모델을 추가하세요.</sys:String>
-    <sys:String x:Key="Customize.Figure.ChoosePrompt">이 프로필의 3D 피규어로 표시할 GLB 모델을 선택하세요.</sys:String>
+    <sys:String x:Key="Customize.Figure.NoCandidate">먼저 이 프로필에 3D 모델을 추가하세요.</sys:String>
+    <sys:String x:Key="Customize.Figure.ChoosePrompt">이 프로필의 3D 피규어로 표시할 3D 모델을 선택하세요.</sys:String>
     <sys:String x:Key="Customize.Figure.Choose">3D 피규어 선택</sys:String>
     <sys:String x:Key="Customize.Figure.Change">변경</sys:String>
     <sys:String x:Key="Customize.Figure.Hide">3D 피규어 끄기</sys:String>

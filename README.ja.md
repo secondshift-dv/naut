@@ -7,7 +7,7 @@
 <p align="center">Windows 向けのローカルメディアコレクション — オフライン顔認識、インタラクティブな 3D Figure、自分だけのポータブル Vault。</p>
 
 <p align="center">
-  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.3"><strong>Naut v0.0.3 をダウンロード</strong></a>
+  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.4"><strong>Naut v0.0.4 をダウンロード</strong></a>
   ·
   <a href="https://secondshift-dv.github.io/naut/"><strong>ライブデモを見る</strong></a>
   ·
@@ -107,7 +107,7 @@ English、Bahasa Indonesia、日本語、한국어、简体中文、Deutsch、Fr
 
 ## クイックスタート
 
-1. 公式 [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.3) から **Naut v0.0.3** をダウンロードします。
+1. 公式 [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.4) から **Naut v0.0.4** をダウンロードします。
 2. ZIP 全体を通常のフォルダーへ展開します。
 3. `naut.exe` を起動します。
 4. Vault の保存場所を選びます。
@@ -126,9 +126,9 @@ English、Bahasa Indonesia、日本語、한국어、简体中文、Deutsch、Fr
 | **RAM** | 8 GB | 16 GB |
 | **GPU** | 通常利用は integrated graphics | より滑らかな Figure には Direct3D 11 対応 integrated/discrete GPU |
 | **Display** | 1280 × 720 | 1920 × 1080 以上 |
-| **App/update 空き容量** | 1.5 GB | SSD に 1.5 GB+ |
+| **App/update 空き容量** | 3 GB | SSD に 3 GB+ |
 
-Vault 容量は別で、コレクションサイズに依存します。詳しくは [Naut v0.0.3 System Requirements](docs/system-requirements.md) を参照してください。
+Vault 容量は別で、コレクションサイズに依存します。詳しくは [Naut v0.0.4 System Requirements](docs/system-requirements.md) を参照してください。
 
 ## ドキュメント
 

@@ -2060,8 +2060,8 @@
     <sys:String x:Key="Customize.Figure.Show">Tampilkan figur 3D di Profil ini.</sys:String>
     <sys:String x:Key="Customize.Figure.Loading">Memuat opsi Figur 3D…</sys:String>
     <sys:String x:Key="Customize.Figure.NoCandidateTitle">Belum ada Figur 3D</sys:String>
-    <sys:String x:Key="Customize.Figure.NoCandidate">Tambahkan model GLB ke Profil ini terlebih dahulu.</sys:String>
-    <sys:String x:Key="Customize.Figure.ChoosePrompt">Pilih model GLB yang akan ditampilkan sebagai Figur 3D Profil ini.</sys:String>
+    <sys:String x:Key="Customize.Figure.NoCandidate">Tambahkan model 3D ke Profil ini terlebih dahulu.</sys:String>
+    <sys:String x:Key="Customize.Figure.ChoosePrompt">Pilih model 3D yang akan ditampilkan sebagai Figur 3D Profil ini.</sys:String>
     <sys:String x:Key="Customize.Figure.Choose">Pilih Figur 3D</sys:String>
     <sys:String x:Key="Customize.Figure.Change">Ganti</sys:String>
     <sys:String x:Key="Customize.Figure.Hide">Matikan Figur 3D</sys:String>

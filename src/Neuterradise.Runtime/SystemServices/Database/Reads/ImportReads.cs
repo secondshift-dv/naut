@@ -620,6 +620,9 @@ public sealed class ImportReads
             index++;
         }
 
+        command.Parameters.AddWithValue("$candidateImageCapabilityCount", CapabilityApplicability.GetForImportPhase(MediaType.Image, false).Count);
+        command.Parameters.AddWithValue("$candidateVideoCapabilityCount", CapabilityApplicability.GetForImportPhase(MediaType.Video, false).Count);
+        command.Parameters.AddWithValue("$candidateModelCapabilityCount", CapabilityApplicability.GetForImportPhase(MediaType.Model, false).Count);
         command.Parameters.AddWithValue("$imageCapabilityCount",
             CapabilityApplicability.GetAll(MediaType.Image).Count);
         command.Parameters.AddWithValue("$videoCapabilityCount",
@@ -655,14 +658,24 @@ public sealed class ImportReads
                        FROM eligible_assets ea2
                        JOIN media a2 ON a2.media_id = ea2.media_id
                        LEFT JOIN media_capability_readiness cr2 ON cr2.media_id = ea2.media_id
+                           AND (u.library_commit_state IN ('DOMAIN_AUTHORITY_COMMITTED','SOURCE_CLEANUP_PENDING','SOURCE_CLEANUP_COMPLETE','TERMINAL')
+                                OR cr2.capability IN ('METADATA','FACE_DETECTION','FACE_EMBEDDING','SIMILARITY_RELATED'))
+                       LEFT JOIN jobs capability_job ON capability_job.job_id = cr2.job_id
                        WHERE ea2.import_unit_id = u.import_unit_id
                        GROUP BY ea2.media_id
                        HAVING COUNT(cr2.capability) >= (
-                           CASE WHEN a2.media_type = 'VIDEO' THEN $videoCapabilityCount
-                                WHEN a2.media_type = 'MODEL' THEN $modelCapabilityCount
-                                ELSE $imageCapabilityCount END
+                           CASE WHEN u.library_commit_state NOT IN ('DOMAIN_AUTHORITY_COMMITTED','SOURCE_CLEANUP_PENDING','SOURCE_CLEANUP_COMPLETE','TERMINAL')
+                                THEN CASE WHEN a2.media_type = 'VIDEO' THEN $candidateVideoCapabilityCount
+                                          WHEN a2.media_type = 'MODEL' THEN $candidateModelCapabilityCount
+                                          ELSE $candidateImageCapabilityCount END
+                                ELSE CASE WHEN a2.media_type = 'VIDEO' THEN $videoCapabilityCount
+                                          WHEN a2.media_type = 'MODEL' THEN $modelCapabilityCount
+                                          ELSE $imageCapabilityCount END END
                        )
-                       AND SUM(CASE WHEN cr2.state IN ('QUEUED','PROCESSING','FAILED') THEN 1 ELSE 0 END) = 0
+                       AND SUM(CASE WHEN cr2.state IN ('QUEUED','PROCESSING')
+                           OR (cr2.state = 'FAILED' AND capability_job.state IS NOT NULL
+                               AND capability_job.state NOT IN ('FAILED_TERMINAL','CANCELLED','SUCCEEDED'))
+                           THEN 1 ELSE 0 END) = 0
                    ) prepared_assets),
                    SUM(CASE WHEN i.disposition IN ('INCLUDED','REUSED')
                              AND i.source_cleanup_state <> 'SOURCE_PRESENT' THEN 1 ELSE 0 END),

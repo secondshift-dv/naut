@@ -50,11 +50,13 @@ function Verify-PublicTree {
         }
     }
     $primaryReadme=Get-Content -LiteralPath (Join-Path $repo 'README.md') -Raw
-    foreach ($requiredText in @('Download Naut v0.0.3','View Live Demo','Documentation','Feature highlights','Why Naut','System Requirements','Quick Start')) {
+    [xml]$buildProps=Get-Content -LiteralPath (Join-Path $repo 'Directory.Build.props') -Raw
+    $productVersion=$buildProps.SelectSingleNode('/Project/PropertyGroup/ProductVersion').InnerText
+    foreach ($requiredText in @(('Download Naut v'+$productVersion),'View Live Demo','Documentation','Feature highlights','Why Naut','System Requirements','Quick Start')) {
         if ($primaryReadme -notmatch [regex]::Escape($requiredText)) { throw "Primary README landing contract missing: $requiredText" }
     }
     $requirements=Get-Content -LiteralPath (Join-Path $repo 'docs/system-requirements.md') -Raw
-    foreach ($requiredText in @('Windows 10 64-bit','2 cores','8 GB','16 GB','1.5 GB','1280 × 720','1920 × 1080','Direct3D 11','2048 × 2048')) {
+    foreach ($requiredText in @('Windows 10 64-bit','2 cores','8 GB','16 GB','3 GB','1280 × 720','1920 × 1080','Direct3D 11','2048 × 2048')) {
         if ($requirements -notmatch [regex]::Escape($requiredText)) { throw "System requirements contract missing: $requiredText" }
     }
     Write-Host 'README_PRODUCT_LANDING=PASS'

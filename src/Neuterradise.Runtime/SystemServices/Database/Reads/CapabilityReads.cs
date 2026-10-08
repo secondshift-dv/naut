@@ -1,3 +1,4 @@
+using Neuterradise.App.Import;
 using Neuterradise.App.Import.Preparation;
 
 namespace Neuterradise.App.SystemServices.Database.Reads;
@@ -68,6 +69,7 @@ public sealed class CapabilityReads
         Guid unitId,
         CancellationToken cancellationToken = default)
     {
+        var domainCommitted = await IsDomainCommittedAsync(unitId, cancellationToken).ConfigureAwait(false);
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText =
@@ -114,7 +116,7 @@ public sealed class CapabilityReads
         var terminalMedias = 0;
         foreach (var snapshot in media.Values)
         {
-            var required = CapabilityApplicability.GetRequired(snapshot.MediaType);
+            var required = CapabilityApplicability.GetRequiredForImportPhase(snapshot.MediaType, domainCommitted);
             if (required.All(capability =>
                     snapshot.States.TryGetValue(capability, out var state)
                     && state is MediaCapabilityState.Ready or MediaCapabilityState.NotApplicable))
@@ -139,6 +141,7 @@ public sealed class CapabilityReads
         Guid unitId,
         CancellationToken cancellationToken = default)
     {
+        var domainCommitted = await IsDomainCommittedAsync(unitId, cancellationToken).ConfigureAwait(false);
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken)
             .ConfigureAwait(false);
         await using var command = connection.CreateCommand();
@@ -193,7 +196,7 @@ public sealed class CapabilityReads
 
         foreach (var snapshot in media.Values)
         {
-            foreach (var capability in CapabilityApplicability.GetRequired(snapshot.MediaType))
+            foreach (var capability in CapabilityApplicability.GetRequiredForImportPhase(snapshot.MediaType, domainCommitted))
             {
                 if (!snapshot.States.TryGetValue(capability, out var state))
                 {
@@ -229,6 +232,7 @@ public sealed class CapabilityReads
         Guid unitId,
         CancellationToken cancellationToken = default)
     {
+        var domainCommitted = await IsDomainCommittedAsync(unitId, cancellationToken).ConfigureAwait(false);
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText =
@@ -259,13 +263,23 @@ public sealed class CapabilityReads
             var assetId = DbGuid.Parse(reader.GetString(0));
             var mediaType = DbEnum.ParseMediaType(reader.GetString(1));
             var capability = DbEnum.ParseMediaCapability(reader.GetString(2));
-            if (CapabilityApplicability.GetRequired(mediaType).Contains(capability))
+            if (CapabilityApplicability.GetRequiredForImportPhase(mediaType, domainCommitted).Contains(capability))
             {
                 ids.Add(assetId);
             }
         }
 
         return ids.Order().ToArray();
+    }
+
+    private async Task<bool> IsDomainCommittedAsync(Guid unitId, CancellationToken ct)
+    {
+        await using var connection = await _connectionFactory.OpenConnectionAsync(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT library_commit_state FROM import_units WHERE import_unit_id = $id;";
+        command.Parameters.AddWithValue("$id", DbGuid.Format(unitId));
+        var checkpoint = await command.ExecuteScalarAsync(ct).ConfigureAwait(false) as string;
+        return DbEnum.ParseImportCommitCheckpointOrDefault(checkpoint).HasReachedDomainCommit();
     }
 
     private sealed record CapabilityMediaSnapshot(

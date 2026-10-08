@@ -12,7 +12,8 @@ Naut is a local-first media collection manager for Windows. Start here if you ar
 - [Customization](customization.md) — themes, layouts, frames, backdrops, effects, and presentation choices.
 - [Languages](languages.md) — the eight interface languages and what changing language does and does not affect.
 - [3D Figures](figures.md) — optional interactive 3D presentation and its performance tier.
-- [System Requirements](system-requirements.md) — minimum and recommended requirements for Naut v0.0.2.
+- [Model formats](model-formats.md) — GLB, FBX, OBJ, STL and 3MF preparation, textures and package dependencies.
+- [System Requirements](system-requirements.md) — minimum and recommended requirements for Naut v0.0.4.
 - [FAQ & Troubleshooting](troubleshooting.md) — common installation, media, face analysis, video, Figure, and update questions.
 
 ## Developers and contributors

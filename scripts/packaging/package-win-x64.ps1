@@ -549,6 +549,13 @@ try {
     Invoke-DotNet -Arguments $workerArgs
     Copy-Item -Path (Join-Path $workerOutput '*') -Destination $workerInstallRoot -Recurse -Force
 
+    $modelWorkerOutput = Join-Path $PublishRoot 'model-worker'
+    $modelWorkerInstallRoot = Join-Path $RuntimeInstallRoot 'tools/model'
+    New-Item -ItemType Directory -Path $modelWorkerOutput, $modelWorkerInstallRoot -Force | Out-Null
+    Invoke-DotNet -Arguments (@('publish', 'src/Neuterradise.Model.Worker/Neuterradise.Model.Worker.csproj') + $commonPublish + @(
+        '-p:PublishSingleFile=false', '--output', $modelWorkerOutput))
+    Copy-Item -Path (Join-Path $modelWorkerOutput '*') -Destination $modelWorkerInstallRoot -Recurse -Force
+
     $updaterOutput = Join-Path $PublishRoot 'updater'
     New-Item -ItemType Directory -Path $updaterOutput -Force | Out-Null
     $updaterArgs = @(
@@ -710,6 +717,13 @@ foreach ($component in @(
     Copy-Item -LiteralPath $noticesSource -Destination (Join-Path $LicensesRoot "$($component.Name)-THIRD-PARTY-NOTICES.txt") -Force
 }
 
+$AssimpPackageRoot = Join-Path $NuGetPackagesRoot "$($RuntimeThirdPartyLock.sharpAssimp.packageId.ToLowerInvariant())/$($RuntimeThirdPartyLock.sharpAssimp.packageVersion)"
+$AssimpNativePath = Join-Path $RuntimeInstallRoot 'tools/model/assimp.dll'
+Assert-Sha256 -Path (Join-Path $AssimpPackageRoot 'runtimes/win-x64/native/assimp.dll') -Expected $RuntimeThirdPartyLock.sharpAssimp.binarySha256 -Label 'Assimp package binary'
+Assert-Sha256 -Path $AssimpNativePath -Expected $RuntimeThirdPartyLock.sharpAssimp.binarySha256 -Label 'Assimp deployed binary'
+Assert-Sha256 -Path (Join-Path $AssimpPackageRoot 'LICENSE.txt') -Expected $RuntimeThirdPartyLock.sharpAssimp.licenseSha256 -Label 'SharpAssimp and Assimp licenses'
+Copy-Item -LiteralPath (Join-Path $AssimpPackageRoot 'LICENSE.txt') -Destination (Join-Path $LicensesRoot 'SharpAssimp-LICENSE.txt') -Force
+
 $ThirdPartyNoticePath = Join-Path $RuntimeInstallRoot 'THIRD-PARTY-NOTICES.txt'
 $notice = @"
 naut v$ProductVersion - Third-Party Runtime Notices
@@ -777,6 +791,15 @@ This runtime package contains third-party runtime artifacts pinned by exact sour
    Uno OpenSans and Fluent font assets are verified byte-for-byte against their locked NuGet packages.
    Uno package license copy: LICENSES/$($RuntimeThirdPartyLock.unoFonts.licenseFile)
 
+9. SharpAssimp and Assimp
+   Package: SharpAssimp $($RuntimeThirdPartyLock.sharpAssimp.packageVersion)
+   Source: $($RuntimeThirdPartyLock.sharpAssimp.sourceUrl)
+   Deployed native library: tools/model/assimp.dll
+   SHA-256: $($RuntimeThirdPartyLock.sharpAssimp.binarySha256)
+   License: MIT (wrapper), BSD-3-Clause (native library)
+   License copy: LICENSES/SharpAssimp-LICENSE.txt
+   Used by the isolated Naut Model Worker for static FBX, OBJ, STL and 3MF Figure preparation.
+
 The deployment/artifacts.json manifest remains the operational authority for model/tool/native capabilities explicitly resolved by Naut. The runtime-third-party lock and packaged license inventory are the compliance authority for the remaining bundled runtime libraries. A missing file or SHA-256 mismatch fails the canonical build.
 "@
 [IO.File]::WriteAllText($ThirdPartyNoticePath, $notice.TrimStart() + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
@@ -792,6 +815,23 @@ $deploymentManifest = [ordered]@{
     policy = 'InstallRoot-only pinned runtime artifacts; SHA-256 verification is mandatory and mismatches fail closed. The profiling worker is isolated under workers/ and resolves its models from workers/models. No PATH, source-tree, or network fallback is permitted at runtime.'
     noticesRelativePath = 'THIRD-PARTY-NOTICES.txt'
     sources = @(
+        [ordered]@{
+            sourceId = 'naut-model-worker'
+            kind = 'file'
+            url = "https://github.com/secondshift-dv/naut/blob/v$ProductVersion/src/Neuterradise.Model.Worker/Program.cs"
+            sha256 = Get-Sha256Lower -Path (Join-Path $RepositoryRoot 'src/Neuterradise.Model.Worker/Program.cs')
+            license = 'MIT'
+            provenance = "Naut v$ProductVersion source-built isolated model conversion worker."
+        },
+        [ordered]@{
+            sourceId = 'sharp-assimp'
+            kind = 'nuget'
+            package = $RuntimeThirdPartyLock.sharpAssimp.packageId
+            version = $RuntimeThirdPartyLock.sharpAssimp.packageVersion
+            license = $RuntimeThirdPartyLock.sharpAssimp.license
+            licenseUrl = 'https://github.com/JeremyAnsel/SharpAssimp/blob/main/LICENSE.txt'
+            provenance = 'Pinned SharpAssimp package; native library and license hashes verified before packaging.'
+        },
         [ordered]@{
             sourceId = 'opencv-zoo-yunet-2023mar'
             kind = 'file'
@@ -831,6 +871,43 @@ $deploymentManifest = [ordered]@{
         }
     )
     artifacts = @(
+        [ordered]@{
+            logicalName = 'Naut Model Worker'
+            kind = 'tool'
+            toolId = 'model-converter'
+            version = $ProductVersion
+            sourceId = 'naut-model-worker'
+            sourceEntryPath = 'src/Neuterradise.Model.Worker/Program.cs'
+            deployedRelativePath = 'tools/model/NeuTerradise.Model.Worker.exe'
+            sha256 = Get-Sha256Lower -Path (Join-Path $RuntimeInstallRoot 'tools/model/NeuTerradise.Model.Worker.exe')
+            license = 'MIT'
+            provenance = 'Built from the approved Naut source snapshot; original model bytes are preserved.'
+            consumers = @('app')
+            distribution = 'build'
+            featureImpactWhenMissing = 'FBX, OBJ, STL and 3MF Figure preparation is unavailable.'
+            mismatchBehavior = 'Fail closed and do not launch an unverified model worker.'
+            startupBlocking = $false
+            releaseRequired = $true
+            contentState = 'PROVISIONED'
+        },
+        [ordered]@{
+            logicalName = 'Assimp native model importer'
+            kind = 'native'
+            version = $RuntimeThirdPartyLock.sharpAssimp.packageVersion
+            sourceId = 'sharp-assimp'
+            sourceEntryPath = 'runtimes/win-x64/native/assimp.dll'
+            deployedRelativePath = 'tools/model/assimp.dll'
+            sha256 = $RuntimeThirdPartyLock.sharpAssimp.binarySha256
+            license = 'BSD-3-Clause'
+            provenance = 'Exact native bytes from the pinned SharpAssimp package.'
+            consumers = @('model-worker')
+            distribution = 'build'
+            featureImpactWhenMissing = 'Static model conversion is unavailable.'
+            mismatchBehavior = 'Fail closed; the model worker rejects an unverified native library.'
+            startupBlocking = $false
+            releaseRequired = $true
+            contentState = 'PROVISIONED'
+        },
         [ordered]@{
             logicalName = 'YuNet face detector'
             kind = 'model'
@@ -931,7 +1008,7 @@ $deploymentManifest = [ordered]@{
 Write-JsonUtf8NoBom -Value $deploymentManifest -Path $DeploymentManifestPath -Depth 12
 
 $parsedDeployment = Get-Content -LiteralPath $DeploymentManifestPath -Raw | ConvertFrom-Json
-if ($parsedDeployment.schemaVersion -ne 2 -or $parsedDeployment.artifacts.Count -ne 5) {
+if ($parsedDeployment.schemaVersion -ne 2 -or $parsedDeployment.artifacts.Count -ne 7) {
     throw 'Generated deployment/artifacts.json failed structural validation.'
 }
 foreach ($artifact in $parsedDeployment.artifacts) {

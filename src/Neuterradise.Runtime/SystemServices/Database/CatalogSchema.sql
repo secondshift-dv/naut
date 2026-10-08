@@ -1172,8 +1172,18 @@ WHEN NOT EXISTS (
       AND NEW.relative_path = 'media-assets/' || a.media_storage_token || '/'
           || CASE NEW.role WHEN 'THUMBNAIL' THEN 'thumbnail.webp' WHEN 'HOVER' THEN 'hover.mp4' WHEN 'MODEL_RENDER' THEN 'model-render.nfig' END
       AND (NEW.role <> 'HOVER' OR a.media_type = 'VIDEO')
-      AND (NEW.role <> 'MODEL_RENDER' OR (a.media_type = 'MODEL' AND a.dependency_status = 'SELF_CONTAINED'
-          AND lower(coalesce(a.current_managed_file_name, '')) LIKE '%.glb'))
+      AND (NEW.role <> 'MODEL_RENDER' OR (a.media_type = 'MODEL'
+          /* model-figure-format-start */
+          AND (
+              (lower(coalesce(a.current_managed_file_name, '')) LIKE '%.glb' AND a.dependency_status = 'SELF_CONTAINED')
+              OR ((lower(coalesce(a.current_managed_file_name, '')) LIKE '%.obj'
+                   OR lower(coalesce(a.current_managed_file_name, '')) LIKE '%.stl'
+                   OR lower(coalesce(a.current_managed_file_name, '')) LIKE '%.3mf')
+                  AND a.dependency_status IN ('SELF_CONTAINED','COMPLETE'))
+              OR (lower(coalesce(a.current_managed_file_name, '')) LIKE '%.fbx'
+                  AND a.dependency_status IN ('SELF_CONTAINED','COMPLETE','DEPENDENCIES_UNKNOWN'))
+          )
+          /* model-figure-format-end */))
 )
 BEGIN
     SELECT RAISE(ABORT, 'MediaAsset path or role is not owned by its Media');
@@ -1187,8 +1197,18 @@ WHEN NOT EXISTS (
       AND NEW.relative_path = 'media-assets/' || a.media_storage_token || '/'
           || CASE NEW.role WHEN 'THUMBNAIL' THEN 'thumbnail.webp' WHEN 'HOVER' THEN 'hover.mp4' WHEN 'MODEL_RENDER' THEN 'model-render.nfig' END
       AND (NEW.role <> 'HOVER' OR a.media_type = 'VIDEO')
-      AND (NEW.role <> 'MODEL_RENDER' OR (a.media_type = 'MODEL' AND a.dependency_status = 'SELF_CONTAINED'
-          AND lower(coalesce(a.current_managed_file_name, '')) LIKE '%.glb'))
+      AND (NEW.role <> 'MODEL_RENDER' OR (a.media_type = 'MODEL'
+          /* model-figure-format-start */
+          AND (
+              (lower(coalesce(a.current_managed_file_name, '')) LIKE '%.glb' AND a.dependency_status = 'SELF_CONTAINED')
+              OR ((lower(coalesce(a.current_managed_file_name, '')) LIKE '%.obj'
+                   OR lower(coalesce(a.current_managed_file_name, '')) LIKE '%.stl'
+                   OR lower(coalesce(a.current_managed_file_name, '')) LIKE '%.3mf')
+                  AND a.dependency_status IN ('SELF_CONTAINED','COMPLETE'))
+              OR (lower(coalesce(a.current_managed_file_name, '')) LIKE '%.fbx'
+                  AND a.dependency_status IN ('SELF_CONTAINED','COMPLETE','DEPENDENCIES_UNKNOWN'))
+          )
+          /* model-figure-format-end */))
 )
 BEGIN
     SELECT RAISE(ABORT, 'MediaAsset path or role is not owned by its Media');
@@ -1248,8 +1268,18 @@ WHEN NEW.figure_media_id IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM media m JOIN profiles p ON p.profile_id = NEW.profile_id
     JOIN profile_media pm ON pm.profile_id = p.profile_id AND pm.media_id = m.media_id
     WHERE m.media_id = NEW.figure_media_id AND m.state = 'ACTIVE' AND m.trashed_at_ms IS NULL
-      AND m.media_type = 'MODEL' AND m.sha256 IS NOT NULL AND m.dependency_status = 'SELF_CONTAINED'
-      AND lower(coalesce(m.current_managed_file_name,m.original_file_name,'')) LIKE '%.glb'
+      AND m.media_type = 'MODEL' AND m.sha256 IS NOT NULL
+      /* model-figure-format-start */
+      AND (
+          (lower(coalesce(m.current_managed_file_name,m.original_file_name,'')) LIKE '%.glb' AND m.dependency_status = 'SELF_CONTAINED')
+          OR ((lower(coalesce(m.current_managed_file_name,m.original_file_name,'')) LIKE '%.obj'
+               OR lower(coalesce(m.current_managed_file_name,m.original_file_name,'')) LIKE '%.stl'
+               OR lower(coalesce(m.current_managed_file_name,m.original_file_name,'')) LIKE '%.3mf')
+              AND m.dependency_status IN ('SELF_CONTAINED','COMPLETE'))
+          OR (lower(coalesce(m.current_managed_file_name,m.original_file_name,'')) LIKE '%.fbx'
+              AND m.dependency_status IN ('SELF_CONTAINED','COMPLETE','DEPENDENCIES_UNKNOWN'))
+      )
+      /* model-figure-format-end */
       AND p.kind = 'NORMAL' AND p.visibility = 'PUBLISHED' AND p.trashed_at_ms IS NULL
       AND pm.publication_import_unit_id IS NULL
       AND NOT EXISTS (SELECT 1 FROM trash_entries te WHERE te.entity_type = 'MEDIA' AND te.entity_id = m.media_id AND te.state IN ('PENDING','EXECUTING')))
@@ -1264,8 +1294,18 @@ WHEN NEW.figure_media_id IS NOT NULL AND (NEW.figure_media_id IS NOT OLD.figure_
     SELECT 1 FROM media m JOIN profiles p ON p.profile_id = NEW.profile_id
     JOIN profile_media pm ON pm.profile_id = p.profile_id AND pm.media_id = m.media_id
     WHERE m.media_id = NEW.figure_media_id AND m.state = 'ACTIVE' AND m.trashed_at_ms IS NULL
-      AND m.media_type = 'MODEL' AND m.sha256 IS NOT NULL AND m.dependency_status = 'SELF_CONTAINED'
-      AND lower(coalesce(m.current_managed_file_name,m.original_file_name,'')) LIKE '%.glb'
+      AND m.media_type = 'MODEL' AND m.sha256 IS NOT NULL
+      /* model-figure-format-start */
+      AND (
+          (lower(coalesce(m.current_managed_file_name,m.original_file_name,'')) LIKE '%.glb' AND m.dependency_status = 'SELF_CONTAINED')
+          OR ((lower(coalesce(m.current_managed_file_name,m.original_file_name,'')) LIKE '%.obj'
+               OR lower(coalesce(m.current_managed_file_name,m.original_file_name,'')) LIKE '%.stl'
+               OR lower(coalesce(m.current_managed_file_name,m.original_file_name,'')) LIKE '%.3mf')
+              AND m.dependency_status IN ('SELF_CONTAINED','COMPLETE'))
+          OR (lower(coalesce(m.current_managed_file_name,m.original_file_name,'')) LIKE '%.fbx'
+              AND m.dependency_status IN ('SELF_CONTAINED','COMPLETE','DEPENDENCIES_UNKNOWN'))
+      )
+      /* model-figure-format-end */
       AND p.kind = 'NORMAL' AND p.visibility = 'PUBLISHED' AND p.trashed_at_ms IS NULL
       AND pm.publication_import_unit_id IS NULL
       AND NOT EXISTS (SELECT 1 FROM trash_entries te WHERE te.entity_type = 'MEDIA' AND te.entity_id = m.media_id AND te.state IN ('PENDING','EXECUTING')))

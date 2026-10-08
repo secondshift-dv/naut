@@ -416,8 +416,17 @@ public sealed class ProfileReads
             WHERE pa.figure_media_id IS NOT NULL
               AND p.kind = 'NORMAL' AND p.visibility = 'PUBLISHED' AND p.trashed_at_ms IS NULL
               AND m.media_type = 'MODEL' AND m.state = 'ACTIVE' AND m.trashed_at_ms IS NULL
-              AND m.sha256 IS NOT NULL AND m.dependency_status = 'SELF_CONTAINED'
-              AND lower(coalesce(m.current_managed_file_name,m.original_file_name,'')) LIKE '%.glb'
+              AND m.sha256 IS NOT NULL
+              AND (
+                  (lower(coalesce(m.current_managed_file_name,m.original_file_name,'')) LIKE '%.glb'
+                   AND m.dependency_status = 'SELF_CONTAINED')
+                  OR ((lower(coalesce(m.current_managed_file_name,m.original_file_name,'')) LIKE '%.obj'
+                       OR lower(coalesce(m.current_managed_file_name,m.original_file_name,'')) LIKE '%.stl'
+                       OR lower(coalesce(m.current_managed_file_name,m.original_file_name,'')) LIKE '%.3mf')
+                      AND m.dependency_status IN ('SELF_CONTAINED','COMPLETE'))
+                  OR (lower(coalesce(m.current_managed_file_name,m.original_file_name,'')) LIKE '%.fbx'
+                      AND m.dependency_status IN ('SELF_CONTAINED','COMPLETE','DEPENDENCIES_UNKNOWN'))
+              )
               AND EXISTS (
                   SELECT 1 FROM profile_media pm
                   WHERE pm.profile_id = p.profile_id

@@ -19,6 +19,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Neuterradise.Runtime", "src\Neuterradise.Runtime\Neuterradise.Runtime.csproj", "{0C9C87B4-0880-4096-B95C-421E24144C0C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Neuterradise.Model.Worker", "src\Neuterradise.Model.Worker\Neuterradise.Model.Worker.csproj", "{B728E798-C1CB-4769-B2C0-E0241F2B4318}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -53,6 +55,10 @@ Global
 		{0C9C87B4-0880-4096-B95C-421E24144C0C}.Debug|x64.Build.0 = Debug|Any CPU
 		{0C9C87B4-0880-4096-B95C-421E24144C0C}.Release|x64.ActiveCfg = Release|Any CPU
 		{0C9C87B4-0880-4096-B95C-421E24144C0C}.Release|x64.Build.0 = Release|Any CPU
+		{B728E798-C1CB-4769-B2C0-E0241F2B4318}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B728E798-C1CB-4769-B2C0-E0241F2B4318}.Debug|x64.Build.0 = Debug|Any CPU
+		{B728E798-C1CB-4769-B2C0-E0241F2B4318}.Release|x64.ActiveCfg = Release|Any CPU
+		{B728E798-C1CB-4769-B2C0-E0241F2B4318}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -61,6 +67,6 @@ Global
 		{2D3D6044-4492-4A77-8FBA-46D725F6D08D} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{A83C21E7-9D5D-4D71-A0A8-4FB45E7904D2} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{0C9C87B4-0880-4096-B95C-421E24144C0C} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{B728E798-C1CB-4769-B2C0-E0241F2B4318} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal
-

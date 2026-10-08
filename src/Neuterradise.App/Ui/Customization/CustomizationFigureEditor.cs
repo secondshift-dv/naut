@@ -113,7 +113,7 @@ public sealed partial class CustomizationCenter
         {
             body.Children.Add(UI.Guidance(
                 UI.T("Customize.Figure.NoCandidateTitle", "No 3D Figure available"),
-                UI.T("Customize.Figure.NoCandidate", "Add a GLB model to this Profile first."),
+                UI.T("Customize.Figure.NoCandidate", "Add a supported 3D model to this Profile first."),
                 "warning"));
         }
         else if (selected is not null)
@@ -127,7 +127,7 @@ public sealed partial class CustomizationCenter
         else if (_figureEnabledDraft && selectable.Count > 1)
         {
             body.Children.Add(UI.WrappedText(
-                UI.T("Customize.Figure.ChoosePrompt", "Choose which GLB model to show as this Profile's 3D Figure."),
+                UI.T("Customize.Figure.ChoosePrompt", "Choose which model to show as this Profile's 3D Figure."),
                 "caption",
                 "textSecondary"));
         }
@@ -167,7 +167,7 @@ public sealed partial class CustomizationCenter
         {
             return UI.Guidance(
                 UI.T("Customize.Figure.NoCandidateTitle", "No 3D Figure available"),
-                UI.T("Customize.Figure.NoCandidate", "Add a GLB model to this Profile first."),
+                UI.T("Customize.Figure.NoCandidate", "Add a supported 3D model to this Profile first."),
                 "warning");
         }
 

@@ -2060,8 +2060,8 @@
     <sys:String x:Key="Customize.Figure.Show">このプロフィールに3Dフィギュアを表示します。</sys:String>
     <sys:String x:Key="Customize.Figure.Loading">3Dフィギュアのオプションを読み込み中…</sys:String>
     <sys:String x:Key="Customize.Figure.NoCandidateTitle">利用できる3Dフィギュアがありません</sys:String>
-    <sys:String x:Key="Customize.Figure.NoCandidate">まずこのプロフィールにGLBモデルを追加してください。</sys:String>
-    <sys:String x:Key="Customize.Figure.ChoosePrompt">このプロフィールの3Dフィギュアとして表示するGLBモデルを選択します。</sys:String>
+    <sys:String x:Key="Customize.Figure.NoCandidate">まずこのプロフィールに3Dモデルを追加してください。</sys:String>
+    <sys:String x:Key="Customize.Figure.ChoosePrompt">このプロフィールの3Dフィギュアとして表示する3Dモデルを選択します。</sys:String>
     <sys:String x:Key="Customize.Figure.Choose">3Dフィギュアを選択</sys:String>
     <sys:String x:Key="Customize.Figure.Change">変更</sys:String>
     <sys:String x:Key="Customize.Figure.Hide">3Dフィギュアをオフにする</sys:String>

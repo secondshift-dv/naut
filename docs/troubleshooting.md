@@ -22,6 +22,10 @@ See [Face Intelligence](face-intelligence.md) for the detection → embedding �
 
 No. A candidate is a reviewable model suggestion. Naut keeps confirmation as a separate durable decision.
 
+## MPG or MPEG stays at Preparing media
+
+Naut v0.0.4 fixes candidate imports that had finished metadata and face-analysis jobs but kept waiting for assets created only after confirmation. Update to v0.0.4 and open Import again. A completed candidate can offer **Review**; imports with failed required work remain under **Needs attention**. If you already cancelled the import, import the original files again.
+
 ## Why does an original video open outside Naut?
 
 Opening an original media item uses the Windows default application for that file. For original video playback, the available Windows player/codecs therefore matter.
@@ -36,7 +40,7 @@ Yes. Figure is optional and independent from the rest of the Profile experience.
 
 ## Which interface languages are included?
 
-Naut v0.0.2 includes English, Bahasa Indonesia, 日本語, 한국어, 简体中文, Deutsch, Français, and Español. See [Languages](languages.md).
+Naut v0.0.4 includes English, Bahasa Indonesia, 日本語, 한국어, 简体中文, Deutsch, Français, and Español. See [Languages](languages.md).
 
 ## Where should I put the Vault?
 

@@ -7,7 +7,7 @@ using Neuterradise.App.SystemServices.Storage;
 
 namespace Neuterradise.App.Media.Model;
 
-public enum ModelPackageFormat { Gltf, Glb, Obj, Dae, Fbx, Blend }
+public enum ModelPackageFormat { Gltf, Glb, Obj, Dae, Fbx, Blend, Stl, ThreeMf }
 
 public enum ComponentRole { Primary, Dependency }
 
@@ -190,6 +190,8 @@ public static class ModelPackageDiscovery
             ".dae" => ModelPackageFormat.Dae,
             ".fbx" => ModelPackageFormat.Fbx,
             ".blend" => ModelPackageFormat.Blend,
+            ".stl" => ModelPackageFormat.Stl,
+            ".3mf" => ModelPackageFormat.ThreeMf,
             _ => ModelPackageFormat.Obj,
         };
 
@@ -215,7 +217,7 @@ public static class ModelPackageDiscovery
             fullPath,
             true);
 
-        if (format == ModelPackageFormat.Glb)
+        if (format is ModelPackageFormat.Glb or ModelPackageFormat.Stl or ModelPackageFormat.ThreeMf)
         {
             return new ModelPackageDiscoveryResult(
                 format,

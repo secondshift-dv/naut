@@ -42,7 +42,7 @@ public sealed class MediaAssetWrites
                 || reader.GetString(5) != "ACTIVE" || mediaType != "MODEL"
                 || reader.IsDBNull(3) || !ModelRenderEligibility.IsEligible(reader.GetString(3), reader.GetString(4))
                 || reader.IsDBNull(2))
-                throw new CatalogInvariantException("ModelRender requires a committed self-contained GLB and contract 1.");
+                throw new CatalogInvariantException("ModelRender requires a committed supported Model and contract 1.");
             modelSourceHash = reader.GetString(2);
         }
         await reader.DisposeAsync().ConfigureAwait(false);

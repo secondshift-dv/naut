@@ -7,7 +7,7 @@
 <p align="center">Des collections multimédias locales pour Windows — reconnaissance faciale hors ligne, Figures 3D interactives et votre propre Vault portable.</p>
 
 <p align="center">
-  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.3"><strong>Télécharger Naut v0.0.3</strong></a>
+  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.4"><strong>Télécharger Naut v0.0.4</strong></a>
   ·
   <a href="https://secondshift-dv.github.io/naut/"><strong>Voir la démo</strong></a>
   ·
@@ -99,7 +99,7 @@ Le paquet applicatif portable et le Vault sont séparés. L'import copie les fic
 
 ## Démarrage rapide
 
-1. Téléchargez **Naut v0.0.3** depuis le [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.3) officiel.
+1. Téléchargez **Naut v0.0.4** depuis le [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.4) officiel.
 2. Extrayez le ZIP complet dans un dossier normal.
 3. Lancez `naut.exe`.
 4. Choisissez où conserver le Vault.
@@ -118,9 +118,9 @@ L'expérience Naut normale est volontairement plus légère que la charge option
 | **RAM** | 8 GB | 16 GB |
 | **GPU** | Graphiques intégrés pour l'usage normal | GPU intégré/dédié Direct3D 11 pour des Figures plus fluides |
 | **Écran** | 1280 × 720 | 1920 × 1080 ou plus |
-| **Espace app/update** | 1.5 GB | 1.5 GB+ sur SSD |
+| **Espace app/update** | 3 GB | 3 GB+ sur SSD |
 
-Le stockage du Vault est séparé et dépend de la collection. Voir [Naut v0.0.3 System Requirements](docs/system-requirements.md).
+Le stockage du Vault est séparé et dépend de la collection. Voir [Naut v0.0.4 System Requirements](docs/system-requirements.md).
 
 ## Optional pack collection
 

@@ -2,7 +2,7 @@
 
 ## 1. Download Naut
 
-Download **Naut v0.0.2** from the official [GitHub Releases](https://github.com/secondshift-dv/naut/releases/tag/v0.0.2) page.
+Download **Naut v0.0.4** from the official [GitHub Releases](https://github.com/secondshift-dv/naut/releases/tag/v0.0.4) page.
 
 The Windows package is portable. Extract the complete ZIP to a normal folder; do not run only the EXE from inside the archive.
 

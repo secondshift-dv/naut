@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "SharpAssimp": {
+        "type": "Direct",
+        "requested": "[6.0.12, )",
+        "resolved": "6.0.12",
+        "contentHash": "HdfQ20RqLW32Nf05L0rrJYQlgcFWmQOdIZNDY4SNC0o8485DUzTeXAUMAp3KvUg8rDFIHbzFhvxDVl33WAV7Bg=="
+      }
+    },
+    "net10.0/win-x64": {
+      "SharpAssimp": {
+        "type": "Direct",
+        "requested": "[6.0.12, )",
+        "resolved": "6.0.12",
+        "contentHash": "HdfQ20RqLW32Nf05L0rrJYQlgcFWmQOdIZNDY4SNC0o8485DUzTeXAUMAp3KvUg8rDFIHbzFhvxDVl33WAV7Bg=="
+      }
+    }
+  }
+}

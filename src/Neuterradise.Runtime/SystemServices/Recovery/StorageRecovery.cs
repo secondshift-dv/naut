@@ -121,11 +121,11 @@ public sealed class StorageRecovery
                 RecoveryOutcome.Requeued, "MEDIA_ASSET_REPAIR_QUEUED",
                 "A missing, incomplete, or obsolete MediaAsset was queued for background repair."));
         }
-        await QueueLegacyGlbThumbnailsAsync(findings, cancellationToken).ConfigureAwait(false);
+        await QueueSupportedModelAssetsAsync(findings, cancellationToken).ConfigureAwait(false);
         return findings;
     }
 
-    private async Task QueueLegacyGlbThumbnailsAsync(List<RecoveryFinding> findings, CancellationToken ct)
+    private async Task QueueSupportedModelAssetsAsync(List<RecoveryFinding> findings, CancellationToken ct)
     {
         var mediaIds = new List<Guid>();
         await using (var connection = await _catalog.OpenConnectionAsync(ct).ConfigureAwait(false))
@@ -159,7 +159,7 @@ public sealed class StorageRecovery
             }
             if (!await CreateRecoveryAssetJobAsync(jobId,mediaId,"GenerateModelMediaAssets",JobLane.Media,ct).ConfigureAwait(false)) continue;
             findings.Add(new RecoveryFinding(jobId, "Media", mediaId, RecoveryOutcome.Requeued,
-                "MODEL_MEDIA_ASSETS_QUEUED", "An eligible canonical GLB was queued for its missing durable MediaAssets."));
+                "MODEL_MEDIA_ASSETS_QUEUED", "An eligible canonical model was queued for its missing durable MediaAssets."));
         }
     }
 
