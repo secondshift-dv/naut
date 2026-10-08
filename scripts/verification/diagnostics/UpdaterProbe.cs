@@ -33,14 +33,14 @@ var state = new AppStatePaths(Path.Combine(root, "state"));
 var files = new List<UpdateManifestFile>();
 var data = new Dictionary<string, byte[]>();
 var members = ReleaseContract.Current.RequiredMembers.Append("runtime/OpenCvSharpExtern.dll")
-    .Append(IncrementalUpdateService.MarkerPath).Append("runtime/new.dll").ToArray();
+    .Append(IncrementalUpdateService.MarkerPath).Append("runtime/new.dll").Append("runtime/empty.marker").ToArray();
 foreach (var member in members)
 {
     var bytes = member == IncrementalUpdateService.MarkerPath ? Encoding.UTF8.GetBytes("{\"schemaVersion\":1}")
-        : Encoding.UTF8.GetBytes("target:" + member);
+        : member == "runtime/empty.marker" ? Array.Empty<byte>() : Encoding.UTF8.GetBytes("target:" + member);
     files.Add(new(member, bytes.Length, Hash(bytes), "runtime"));
     data[Hash(bytes)] = bytes;
-    if (member == "runtime/new.dll") continue;
+    if (member is "runtime/new.dll" or "runtime/empty.marker") continue;
     var path = Path.Combine(installRoot, member);
     Directory.CreateDirectory(Path.GetDirectoryName(path)!);
     File.WriteAllBytes(path, bytes);
@@ -53,9 +53,9 @@ File.WriteAllText(Path.Combine(installRoot, "runtime/obsolete.dll"), "obsolete")
 var manifest = new UpdateManifest(1, "neuterradise", "0.0.4", "win-x64", 300_000_000, new string('0',64), "0.0.1", files);
 var feed = new Uri("https://github.com/secondshift-dv/naut/releases/download/v0.0.4/update.json");
 var plan = await IncrementalUpdateService.PlanAsync(manifest, installRoot);
-Require(plan.DownloadFiles.Count == 3 && plan.DownloadFiles.Contains(changed) && plan.DownloadFiles.Contains(corrupt)
+Require(plan.DownloadFiles.Count == 4 && plan.DownloadFiles.Contains(changed) && plan.DownloadFiles.Contains(corrupt)
     && plan.DownloadFiles.Any(f => f.RelativePath == "runtime/new.dll"), "Planner reused corrupt/changed bytes or missed new file");
-Require(plan.ReusedFiles.Count == files.Count - 3, "Unchanged file scheduled for transfer");
+Require(plan.ReusedFiles.Count == files.Count - 4, "Unchanged file scheduled for transfer");
 foreach (var unsafePath in new[] { "../escape", "runtime//a", "runtime/./a", "runtime/a.", "runtime/CON.bin", "runtime/a:stream" })
 {
     try { await IncrementalUpdateService.PlanAsync(manifest with { Files = new[] { changed with { RelativePath = unsafePath } } }, installRoot); throw new Exception("Unsafe path accepted"); }
@@ -85,12 +85,14 @@ var staged = await service.StageAsync(feed, manifest, op, progress);
 Require(staged.IsSuccess, staged.SafeError ?? "Staging failed");
 var payload = state.ResolveContainedPath(AppStatePathArea.UpdateStaging, op.ToString("D"));
 Require(!File.Exists(Path.Combine(payload, "runtime/obsolete.dll")), "Obsolete member copied");
-Require(handler.Requests.Count == 4, "Unchanged members downloaded");
+Require(handler.Requests.Count == 4 && handler.Requests.All(uri=>!uri.AbsolutePath.Contains(UpdateManifestFile.EmptySha256)), "Unchanged/empty members downloaded");
+try { (changed with { ByteLength=0 }).Validate(); throw new Exception("Impossible empty identity accepted"); }
+catch (FormatException) { }
 var points = progress.Values.Where(v => v.Phase == UpdatePhase.Downloading).ToArray();
 Require(points.Length > 1 && points.All(v => v.TotalBytes == plan.DownloadBytes && v.CompletedBytes <= v.TotalBytes
     && v.Percentage is >= 0 and <= 100), "Incremental denominator/bounds incorrect");
 Require(points.Zip(points.Skip(1)).All(pair => pair.First.CompletedBytes <= pair.Second.CompletedBytes), "Byte progress regressed");
-Require(points[^1].CompletedBytes == plan.DownloadBytes && points[^1].CompletedFiles == 3, "Final progress incomplete");
+Require(points[^1].CompletedBytes == plan.DownloadBytes && points[^1].CompletedFiles == 4, "Final progress incomplete");
 Require(new UpdateProgress(UpdatePhase.Planning, 0, null, 0, 0).Percentage is null, "Unknown denominator is determinate");
 foreach (var file in files)
     File.Copy(Path.Combine(payload, file.RelativePath), Path.Combine(installRoot, file.RelativePath), true);

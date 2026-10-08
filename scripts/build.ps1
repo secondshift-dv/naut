@@ -178,6 +178,7 @@ try {
     New-Item -ItemType Directory -Path $incrementalRoot -Force | Out-Null
     $incrementalManifest = Get-Content -LiteralPath (Join-Path $DistRoot 'update.json') -Raw | ConvertFrom-Json
     foreach ($file in $incrementalManifest.files) {
+        if ([long]$file.byteLength -eq 0) { continue }
         $source = Join-Path $runtimeOutput ([string]$file.relativePath)
         $target = Join-Path $incrementalRoot ("update-file-$($file.sha256).bin")
         if (-not (Test-Path -LiteralPath $target)) { Copy-Item -LiteralPath $source -Destination $target }

@@ -178,6 +178,7 @@ public sealed record UpdateReleaseManifest(
 
 public sealed record UpdateManifestFile(string RelativePath, long ByteLength, string Sha256, string? Role)
 {
+    public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
     private static bool IsDeviceName(string segment)
     {
         var name = segment.Split('.')[0];
@@ -204,7 +205,8 @@ public sealed record UpdateManifestFile(string RelativePath, long ByteLength, st
             || IsDeviceName(segment)))
             throw new FormatException("Update file path is not canonical.");
 
-        if (ByteLength < 0
+        if ((ByteLength == 0 && !string.Equals(Sha256, EmptySha256, StringComparison.Ordinal))
+            || ByteLength < 0
             || string.IsNullOrWhiteSpace(Sha256)
             || Sha256.Length != 64
             || Sha256.Any(c => !char.IsAsciiDigit(c) && c is not (>= 'a' and <= 'f')))

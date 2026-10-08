@@ -3,6 +3,12 @@ param([switch]$Offline, [string]$PackageRoot)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+foreach ($entryPoint in @('scripts/build.ps1','scripts/release.ps1','scripts/packaging/package-win-x64.ps1')) {
+    $syntaxTokens = $null
+    $syntaxErrors = $null
+    [Management.Automation.Language.Parser]::ParseFile((Join-Path $repositoryRoot $entryPoint), [ref]$syntaxTokens, [ref]$syntaxErrors) | Out-Null
+    if ($syntaxErrors.Count -gt 0) { throw "Canonical PowerShell syntax failed: $entryPoint" }
+}
 $probeRoot = Join-Path $repositoryRoot 'out/updater-check'
 New-Item -ItemType Directory -Path $probeRoot -Force | Out-Null
 $runtime = [Security.SecurityElement]::Escape((Join-Path $repositoryRoot 'src/Neuterradise.Runtime/Neuterradise.Runtime.csproj'))

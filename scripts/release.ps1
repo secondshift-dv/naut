@@ -362,7 +362,7 @@ try {
         (Get-Sha256Lower -Path $incrementalMetadataPath) -cne [string]$marker[0].sha256) {
         throw 'Incremental metadata does not match signed release membership.'
     }
-    $incrementalAssets = @($manifest.files | ForEach-Object {
+    $incrementalAssets = @($manifest.files | Where-Object { [long]$_.byteLength -gt 0 } | ForEach-Object {
         $asset = Join-Path $DistRoot ("update-files/update-file-$($_.sha256).bin")
         if (-not (Test-Path -LiteralPath $asset) -or
             [long](Get-Item -LiteralPath $asset).Length -ne [long]$_.byteLength -or
@@ -379,6 +379,20 @@ try {
             throw "GitHub Release '$tag' is already published and is immutable through this script."
         }
 
+        $expectedAssetNames = @($releaseAssets + $incrementalAssets | ForEach-Object { [IO.Path]::GetFileName($_) })
+        $draftAssetsJson = & gh release view $tag --repo $Repository --json isDraft,assets
+        if ($LASTEXITCODE -ne 0) { throw 'Could not inventory existing draft assets.' }
+        $draftInventory = $draftAssetsJson | ConvertFrom-Json
+        if (-not $draftInventory.isDraft) { throw 'Draft changed to published before asset reconciliation.' }
+        $draftAssets = $draftInventory.assets
+        foreach ($draftAsset in $draftAssets) {
+            if ($draftAsset.name -notin $expectedAssetNames) {
+                if ($draftAsset.name -notmatch '^update-file-[a-f0-9]{64}\.bin$') {
+                    throw "Draft contains an unexpected non-incremental asset '$($draftAsset.name)'."
+                }
+                Invoke-GhChecked -Arguments @('release', 'delete-asset', $tag, [string]$draftAsset.name, '--repo', $Repository, '--yes')
+            }
+        }
         Invoke-GhChecked -Arguments @(
             'release', 'edit', $tag,
             '--repo', $Repository,
@@ -411,6 +425,21 @@ try {
     for ($offset = 0; $offset -lt $incrementalAssets.Count; $offset += 20) {
         $last = [Math]::Min($offset + 19, $incrementalAssets.Count - 1)
         Invoke-GhChecked -Arguments (@('release', 'upload', $tag, '--repo', $Repository, '--clobber') + $incrementalAssets[$offset..$last])
+    }
+
+    $candidateJson = & gh release view $tag --repo $Repository --json isDraft,targetCommitish,assets
+    if ($LASTEXITCODE -ne 0) { throw 'Could not verify uploaded canonical draft.' }
+    $candidate = $candidateJson | ConvertFrom-Json
+    $expectedPaths = @($releaseAssets + $incrementalAssets)
+    if (-not $candidate.isDraft -or $candidate.targetCommitish -ne $head -or
+        $candidate.assets.Count -ne $expectedPaths.Count) { throw 'Draft source or exact asset membership mismatch.' }
+    foreach ($expectedPath in $expectedPaths) {
+        $name = [IO.Path]::GetFileName($expectedPath)
+        $matches = @($candidate.assets | Where-Object { $_.name -ceq $name })
+        if ($matches.Count -ne 1 -or [long]$matches[0].size -ne [long](Get-Item -LiteralPath $expectedPath).Length -or
+            [string]$matches[0].digest -cne ('sha256:' + (Get-Sha256Lower -Path $expectedPath))) {
+            throw "Remote canonical asset integrity mismatch: $name"
+        }
     }
 
     if ($Publish) {

@@ -89,6 +89,19 @@ public sealed class IncrementalUpdateService(AppStatePaths appState, InstallPath
             progress?.Report(new(UpdatePhase.Downloading, 0, plan.DownloadBytes, 0, plan.DownloadFiles.Count));
             foreach (var file in plan.DownloadFiles)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (file.ByteLength == 0)
+                {
+                    // Signed zero length plus the empty SHA-256 completely specifies these bytes.
+                    // GitHub rejects zero-length assets; no network transfer is needed.
+                    var emptyPath = Destination(staging, file.RelativePath);
+                    written.Add(emptyPath);
+                    using (File.Open(emptyPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { }
+                    completedFiles++;
+                    progress?.Report(new(UpdatePhase.Downloading, transferred, plan.DownloadBytes,
+                        completedFiles, plan.DownloadFiles.Count));
+                    continue;
+                }
                 var fileProgress = new UpdateProgressCallback(value =>
                 {
                     if (value.Phase == UpdatePhase.Downloading)
