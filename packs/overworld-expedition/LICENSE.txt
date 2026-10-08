@@ -1,0 +1,6 @@
+Original pack definitions and artwork: Creative Commons Attribution 4.0 International.
+Copyright 2026 Anas / Second Shift.
+License text: https://creativecommons.org/licenses/by/4.0/legalcode
+Attribute this pack to Anas / Second Shift and identify modifications.
+This grant covers the author's original contribution and makes no claim to
+third-party material. Fonts retain the licenses in licenses/.

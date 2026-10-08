@@ -4,6 +4,28 @@ Give your collection another atmosphere. These packs are reviewed by Naut's
 maintainer and installed only when you choose them. They are customization
 content with independent versions; they do not replace the application.
 
+## Overworld Expedition — 1.0.0
+
+![Overworld Expedition](overworld-expedition/preview.png)
+
+**A calm voxel expedition**: cream and moss colors, compact block controls,
+collection shelves, three cozy backdrops and three cute square portrait frames.
+17 independently selectable components. The Profile layout puts the media wall
+before context and moves Delete to the bottom; the spotlight omits overview.
+Sparse effects drift slowly and provide reduced-motion/static variants.
+The preview is an asset composition, not a live app screenshot.
+
+**[Download Overworld Expedition 1.0.0](https://secondshift-dv.github.io/naut/packs/overworld-expedition-1.0.0.ntpack)**
+· [Checksums](https://secondshift-dv.github.io/naut/packs/checksums.json)
+· [Setup and recommended components](overworld-expedition/README.md)
+· [Pack source](overworld-expedition/pack.json)
+· [Artwork/font provenance](overworld-expedition/PROVENANCE.txt)
+
+Original artwork and definitions: CC BY 4.0, **Anas / Second Shift**.
+Fonts retain OFL. Use Square Covers for the portrait frames.
+Topbar colors share Naut's surface palette; page ornaments and Customize Card
+size remain engine controlled.
+
 ## Celestial Collection · 1.2.0
 
 ![Celestial Collection](celestial/preview.png)

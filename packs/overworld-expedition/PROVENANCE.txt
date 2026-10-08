@@ -1,0 +1,39 @@
+Overworld Expedition 1.0.0
+Author: Anas / Second Shift. Original definitions and commissioned artwork: CC BY 4.0.
+Six original AI-assisted bitmap assets were generated for this pack with the
+built-in OpenAI image generator on 2026-10-09. No reference image was supplied.
+Voxel-world inspiration came from the author's requested Minecraft-like mood;
+no game files, logos, textures, characters or third-party image assets were used.
+Generated files are copied without artwork modification. preview.png is an
+asset composition with labels, not a Naut screenshot or evidence of UI acceptance.
+
+Silkscreen Regular: official Google Fonts distribution, unmodified.
+https://github.com/googlefonts/silkscreen
+https://github.com/google/fonts/tree/2eb0b48d5f760f62e286216f0859a8c540dbc1bd/ofl/silkscreen
+assets/silkscreen.ttf; licenses/silkscreen-OFL.txt.
+Inter and Noto Sans Mono: unmodified binaries reused from the curated
+Celestial 1.2.0 collection. Their font author notices are preserved:
+assets/inter.ttf; licenses/inter-OFL.txt.
+assets/notosansmono.ttf; licenses/notosansmono-OFL.txt.
+All fonts retain SIL OFL 1.1. Original-content CC BY does not replace font licenses.
+No executable code, plugins or personal media are included.
+
+Generation prompts (built-in image generator; no CLI/API fallback):
+
+meadow:
+Create a production-ready wide 16:9 desktop background image for a Naut customization pack named Overworld Expedition. Original polished voxel illustration, cheerful block-shaped meadow morning. Warm creamy blue sky, distant terraced grassy hills, a few square-leaf trees at far left and right, tiny pale daisies and warm yellow flowers along lower outer edges. Soft morning light, moss green, earth brown, sandstone cream. Composition: central 65 percent is quiet low-detail open sky and softly blurred distant grass, suitable behind UI panels. Decor concentrated at outer edges, no big central subjects, no text, no logos, no UI, no buildings or recognizable game characters. Crisp charming cuboid geometry with soft ambient light, carefully crafted game-world diorama aesthetic. Full landscape artwork, no border, opaque background.
+
+forest:
+Wide 16:9 production desktop backdrop, original polished voxel diorama Forest Hideaway. Cuboid leafy forest framing left and right edges, moss green trees and ferns, warm sun shafts, peaceful open central clearing with broad low-detail pale green light for readable interface panels. Decorations confined to outer edges, no characters, no logos, no text, no UI. Calm and charming, soft ambient lighting, richly crafted block geometry, opaque full landscape.
+
+workshop:
+Wide 16:9 production desktop backdrop, original polished voxel diorama Cozy Workshop. Warm cuboid timber room, plants, little lantern and crafting tools at far outer edges, sandstone wall with a very broad quiet central area for interface panels, soft amber evening lighting, charming wooden block geometry. No people, no game logos, no text, no UI or inventory slots, no central objects. Opaque full landscape.
+
+bunny:
+Production transparent PNG square portrait frame, original charming voxel Moss Bunny. A substantial square light timber border decorated with moss and tiny white daisies, one cute tiny cuboid white rabbit perched at lower right corner. Border occupies outer 15 percent of image, large completely transparent square central portrait aperture occupying middle 70 percent. Transparent exterior also, no background, no portrait, no text, no shadow filling opening. Frame nearly fills canvas with only 3 percent exterior margin. Crisp cuboid crafted geometry with soft lighting, adorable polished game-world collectible ornament, straight-on symmetrical square aperture.
+
+piglet:
+Production transparent PNG square portrait frame, original charming voxel Piglet Patch. A substantial square creamy sandstone and pale timber border, pink little flowers at edges, one cute tiny cuboid pink pig perched at lower left corner. Border occupies outer 15 percent of image, large completely transparent square central portrait aperture occupying middle 70 percent. Transparent exterior also, no background, no portrait, no text, no shadow filling opening. Frame nearly fills canvas with only 3 percent exterior margin. Crisp cuboid crafted geometry with soft lighting, adorable polished collectible ornament, straight-on symmetrical square aperture.
+
+bee:
+Production transparent PNG square portrait frame, original charming voxel Bee Meadow. A substantial square honey-colored timber border with tiny daisies and yellow flowers at edges, one cute tiny cuboid bee perched at upper right corner. Border occupies outer 15 percent of image, large completely transparent square central portrait aperture occupying middle 70 percent. Transparent exterior also, no background, no portrait, no text, no shadow filling opening. Frame nearly fills canvas with only 3 percent exterior margin. Crisp cuboid crafted geometry with soft lighting, adorable polished collectible ornament, straight-on symmetrical square aperture.

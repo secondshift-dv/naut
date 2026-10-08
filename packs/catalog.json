@@ -8,6 +8,14 @@
       "name": "Celestial Collection",
       "author": "Anas / Second Shift",
       "preview": "preview.png"
+    },
+    {
+      "version": "1.0.0",
+      "author": "Anas / Second Shift",
+      "name": "Overworld Expedition",
+      "packId": "naut.overworld-expedition",
+      "preview": "preview.png",
+      "slug": "overworld-expedition"
     }
   ]
 }
