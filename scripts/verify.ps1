@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([ValidateSet('Source','Compile','Hygiene','Closure','WorkflowPolicy')][string]$Scope='Source',[switch]$Offline,[switch]$RequireBuild)
+param([ValidateSet('Source','Compile','Hygiene','Closure','WorkflowPolicy','Updater','ReleaseLayout')][string]$Scope='Source',[switch]$Offline,[switch]$RequireBuild)
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $repo=(Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -50,7 +50,7 @@ function Verify-PublicTree {
         }
     }
     $primaryReadme=Get-Content -LiteralPath (Join-Path $repo 'README.md') -Raw
-    foreach ($requiredText in @('Download Naut v0.0.2','View Live Demo','Documentation','Feature highlights','Why Naut','System Requirements','Quick Start')) {
+    foreach ($requiredText in @('Download Naut v0.0.3','View Live Demo','Documentation','Feature highlights','Why Naut','System Requirements','Quick Start')) {
         if ($primaryReadme -notmatch [regex]::Escape($requiredText)) { throw "Primary README landing contract missing: $requiredText" }
     }
     $requirements=Get-Content -LiteralPath (Join-Path $repo 'docs/system-requirements.md') -Raw
@@ -76,6 +76,8 @@ function Verify-WorkflowPolicy {
 if ($Scope -in @('Source','Hygiene','Closure')) { Verify-PublicTree }
 if ($Scope -in @('Source','WorkflowPolicy','Closure')) { Verify-WorkflowPolicy }
 if ($Scope -in @('Source','Compile')) { & (Join-Path $PSScriptRoot 'verification/verify-compile.ps1') -Offline:$Offline }
+if ($Scope -eq 'Updater') { & (Join-Path $PSScriptRoot 'verification/verify-updater.ps1') -Offline:$Offline }
+if ($Scope -eq 'ReleaseLayout') { & (Join-Path $PSScriptRoot 'verification/verify-release-layout.ps1') -Offline:$Offline }
 if ($Scope -eq 'Closure') {
     if (@(& git -C $repo status --porcelain).Count) { throw 'Public worktree is not clean' }
     if ((& git -C $repo rev-parse HEAD).Trim() -ne (& git -C $repo rev-parse origin/main).Trim()) { throw 'Public main differs from origin/main' }

@@ -21,7 +21,8 @@ public sealed class UpdateDownloadService
         Guid operationId,
         long expectedLength,
         string expectedSha256,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<UpdateProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         if (!source.IsAbsoluteUri
@@ -47,6 +48,7 @@ public sealed class UpdateDownloadService
         var partial = Path.Combine(directory, "payload.partial");
         var completed = Path.Combine(directory, "payload.zip");
         var completedSuccessfully = false;
+        ReportProgress(progress, new(UpdatePhase.Downloading, 0, expectedLength, 0, 1));
 
         try
         {
@@ -94,6 +96,7 @@ public sealed class UpdateDownloadService
                         return UpdateDownloadResult.Rejected("Downloaded payload exceeded the manifest byte bound.");
 
                     await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+                    ReportProgress(progress, new(UpdatePhase.Downloading, total, expectedLength, 0, 1));
                 }
 
                 await output.FlushAsync(cancellationToken).ConfigureAwait(false);
@@ -101,6 +104,7 @@ public sealed class UpdateDownloadService
                     return UpdateDownloadResult.Rejected("Downloaded payload length does not match the manifest.");
             }
 
+            ReportProgress(progress, new(UpdatePhase.Verifying, expectedLength, expectedLength, 0, 1));
             await using (var stream = new FileStream(
                 partial,
                 FileMode.Open,
@@ -118,19 +122,24 @@ public sealed class UpdateDownloadService
 
             File.Move(partial, completed, overwrite: true);
             completedSuccessfully = true;
+            ReportProgress(progress, new(UpdatePhase.Verifying, expectedLength, expectedLength, 1, 1));
             return new UpdateDownloadResult(true, completed, null);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             return UpdateDownloadResult.Cancelled();
         }
+        catch (OperationCanceledException)
+        {
+            return UpdateDownloadResult.Recoverable("Payload transport timed out.");
+        }
         catch (HttpRequestException)
         {
-            return UpdateDownloadResult.Rejected("Payload download failed; Vault was not touched.");
+            return UpdateDownloadResult.Recoverable("Payload download failed; Vault was not touched.");
         }
         catch (IOException)
         {
-            return UpdateDownloadResult.Rejected("Payload staging failed; Vault was not touched.");
+            return UpdateDownloadResult.Recoverable("Payload staging failed; Vault was not touched.");
         }
         catch (OverflowException)
         {
@@ -140,6 +149,15 @@ public sealed class UpdateDownloadService
         {
             if (!completedSuccessfully)
                 TryDelete(partial);
+        }
+    }
+
+    private static void ReportProgress(IProgress<UpdateProgress>? progress, UpdateProgress value)
+    {
+        try { progress?.Report(value); }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            System.Diagnostics.Trace.TraceWarning("Update progress subscriber failed: {0}", exception.Message);
         }
     }
 
@@ -159,8 +177,9 @@ public sealed class UpdateDownloadService
     }
 }
 
-public sealed record UpdateDownloadResult(bool IsSuccess, string? PayloadPath, string? SafeError)
+public sealed record UpdateDownloadResult(bool IsSuccess, string? PayloadPath, string? SafeError, bool CanFallback = false)
 {
+    public static UpdateDownloadResult Recoverable(string error) => new(false, null, error, true);
     public static UpdateDownloadResult Rejected(string error) => new(false, null, error);
     public static UpdateDownloadResult Cancelled() => new(false, null, "Payload download cancelled.");
 }

@@ -106,6 +106,16 @@ public sealed record UpdateManifest(
             if (!seen.Add(normalized))
                 throw new FormatException($"{sourceName} contains duplicate file membership.");
         }
+        foreach (var path in seen)
+        {
+            var separator = path.IndexOf('/');
+            while (separator >= 0)
+            {
+                if (seen.Contains(path[..separator]))
+                    throw new FormatException($"{sourceName} contains file/directory path collisions.");
+                separator = path.IndexOf('/', separator + 1);
+            }
+        }
     }
 
     private static void ValidateHash(string value)
@@ -168,6 +178,14 @@ public sealed record UpdateReleaseManifest(
 
 public sealed record UpdateManifestFile(string RelativePath, long ByteLength, string Sha256, string? Role)
 {
+    private static bool IsDeviceName(string segment)
+    {
+        var name = segment.Split('.')[0];
+        return new[] { "CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$" }.Contains(name, StringComparer.OrdinalIgnoreCase)
+            || (name.Length == 4 && (name.StartsWith("COM", StringComparison.OrdinalIgnoreCase)
+                || name.StartsWith("LPT", StringComparison.OrdinalIgnoreCase)) && name[3] is >= '1' and <= '9');
+    }
+
     public void Validate()
     {
         if (string.IsNullOrWhiteSpace(RelativePath)
@@ -178,6 +196,13 @@ public sealed record UpdateManifestFile(string RelativePath, long ByteLength, st
         {
             throw new FormatException("Update file path is unsafe.");
         }
+
+        var segments = RelativePath.Replace('\\', '/').Split('/');
+        if (segments.Any(segment => string.IsNullOrWhiteSpace(segment) || segment is "." or ".."
+            || segment.EndsWith('.') || segment.EndsWith(' ')
+            || segment.Any(character => character < 32 || "<>\"|?*".Contains(character))
+            || IsDeviceName(segment)))
+            throw new FormatException("Update file path is not canonical.");
 
         if (ByteLength < 0
             || string.IsNullOrWhiteSpace(Sha256)

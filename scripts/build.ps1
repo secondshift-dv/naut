@@ -121,6 +121,7 @@ try {
     }
     Invoke-DotNetChecked -Arguments $restoreArgs
 
+    & (Join-Path $PSScriptRoot 'verification/verify-updater.ps1') -Offline:$Offline
     & $PackageScript -RepositoryRoot $RepositoryRoot -OutputDirectory $StageRoot -Offline:$Offline
     if (-not $?) { throw 'Packaging authority failed.' }
 
@@ -172,6 +173,20 @@ try {
     Copy-Item -LiteralPath $verifiedFfmpegSource -Destination (Join-Path $DistRoot ([IO.Path]::GetFileName($verifiedFfmpegSource))) -Force
     Copy-Item -LiteralPath $verifiedOpenCvFfmpegSource -Destination (Join-Path $DistRoot ([IO.Path]::GetFileName($verifiedOpenCvFfmpegSource))) -Force
 
+    & (Join-Path $PSScriptRoot 'verification/verify-updater.ps1') -Offline:$Offline -PackageRoot $runtimeOutput
+    $incrementalRoot = Join-Path $DistRoot 'update-files'
+    New-Item -ItemType Directory -Path $incrementalRoot -Force | Out-Null
+    $incrementalManifest = Get-Content -LiteralPath (Join-Path $DistRoot 'update.json') -Raw | ConvertFrom-Json
+    foreach ($file in $incrementalManifest.files) {
+        $source = Join-Path $runtimeOutput ([string]$file.relativePath)
+        $target = Join-Path $incrementalRoot ("update-file-$($file.sha256).bin")
+        if (-not (Test-Path -LiteralPath $target)) { Copy-Item -LiteralPath $source -Destination $target }
+        if ([long](Get-Item -LiteralPath $target).Length -ne [long]$file.byteLength -or
+            (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant() -cne [string]$file.sha256) {
+            throw 'Incremental build asset integrity differs from signed target membership.'
+        }
+    }
+    Copy-Item -LiteralPath (Join-Path $runtimeOutput 'runtime/deployment/incremental-update.json') -Destination (Join-Path $DistRoot 'update-incremental.json')
     $distZip = Join-Path $DistRoot $zipName
     $distManifest = Join-Path $DistRoot 'update.json'
     $provenancePath = Join-Path $DistRoot 'build-provenance.json'

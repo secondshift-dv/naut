@@ -16,6 +16,7 @@ public sealed class UpdateCoordinator : IDisposable
     public const string StatusChecking = "checking";
     public const string StatusAvailable = "available";
     public const string StatusUnavailable = "unavailable";
+    public const string StatusPlanning = "planning";
     public const string StatusDownloading = "downloading";
     public const string StatusStaging = "staging";
     public const string StatusPreparing = "preparing";
@@ -189,7 +190,8 @@ public sealed class UpdateCoordinator : IDisposable
                 false,
                 null,
                 false,
-                null));
+                null,
+            new UpdateProgress(UpdatePhase.Checking, 0, null, 0, 0)));
 
             var result = await _check.CheckAsync(feed, trust, cancellationToken).ConfigureAwait(false);
             if (cancellationToken.IsCancellationRequested)
@@ -332,20 +334,29 @@ public sealed class UpdateCoordinator : IDisposable
                 return UpdateCommandResult.Failed(error);
             }
 
-            SetState(new UpdatePresentationState(
-                StatusDownloading,
-                null,
-                true,
-                null,
-                false,
-                manifest.ProductVersion));
+            var progress = new UpdateProgressCallback(value => ReportProgress(value, manifest.ProductVersion));
+            var incremental = await new IncrementalUpdateService(_appState, _install, _download,
+                new UpdatePackageValidator(_install)).StageAsync(feed, manifest, operationId, progress,
+                    cancellationToken).ConfigureAwait(false);
+            if (incremental.IsSuccess)
+                return await HandoffStagingAsync(operationId, manifest, cancellationToken).ConfigureAwait(false);
+            if (!incremental.CanFallback)
+            {
+                SetState(new(StatusUnavailable, incremental.SafeError, false, null, false, manifest.ProductVersion));
+                ClearCandidate();
+                return UpdateCommandResult.Failed(incremental.SafeError ?? "Incremental integrity verification failed.");
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            // Fallback owns a fresh operation root; failed staging is never reused.
+            operationId = Guid.NewGuid();
+            ReportProgress(new(UpdatePhase.Downloading, 0, manifest.PayloadByteLength, 0, 1), manifest.ProductVersion);
 
             var download = await _download.DownloadAsync(
                 payloadUri!,
                 operationId,
                 manifest.PayloadByteLength,
                 manifest.PayloadSha256,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken, progress).ConfigureAwait(false);
             if (!download.IsSuccess || string.IsNullOrWhiteSpace(download.PayloadPath))
             {
                 var error = download.SafeError ?? "Update payload download failed.";
@@ -522,7 +533,8 @@ public sealed class UpdateCoordinator : IDisposable
             true,
             null,
             false,
-            manifest.ProductVersion));
+            manifest.ProductVersion,
+            new UpdateProgress(UpdatePhase.Verifying, 0, null, 0, 0)));
 
         var validation = await _stager.ExtractAndValidateAsync(
             archivePath,
@@ -542,6 +554,12 @@ public sealed class UpdateCoordinator : IDisposable
             return UpdateCommandResult.Failed(error);
         }
 
+        return await HandoffStagingAsync(operationId, manifest, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<UpdateCommandResult> HandoffStagingAsync(Guid operationId, UpdateManifest manifest,
+        CancellationToken cancellationToken)
+    {
         var stagedRoot = _appState.ResolveContainedPath(
             AppStatePathArea.UpdateStaging,
             operationId.ToString("D"));
@@ -563,7 +581,8 @@ public sealed class UpdateCoordinator : IDisposable
             true,
             null,
             false,
-            manifest.ProductVersion));
+            manifest.ProductVersion,
+            new UpdateProgress(UpdatePhase.Preparing, 0, null, 0, 0)));
 
         var prepared = await _handoff.PrepareAsync(handoff, cancellationToken).ConfigureAwait(false);
         if (!prepared.IsStarted)
@@ -585,7 +604,8 @@ public sealed class UpdateCoordinator : IDisposable
             false,
             null,
             true,
-            manifest.ProductVersion));
+            manifest.ProductVersion,
+            new UpdateProgress(UpdatePhase.Restarting, 0, null, 0, 0)));
 
         _requestControlledShutdown(shutdownDeadlineUtc);
         return UpdateCommandResult.Success();
@@ -621,6 +641,21 @@ public sealed class UpdateCoordinator : IDisposable
 
         payload = candidate;
         return true;
+    }
+
+    private void ReportProgress(UpdateProgress progress, string? version)
+    {
+        var status = progress.Phase switch
+        {
+            UpdatePhase.Checking => StatusChecking,
+            UpdatePhase.Planning => StatusPlanning,
+            UpdatePhase.Downloading => StatusDownloading,
+            UpdatePhase.Verifying => StatusStaging,
+            UpdatePhase.Preparing => StatusPreparing,
+            UpdatePhase.Restarting => StatusRestarting,
+            _ => StatusUnavailable
+        };
+        SetState(new(status, null, true, progress.Percentage, false, version, progress));
     }
 
     private void ClearCandidate()

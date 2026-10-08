@@ -952,6 +952,8 @@ foreach ($requiredFileName in $RequiredUniqueFileNames) {
     }
 }
 
+$IncrementalMarkerPath = Join-Path $InstallRoot 'runtime/deployment/incremental-update.json'
+Write-JsonUtf8NoBom -Value ([ordered]@{ schemaVersion = 1 }) -Path $IncrementalMarkerPath -Depth 2
 $ReleaseManifestPath = Join-Path $InstallRoot 'release-manifest.json'
 $releaseFiles = @(
     Get-ChildItem -LiteralPath $InstallRoot -File -Recurse |

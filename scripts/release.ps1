@@ -184,6 +184,9 @@ try {
     }
 
     $Repository = Resolve-RepositorySlug -ExplicitRepository $Repository
+    if ($Repository -cne 'secondshift-dv/naut') {
+        throw 'Canonical Naut releases may only be published from secondshift-dv/naut.'
+    }
 
 
     if ($ArtifactMode) {
@@ -322,6 +325,18 @@ try {
     }
     New-UpdatePublisherSignature @signingArgs
 
+    # Legacy binaries are compiled from their immutable release tags and exercise the final
+    # signed manifest, full ZIP and complete staging before any draft or publication is created.
+    git fetch origin tag v0.0.1 tag v0.0.2 --quiet
+    if ($LASTEXITCODE -ne 0) { throw 'Exact legacy updater tags are required for publication.' }
+    $verificationSigningEnvironment = $env:NEUTERRADISE_UPDATE_SIGNING_KEY_PEM
+    try {
+        Remove-Item Env:NEUTERRADISE_UPDATE_SIGNING_KEY_PEM -ErrorAction SilentlyContinue
+        & (Join-Path $PSScriptRoot 'verification/verify-legacy-updates.ps1') -LegacyRepository $RepositoryRoot -DistributionRoot $DistRoot
+    }
+    finally { $env:NEUTERRADISE_UPDATE_SIGNING_KEY_PEM = $verificationSigningEnvironment }
+
+
     gh auth status | Out-Null
     if ($LASTEXITCODE -ne 0) {
         throw 'GitHub CLI is not authenticated.'
@@ -340,7 +355,23 @@ try {
         & gh release view $tag --repo $Repository --json isDraft,targetCommitish,tagName 2>&1
     )
     $releaseExists = $LASTEXITCODE -eq 0
-    $releaseAssets = @($zipPath, $manifestPath, $signaturePath) + $sourceCompanionPaths
+    $incrementalMetadataPath = Join-Path $DistRoot 'update-incremental.json'
+    $marker = @($manifest.files | Where-Object { $_.relativePath -ceq 'runtime/deployment/incremental-update.json' })
+    if ($marker.Count -ne 1 -or -not (Test-Path -LiteralPath $incrementalMetadataPath) -or
+        [long](Get-Item -LiteralPath $incrementalMetadataPath).Length -ne [long]$marker[0].byteLength -or
+        (Get-Sha256Lower -Path $incrementalMetadataPath) -cne [string]$marker[0].sha256) {
+        throw 'Incremental metadata does not match signed release membership.'
+    }
+    $incrementalAssets = @($manifest.files | ForEach-Object {
+        $asset = Join-Path $DistRoot ("update-files/update-file-$($_.sha256).bin")
+        if (-not (Test-Path -LiteralPath $asset) -or
+            [long](Get-Item -LiteralPath $asset).Length -ne [long]$_.byteLength -or
+            (Get-Sha256Lower -Path $asset) -cne [string]$_.sha256) {
+            throw 'Incremental release asset integrity failed.'
+        }
+        $asset
+    } | Sort-Object -Unique)
+    $releaseAssets = @($zipPath, $manifestPath, $signaturePath, $provenancePath, $incrementalMetadataPath) + $sourceCompanionPaths
 
     if ($releaseExists) {
         $releaseInfo = ($releaseViewOutput -join [Environment]::NewLine) | ConvertFrom-Json
@@ -375,6 +406,11 @@ try {
             '--generate-notes',
             '--draft'
         ) + $releaseAssets)
+    }
+
+    for ($offset = 0; $offset -lt $incrementalAssets.Count; $offset += 20) {
+        $last = [Math]::Min($offset + 19, $incrementalAssets.Count - 1)
+        Invoke-GhChecked -Arguments (@('release', 'upload', $tag, '--repo', $Repository, '--clobber') + $incrementalAssets[$offset..$last])
     }
 
     if ($Publish) {

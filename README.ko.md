@@ -5,7 +5,7 @@
 <p align="center"><strong>A Navigator for Your Things Worth Keeping</strong></p>
 
 <p align="center">
-  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.2"><strong>Naut v0.0.2 다운로드</strong></a>
+  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.3"><strong>Naut v0.0.3 다운로드</strong></a>
   ·
   <a href="https://secondshift-dv.github.io/naut/"><strong>라이브 데모 보기</strong></a>
   ·
@@ -97,7 +97,7 @@ English, Bahasa Indonesia, 日本語, 한국어, 简体中文, Deutsch, Françai
 
 ## 빠른 시작
 
-1. 공식 [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.2)에서 **Naut v0.0.2**을 다운로드합니다.
+1. 공식 [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.3)에서 **Naut v0.0.3**을 다운로드합니다.
 2. 전체 ZIP을 일반 폴더에 압축 해제합니다.
 3. `naut.exe`를 실행합니다.
 4. Vault를 보관할 위치를 선택합니다.
@@ -118,7 +118,7 @@ English, Bahasa Indonesia, 日本語, 한국어, 简体中文, Deutsch, Françai
 | **Display** | 1280 × 720 | 1920 × 1080 이상 |
 | **App/update 여유 공간** | 1.5 GB | SSD 1.5 GB+ |
 
-Vault 저장 공간은 별도이며 컬렉션 크기에 따라 달라집니다. [Naut v0.0.2 System Requirements](docs/system-requirements.md)를 참고하세요.
+Vault 저장 공간은 별도이며 컬렉션 크기에 따라 달라집니다. [Naut v0.0.3 System Requirements](docs/system-requirements.md)를 참고하세요.
 
 ## 문서
 

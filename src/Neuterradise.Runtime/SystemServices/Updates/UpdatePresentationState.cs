@@ -6,7 +6,8 @@ public sealed record UpdatePresentationState(
     bool IsDownloading,
     double? Progress,
     bool RestartRequired,
-    string? CandidateVersion)
+    string? CandidateVersion,
+    UpdateProgress? Transfer = null)
 {
     public static UpdatePresentationState Idle { get; } =
         new(UpdateCoordinator.StatusNotChecked, null, false, null, false, null);

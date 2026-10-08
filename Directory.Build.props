@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
-    <ProductVersion>0.0.2</ProductVersion>
-    <ProductAssemblyVersion>0.0.2.0</ProductAssemblyVersion>
+    <ProductVersion>0.0.3</ProductVersion>
+    <ProductAssemblyVersion>0.0.3.0</ProductAssemblyVersion>
     <ProductRuntimeIdentifier>win-x64</ProductRuntimeIdentifier>
     <Version>$(ProductVersion)</Version>
     <AssemblyVersion>$(ProductAssemblyVersion)</AssemblyVersion>

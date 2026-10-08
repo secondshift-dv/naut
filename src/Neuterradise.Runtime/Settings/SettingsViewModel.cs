@@ -470,7 +470,10 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
         UpdateCoordinator.StatusChecking => SurfaceText.Get("Settings.Update.Status.Checking", "Checking for updates…"),
         UpdateCoordinator.StatusAvailable => SurfaceText.Get("Settings.Update.Status.Available", "Update available"),
         UpdateCoordinator.StatusUnavailable => SurfaceText.Get("Settings.Update.Status.Unavailable", "No update available"),
-        UpdateCoordinator.StatusDownloading => SurfaceText.Get("Settings.Update.Status.Downloading", "Downloading update…"),
+        UpdateCoordinator.StatusPlanning => SurfaceText.Get("Settings.Update.Status.Planning", "Planning update…"),
+        UpdateCoordinator.StatusDownloading => _updateState.Transfer is { TotalBytes: not null } transfer
+            ? $"{SurfaceText.Get("Settings.Update.Status.Downloading", "Downloading update…")} {transfer.Percentage:0}% — {transfer.CompletedBytes / 1048576d:0.0} / {transfer.TotalBytes / 1048576d:0.0} MB"
+            : SurfaceText.Get("Settings.Update.Status.Downloading", "Downloading update…"),
         UpdateCoordinator.StatusStaging => SurfaceText.Get("Settings.Update.Status.Staging", "Validating update package…"),
         UpdateCoordinator.StatusPreparing => SurfaceText.Get("Settings.Update.Status.Preparing", "Starting updater…"),
         UpdateCoordinator.StatusRestarting => SurfaceText.Get("Settings.Update.Status.Restarting", "Updater started; naut is closing…"),
