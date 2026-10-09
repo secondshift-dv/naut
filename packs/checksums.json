@@ -16,6 +16,14 @@
       "file": "overworld-expedition-1.0.1.ntpack",
       "sha256": "ff6009e84c5815da02190743458a16d938a118079b6d521399a58ad3aa8b0821",
       "bytes": 12051836
+    },
+    {
+      "slug": "black-dossier",
+      "packId": "naut.black-dossier",
+      "version": "1.0.0",
+      "file": "black-dossier-1.0.0.ntpack",
+      "sha256": "a6ae1ca0443c655b0078849c18bdf5d7d10d380cc3b64aa1f13e141a29e0371f",
+      "bytes": 1866496
     }
   ]
 }
