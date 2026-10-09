@@ -366,7 +366,14 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
             var bannerVideo = selectedBanner?.Role == MediaAssetRole.Hover
                 ? ResolveMediaAssetPath(selectedBanner)
                 : null;
-            resolved.Add((item, null, cover, bannerVideo));
+            string? bannerPath = null;
+            if (selectedBanner?.Role == MediaAssetRole.Hover && _mediaResources is not null)
+            {
+                var thumbnail = await _mediaResources.ResolveSelectedProfileBannerThumbnailAsync(
+                    item.Summary.ProfileId, selectedBanner.MediaAssetId, cancellationToken).ConfigureAwait(false);
+                bannerPath = thumbnail.State == MediaAssetResourceState.Ready ? thumbnail.PhysicalPath : null;
+            }
+            resolved.Add((item, bannerPath, cover, bannerVideo));
         }
 
         return new SpotlightResolution(resolved, false);

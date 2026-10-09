@@ -16,6 +16,14 @@
       "packId": "naut.overworld-expedition",
       "preview": "preview.png",
       "slug": "overworld-expedition"
+    },
+    {
+      "slug": "black-dossier",
+      "packId": "naut.black-dossier",
+      "version": "1.0.0",
+      "name": "BLACK DOSSIER",
+      "author": "Anas / Second Shift",
+      "preview": "preview.png"
     }
   ]
 }

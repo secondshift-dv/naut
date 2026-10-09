@@ -115,8 +115,8 @@ public sealed class CardVisual : Grid
 
     public void AddCustomizationAction(Action<CardData> customize)
     {
-        var action = new LivingNavigationButton(
-            LivingNavigationRole.Customize,
+        var action = UI.IconButton(
+            "icon.navigation.customize",
             UI.T("Card.Customize", "Customize Card"),
             () =>
             {
@@ -125,11 +125,10 @@ public sealed class CardVisual : Grid
                     customize(data);
                 }
             },
-            signature: true);
-        action.SetCompact(true);
+            size: 24);
         action.HorizontalAlignment = HorizontalAlignment.Right;
         action.VerticalAlignment = VerticalAlignment.Top;
-        action.Margin = new Thickness(6);
+        action.Margin = new Thickness(4);
         // This secondary action consumes only its own tap; the card body still opens the Profile.
         action.Tapped += (_, args) => args.Handled = true;
         Children.Add(action);
@@ -300,12 +299,11 @@ public sealed class CardVisual : Grid
 
                 _binders.Add(data =>
                 {
-                    var transform = image.Slot == SemanticSlots.ProfileBanner
-                        ? data.Banner is null ? data.CoverTransform : data.BannerTransform
-                        : data.Cover is null ? data.BannerTransform : data.CoverTransform;
-                    view.Source = image.Slot == SemanticSlots.ProfileBanner
-                        ? data.Banner ?? data.Cover
-                        : data.Cover ?? data.Banner;
+                    var isBanner = image.Slot == SemanticSlots.ProfileBanner;
+                    var primary = isBanner ? data.Banner : data.Cover;
+                    var useFallback = primary is null && image.Fallback == "identity";
+                    view.Source = useFallback ? (isBanner ? data.Cover : data.Banner) : primary;
+                    var transform = isBanner != useFallback ? data.BannerTransform : data.CoverTransform;
                     view.Transform = transform with
                     {
                         Fit = image.Stretch switch

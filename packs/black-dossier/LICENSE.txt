@@ -1,0 +1,5 @@
+BLACK DOSSIER 1.0.0
+Original artwork and definitions: Copyright 2026 Anas / Second Shift.
+Licensed under Creative Commons Attribution 4.0 International:
+https://creativecommons.org/licenses/by/4.0/
+Bundled fonts retain SIL Open Font License 1.1; see licenses/.

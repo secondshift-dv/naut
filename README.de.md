@@ -7,7 +7,7 @@
 <p align="center">Lokale Mediensammlungen für Windows — Offline-Gesichtserkennung, interaktive 3D-Figures und dein eigenes portables Vault.</p>
 
 <p align="center">
-  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.5"><strong>Naut v0.0.5 herunterladen</strong></a>
+  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.6"><strong>Naut v0.0.6 herunterladen</strong></a>
   ·
   <a href="https://secondshift-dv.github.io/naut/"><strong>Live-Demo ansehen</strong></a>
   ·
@@ -107,7 +107,7 @@ Anwendungspaket und Vault sind getrennte Bereiche. Imports kopieren Dateien in d
 
 ## Schnellstart
 
-1. **Naut v0.0.5** aus dem offiziellen [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.5) herunterladen.
+1. **Naut v0.0.6** aus dem offiziellen [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.6) herunterladen.
 2. Das vollständige ZIP in einen normalen Ordner entpacken.
 3. `naut.exe` starten.
 4. Den Speicherort für den Vault wählen.
@@ -128,7 +128,7 @@ Die normale Naut-Nutzung ist bewusst leichter als die optionale Figure-Arbeitsla
 | **Display** | 1280 × 720 | 1920 × 1080 oder höher |
 | **Freier App-/Update-Speicher** | 1,5 GB | 1,5 GB+ auf SSD |
 
-Vault-Speicher ist separat und hängt von der Sammlung ab. Siehe [Naut v0.0.5 System Requirements](docs/system-requirements.md).
+Vault-Speicher ist separat und hängt von der Sammlung ab. Siehe [Naut v0.0.6 System Requirements](docs/system-requirements.md).
 
 ## Dokumentation
 

@@ -743,6 +743,7 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
             snapshot.Add(new ArtworkResolveRequest(
                 card.ProfileId,
                 card.RowVersion,
+                card.BannerMediaAssetId,
                 card.BannerAssetRelativePath));
         }
 
@@ -758,6 +759,7 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
     {
         // Selections are Profile-scoped; Media identity cannot select Banner media.
         var coverPaths = new Dictionary<Guid, string?>();
+        var bannerPaths = new Dictionary<Guid, string?>();
         var motionPaths = new Dictionary<Guid, string?>();
         foreach (var req in requests)
         {
@@ -765,6 +767,12 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
             var cover = await _mediaResources!.ResolveSelectedProfileCoverAsync(req.ProfileId, cancellationToken)
                 .ConfigureAwait(false);
             coverPaths[req.ProfileId] = cover.State == MediaAssetResourceState.Ready ? cover.PhysicalPath : null;
+            if (req.BannerMediaAssetId is { } bannerId)
+            {
+                var banner = await _mediaResources.ResolveSelectedProfileBannerThumbnailAsync(
+                    req.ProfileId, bannerId, cancellationToken).ConfigureAwait(false);
+                bannerPaths[req.ProfileId] = banner.State == MediaAssetResourceState.Ready ? banner.PhysicalPath : null;
+            }
             motionPaths[req.ProfileId] = ResolvePreparedAssetPath(req.BannerAssetRelativePath);
         }
 
@@ -793,7 +801,7 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
                 }
 
                 card.CoverSource = ImageRef.FromPath(coverPaths.GetValueOrDefault(req.ProfileId), CardCoverDecodeWidth);
-                card.BannerImageSource = null;
+                card.BannerImageSource = ImageRef.FromPath(bannerPaths.GetValueOrDefault(req.ProfileId), CardCoverDecodeWidth);
                 card.BannerHoverPath = motionPaths.GetValueOrDefault(req.ProfileId);
             }
         });
@@ -839,6 +847,7 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
     private sealed record ArtworkResolveRequest(
         Guid ProfileId,
         long RowVersion,
+        Guid? BannerMediaAssetId,
         string? BannerAssetRelativePath);
 
     public void ApplyPage(GalleryPage page)

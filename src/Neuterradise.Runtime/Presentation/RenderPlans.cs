@@ -209,7 +209,7 @@ public sealed record OverlayNode(NodeLayout Layout, IReadOnlyList<CompositionNod
 
 public sealed record TextNode(NodeLayout Layout, string? Slot, string? TextKey, string TypeRole, string Color, int MaxLines, string TextAlignment, bool OnMedia) : CompositionNode(Layout);
 
-public sealed record ImageNode(NodeLayout Layout, string Slot, string Stretch, string? CornerRadius, string Shape, bool Ambient) : CompositionNode(Layout);
+public sealed record ImageNode(NodeLayout Layout, string Slot, string Stretch, string? CornerRadius, string Shape, bool Ambient, string Fallback = "identity") : CompositionNode(Layout);
 
 public sealed record FrameNode(NodeLayout Layout, double Size) : CompositionNode(Layout);
 

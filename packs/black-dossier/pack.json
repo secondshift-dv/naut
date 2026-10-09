@@ -1,0 +1,688 @@
+{
+  "schemaVersion": 1,
+  "packId": "naut.black-dossier",
+  "version": "1.0.0",
+  "name": "BLACK DOSSIER",
+  "author": "Anas / Second Shift",
+  "description": "A black architectural collection: cinematic banners, framed Cover identities, condensed dossiers and restrained crimson motion. Requires Naut 0.0.6 or later.",
+  "license": "CC-BY-4.0 (original definitions/artwork); SIL-OFL-1.1 (fonts)",
+  "minContractVersion": 1,
+  "assets": [
+    {
+      "id": "backdrop-atrium",
+      "kind": "Image",
+      "path": "assets/atrium.jpg",
+      "bytes": 228918
+    },
+    {
+      "id": "frame-gunmetal",
+      "kind": "Image",
+      "path": "assets/frame-gunmetal.png",
+      "bytes": 20056
+    },
+    {
+      "id": "font-display",
+      "kind": "Font",
+      "path": "assets/instrument-condensed.ttf",
+      "bytes": 111184
+    },
+    {
+      "id": "font-body",
+      "kind": "Font",
+      "path": "assets/inter.ttf",
+      "bytes": 341396
+    },
+    {
+      "id": "font-mono",
+      "kind": "Font",
+      "path": "assets/notosansmono.ttf",
+      "bytes": 405760
+    }
+  ],
+  "definitions": [
+    {
+      "id": "naut.black-dossier.theme",
+      "kind": "theme",
+      "name": "Obsidian Protocol",
+      "description": "Neutral black, white typography and controlled crimson accents. All semantic states retain contrast.",
+      "previewAccent": "#FFB72739",
+      "spec": {
+        "theme": {
+          "schemaVersion": 1,
+          "id": "black-dossier",
+          "name": "BLACK DOSSIER",
+          "isDark": true,
+          "colors": {
+            "canvas": "#FF08090B",
+            "surface1": "#FF111215",
+            "surface2": "#FF191B1F",
+            "surface3": "#FF24262B",
+            "surfaceElevated": "#FF1D1F24",
+            "surfaceOverlay": "#EE131418",
+            "surfaceHover": "#FF292C32",
+            "surfacePressed": "#FF33363D",
+            "surfaceSelected": "#FF382027",
+            "accent": "#FFB72739",
+            "accentHover": "#FFD4394C",
+            "accentPressed": "#FF942031",
+            "accentSecondary": "#FFD5D8DE",
+            "textPrimary": "#FFF2F3F5",
+            "textSecondary": "#FFC2C5CB",
+            "textMuted": "#FF989DA7",
+            "textDisabled": "#FF737986",
+            "textOnAccent": "#FFFFFFFF",
+            "textInverse": "#FF08090B",
+            "textLink": "#FFF0B0B7",
+            "borderSubtle": "#FF30333A",
+            "borderDefault": "#FF42464F",
+            "borderStrong": "#FF686E79",
+            "borderInteractive": "#FFD4394C",
+            "borderSelected": "#FFD4394C",
+            "selection": "#FF50242D",
+            "selectionHover": "#FF61303A",
+            "focus": "#FFF0B0B7",
+            "success": "#FF8BC8A7",
+            "warning": "#FFD9BB80",
+            "info": "#FFC2C5CB",
+            "danger": "#FFE56F7B",
+            "dangerHover": "#FFF08D97"
+          },
+          "typography": {
+            "displayFamily": "Naut Instrument Condensed",
+            "headingFamily": "Naut Instrument Condensed",
+            "bodyFamily": "Inter",
+            "monoFamily": "Noto Sans Mono"
+          },
+          "shape": {
+            "xs": 0,
+            "sm": 2,
+            "md": 3,
+            "lg": 4,
+            "xl": 4
+          },
+          "motion": {
+            "fastMs": 110,
+            "normalMs": 180,
+            "slowMs": 300,
+            "cinematicMs": 600
+          },
+          "background": {
+            "kind": "RadialGlow"
+          },
+          "morphology": {
+            "motionIntensity": 0.35,
+            "focusTreatment": "Ring",
+            "glowStrength": 0,
+            "borderWeight": 1,
+            "elevationStrength": 0.25,
+            "cardPersonality": "Flat",
+            "chromeTreatment": "Elevated",
+            "panelOpacity": 0.9,
+            "navigationRadiusScale": 0.25,
+            "navigationTreatment": "SelectedSurface"
+          }
+        },
+        "material": {
+          "personality": "grounded",
+          "atmosphere": "none",
+          "grain": 0.015,
+          "glassOpacity": 0.9,
+          "glassBlur": 10,
+          "specular": 0.35,
+          "rimLight": 0.25,
+          "ambientPrimary": "#FFB72739",
+          "ambientSecondary": "#FFD5D8DE",
+          "frameAffinity": [
+            "naut.black-dossier.frame"
+          ]
+        }
+      }
+    },
+    {
+      "id": "naut.black-dossier.typography",
+      "kind": "typography",
+      "name": "Dossier Type",
+      "description": "Locally bundled condensed display and headings, Inter body and Noto Sans Mono metadata.",
+      "previewAccent": "#FFB72739",
+      "spec": {
+        "display": {
+          "family": "Naut Instrument Condensed",
+          "asset": "font-display"
+        },
+        "heading": {
+          "family": "Naut Instrument Condensed",
+          "asset": "font-display"
+        },
+        "body": {
+          "family": "Inter",
+          "asset": "font-body"
+        },
+        "mono": {
+          "family": "Noto Sans Mono",
+          "asset": "font-mono"
+        }
+      }
+    },
+    {
+      "id": "naut.black-dossier.home",
+      "kind": "home-layout",
+      "name": "Operations Desk",
+      "description": "Large inset feature, compact statistics and a responsive collection/activity split.",
+      "previewAccent": "#FFB72739",
+      "spec": {
+        "hero": {
+          "placement": "inset",
+          "heightFraction": 0.48,
+          "minHeight": 280,
+          "maxHeight": 520
+        },
+        "rails": [
+          {
+            "id": "statistics",
+            "style": "strip",
+            "maxItems": 4
+          },
+          {
+            "id": "favorites",
+            "style": "poster",
+            "maxItems": 8
+          },
+          {
+            "id": "recent",
+            "style": "tile",
+            "maxItems": 8
+          },
+          {
+            "id": "activity",
+            "style": "compact",
+            "maxItems": 5
+          },
+          {
+            "id": "attention",
+            "style": "compact",
+            "maxItems": 3
+          }
+        ],
+        "surface": {
+          "type": "stack",
+          "spacing": 20,
+          "children": [
+            {
+              "type": "semantic",
+              "id": "featured"
+            },
+            {
+              "type": "semantic",
+              "id": "statistics"
+            },
+            {
+              "type": "columns",
+              "columns": [
+                "2*",
+                "*"
+              ],
+              "spacing": 24,
+              "children": [
+                {
+                  "type": "stack",
+                  "spacing": 24,
+                  "children": [
+                    {
+                      "type": "semantic",
+                      "id": "favorites"
+                    },
+                    {
+                      "type": "semantic",
+                      "id": "recent"
+                    }
+                  ]
+                },
+                {
+                  "type": "stack",
+                  "spacing": 20,
+                  "children": [
+                    {
+                      "type": "semantic",
+                      "id": "activity"
+                    },
+                    {
+                      "type": "semantic",
+                      "id": "attention"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "naut.black-dossier.spotlight",
+      "kind": "spotlight-style",
+      "name": "Opening Brief",
+      "description": "A cinematic left-aligned feature, framed Cover, readable overview and restrained still motion.",
+      "previewAccent": "#FFB72739",
+      "spec": {
+        "composition": "cinematic-left",
+        "motion": "still",
+        "transition": "fade",
+        "rotationSeconds": 30,
+        "showCover": true,
+        "showOverview": true,
+        "pagination": "counter-rail",
+        "scrimStrength": 0.78
+      }
+    },
+    {
+      "id": "naut.black-dossier.gallery",
+      "kind": "gallery-layout",
+      "name": "Dossier Wall",
+      "description": "Even virtualized cards with a separate widescreen Banner area and framed Cover identity.",
+      "previewAccent": "#FFB72739",
+      "spec": {
+        "primitive": "VirtualizedUniformGrid",
+        "itemMinWidth": 260,
+        "itemMaxWidth": 340,
+        "itemAspect": 1.0,
+        "spacing": 18,
+        "rowHeight": 280,
+        "maxColumns": 6,
+        "toolbar": "catalog"
+      }
+    },
+    {
+      "id": "naut.black-dossier.card",
+      "kind": "profile-card",
+      "name": "Dual Identity",
+      "description": "Separate Banner still from its selected video; hover plays that Banner. Cover stays framed in the identity panel.",
+      "previewAccent": "#FFB72739",
+      "spec": {
+        "legacyVariant": "prestige",
+        "aspect": 1.0,
+        "art": "cover-over-banner",
+        "density": "detailed",
+        "hover": "banner",
+        "frame": "full",
+        "composition": {
+          "type": "overlay",
+          "children": [
+            {
+              "type": "shape",
+              "fill": "token:surface1",
+              "stroke": "token:borderDefault",
+              "strokeThickness": 1,
+              "cornerRadius": 3
+            },
+            {
+              "type": "grid",
+              "rows": [
+                "*",
+                "124"
+              ],
+              "columns": [
+                "*"
+              ],
+              "children": [
+                {
+                  "type": "overlay",
+                  "row": 0,
+                  "children": [
+                    {
+                      "type": "shape",
+                      "fill": "token:surface2"
+                    },
+                    {
+                      "type": "image",
+                      "slot": "profile.identity.banner",
+                      "stretch": "uniform-to-fill",
+                      "fallback": "none"
+                    },
+                    {
+                      "type": "scrim",
+                      "direction": "to-top",
+                      "from": "#CC08090B",
+                      "to": "#00000000"
+                    },
+                    {
+                      "type": "badge",
+                      "slot": "profile.identity.favorite",
+                      "style": "solid",
+                      "visibleWhen": "profile.identity.favorite",
+                      "hAlign": "right",
+                      "vAlign": "top",
+                      "margin": 12
+                    }
+                  ]
+                },
+                {
+                  "type": "grid",
+                  "row": 1,
+                  "columns": [
+                    "96",
+                    "*"
+                  ],
+                  "rows": [
+                    "*"
+                  ],
+                  "spacing": 12,
+                  "margin": 12,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "size": 96,
+                      "hAlign": "left",
+                      "vAlign": "center"
+                    },
+                    {
+                      "type": "stack",
+                      "column": 1,
+                      "spacing": 6,
+                      "vAlign": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "slot": "profile.identity.name",
+                          "role": "card-title",
+                          "color": "token:textPrimary",
+                          "maxLines": 2
+                        },
+                        {
+                          "type": "text",
+                          "slot": "profile.identity.category",
+                          "role": "micro",
+                          "color": "token:textSecondary",
+                          "maxLines": 1,
+                          "visibleWhen": "profile.identity.category"
+                        },
+                        {
+                          "type": "badge",
+                          "slot": "profile.identity.rating",
+                          "style": "outline",
+                          "visibleWhen": "profile.identity.rating",
+                          "hAlign": "left"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "shape",
+              "fill": "token:accent",
+              "height": 2,
+              "vAlign": "bottom"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "naut.black-dossier.profile",
+      "kind": "profile-layout",
+      "name": "Subject Dossier",
+      "description": "Full Banner and native Figure beside the identity on wide screens; media first, context after, Delete last.",
+      "previewAccent": "#FFB72739",
+      "spec": {
+        "preset": "cinematic",
+        "surface": {
+          "type": "stack",
+          "spacing": 20,
+          "children": [
+            {
+              "type": "semantic",
+              "id": "identity"
+            },
+            {
+              "type": "semantic",
+              "id": "media"
+            },
+            {
+              "type": "semantic",
+              "id": "overview"
+            },
+            {
+              "type": "columns",
+              "columns": [
+                "*",
+                "*"
+              ],
+              "spacing": 20,
+              "children": [
+                {
+                  "type": "semantic",
+                  "id": "related"
+                },
+                {
+                  "type": "semantic",
+                  "id": "faces"
+                }
+              ]
+            },
+            {
+              "type": "semantic",
+              "id": "recent-media"
+            },
+            {
+              "type": "semantic",
+              "id": "review"
+            },
+            {
+              "type": "semantic",
+              "id": "actions"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "naut.black-dossier.media",
+      "kind": "profile-media-layout",
+      "name": "Evidence Grid",
+      "description": "Wide media tiles with undistorted images, crisp selection frames and useful metadata below.",
+      "previewAccent": "#FFB72739",
+      "spec": {
+        "metadataPlacement": "below",
+        "frameStyle": "hairline",
+        "mediaWidthFraction": 1,
+        "cardWidth": 260,
+        "metadataLines": 2,
+        "layoutId": "editorial",
+        "frameRadius": 2,
+        "metadataFields": [
+          "name",
+          "dimensions",
+          "duration",
+          "favorite"
+        ],
+        "frameColor": "token:borderDefault",
+        "hoverStyle": "lift",
+        "frameGlow": 0,
+        "selectedFrameColor": "token:accent",
+        "showTypeBadge": true,
+        "browse": "wall",
+        "frameThickness": 1,
+        "aspect": 1.5,
+        "fit": "fit"
+      }
+    },
+    {
+      "id": "naut.black-dossier.backdrop",
+      "kind": "backdrop",
+      "name": "Obsidian Atrium",
+      "description": "Original black architectural artwork, white light slits and a crimson line. Static in every visual tier.",
+      "previewAccent": "#FFB72739",
+      "spec": {
+        "variants": {
+          "full": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "backdrop-atrium",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FF08090B",
+                "opacity": 0.18
+              }
+            ]
+          },
+          "reduced": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "backdrop-atrium",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FF08090B",
+                "opacity": 0.18
+              }
+            ]
+          },
+          "fallback": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "backdrop-atrium",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FF08090B",
+                "opacity": 0.18
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "naut.black-dossier.frame",
+      "kind": "cover-frame",
+      "name": "Gunmetal Seal",
+      "description": "Symmetric square gunmetal rails, fine silver edges and crimson corner brackets; transparent portrait opening.",
+      "previewAccent": "#FFB72739",
+      "spec": {
+        "family": "Minimal",
+        "category": "Ornate",
+        "shapes": [
+          "Square"
+        ],
+        "overlayAsset": "frame-gunmetal",
+        "coverInset": 0.1,
+        "scale": 1,
+        "tint": false,
+        "animated": false
+      }
+    },
+    {
+      "id": "naut.black-dossier.effect",
+      "kind": "effect",
+      "name": "Signal Trace",
+      "description": "Visible silver traces and a restrained crimson sweep. Reduced keeps fewer traces; fallback preserves static grid and glow.",
+      "previewAccent": "#FFB72739",
+      "spec": {
+        "channel": "environment",
+        "targets": [
+          "effect.home",
+          "effect.profile",
+          "effect.card"
+        ],
+        "interactionOnly": false,
+        "variants": {
+          "full": {
+            "layers": [
+              {
+                "kind": "grid-field",
+                "color": "#FFADB3BF",
+                "opacity": 0.08,
+                "scale": 1.2,
+                "depth": 0.12
+              },
+              {
+                "kind": "particles",
+                "particleShape": "line",
+                "color": "#FFDFE3E9",
+                "count": 24,
+                "sizeMin": 2,
+                "sizeMax": 4,
+                "direction": "down",
+                "speed": 0.12,
+                "opacity": 0.32
+              },
+              {
+                "kind": "light-sweep",
+                "color": "#FFB72739",
+                "opacity": 0.16,
+                "width": 0.1,
+                "angle": 110,
+                "period": 24,
+                "speed": 0.12
+              }
+            ]
+          },
+          "reduced": {
+            "layers": [
+              {
+                "kind": "grid-field",
+                "color": "#FFADB3BF",
+                "opacity": 0.08,
+                "scale": 1.2,
+                "depth": 0.12
+              },
+              {
+                "kind": "particles",
+                "particleShape": "line",
+                "color": "#FFDFE3E9",
+                "count": 12,
+                "sizeMin": 2,
+                "sizeMax": 4,
+                "direction": "down",
+                "speed": 0.06,
+                "opacity": 0.27
+              },
+              {
+                "kind": "light-sweep",
+                "color": "#FFB72739",
+                "opacity": 0.12,
+                "width": 0.1,
+                "angle": 110,
+                "period": 36,
+                "speed": 0.12
+              }
+            ]
+          },
+          "fallback": {
+            "layers": [
+              {
+                "kind": "grid-field",
+                "color": "#FFADB3BF",
+                "opacity": 0.12,
+                "scale": 1.2,
+                "depth": 0.12
+              },
+              {
+                "kind": "radial-glow",
+                "color": "#FFB72739",
+                "centerX": 0.86,
+                "centerY": 0.2,
+                "radius": 0.8,
+                "opacity": 0.2
+              }
+            ]
+          }
+        }
+      },
+      "performance": {
+        "tier": "light",
+        "maxAnimatedLayers": 2,
+        "offscreenPolicy": "pause",
+        "continuousAnimation": true
+      }
+    }
+  ]
+}

@@ -38,6 +38,16 @@ public sealed class MediaAssetResourceAuthority
             : Missing(Guid.Empty);
     }
 
+    public async Task<MediaAssetResource> ResolveSelectedProfileBannerThumbnailAsync(
+        Guid profileId, Guid bannerMediaAssetId, CancellationToken ct = default)
+    {
+        var banner = await _reads.GetPublicSelectedMediaAsync(profileId, bannerMediaAssetId, ct)
+            .ConfigureAwait(false);
+        return banner?.Role == MediaAssetRole.Hover
+            ? await ResolveMediaThumbnailAsync(banner.MediaId, ct).ConfigureAwait(false)
+            : Missing(bannerMediaAssetId);
+    }
+
     private async Task<MediaAssetResource> ResolveSelectedMediaAssetAsync(Guid profileId, Guid mediaAssetId,
         CancellationToken ct)
     {

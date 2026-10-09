@@ -21,6 +21,10 @@ public sealed class MediaResourceAuthority
     public Task<MediaAssetResource> ResolveSelectedProfileCoverAsync(Guid profileId, CancellationToken ct = default) =>
         _mediaAssets.ResolveSelectedProfileCoverAsync(profileId, ct);
 
+    public Task<MediaAssetResource> ResolveSelectedProfileBannerThumbnailAsync(
+        Guid profileId, Guid bannerMediaAssetId, CancellationToken ct = default) =>
+        _mediaAssets.ResolveSelectedProfileBannerThumbnailAsync(profileId, bannerMediaAssetId, ct);
+
     public Task<MediaAssetResource> ResolveImportCandidateMediaAssetAsync(Guid importUnitId, Guid assetId,
         MediaAssetRole role, CancellationToken ct = default) =>
         _mediaAssets.ResolveImportCandidateAsync(importUnitId, assetId, role, ct);

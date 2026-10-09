@@ -4,6 +4,14 @@ Give your collection another atmosphere. These packs are reviewed by Naut's
 maintainer and installed only when you choose them. They are customization
 content with independent versions; they do not replace the application.
 
+## BLACK DOSSIER — 1.0.0
+
+![BLACK DOSSIER](black-dossier/preview.png)
+
+A neutral black cinematic collection with restrained crimson accents. Eleven independently selectable components, including bundled typography, separate Cover/Banner cards, the native Figure and a visible three-tier effect. Requires **Naut 0.0.6 or later**. Preview is an asset composition.
+
+**[Download BLACK DOSSIER 1.0.0](https://secondshift-dv.github.io/naut/packs/black-dossier-1.0.0.ntpack)** · [Setup](black-dossier/README.md) · [Provenance](black-dossier/PROVENANCE.txt) · [Checksums](https://secondshift-dv.github.io/naut/packs/checksums.json)
+
 ## Overworld Expedition — 1.0.1
 
 ![Overworld Expedition](overworld-expedition/preview.png)
