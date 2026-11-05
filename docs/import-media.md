@@ -29,6 +29,8 @@ In v0.0.7, **Add media** from a Profile imports eligible files directly into tha
 
 Transfers retain a staged copy and incremental SHA-256, with durable Resume and safe Cancel. Cancel settles an active copy at a checkpoint before cleaning interrupted staging; **Settings → Vault → Vault Health** can help resume, retry or finish interrupted cleanup. The copied originals in the Vault and original files outside the Vault are not silently removed by cancelling.
 
+In v0.0.8, a transfer that finishes exactly at an already-durable checkpoint no longer repeats that final flush and catalog write. The 64 MiB checkpoint interval, staged copy, source integrity checks, and restart recovery remain unchanged.
+
 Additional eligible inputs include JPEG 2000 (`.jp2`, `.j2k`), OGV/Theora, VOB and representative MXF containers. Actual support depends on the contained codec; damaged or unsupported media can still require attention. Video previews use prepared Thumbnail and Hover assets where supported.
 
 ## Originals and prepared media

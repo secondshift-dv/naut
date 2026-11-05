@@ -13,26 +13,29 @@ public sealed class TransferOriginalJobHandler : AuthorizedJobHandler
     internal static Guid ProcessNonce { get; } = Guid.NewGuid();
 
     public TransferOriginalJobHandler(CatalogDb catalog, ImportPreparationCoordinator preparation,
-        long checkpointIntervalBytes = 64L * 1024 * 1024)
+        long checkpointIntervalBytes = 64L * 1024 * 1024, int bufferSizeBytes = 1024 * 1024)
         : base("TransferOriginal", [JobLane.Io], "Media",
-            new TransferOriginalOperation(catalog, preparation, checkpointIntervalBytes), runOffCallingThread: false)
+            new TransferOriginalOperation(catalog, preparation, checkpointIntervalBytes, bufferSizeBytes), runOffCallingThread: false)
     {
     }
 }
 
 internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
 {
-    private const int BufferSize = 1024 * 1024;
+    private readonly int _bufferSize;
     private readonly long _checkpointInterval;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
     private readonly CatalogDb _catalog;
     private readonly ImportPreparationCoordinator _preparation;
 
-    public TransferOriginalOperation(CatalogDb catalog, ImportPreparationCoordinator preparation, long checkpointIntervalBytes)
+    public TransferOriginalOperation(CatalogDb catalog, ImportPreparationCoordinator preparation, long checkpointIntervalBytes, int bufferSizeBytes)
     {
         if (checkpointIntervalBytes is not (16L * 1024 * 1024 or 64L * 1024 * 1024 or 128L * 1024 * 1024))
             throw new ArgumentOutOfRangeException(nameof(checkpointIntervalBytes));
+        if (bufferSizeBytes is not (256 * 1024 or 1024 * 1024 or 4 * 1024 * 1024))
+            throw new ArgumentOutOfRangeException(nameof(bufferSizeBytes));
         _checkpointInterval = checkpointIntervalBytes;
+        _bufferSize = bufferSizeBytes;
         _catalog = catalog;
         _preparation = preparation;
     }
@@ -65,7 +68,7 @@ internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
             Directory.CreateDirectory(Path.GetDirectoryName(partialPath)!);
             RootPathRules.RejectExistingReparsePoints(_catalog.Paths.Root, partialPath);
             await using var source = new FileStream(item.SourcePath, FileMode.Open, FileAccess.Read,
-                FileShare.Read, BufferSize, FileOptions.Asynchronous | FileOptions.SequentialScan);
+                FileShare.Read, _bufferSize, FileOptions.Asynchronous | FileOptions.SequentialScan);
             var identity = SourceIdentityHelper.CaptureIdentity(item.SourcePath);
             if (identity is null || !SourceIdentityHelper.VerifyIdentity(identity, source.SafeFileHandle, item.SourcePath))
                 return Failed("SOURCE_IDENTITY_UNAVAILABLE", "The source file object could not be identified.");
@@ -79,7 +82,7 @@ internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
             await using var partial = new FileStream(partialPath, new FileStreamOptions
             {
                 Mode = partialExists ? FileMode.Open : FileMode.CreateNew, Access = FileAccess.ReadWrite, Share = FileShare.None,
-                BufferSize = BufferSize, Options = FileOptions.Asynchronous | FileOptions.SequentialScan,
+                BufferSize = _bufferSize, Options = FileOptions.Asynchronous | FileOptions.SequentialScan,
                 PreallocationSize = partialExists ? 0 : length,
             });
             using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -89,7 +92,7 @@ internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
             // Bytes after the durable checkpoint may have reached disk before a crash.
             if (partial.Length > safeOffset) partial.SetLength(safeOffset);
 
-            var buffer = ArrayPool<byte>.Shared.Rent(BufferSize);
+            var buffer = ArrayPool<byte>.Shared.Rent(_bufferSize);
             try
             {
                 if (safeOffset > 0)
@@ -98,7 +101,7 @@ internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
                     var remaining = safeOffset;
                     while (remaining > 0)
                     {
-                        var read = await partial.ReadAsync(buffer.AsMemory(0, (int)Math.Min(BufferSize, remaining)),
+                        var read = await partial.ReadAsync(buffer.AsMemory(0, (int)Math.Min(_bufferSize, remaining)),
                             cancellationToken).ConfigureAwait(false);
                         if (read == 0) return Failed("TRANSFER_PARTIAL_SHORT", "The safe partial prefix could not be read.");
                         hash.AppendData(buffer, 0, read);
@@ -113,11 +116,12 @@ internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
                 partial.Position = safeOffset;
                 var written = safeOffset;
                 var lastCheckpoint = safeOffset;
+                var checkpointSavedThisRun = false;
                 while (written < length && !cancellationToken.IsCancellationRequested)
                 {
                     await Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared
                         .YieldBackgroundDiskAsync(cancellationToken).ConfigureAwait(false);
-                    var read = await source.ReadAsync(buffer.AsMemory(0, (int)Math.Min(BufferSize, length - written)),
+                    var read = await source.ReadAsync(buffer.AsMemory(0, (int)Math.Min(_bufferSize, length - written)),
                         cancellationToken).ConfigureAwait(false);
                     if (read == 0) return Failed("SOURCE_CHANGED", "The source ended before its expected length.");
                     await partial.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
@@ -127,14 +131,18 @@ internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
                         .ConfigureAwait(false);
                     if (written - lastCheckpoint >= _checkpointInterval)
                     {
-                        await SaveCheckpointAsync(context, partial, item.UnitId, identity, length,
+                        await SaveCheckpointAsync(context, partial, checkpoint.ImportItemId, item.UnitId, identity, length,
                             written, relativePath, hash).ConfigureAwait(false);
                         lastCheckpoint = written;
+                        checkpointSavedThisRun = true;
                     }
                 }
 
-                await SaveCheckpointAsync(context, partial, item.UnitId, identity, length,
-                    written, relativePath, hash).ConfigureAwait(false);
+                // A checkpoint written at EOF is already durable; a second flush and
+                // catalog write at the same offset adds no recovery information.
+                if (written != lastCheckpoint || !checkpointSavedThisRun)
+                    await SaveCheckpointAsync(context, partial, checkpoint.ImportItemId, item.UnitId, identity, length,
+                        written, relativePath, hash).ConfigureAwait(false);
                 if (cancellationToken.IsCancellationRequested)
                     return JobExecutionResult.Cancelled("Transfer stopped after a durable safe checkpoint.");
                 if (!SourceIdentityHelper.VerifyIdentity(identity, source.SafeFileHandle, item.SourcePath)
@@ -198,14 +206,14 @@ internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
     }
 
     private static async Task SaveCheckpointAsync(JobExecutionContext context, FileStream partial,
-        Guid unitId, string identity, long length, long offset, string relativePath, IncrementalHash hash)
+        Guid importItemId, Guid unitId, string identity, long length, long offset, string relativePath, IncrementalHash hash)
     {
         // The catalog can name only bytes already flushed to the Vault volume.
         await partial.FlushAsync(CancellationToken.None).ConfigureAwait(false);
         partial.Flush(flushToDisk: true);
         var json = JsonSerializer.Serialize(new TransferCheckpoint
         {
-            SchemaVersion = 1, ImportItemId = ReadItemId(context.CheckpointJson!),
+            SchemaVersion = 1, ImportItemId = importItemId,
             CandidateMediaId = context.OwnerId, ImportUnitId = unitId,
             SourceIdentity = identity, ExpectedLength = length, SafeOffset = offset,
             PrefixSha256 = Convert.ToHexStringLower(hash.GetCurrentHash()),
@@ -214,8 +222,6 @@ internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
         await context.Checkpoints.UpdateCheckpointAsync(json, CancellationToken.None).ConfigureAwait(false);
     }
 
-    private static Guid ReadItemId(string json) =>
-        JsonSerializer.Deserialize<TransferCheckpoint>(json, JsonOptions)!.ImportItemId;
 
     private static JobExecutionResult Failed(string code, string message) =>
         JobExecutionResult.Failed(JobFailureClassification.AmbiguousPhysicalState, code, message);
