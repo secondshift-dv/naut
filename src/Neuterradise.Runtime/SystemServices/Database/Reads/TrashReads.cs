@@ -40,7 +40,11 @@ public sealed class TrashReads
                        ELSE NULL
                    END AS display_name,
                    t.state, t.recovery_relative_path, t.plan_json,
-                   t.created_at_ms, t.updated_at_ms, t.completed_at_ms, t.row_version
+                   t.created_at_ms, t.updated_at_ms, t.completed_at_ms, t.row_version,
+                   CASE t.entity_type
+                       WHEN 'MEDIA' THEN (SELECT trashed_at_ms FROM media WHERE media_id = t.entity_id)
+                       WHEN 'PROFILE' THEN (SELECT trashed_at_ms FROM profiles WHERE profile_id = t.entity_id)
+                       ELSE NULL END
             FROM trash_entries t
             WHERE t.trash_entry_id = $id;
             """;
@@ -78,7 +82,11 @@ public sealed class TrashReads
                        ELSE NULL
                    END AS display_name,
                    t.state, t.recovery_relative_path, t.plan_json,
-                   t.created_at_ms, t.updated_at_ms, t.completed_at_ms, t.row_version
+                   t.created_at_ms, t.updated_at_ms, t.completed_at_ms, t.row_version,
+                   CASE t.entity_type
+                       WHEN 'MEDIA' THEN (SELECT trashed_at_ms FROM media WHERE media_id = t.entity_id)
+                       WHEN 'PROFILE' THEN (SELECT trashed_at_ms FROM profiles WHERE profile_id = t.entity_id)
+                       ELSE NULL END
             FROM trash_entries t
             WHERE t.entity_type = $type AND t.entity_id = $id
             ORDER BY t.created_at_ms DESC
@@ -114,9 +122,20 @@ public sealed class TrashReads
                        ELSE NULL
                    END AS display_name,
                    t.state, t.recovery_relative_path, t.plan_json,
-                   t.created_at_ms, t.updated_at_ms, t.completed_at_ms, t.row_version
+                   t.created_at_ms, t.updated_at_ms, t.completed_at_ms, t.row_version,
+                   CASE t.entity_type
+                       WHEN 'MEDIA' THEN (SELECT trashed_at_ms FROM media WHERE media_id = t.entity_id)
+                       WHEN 'PROFILE' THEN (SELECT trashed_at_ms FROM profiles WHERE profile_id = t.entity_id)
+                       ELSE NULL END
             FROM trash_entries t
-            WHERE t.state IN ('PENDING', 'IN_TRASH', 'EXECUTING', 'RESTORE_EXECUTING', 'RESTORE_FINALIZING')
+            WHERE json_extract(CASE WHEN json_valid(t.plan_json) THEN t.plan_json ELSE json_object() END, '$.cancellationImportUnitId') IS NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM trash_entries parent
+                  WHERE t.entity_type='MEDIA' AND parent.entity_type='PROFILE'
+                    AND parent.trash_entry_id=json_extract(CASE WHEN json_valid(t.plan_json) THEN t.plan_json ELSE json_object() END, '$.parentProfileTrashEntryId')
+                    AND parent.state IN ('PENDING','EXECUTING','IN_TRASH','RESTORE_EXECUTING','RESTORE_FINALIZING')
+              )
+              AND t.state IN ('PENDING', 'IN_TRASH', 'EXECUTING', 'RESTORE_EXECUTING', 'RESTORE_FINALIZING')
             ORDER BY t.created_at_ms DESC, t.trash_entry_id DESC
             LIMIT {limit};
             """;
@@ -131,7 +150,7 @@ public sealed class TrashReads
         return list;
     }
 
-    public async Task<IReadOnlyList<TrashItemSummary>> GetExpiredProfileTrashEntriesAsync(
+    public async Task<IReadOnlyList<TrashItemSummary>> GetExpiredTrashEntriesAsync(
         DateTimeOffset cutoffUtc,
         CancellationToken cancellationToken = default)
     {
@@ -147,11 +166,25 @@ public sealed class TrashReads
                        ELSE NULL
                    END AS display_name,
                    t.state, t.recovery_relative_path, t.plan_json,
-                   t.created_at_ms, t.updated_at_ms, t.completed_at_ms, t.row_version
+                   t.created_at_ms, t.updated_at_ms, t.completed_at_ms, t.row_version,
+                   CASE t.entity_type
+                       WHEN 'MEDIA' THEN (SELECT trashed_at_ms FROM media WHERE media_id = t.entity_id)
+                       WHEN 'PROFILE' THEN (SELECT trashed_at_ms FROM profiles WHERE profile_id = t.entity_id)
+                       ELSE NULL END
             FROM trash_entries t
-            WHERE t.state = 'IN_TRASH'
-              AND t.entity_type = 'PROFILE'
-              AND t.created_at_ms <= $cutoff
+            WHERE json_extract(CASE WHEN json_valid(t.plan_json) THEN t.plan_json ELSE json_object() END, '$.cancellationImportUnitId') IS NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM trash_entries parent
+                  WHERE t.entity_type='MEDIA' AND parent.entity_type='PROFILE'
+                    AND parent.trash_entry_id=json_extract(CASE WHEN json_valid(t.plan_json) THEN t.plan_json ELSE json_object() END, '$.parentProfileTrashEntryId')
+                    AND parent.state IN ('PENDING','EXECUTING','IN_TRASH','RESTORE_EXECUTING','RESTORE_FINALIZING')
+              )
+              AND t.state = 'IN_TRASH'
+              AND t.entity_type IN ('PROFILE', 'MEDIA')
+              AND CASE t.entity_type
+                  WHEN 'MEDIA' THEN (SELECT trashed_at_ms FROM media WHERE media_id = t.entity_id)
+                  WHEN 'PROFILE' THEN (SELECT trashed_at_ms FROM profiles WHERE profile_id = t.entity_id)
+                  ELSE NULL END <= $cutoff
             ORDER BY t.created_at_ms, t.trash_entry_id;
             """;
         command.Parameters.AddWithValue("$cutoff", DbTime.Format(cutoffUtc));
@@ -195,9 +228,20 @@ public sealed class TrashReads
                        ELSE NULL
                    END AS display_name,
                    t.state, t.recovery_relative_path, t.plan_json,
-                   t.created_at_ms, t.updated_at_ms, t.completed_at_ms, t.row_version
+                   t.created_at_ms, t.updated_at_ms, t.completed_at_ms, t.row_version,
+                   CASE t.entity_type
+                       WHEN 'MEDIA' THEN (SELECT trashed_at_ms FROM media WHERE media_id = t.entity_id)
+                       WHEN 'PROFILE' THEN (SELECT trashed_at_ms FROM profiles WHERE profile_id = t.entity_id)
+                       ELSE NULL END
             FROM trash_entries t
-            WHERE t.state IN ('PENDING', 'IN_TRASH', 'EXECUTING', 'RESTORE_EXECUTING', 'RESTORE_FINALIZING')
+            WHERE json_extract(CASE WHEN json_valid(t.plan_json) THEN t.plan_json ELSE json_object() END, '$.cancellationImportUnitId') IS NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM trash_entries parent
+                  WHERE t.entity_type='MEDIA' AND parent.entity_type='PROFILE'
+                    AND parent.trash_entry_id=json_extract(CASE WHEN json_valid(t.plan_json) THEN t.plan_json ELSE json_object() END, '$.parentProfileTrashEntryId')
+                    AND parent.state IN ('PENDING','EXECUTING','IN_TRASH','RESTORE_EXECUTING','RESTORE_FINALIZING')
+              )
+              AND t.state IN ('PENDING', 'IN_TRASH', 'EXECUTING', 'RESTORE_EXECUTING', 'RESTORE_FINALIZING')
             {cursorClause}
             ORDER BY t.created_at_ms DESC, t.trash_entry_id DESC
             LIMIT {pageSize + 1};
@@ -244,7 +288,14 @@ public sealed class TrashReads
         command.CommandText = """
             SELECT COUNT(*)
             FROM trash_entries t
-            WHERE t.state IN ('PENDING', 'IN_TRASH', 'EXECUTING', 'RESTORE_EXECUTING', 'RESTORE_FINALIZING');
+            WHERE json_extract(CASE WHEN json_valid(t.plan_json) THEN t.plan_json ELSE json_object() END, '$.cancellationImportUnitId') IS NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM trash_entries parent
+                  WHERE t.entity_type='MEDIA' AND parent.entity_type='PROFILE'
+                    AND parent.trash_entry_id=json_extract(CASE WHEN json_valid(t.plan_json) THEN t.plan_json ELSE json_object() END, '$.parentProfileTrashEntryId')
+                    AND parent.state IN ('PENDING','EXECUTING','IN_TRASH','RESTORE_EXECUTING','RESTORE_FINALIZING')
+              )
+              AND t.state IN ('PENDING', 'IN_TRASH', 'EXECUTING', 'RESTORE_EXECUTING', 'RESTORE_FINALIZING');
             """;
 
         var result = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
@@ -264,7 +315,16 @@ public sealed class TrashReads
         long totalCount;
         await using (var countCommand = connection.CreateCommand())
         {
-            countCommand.CommandText = "SELECT COUNT(*) FROM trash_entries;";
+            countCommand.CommandText = """
+                  SELECT COUNT(*) FROM trash_entries t
+                  WHERE json_extract(CASE WHEN json_valid(t.plan_json) THEN t.plan_json ELSE json_object() END, '$.cancellationImportUnitId') IS NULL
+                AND NOT EXISTS (
+                    SELECT 1 FROM trash_entries parent
+                    WHERE t.entity_type='MEDIA' AND parent.entity_type='PROFILE'
+                      AND parent.trash_entry_id=json_extract(CASE WHEN json_valid(t.plan_json) THEN t.plan_json ELSE json_object() END, '$.parentProfileTrashEntryId')
+                      AND parent.state IN ('PENDING','EXECUTING','IN_TRASH','RESTORE_EXECUTING','RESTORE_FINALIZING')
+                );
+                """;
             totalCount = Convert.ToInt64(
                 await countCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false),
                 CultureInfo.InvariantCulture);
@@ -274,8 +334,8 @@ public sealed class TrashReads
         var cursorClause = cursor is null
             ? ""
             : """
-              WHERE (t.created_at_ms < $cursorCreatedAt)
-                 OR (t.created_at_ms = $cursorCreatedAt AND t.trash_entry_id < $cursorId)
+              AND ((t.created_at_ms < $cursorCreatedAt)
+                 OR (t.created_at_ms = $cursorCreatedAt AND t.trash_entry_id < $cursorId))
               """;
 
         await using var command = connection.CreateCommand();
@@ -287,8 +347,19 @@ public sealed class TrashReads
                        ELSE NULL
                    END AS display_name,
                    t.state, t.recovery_relative_path, t.plan_json,
-                   t.created_at_ms, t.updated_at_ms, t.completed_at_ms, t.row_version
+                   t.created_at_ms, t.updated_at_ms, t.completed_at_ms, t.row_version,
+                   CASE t.entity_type
+                       WHEN 'MEDIA' THEN (SELECT trashed_at_ms FROM media WHERE media_id = t.entity_id)
+                       WHEN 'PROFILE' THEN (SELECT trashed_at_ms FROM profiles WHERE profile_id = t.entity_id)
+                       ELSE NULL END
             FROM trash_entries t
+            WHERE json_extract(CASE WHEN json_valid(t.plan_json) THEN t.plan_json ELSE json_object() END, '$.cancellationImportUnitId') IS NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM trash_entries parent
+                  WHERE t.entity_type='MEDIA' AND parent.entity_type='PROFILE'
+                    AND parent.trash_entry_id=json_extract(CASE WHEN json_valid(t.plan_json) THEN t.plan_json ELSE json_object() END, '$.parentProfileTrashEntryId')
+                    AND parent.state IN ('PENDING','EXECUTING','IN_TRASH','RESTORE_EXECUTING','RESTORE_FINALIZING')
+              )
             {cursorClause}
             ORDER BY t.created_at_ms DESC, t.trash_entry_id DESC
             LIMIT {pageSize + 1};
@@ -364,6 +435,7 @@ public sealed class TrashReads
             createdAt,
             updatedAt,
             completedAt,
-            rowVersion);
+            rowVersion,
+            reader.IsDBNull(11) ? null : DbTime.Parse(reader.GetInt64(11)));
     }
 }

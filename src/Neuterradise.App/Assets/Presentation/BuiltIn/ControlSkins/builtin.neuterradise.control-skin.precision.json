@@ -1,0 +1,43 @@
+{
+  "id": "builtin.neuterradise.control-skin.precision",
+  "kind": "control-skin",
+  "name": "Precision",
+  "spec": {
+    "radius": 3,
+    "borderWidth": 1,
+    "height": 26,
+    "horizontalPadding": 8,
+    "verticalPadding": 3,
+    "scrollbarWidth": 8,
+    "fill": "token:surface2",
+    "hoverFill": "token:surfaceHover",
+    "pressedFill": "token:surfacePressed",
+    "border": "token:borderDefault",
+    "focus": "token:focus",
+    "material": "flat",
+    "relief": 0,
+    "families": {
+      "input": {
+        "radius": 3
+      },
+      "chip": {
+        "radius": 12,
+        "height": 24,
+        "horizontalPadding": 7,
+        "verticalPadding": 2
+      },
+      "slider": {
+        "thumbWidth": 16,
+        "thumbHeight": 16
+      },
+      "tab": {
+        "edge": "all",
+        "radius": 3
+      },
+      "scrollbar": {
+        "scrollbarWidth": 8
+      }
+    }
+  },
+  "description": "Crisp edges and clear focus."
+}

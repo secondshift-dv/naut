@@ -31,13 +31,25 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     private readonly CompositeTransform _heroMotion = new();
     private readonly SkVideoView _heroVideo = new() { Visibility = Visibility.Collapsed };
     private readonly Grid _identityHost = new();
+    private readonly Grid _heroFrame = new();
+    private readonly Grid _heroFooter = new();
+    private Border? _heroArtworkHost;
+    private Border? _heroFooterPanel;
+    private UIElement? _heroScrim;
+    private TextBlock? _heroMeta;
+    private SpotlightGeometry? _heroGeometry;
+    private bool? _footerNavBelow;
     private UIElement? _pagination;
     private readonly TextBlock _counter = UI.Text(string.Empty, "numeric", "onHeroSecondary");
     private readonly ScaleTransform _progressScale = new() { ScaleX = 0, ScaleY = 1 };
     private readonly Border _progressFill = new() { Height = 2, HorizontalAlignment = HorizontalAlignment.Left, Width = 120 };
     private readonly DispatcherTimer _rotation = new();
     private readonly Dictionary<Guid, ProfileAppearanceOverrides> _appearance = [];
+    private readonly List<WeakReference<HomeProfileTile>> _profileTiles = [];
+    private int _railAppearanceGeneration;
     private CoverFrameView? _heroCover;
+    private TextBlock? _heroName;
+    private TextBlock? _heroOverview;
     private Storyboard? _kenBurns;
     private Storyboard? _progress;
     private HomeLayoutPlan _layout = null!;
@@ -46,6 +58,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     private bool _railRenderQueued;
     private bool _retired;
     private int _mediaGeneration;
+    private HomeSpotlightViewModel? _displayedSpotlight;
 
     public CardData? SampleCard()
     {
@@ -76,7 +89,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
             CardDataFactory.AppearanceFor(overrides, frame, ReducedMotionAuthority.IsReduced),
             media.Cover,
             media.Banner,
-            frame);
+            frame) { AssignedTags = spotlight.AssignedTags };
     }
 
     public HomeSurface(AppServices services, HomeViewModel vm) : base(services)
@@ -164,6 +177,12 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     protected override void RefreshPreviewPresentation(string? slot = null)
     {
         if (slot == PresentationSlots.HomeEffect) return;
+        if (slot is PresentationSlots.ProfileFrame or PresentationSlots.ProfileCover or PresentationSlots.ProfileBanner)
+        {
+            RefreshRailFrames();
+            OnSpotlightChanged();
+            return;
+        }
         if (slot == PresentationSlots.HomeBackdrop)
         {
             _backdrop.Plan = ResolvePresentation(slot, Context).PlanAs<BackdropPlan>();
@@ -216,12 +235,18 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
 
     public override void OnPresentationChanged(PresentationChangedEventArgs args)
     {
+        if (args.PacksChanged || args.Slots.Contains(PresentationSlots.ProfileFrame)
+            || args.Slots.Contains(PresentationSlots.ProfileCover) || args.Slots.Contains(PresentationSlots.ProfileBanner))
+        {
+            _appearance.Clear();
+            RefreshRailFrames();
+            if (!args.PacksChanged) OnSpotlightChanged();
+        }
         if (args.Slots.Contains(PresentationSlots.ProfileCover) || args.Slots.Contains(PresentationSlots.ProfileBanner))
         {
             _appearance.Clear();
             Services.RunUserAction(_vm.RefreshAsync(), "HomeSurface.RefreshProfilePresentation",
                 UI.T("Home.RefreshFailed", "Home could not be refreshed."));
-            OnSpotlightChanged();
         }
         if (!args.PacksChanged && args.Slots.Count == 1 && args.Slots.First() is { } slot
             && (slot.StartsWith("home.", StringComparison.Ordinal) || slot == PresentationSlots.HomeEffect))
@@ -242,26 +267,31 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     private void BuildHero()
     {
         _hero.Children.Clear();
+        _heroFrame.Children.Clear();
+        _heroFrame.RowDefinitions.Clear();
+        _heroFrame.ColumnDefinitions.Clear();
+        _heroFooter.Children.Clear();
+        _heroFooter.RowDefinitions.Clear();
+        _heroFooter.ColumnDefinitions.Clear();
+        _heroGeometry = null;
+        _footerNavBelow = null;
         SurfaceComposer.Detach(_heroImage);
         SurfaceComposer.Detach(_heroVideo);
         SurfaceComposer.Detach(_identityHost);
-        var inset = _layout.HeroPlacement == "inset";
-        var art = new Grid
-        {
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            VerticalAlignment = VerticalAlignment.Stretch,
-        };
+
+        var art = new Grid();
         _heroImage.HorizontalAlignment = HorizontalAlignment.Stretch;
         _heroImage.VerticalAlignment = VerticalAlignment.Stretch;
         _heroVideo.HorizontalAlignment = HorizontalAlignment.Stretch;
         _heroVideo.VerticalAlignment = VerticalAlignment.Stretch;
         art.SizeChanged += (_, args) =>
         {
-            if (args.NewSize.Width <= 0 || args.NewSize.Height <= 0)
+            if (args.NewSize.Width <= 0 || args.NewSize.Height <= 0) return;
+            art.Clip = new RectangleGeometry
             {
-                return;
-            }
-
+                Rect = new Windows.Foundation.Rect(
+                    0, 0, args.NewSize.Width, args.NewSize.Height),
+            };
             _heroImage.Width = args.NewSize.Width;
             _heroImage.Height = args.NewSize.Height;
             _heroVideo.Width = args.NewSize.Width;
@@ -270,27 +300,31 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         art.Children.Add(_heroImage);
         art.Children.Add(_heroVideo);
 
-        var visual = new Grid();
-        visual.Children.Add(art);
-        visual.Children.Add(Scrim());
-        var horizontalInset = UI.PagePadding(_root.ActualWidth);
-        var topInset = 12.0;
-        var clip = new Border
+        var imageLayer = new Grid();
+        imageLayer.Children.Add(art);
+        _heroScrim = Scrim();
+        imageLayer.Children.Add(_heroScrim);
+        _heroArtworkHost = new Border
         {
-            Child = visual,
-            CornerRadius = new CornerRadius(inset ? ThemeRuntime.Current.Tokens.Number("radiusHero", 20) : 0),
-            Margin = inset ? new Thickness(horizontalInset, topInset, horizontalInset, 0) : new Thickness(0),
+            Child = imageLayer,
+            CornerRadius = new CornerRadius(_layout.HeroPlacement == "inset"
+                ? ThemeRuntime.Current.Tokens.Number("radiusHero", 20) : 0),
         };
+        _heroFrame.Children.Add(_heroArtworkHost);
 
-        if (_layout.HeroPlacement == "split" || _spotlight.Composition is "split-glass" or "storefront")
-        {
-            clip.HorizontalAlignment = HorizontalAlignment.Left;
-        }
-
-        if (_spotlight.Composition != "snapshot") _hero.Children.Add(clip);
-        _hero.Children.Add(_identityHost);
         _pagination = Pagination();
-        _hero.Children.Add(_pagination);
+        _heroFooter.Children.Add(_identityHost);
+        _heroFooter.Children.Add(_pagination);
+        _heroFooterPanel = new Border
+        {
+            Child = _heroFooter,
+            Padding = new Thickness(20, 12, 20, 12),
+            Background = ThemeRuntime.Current.Brush("transparent"),
+            BorderThickness = new Thickness(0),
+        };
+        _heroFrame.Children.Add(_heroFooterPanel);
+        _hero.Children.Add(_heroFrame);
+
         LayoutHero();
         OnSpotlightChanged();
     }
@@ -298,21 +332,39 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     private UIElement Scrim()
     {
         var theme = ThemeRuntime.Current;
-        var strength = _spotlight.ScrimStrength;
-        var grid = new Grid { IsHitTestVisible = false };
-        var bottom = new LinearGradientBrush { StartPoint = new Windows.Foundation.Point(0.5, 1), EndPoint = new Windows.Foundation.Point(0.5, 0.2) };
-        bottom.GradientStops.Add(new GradientStop { Color = WithAlpha(theme.Color("heroScrimStrong"), strength), Offset = 0 });
-        bottom.GradientStops.Add(new GradientStop { Color = WithAlpha(theme.Color("heroScrimStrong"), 0), Offset = 1 });
-        grid.Children.Add(new Border { Background = bottom });
-        if (_spotlight.Composition is "cinematic-left" or "editorial" or "cinema")
+        var strength = Math.Clamp(_spotlight.ScrimStrength, 0, 1);
+        var fade = new LinearGradientBrush
         {
-            var left = new LinearGradientBrush { StartPoint = new Windows.Foundation.Point(0, 0.5), EndPoint = new Windows.Foundation.Point(0.65, 0.5) };
-            left.GradientStops.Add(new GradientStop { Color = WithAlpha(theme.Color("heroScrimStrong"), strength * 0.85), Offset = 0 });
-            left.GradientStops.Add(new GradientStop { Color = WithAlpha(theme.Color("heroScrimSoft"), 0), Offset = 1 });
-            grid.Children.Add(new Border { Background = left });
-        }
-
-        return grid;
+            StartPoint = new Windows.Foundation.Point(0.5, 1),
+            EndPoint = new Windows.Foundation.Point(0.5, 0),
+        };
+        fade.GradientStops.Add(new GradientStop
+        {
+            Color = WithAlpha(theme.Color("heroScrimStrong"), strength * 0.97),
+            Offset = 0,
+        });
+        fade.GradientStops.Add(new GradientStop
+        {
+            Color = WithAlpha(theme.Color("heroScrimStrong"), strength * 0.88),
+            Offset = 0.34,
+        });
+        fade.GradientStops.Add(new GradientStop
+        {
+            Color = WithAlpha(theme.Color("heroScrimSoft"), strength * 0.12),
+            Offset = 0.75,
+        });
+        fade.GradientStops.Add(new GradientStop
+        {
+            Color = WithAlpha(theme.Color("heroScrimSoft"), 0),
+            Offset = 1,
+        });
+        return new Border
+        {
+            Background = fade,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch,
+            IsHitTestVisible = false,
+        };
     }
 
     private static Windows.UI.Color WithAlpha(Windows.UI.Color color, double factor) =>
@@ -335,6 +387,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
             () => _vm.NextSpotlightCommand.Execute(null),
             mirrored: true);
         _counter.VerticalAlignment = VerticalAlignment.Center;
+        _counter.Foreground = theme.Brush("onHeroPrimary");
         var panel = UI.H(10,
             previous,
             _counter,
@@ -342,16 +395,16 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
             next);
         panel.HorizontalAlignment = HorizontalAlignment.Right;
         panel.VerticalAlignment = VerticalAlignment.Bottom;
-        panel.Margin = new Thickness(0, 0, ThemeRuntime.Current.Tokens.Number("space24", 24), 22);
+        panel.Margin = new Thickness(0);
         var control = new Border
         {
             Child = panel,
-            Background = theme.Brush("mediaOverlay"),
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(6, 2, 6, 2),
+            Background = theme.Brush("transparent"),
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(0),
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Bottom,
-            Margin = new Thickness(12, 0, UI.PagePadding(_root.ActualWidth), 10),
+            Margin = new Thickness(0),
         };
         panel.Margin = new Thickness(0);
         return _spotlight.Pagination == "none" ? new Grid() : control;
@@ -377,75 +430,202 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
 
     private void LayoutHero()
     {
+        if (_heroArtworkHost is null || _heroFooterPanel is null) return;
+        var theme = ThemeRuntime.Current;
         var height = _root.ActualHeight > 0 ? _root.ActualHeight : 720;
-        var width = _hero.ActualWidth > 0 ? _hero.ActualWidth : _root.ActualWidth > 0 ? _root.ActualWidth : 1280;
+        var width = _hero.ActualWidth > 0 ? _hero.ActualWidth
+            : _root.ActualWidth > 0 ? _root.ActualWidth : 1280;
+
         if (_vm.CurrentSpotlight is null)
         {
             _hero.Height = double.NaN;
             _hero.MinHeight = 0;
+            _heroArtworkHost.Visibility = Visibility.Collapsed;
+            _heroFooterPanel.Background = theme.Brush("transparent");
+            _heroFooterPanel.VerticalAlignment = VerticalAlignment.Top;
+            _heroFrame.Background = theme.Brush("transparent");
             if (_identityHost.Children.FirstOrDefault() is FrameworkElement welcome)
             {
-                welcome.MaxWidth = Math.Min(760, Math.Max(1, width - 2 * UI.PagePadding(width)));
-                welcome.Margin = new Thickness(UI.PagePadding(width), 20, UI.PagePadding(width), 20);
+                welcome.MaxWidth = Math.Min(760, Math.Max(1, width - 40));
+                welcome.Margin = new Thickness(20);
             }
             return;
         }
-        var minimum = Math.Min(_layout.HeroMinHeight, Math.Max(160, height * 0.52));
-        var maximum = Math.Max(minimum, Math.Min(_layout.HeroMaxHeight, height * 0.56));
-        _hero.Height = Math.Clamp(height * _layout.HeroFraction, minimum, maximum);
-        var pagePadding = UI.PagePadding(width);
-        if (_hero.Children.Count > 0 && _hero.Children[0] is Border art)
+
+        // Home owns the featured envelope; Spotlight owns the composition inside it.
+        var geometry = _spotlight.GeometryFor(width, _layout.HeroPlacement);
+        var split = geometry is SpotlightGeometry.ArtworkLeft or SpotlightGeometry.IdentityLeft;
+        var stacked = geometry is SpotlightGeometry.ArtworkAbove or SpotlightGeometry.IdentityAbove;
+        var separated = split || stacked;
+        var centered = !separated && _spotlight.Composition == "storefront";
+        var lowerLayer = !separated && _spotlight.Composition == "editorial";
+        var compact = width < 760 || height < 540;
+        _heroArtworkHost.Visibility = Visibility.Visible;
+        _heroFooterPanel.Background = separated ? theme.Brush("surface2")
+            : lowerLayer ? new SolidColorBrush(WithAlpha(theme.Color("heroScrimStrong"), 0.46))
+            : theme.Brush("transparent");
+        _heroFooterPanel.BorderBrush = theme.Brush(separated ? "borderSubtle" : "transparent");
+        _heroFooterPanel.BorderThickness = new Thickness(separated ? 1 : 0);
+        _heroFrame.Background = theme.Brush("transparent");
+        if (_heroScrim is not null)
+            _heroScrim.Visibility = separated ? Visibility.Collapsed : Visibility.Visible;
+
+        if (_heroGeometry != geometry)
         {
-            var inset = _layout.HeroPlacement == "inset";
-            art.Margin = inset ? new Thickness(pagePadding, 12, pagePadding, 0) : new Thickness(0);
-            if (_layout.HeroPlacement == "split" || _spotlight.Composition is "split-glass" or "storefront")
+            _heroGeometry = geometry;
+            _heroFrame.RowDefinitions.Clear();
+            _heroFrame.ColumnDefinitions.Clear();
+            if (split)
             {
-                art.Width = width >= 840 ? width * 0.6 : width;
+                _heroFrame.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                var identityFirst = geometry == SpotlightGeometry.IdentityLeft;
+                var first = identityFirst ? _spotlight.IdentityShare : 1 - _spotlight.IdentityShare;
+                _heroFrame.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(first, GridUnitType.Star) });
+                _heroFrame.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1 - first, GridUnitType.Star) });
+                Grid.SetRow(_heroArtworkHost, 0); Grid.SetRow(_heroFooterPanel, 0);
+                Grid.SetColumn(_heroArtworkHost, identityFirst ? 1 : 0);
+                Grid.SetColumn(_heroFooterPanel, identityFirst ? 0 : 1);
+            }
+            else if (stacked)
+            {
+                var identityFirst = geometry == SpotlightGeometry.IdentityAbove;
+                _heroFrame.RowDefinitions.Add(new RowDefinition { Height = identityFirst ? GridLength.Auto : new GridLength(1, GridUnitType.Star) });
+                _heroFrame.RowDefinitions.Add(new RowDefinition { Height = identityFirst ? new GridLength(1, GridUnitType.Star) : GridLength.Auto });
+                Grid.SetRow(_heroArtworkHost, identityFirst ? 1 : 0);
+                Grid.SetRow(_heroFooterPanel, identityFirst ? 0 : 1);
+                Grid.SetColumn(_heroArtworkHost, 0); Grid.SetColumn(_heroFooterPanel, 0);
+            }
+            else
+            {
+                _heroFrame.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                Grid.SetRow(_heroArtworkHost, 0); Grid.SetRow(_heroFooterPanel, 0);
+                Grid.SetColumn(_heroArtworkHost, 0); Grid.SetColumn(_heroFooterPanel, 0);
             }
         }
-        if (_hero.Children.Count > 2 && _hero.Children[2] is Border pagination)
+
+        if (split && _heroFrame.ColumnDefinitions.Count == 2)
         {
-            pagination.Margin = new Thickness(12, 0, pagePadding + (_layout.HeroPlacement == "inset" ? 12 : 0), 14);
-            pagination.Width = double.NaN;
-            pagination.MaxWidth = double.PositiveInfinity;
+            var first = geometry == SpotlightGeometry.IdentityLeft
+                ? _spotlight.IdentityShare : 1 - _spotlight.IdentityShare;
+            _heroFrame.ColumnDefinitions[0].Width = new GridLength(first, GridUnitType.Star);
+            _heroFrame.ColumnDefinitions[1].Width = new GridLength(1 - first, GridUnitType.Star);
         }
+
+        var navBelow = separated || width < 840 || centered;
+        if (_footerNavBelow != navBelow)
+        {
+            _footerNavBelow = navBelow;
+            _heroFooter.RowDefinitions.Clear();
+            _heroFooter.ColumnDefinitions.Clear();
+            if (navBelow)
+            {
+                _heroFooter.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                _heroFooter.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                Grid.SetRow(_identityHost, 0);
+                Grid.SetRow(_pagination, 1);
+                Grid.SetColumn(_identityHost, 0);
+                Grid.SetColumn(_pagination, 0);
+            }
+            else
+            {
+                _heroFooter.ColumnDefinitions.Add(new ColumnDefinition
+                    { Width = new GridLength(1, GridUnitType.Star) });
+                _heroFooter.ColumnDefinitions.Add(new ColumnDefinition
+                    { Width = GridLength.Auto });
+                Grid.SetRow(_identityHost, 0);
+                Grid.SetRow(_pagination, 0);
+                Grid.SetColumn(_identityHost, 0);
+                Grid.SetColumn(_pagination, 1);
+            }
+        }
+
+        var inset = compact ? 14 : _spotlight.Composition == "editorial" ? 32 : 24;
+        _heroFooterPanel.Padding = new Thickness(inset, lowerLayer ? (compact ? 20 : 28) : 12, inset, compact ? 14 : 20);
+        _heroFooterPanel.VerticalAlignment = separated ? VerticalAlignment.Stretch
+            : centered ? VerticalAlignment.Center : VerticalAlignment.Bottom;
+        _heroFooter.VerticalAlignment = separated || centered
+            ? VerticalAlignment.Center : VerticalAlignment.Stretch;
+        _heroFooterPanel.HorizontalAlignment = HorizontalAlignment.Stretch;
+        if (_heroName is not null)
+        {
+            _heroName.FontSize = compact ? 20 : Math.Clamp(
+                TokenAuthority.Foundations.TypeStyles["hero"].Size * (_spotlight.Composition == "editorial" ? 1.12 : 1),
+                _spotlight.Composition == "editorial" ? 30 : 24,
+                _spotlight.Composition == "editorial" ? 42 : 36);
+            _heroName.Foreground = theme.Brush(separated ? "textPrimary" : "onHeroPrimary");
+        }
+        if (_heroMeta is not null)
+            _heroMeta.Foreground = theme.Brush(separated ? "textSecondary" : "onHeroSecondary");
+        if (_heroOverview is not null)
+        {
+            _heroOverview.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+            _heroOverview.Foreground = theme.Brush(separated ? "textSecondary" : "onHeroSecondary");
+        }
+        _counter.Foreground = theme.Brush(separated ? "textSecondary" : "onHeroPrimary");
+        if (_pagination is Border navigation && navigation.Child is Panel panel)
+        {
+            foreach (var button in panel.Children.OfType<Button>())
+                if (button.Content is IconView icon)
+                    icon.ColorToken = separated ? "textPrimary" : "onHeroPrimary";
+        }
+        if (_heroCover is not null)
+            _heroCover.Width = _heroCover.Height = centered ? (compact ? 60 : 88) : (compact ? 48 : 64);
         if (_identityHost.Children.FirstOrDefault() is FrameworkElement identity)
         {
-            identity.MaxWidth = (_layout.HeroPlacement == "split" || _spotlight.Composition is "split-glass" or "storefront") && width >= 840
-                ? Math.Min(420, width * 0.44)
-                : Math.Min(560, Math.Max(180, width - (2 * pagePadding)));
-            if (_layout.HeroPlacement == "split" || _spotlight.Composition is "split-glass" or "storefront")
-            {
-                var rightInset = pagePadding + (_layout.HeroPlacement == "inset" ? 12 : 0);
-                identity.Margin = new Thickness(12, 0, rightInset, 58);
-                if (_spotlight.Composition == "storefront" && _hero.Children.LastOrDefault() is Border storefrontPagination)
-                {
-                    identity.MaxWidth = Math.Min(420, Math.Max(180, width - rightInset - 12));
-                    identity.MinWidth = Math.Min(280, identity.MaxWidth);
-                    identity.VerticalAlignment = VerticalAlignment.Bottom;
-                    identity.Measure(new Windows.Foundation.Size(identity.MaxWidth, double.PositiveInfinity));
-                    storefrontPagination.Width = identity.ActualWidth > 0
-                        ? identity.ActualWidth
-                        : Math.Max(0, identity.DesiredSize.Width - identity.Margin.Left - identity.Margin.Right);
-                    storefrontPagination.MaxWidth = identity.MaxWidth;
-                    _hero.Height = Math.Max(_hero.Height, identity.DesiredSize.Height + 14);
-                }
-            }
-            else if (_spotlight.Composition == "editorial")
-            {
-                var contentInset = pagePadding + (_layout.HeroPlacement == "inset" ? 28 : 12);
-                identity.Margin = new Thickness(contentInset, 24, contentInset, 56);
-                identity.MaxWidth = Math.Min(520, Math.Max(120, width - (2 * contentInset)));
-                identity.Measure(new Windows.Foundation.Size(identity.MaxWidth, double.PositiveInfinity));
-                _hero.Height = Math.Max(_hero.Height, identity.DesiredSize.Height + 12);
-            }
+            identity.MaxWidth = split ? Math.Max(1, width * _spotlight.IdentityShare - 2 * inset)
+                : centered ? Math.Min(680, Math.Max(1, width - 2 * inset))
+                : navBelow ? Math.Max(1, width - 2 * inset)
+                : Math.Max(1, width - 310);
+            identity.HorizontalAlignment = centered ? HorizontalAlignment.Center : HorizontalAlignment.Left;
+            identity.VerticalAlignment = VerticalAlignment.Center;
+            identity.Margin = new Thickness(0, lowerLayer ? 10 : 0, navBelow || centered ? 0 : 14, 0);
         }
+        if (_pagination is FrameworkElement pagination)
+        {
+            pagination.HorizontalAlignment = centered ? HorizontalAlignment.Center
+                : navBelow ? HorizontalAlignment.Left : HorizontalAlignment.Right;
+            pagination.VerticalAlignment = VerticalAlignment.Center;
+            pagination.Margin = new Thickness(0, navBelow ? 10 : 0, 0, 0);
+        }
+        _heroArtworkHost.Margin = _layout.HeroPlacement == "inset" && !separated
+            ? new Thickness(12, 8, 12, 0) : new Thickness(0);
+        _heroFooterPanel.Margin = _heroArtworkHost.Margin;
+        _heroFooterPanel.CornerRadius = separated ? new CornerRadius(0) : _heroArtworkHost.CornerRadius;
+        if (_heroScrim is Border mask) mask.CornerRadius = _heroArtworkHost.CornerRadius;
+
+        var minimum = Math.Min(_layout.HeroMinHeight, Math.Max(180, height * 0.44));
+        var maximum = Math.Max(minimum, Math.Min(_layout.HeroMaxHeight, height * 0.8));
+        var authoredHeight = Math.Clamp(height * _layout.HeroFraction, minimum, maximum);
+        var widthBound = width * (split ? 0.54 : 0.67);
+        var targetHeight = Math.Clamp(Math.Min(authoredHeight, widthBound),
+            split ? 240 : 270, Math.Max(split ? 240 : 270, maximum));
+        if (stacked) targetHeight = Math.Max(compact ? 390 : 450, targetHeight);
+        if (double.IsNaN(_hero.Height) || Math.Abs(_hero.Height - targetHeight) > 1)
+            _hero.Height = targetHeight;
     }
 
     private void OnSpotlightChanged()
     {
         var generation = ++_mediaGeneration;
         var spotlight = _vm.CurrentSpotlight;
+        var previous = _displayedSpotlight;
+        var changedSource = previous?.ProfileId != spotlight?.ProfileId
+            || !string.Equals(previous?.HeroImagePath, spotlight?.HeroImagePath,
+                StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(previous?.BannerVideoPath, spotlight?.BannerVideoPath,
+                StringComparison.OrdinalIgnoreCase);
+        _displayedSpotlight = spotlight;
+        if (changedSource)
+        {
+            // Retire the previous clip before the new poster/identity enters the tree.
+            // Appearance reads complete asynchronously, so teardown cannot wait for them.
+            StopHeroVideo();
+            _kenBurns?.Stop();
+            _heroMotion.ScaleX = 1;
+            _heroMotion.ScaleY = 1;
+            _heroMotion.TranslateX = 0;
+            _heroMotion.TranslateY = 0;
+        }
         if (_pagination is not null) _pagination.Visibility = _vm.HasMultipleSpotlightCandidates ? Visibility.Visible : Visibility.Collapsed;
         _counter.Text = _vm.SpotlightCandidates.Count == 0 ? string.Empty : $"{_vm.SpotlightIndex + 1:00} / {_vm.SpotlightCandidates.Count:00}";
         _heroCover = null;
@@ -461,6 +641,16 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
             return;
         }
 
+        if (changedSource || _appearance.TryGetValue(spotlight.ProfileId, out _))
+        {
+            var initialAppearance = _appearance.GetValueOrDefault(spotlight.ProfileId)
+                ?? ProfileAppearanceOverrides.Default;
+            var initialMedia = Services.Presentation.ResolveMedia(
+                new ProfilePresentationState(spotlight.ProfileId, 0, null, initialAppearance));
+            _heroImage.Transform = spotlight.BannerImagePath is not null
+                ? initialMedia.Banner : initialMedia.Cover;
+            _heroVideo.SetPresentation(initialMedia.Banner);
+        }
         _heroImage.Source = ImageRef.FromPath(spotlight.HeroImagePath, 1600);
         _backdrop.AmbientImagePath = spotlight.HeroImagePath ?? spotlight.CoverImagePath;
         var identity = Identity(spotlight);
@@ -506,25 +696,30 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
                 ReducedMotionAuthority.IsReduced);
         }
 
-        var heroPresentation = spotlight.HasBannerVideo || spotlight.BannerImagePath is not null
-            ? media.Banner
-            : media.Cover;
-        _heroImage.Transform = heroPresentation;
-        _heroVideo.SetPresentation(heroPresentation);
+        // A missing Banner poster falls back to the Cover and therefore uses Cover framing.
+        // The actual Banner video always uses Banner framing, independent of that fallback.
+        _heroImage.Transform = spotlight.BannerImagePath is not null ? media.Banner : media.Cover;
+        _heroVideo.SetPresentation(media.Banner);
         PlayHeroVideo(spotlight, media.Playback);
     }
 
     private void PlayHeroVideo(HomeSpotlightViewModel spotlight, PlaybackPresentationState playback)
     {
-        if (_spotlight.Composition == "snapshot") { StopHeroVideo(); return; }
-        StopHeroVideo();
-        if (!IsActive || !spotlight.HasBannerVideo || ResourceGovernor.Shared.Tier != PresentationTier.Full || ReducedMotionAuthority.IsReduced)
+        if (_spotlight.Composition == "snapshot" || !IsActive
+            || !spotlight.HasBannerVideo || ResourceGovernor.Shared.Tier != PresentationTier.Full
+            || ReducedMotionAuthority.IsReduced)
+        {
+            StopHeroVideo();
+            return;
+        }
+
+        if (string.Equals(_heroVideo.SourcePath, spotlight.BannerVideoPath,
+            StringComparison.OrdinalIgnoreCase) && _heroVideo.Visibility == Visibility.Visible)
         {
             return;
         }
 
-        // Keep the still fallback visible until the decoder has produced a frame. This avoids a cold-start
-        // transparency window while FFmpeg starts, without ever giving the video a different geometry.
+        // Keep the poster visible until the new source emits its first decoded frame.
         _heroVideo.Visibility = Visibility.Collapsed;
         _heroVideo.Play(spotlight.BannerVideoPath, loop: playback.LoopMode == "loop");
     }
@@ -552,91 +747,69 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     private FrameworkElement Identity(HomeSpotlightViewModel spotlight)
     {
         Services.ProfileSnapshots.Warm(spotlight.ProfileId);
-        var textOverImage = _spotlight.Composition is "editorial" or "centered-poster" or "cinema";
-        var name = UI.Text(spotlight.DisplayName, _spotlight.Composition == "snapshot" ? "section-title" : _spotlight.Composition == "editorial" ? "display" : "hero", textOverImage ? "onHeroPrimary" : "textPrimary", _spotlight.Composition == "centered-poster" ? 1 : 2);
-        var meta = UI.Text(string.Join(" · ", new[] { spotlight.CategoryName, spotlight.TagSummary, spotlight.MediaCountText }.Where(s => !string.IsNullOrWhiteSpace(s))), "metadata", textOverImage ? "onHeroSecondary" : "textSecondary", 1);
+        var name = UI.Text(spotlight.DisplayName, "section-title", "textPrimary", 2);
+        var meta = UI.Text(string.Join(" \u00b7 ",
+            new[] { spotlight.CategoryName, spotlight.MediaCountText }
+                .Where(value => !string.IsNullOrWhiteSpace(value))),
+            "metadata", "textSecondary", 1);
         var overview = _spotlight.ShowOverview && !string.IsNullOrWhiteSpace(spotlight.OverviewExcerpt)
-            ? UI.Text(spotlight.OverviewExcerpt, "body", textOverImage ? "onHeroSecondary" : "textSecondary", 2)
+            ? UI.Text(spotlight.OverviewExcerpt, "body", "textSecondary", 2)
             : null;
-        var actions = UI.H(8,
-            UI.Button(
-                UI.T("Home.OpenProfile", "Open Profile"),
-                () => Services.Navigation.Navigate(new ProfileRoute(spotlight.ProfileId)),
-                ButtonKind.Primary,
-                "icon.action.open"));
+        _heroName = name;
+        _heroMeta = meta;
+        _heroOverview = overview;
+        name.Tip(spotlight.DisplayName);
+
+        var action = UI.Button(
+            UI.T("Home.OpenProfile", "Open Profile"),
+            () => Services.Navigation.Navigate(new ProfileRoute(spotlight.ProfileId)),
+            ButtonKind.Primary,
+            "icon.action.open");
 
         CoverFrameView? cover = null;
         if (_spotlight.ShowCover && spotlight.CoverImagePath is not null)
         {
-            var overrides = _appearance.GetValueOrDefault(spotlight.ProfileId) ?? ProfileAppearanceOverrides.Default;
+            var overrides = _appearance.GetValueOrDefault(spotlight.ProfileId)
+                ?? ProfileAppearanceOverrides.Default;
             var state = new ProfilePresentationState(spotlight.ProfileId, 0, null, overrides);
-            var frame = ResolvePresentation(
-                PresentationSlots.ProfileFrame,
+            var frame = ResolvePresentation(PresentationSlots.ProfileFrame,
                 PresentationContext.ForProfile(state, "home")).PlanAs<FramePlan>();
             cover = new CoverFrameView
             {
                 Source = ImageRef.FromPath(spotlight.CoverImagePath, 480),
                 Transform = Services.Presentation.ResolveMedia(state).Cover,
-                Appearance = CardDataFactory.AppearanceFor(overrides, frame, ReducedMotionAuthority.IsReduced),
+                Appearance = CardDataFactory.AppearanceFor(overrides, frame,
+                    ReducedMotionAuthority.IsReduced),
                 Plan = frame,
                 FrameMode = "full",
-                Width = 80,
-                Height = 80,
+                Width = _spotlight.Composition == "storefront" ? 88 : 64,
+                Height = _spotlight.Composition == "storefront" ? 88 : 64,
             };
             _heroCover = cover;
         }
 
-        switch (_layout.HeroPlacement == "split" ? "split-glass" : _spotlight.Composition)
+        var tags = TagCapsules.Create(spotlight.AssignedTags, 4);
+        var rating = UI.H(4,
+            new IconView("icon.profile.rating", 16, spotlight.Rating is > 0 ? "warning" : "textMuted"),
+            UI.Text(spotlight.Rating is { } value ? $"{value}/5" : "-/5", "caption", "onHeroPrimary"));
+        var favorite = new IconView("icon.profile.favorite", 18,
+            spotlight.IsFavorite ? "danger" : "onHeroSecondary");
+        favorite.Tip(UI.T("Card.Favorite", "Favorite"));
+        var indicators = UI.H(12, rating, favorite);
+        var details = _spotlight.Composition switch
         {
-            case "snapshot":
-                return UI.Surface(UI.Grid("auto", "auto,*",
-                    (cover ?? new CoverFrameView { Width = 72, Height = 72 }).At(0, 0),
-                    UI.V(6, name, meta, overview, UI.Wrap(8, UI.Badge(spotlight.MediaCountText), actions)).Margin(12, 0, 0, 0).At(0, 1)),
-                    Material.Raised, 12, 20).Align(HorizontalAlignment.Stretch, VerticalAlignment.Center).Margin(20, 12, 20, 44);
-            case "storefront":
-                return UI.Surface(UI.V(10, name, meta, overview, UI.Wrap(8, UI.Badge(spotlight.MediaCountText), actions)),
-                    Material.Deep, 12, 20).Align(HorizontalAlignment.Right, VerticalAlignment.Center).Margin(12, 12, 24, 44);
-            case "cinema":
-                return UI.V(10, name, actions).Align(HorizontalAlignment.Left, VerticalAlignment.Bottom).Margin(24, 0, 24, 56);
-            case "centered-poster":
-                return UI.V(8, cover?.Align(HorizontalAlignment.Center), name.Align(HorizontalAlignment.Center), meta.Align(HorizontalAlignment.Center), actions.Align(HorizontalAlignment.Center))
-                    .Align(HorizontalAlignment.Center, VerticalAlignment.Center).Margin(12);
-            case "split-glass":
-            {
-                var content = UI.Grid("auto", cover is null ? "*" : "auto,*");
-                content.ColumnSpacing = 12;
-                if (cover is not null)
-                {
-                    content.Children.Add(cover.At(0, 0));
-                }
-                content.Children.Add(UI.V(6, name, meta, overview, actions).At(0, cover is null ? 0 : 1));
-                var panel = UI.Surface(content, Material.Deep, ThemeRuntime.Current.Tokens.Number("radiusHero", 20), 16);
-                panel.MaxWidth = 420;
-                panel.HorizontalAlignment = HorizontalAlignment.Right;
-                panel.VerticalAlignment = VerticalAlignment.Center;
-                panel.Margin = new Thickness(12, 0, UI.PagePadding(_root.ActualWidth), 44);
-                return panel;
-            }
+            "cinema" => UI.V(8, name, tags, indicators, action),
+            "editorial" => UI.V(8, name, meta, tags, indicators, overview, action),
+            _ => UI.V(8, name, meta, tags, indicators, overview, action),
+        };
+        if (cover is null || _spotlight.Composition == "cinema")
+            return details;
 
-            case "editorial":
-                return UI.V(8, meta, name, overview, actions).Align(HorizontalAlignment.Left, VerticalAlignment.Bottom).Margin(18, 0, 18, 56);
-            default:
-            {
-                var content = UI.Grid("auto", cover is null ? "*" : "auto,*");
-                if (cover is not null)
-                {
-                    content.Children.Add(cover.Margin(0, 0, 12, 0).At(0, 0));
-                }
-
-                content.Children.Add(UI.V(8, name, meta, overview, actions).At(0, cover is null ? 0 : 1));
-                var panel = UI.Surface(content, Material.Deep, ThemeRuntime.Current.Tokens.Number("radiusHero", 20), 16);
-                panel.MaxWidth = 560;
-                panel.HorizontalAlignment = HorizontalAlignment.Left;
-                panel.VerticalAlignment = VerticalAlignment.Bottom;
-                panel.Margin = new Thickness(18, 0, 18, 56);
-                return panel;
-            }
-        }
+        var identity = UI.Grid("auto", "auto,*",
+            cover.Align(vertical: VerticalAlignment.Center).At(0, 0),
+            details.Align(vertical: VerticalAlignment.Center).At(0, 1));
+        identity.ColumnSpacing = 16;
+        return identity;
     }
 
     private FrameworkElement EmptyWelcome()
@@ -653,7 +826,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         var localNote = UI.WrappedText(
             UI.T(
                 "Home.Empty.LocalNote",
-                "Start with a few favorites, shape them into Profiles, and make the collection yours. Your originals stay untouched; imports are copied into the Vault."),
+                "Import favorites to start your collection. Originals stay untouched; copies go into the Vault."),
             "caption",
             "textSecondary");
         var importBtn = UI.Button(
@@ -760,7 +933,11 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         _heroMotion.ScaleX = 1;
         _heroMotion.ScaleY = 1;
         _heroMotion.TranslateX = 0;
-        if (!IsActive || ReducedMotionAuthority.IsReduced || _spotlight.Motion == "still")
+        _heroMotion.TranslateY = 0;
+        // A video and its thumbnail need one stable framing during the poster-to-motion
+        // handoff. Ken Burns applies only to images with no playable Banner clip.
+        if (!IsActive || ReducedMotionAuthority.IsReduced
+            || _spotlight.Motion == "still" || _vm.CurrentSpotlight?.HasBannerVideo == true)
         {
             return;
         }
@@ -914,7 +1091,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         };
 
         var title = UI.Grid("auto", "*,auto");
-        title.Children.Add(UI.Text("Vault", "section-title").At(0, 0));
+        title.Children.Add(UI.Text("Vault", "page-title").At(0, 0));
         title.Children.Add(
             UI.Button(
                     UI.T("Home.Gallery", "Browse all"),
@@ -924,50 +1101,58 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
                 .Align(HorizontalAlignment.Right, VerticalAlignment.Center)
                 .At(0, 1));
 
-        FrameworkElement body;
-        if (rail.Style == "compact")
+        var body = new Grid
         {
-            var summary = UI.H(0);
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            ColumnSpacing = 12,
+            RowSpacing = 8,
+        };
+
+        void ArrangeStats(double width)
+        {
+            var columns = width >= 880 ? stats.Length : width >= 460 ? 2 : 1;
+            if (body.ColumnDefinitions.Count == columns) return;
+
+            body.Children.Clear();
+            body.ColumnDefinitions.Clear();
+            body.RowDefinitions.Clear();
+            body.ColumnSpacing = columns == stats.Length ? 16 : 10;
+            body.RowSpacing = 8;
+
+            for (var column = 0; column < columns; column++)
+            {
+                body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            }
+
+            var rows = (int)Math.Ceiling(stats.Length / (double)columns);
+            for (var row = 0; row < rows; row++)
+            {
+                body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            }
+
             for (var index = 0; index < stats.Length; index++)
             {
-                if (index > 0)
+                FrameworkElement item = rail.Style switch
                 {
-                    summary.Children.Add(PulseDivider());
-                }
+                    "tile" or "poster" => PulseStatCard(stats[index].Value, stats[index].Label, rail.Style),
+                    "compact" => UI.V(
+                        2,
+                        UI.Text(stats[index].Label, "caption", "textSecondary"),
+                        UI.Text(stats[index].Value, "section-title", "textPrimary"))
+                        .Margin(10, 6, 10, 6),
+                    _ => PulseStat(stats[index].Value, stats[index].Label),
+                };
 
-                summary.Children.Add(
-                    UI.H(
-                        5,
-                        UI.Text(stats[index].Label, "micro", "textMuted"),
-                        UI.Text(stats[index].Value, "control", "textPrimary"))
-                    .Align(vertical: VerticalAlignment.Center)
-                    .Margin(12, 6, 12, 6));
+                item.HorizontalAlignment = HorizontalAlignment.Stretch;
+                Grid.SetRow(item, index / columns);
+                Grid.SetColumn(item, index % columns);
+                body.Children.Add(item);
             }
-            body = UI.Scroll(summary, horizontal: true);
-        }
-        else if (rail.Style is "tile" or "poster")
-        {
-            var cards = UI.H(rail.Style == "poster" ? 12 : 10);
-            foreach (var stat in stats)
-            {
-                cards.Children.Add(PulseStatCard(stat.Value, stat.Label, rail.Style));
-            }
-            body = UI.Scroll(cards, horizontal: true);
-        }
-        else
-        {
-            var strip = UI.H(0);
-            for (var index = 0; index < stats.Length; index++)
-            {
-                if (index > 0)
-                {
-                    strip.Children.Add(PulseDivider());
-                }
-                strip.Children.Add(PulseStat(stats[index].Value, stats[index].Label));
-            }
-            body = UI.Scroll(strip, horizontal: true);
         }
 
+        body.SizeChanged += (_, args) => ArrangeStats(args.NewSize.Width);
+        var availableWidth = Math.Max(0, _root.ActualWidth - (padding * 2));
+        ArrangeStats(availableWidth);
         return UI.V(8, title, body).Margin(padding, 12, padding, 0);
     }
 
@@ -975,7 +1160,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     {
         return UI.V(1,
             UI.Text(value, "section-title", maxLines: 1),
-            UI.Text(label, "micro", "textMuted"))
+            UI.Text(label, "caption", "textSecondary"))
             .Margin(16, 8, 16, 8);
     }
 
@@ -989,22 +1174,12 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
             style == "poster" ? Material.Glass : Material.Raised,
             style == "poster" ? 14 : 10,
             style == "poster" ? 16 : 12);
-        card.Width = style == "poster" ? 178 : 148;
+        card.MaxWidth = style == "poster" ? 178 : 148;
+        card.HorizontalAlignment = HorizontalAlignment.Stretch;
         card.MinHeight = style == "poster" ? 96 : 68;
         return card;
     }
 
-    private static FrameworkElement PulseDivider()
-    {
-        return new Border
-        {
-            Width = 1,
-            Height = 28,
-            VerticalAlignment = VerticalAlignment.Center,
-            Opacity = 0.15,
-            Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 128, 128, 128)),
-        };
-    }
     // ─── Profile rails: the layout decides order, visibility and item cap.
 
     private FrameworkElement? ProfileRail(
@@ -1028,70 +1203,36 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         var title = UI.H(8,
             UI.Text(titleText, "section-title"),
             UI.Text(
-                UI.F("Home.Rail.Recent.Count", "{0} profiles", items.Count),
+                UI.F("Home.Rail.Recent.Count", "{0} Profiles", items.Count),
                 "micro",
                 "textMuted").Align(vertical: VerticalAlignment.Center));
         var (itemWidth, itemHeight) = ProfileRailGeometry(rail.Style);
-        return UI.V(6, title, ProfileCarousel(items, itemWidth, itemHeight))
+        return UI.V(6, title, ProfileCarousel(items, itemWidth, itemHeight, rail.Style))
             .Margin(padding, 10, padding, 0);
     }
 
     private static (double Width, double Height) ProfileRailGeometry(string style) => style switch
     {
-        "poster" => (120, 150),
-        "strip" => (208, 104),
-        "compact" => (184, 103),
-        _ => (176, 114),
+        "poster" => (132, 178),
+        "strip" => (232, 104),
+        "compact" => (200, 88),
+        _ => (164, 166),
     };
 
     private FrameworkElement ProfileCarousel(
         IReadOnlyList<(Guid ProfileId, string DisplayName, string? CoverImagePath, string MediaCountText, bool IsFavorite)> items,
-        double width, double height)
+        double width, double height, string style)
     {
         var theme = ThemeRuntime.Current;
-        var radius = theme.Tokens.Number("radiusCard", 12);
         var source = new ObservableCollection<object>(items.Select(i => (object)i));
         var factory = new PooledElementFactory(
             _ => "poster-card",
             (_, _) =>
             {
-                var image = new SkImageView { CornerRadiusValue = radius, PlaceholderToken = "surface2" };
-                var name = UI.Text(null, "control", "onMediaPrimary", maxLines: 1);
-                var count = UI.Text(null, "micro", "onMediaSecondary", maxLines: 1);
-                var fav = new IconView("icon.profile.favorite", 12, "warning") { Visibility = Visibility.Collapsed, VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 6, 6, 0) };
-                var overlay = new LinearGradientBrush { StartPoint = new Windows.Foundation.Point(0.5, 1), EndPoint = new Windows.Foundation.Point(0.5, 0.5) };
-                overlay.GradientStops.Add(new GradientStop { Color = Windows.UI.Color.FromArgb(180, 0, 0, 0), Offset = 0 });
-                overlay.GradientStops.Add(new GradientStop { Color = Windows.UI.Color.FromArgb(0, 0, 0, 0), Offset = 1 });
-                var scrim = new Border { Background = overlay, IsHitTestVisible = false, CornerRadius = new CornerRadius(0, 0, radius, radius) };
-                var textStack = UI.V(1, name, count)
-                    .Align(HorizontalAlignment.Stretch, VerticalAlignment.Bottom)
-                    .Margin(8, 0, 8, 8);
-                var body = new Grid { Width = width, Height = height, IsHitTestVisible = false };
-                body.Children.Add(image);
-                body.Children.Add(scrim);
-                body.Children.Add(textStack);
-                body.Children.Add(fav);
-
-                var tile = new Grid
-                {
-                    Background = theme.Brush("transparent"),
-                    Width = width,
-                    Height = height,
-                };
-                tile.Children.Add(body);
-                var scale = new ScaleTransform();
-                tile.RenderTransform = scale;
-                tile.RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5);
-                tile.PointerEntered += (_, _) => { if (!ReducedMotionAuthority.IsReduced) { scale.ScaleX = scale.ScaleY = 1.04; } };
-                tile.PointerExited += (_, _) => scale.ScaleX = scale.ScaleY = 1;
-                UI.DisableTextSelection(tile);
-                tile.Tapped += (_, _) =>
-                {
-                    if (tile.DataContext is ValueTuple<Guid, string, string?, string, bool> data)
-                    {
-                        Services.Navigation.Navigate(new ProfileRoute(data.Item1));
-                    }
-                };
+                var tile = new HomeProfileTile(style, width, height,
+                    id => Services.Navigation.Navigate(new ProfileRoute(id)));
+                _profileTiles.RemoveAll(reference => !reference.TryGetTarget(out _));
+                _profileTiles.Add(new WeakReference<HomeProfileTile>(tile));
                 return tile;
             },
             (element, data) =>
@@ -1101,18 +1242,11 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
                     return;
                 }
 
-                element.DataContext = item;
+                var tile = (HomeProfileTile)element;
+                tile.Bind(item.Item1, item.Item2, item.Item3, item.Item4, item.Item5);
                 Services.ProfileSnapshots.Warm(item.Item1);
-                var body = (Grid)((Grid)element).Children[0];
-                var image = body.Children.OfType<SkImageView>().First();
-                image.Source = ImageRef.FromPath(item.Item3, 320);
-                var texts = ((StackPanel)body.Children[2]).Children.OfType<TextBlock>().ToList();
-                texts[0].Text = item.Item2;
-                texts[0].Tip(item.Item2);
-                texts[1].Text = item.Item4;
-                var fav = body.Children.OfType<IconView>().First();
-                fav.Visibility = item.Item5 ? Visibility.Visible : Visibility.Collapsed;
-            });
+                RefreshRailTile(tile);
+            }, element => ((HomeProfileTile)element).Clear());
         const double gap = 10;
         var (scroll, repeater) = Repeaters.Virtualized(factory, Repeaters.Stack(true, gap), horizontal: true);
         repeater.ItemsSource = source;
@@ -1129,6 +1263,39 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         scroll.SizeChanged += (_, _) => UpdateEnvelope();
         UpdateEnvelope();
         return scroll;
+    }
+
+    private void RefreshRailTile(HomeProfileTile tile)
+    {
+        Services.RunUserAction(ApplyRailAppearanceAsync(tile), "HomeSurface.RailAppearance",
+            UI.T("Home.MediaFailed", "Spotlight media could not be loaded."));
+    }
+
+    private async Task ApplyRailAppearanceAsync(HomeProfileTile tile)
+    {
+        var id = tile.ProfileId;
+        var binding = tile.BindingVersion;
+        var generation = _railAppearanceGeneration;
+        if (!_appearance.TryGetValue(id, out var appearance))
+        {
+            var summary = await Services.Catalog.GalleryReads.GetGalleryProfileSummaryAsync(id).ConfigureAwait(true);
+            if (_retired || generation != _railAppearanceGeneration || binding != tile.BindingVersion) return;
+            appearance = summary?.EffectiveAppearance ?? ProfileAppearanceOverrides.Default;
+            _appearance[id] = appearance;
+        }
+        if (_retired || generation != _railAppearanceGeneration || binding != tile.BindingVersion) return;
+        var state = PreviewContext(PresentationContext.ForProfile(new ProfilePresentationState(id, 0, null, appearance), "home")).Profile!;
+        var frame = ResolvePresentation(PresentationSlots.ProfileFrame, PresentationContext.ForProfile(state, "home")).PlanAs<FramePlan>();
+        tile.Apply(frame, CardDataFactory.AppearanceFor(state.Overrides, frame, ReducedMotionAuthority.IsReduced),
+            Services.Presentation.ResolveMedia(state).Cover);
+    }
+
+    private void RefreshRailFrames()
+    {
+        _railAppearanceGeneration++;
+        _profileTiles.RemoveAll(reference => !reference.TryGetTarget(out _));
+        foreach (var reference in _profileTiles)
+            if (reference.TryGetTarget(out var tile) && tile.IsLoaded && tile.ProfileId != Guid.Empty) RefreshRailTile(tile);
     }
 
     // ─── Featured connection

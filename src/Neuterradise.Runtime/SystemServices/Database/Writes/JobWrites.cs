@@ -544,6 +544,11 @@ public sealed class JobWrites
               AND owner_id = $assetId
               AND state IN ('PENDING','RUNNABLE','PAUSED','FAILED_RETRYABLE')
               AND NOT EXISTS (
+                  SELECT 1 FROM profile_media relation WHERE relation.media_id = $assetId
+                    AND (relation.publication_import_unit_id IS NULL
+                         OR relation.publication_import_unit_id <> $unitId)
+              )
+              AND NOT EXISTS (
                   SELECT 1
                   FROM import_items other
                   JOIN import_units consumer ON consumer.import_unit_id = other.import_unit_id

@@ -494,6 +494,7 @@ try {
     Invoke-DotNet -Arguments $appArgs
     Copy-Item -Path (Join-Path $appOutput '*') -Destination $RuntimeInstallRoot -Recurse -Force
     Move-Item -LiteralPath (Join-Path $RuntimeInstallRoot 'NeuTerradise.exe') -Destination (Join-Path $RuntimeInstallRoot $AppExe)
+    & (Join-Path $PSScriptRoot 'uno-interop/Apply-UnoUiAutomationPatch.ps1') -TargetDll (Join-Path $RuntimeInstallRoot 'Uno.UI.Runtime.Skia.Win32.dll') -Offline:$Offline
 
     foreach ($forbidden in @(
         '*.msix',

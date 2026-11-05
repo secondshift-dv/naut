@@ -4,6 +4,7 @@ using Neuterradise.App.SystemServices.Database;
 using Neuterradise.App.SystemServices.Database.Reads;
 using Neuterradise.App.SystemServices.Database.Writes;
 using Neuterradise.App.SystemServices.Storage;
+using Neuterradise.App.SystemServices.Recovery;
 using Neuterradise.App.Trash;
 
 namespace Neuterradise.App.Import;
@@ -19,6 +20,7 @@ internal sealed class ImportCancellationSettlement
     private readonly ImportUnitWrites _unitWrites;
     private readonly SchedulerReads _schedulerReads;
     private readonly TrashCoordinator _trashCoordinator;
+    private readonly PurgeExecutor _purge;
 
     public ImportCancellationSettlement(
         CatalogDb catalog,
@@ -29,6 +31,8 @@ internal sealed class ImportCancellationSettlement
         _unitWrites = new ImportUnitWrites(catalog, timeProvider);
         _schedulerReads = new SchedulerReads(catalog);
         _trashCoordinator = trashCoordinator ?? CreateDefaultTrashCoordinator(catalog);
+        _purge = new PurgeExecutor(catalog, new ManagedMoveExecutor(catalog.Paths,
+            new WindowsVolumeIdentityProvider(), new ManagedFileVerifier(), catalog.MediaWrites), timeProvider);
     }
 
     public async Task<ImportCancellationSettlementResult> TrySettleAsync(
@@ -74,13 +78,20 @@ internal sealed class ImportCancellationSettlement
             var runningPreCommit = (await _schedulerReads
                 .GetCancellableRunningJobIdsForImportUnitAsync(unitId, cancellationToken)
                 .ConfigureAwait(false)).Count;
-            return runningPreCommit == 0
-                ? new ImportCancellationSettlementResult(
-                    ImportCancellationSettlementStatus.NotRequired,
-                    "CANCEL_PRE_COMMIT_SETTLED")
-                : new ImportCancellationSettlementResult(
-                    ImportCancellationSettlementStatus.PendingSafeBoundary,
+            if (runningPreCommit != 0)
+                return new ImportCancellationSettlementResult(ImportCancellationSettlementStatus.PendingSafeBoundary,
                     "CANCEL_RUNNING_JOBS_NOT_SETTLED");
+            if ((await ReadExclusiveMediaIdsAsync(unitId, cancellationToken).ConfigureAwait(false)).Count != 0)
+                return new ImportCancellationSettlementResult(ImportCancellationSettlementStatus.PendingRetry,
+                    "CANCEL_COMMIT_SNAPSHOT_UNAVAILABLE");
+            await RetireCancelledCandidatesAsync(unitId, cancellationToken).ConfigureAwait(false);
+            var staging = ImportRecovery.ReleaseCancelledStaging(_catalog, unitId);
+            if (!staging)
+                return new ImportCancellationSettlementResult(ImportCancellationSettlementStatus.PendingRetry,
+                    "CANCEL_STAGING_CLEANUP_PENDING");
+            await _unitWrites.MarkRollbackSettledAsync(unitId, cancellationToken).ConfigureAwait(false);
+            return new ImportCancellationSettlementResult(ImportCancellationSettlementStatus.Settled,
+                "CANCEL_PRE_COMMIT_SETTLED");
         }
 
         // rollback_settled = 0 is a durable promise that post-commit rollback still needs
@@ -106,23 +117,29 @@ internal sealed class ImportCancellationSettlement
 
         try
         {
-            // Media Trash is always settled before DB delta cleanup. Re-entry only returns media
-            // that are still ACTIVE, so already-completed Trash transitions are naturally skipped.
-            foreach (var assetId in await ReadExclusiveActiveMediaIdsAsync(unitId, cancellationToken).ConfigureAwait(false))
+            // Reuse verified recovery moves and Purge, keeping cancellation receipts internal.
+            // Re-entry includes legacy TRASHED candidates until permanent cleanup has completed.
+            foreach (var assetId in await ReadExclusiveMediaIdsAsync(unitId, cancellationToken).ConfigureAwait(false))
             {
-                var reserved = await _unitWrites.TryReserveCancellationMediaRollbackAsync(
-                        unitId,
-                        assetId,
-                        cancellationToken)
+                var existing = await new TrashReads(_catalog).GetTrashEntryForEntityAsync(TrashEntityType.Media, assetId, cancellationToken)
                     .ConfigureAwait(false);
-                if (!reserved)
+                // Prove legacy receipt ownership before reserving it; ambiguous Trash remains untouched.
+                if (existing is { State: TrashEntryState.InTrash }
+                    && !await _trashCoordinator.AdoptCancellationReceiptAsync(unitId, existing, cancellationToken).ConfigureAwait(false))
+                    return new ImportCancellationSettlementResult(ImportCancellationSettlementStatus.PendingRetry,
+                        "CANCEL_MEDIA_CLEANUP_PENDING");
+
+                var reserved = await _unitWrites.TryReserveCancellationMediaRollbackAsync(unitId, assetId, cancellationToken)
+                    .ConfigureAwait(false);
+                if (!reserved) continue;
+                if (existing is { State: TrashEntryState.InTrash })
                 {
-                    // Another live import or durable published relation won the race. This Media is
-                    // preserved; cancellation only removes this unit's unpublished delta.
+                    if (!await PurgeAsync(existing.TrashEntryId, false, cancellationToken).ConfigureAwait(false))
+                        return new ImportCancellationSettlementResult(ImportCancellationSettlementStatus.PendingRetry,
+                            "CANCEL_MEDIA_CLEANUP_PENDING");
                     continue;
                 }
-
-                var plan = await _trashCoordinator.PrepareMediaTrashAsync(assetId, cancellationToken)
+                var plan = await _trashCoordinator.PrepareMediaTrashAsync(assetId, cancellationToken, unitId)
                     .ConfigureAwait(false);
                 if (!plan.IsSuccess || plan.Value is null)
                 {
@@ -142,20 +159,21 @@ internal sealed class ImportCancellationSettlement
                         ImportCancellationSettlementStatus.PendingRetry,
                         "CANCEL_ASSET_TRASH_EXECUTE_PENDING");
                 }
+                if (!await PurgeAsync(plan.Value.TrashEntryId, false, cancellationToken).ConfigureAwait(false))
+                    return new ImportCancellationSettlementResult(ImportCancellationSettlementStatus.PendingRetry,
+                        "CANCEL_MEDIA_CLEANUP_PENDING");
             }
 
-            // DB-only delta cleanup is idempotent and reads the durable commit snapshot on every
-            // attempt, including null-baseline appearance restoration.
+            // Only this unit's unpublished relations and draft intent are rolled back.
             await _unitWrites.RollbackCommittedMediaDeltaAsync(
                     unitId,
-                    snapshot.DestinationProfileId,
-                    snapshot,
                     cancellationToken)
                 .ConfigureAwait(false);
 
             if (snapshot.DestinationProfileCreated)
             {
                 var profileSettled = await SettleDraftProfileTrashAsync(
+                        unitId,
                         snapshot.DestinationProfileId.Value,
                         cancellationToken)
                     .ConfigureAwait(false);
@@ -167,7 +185,11 @@ internal sealed class ImportCancellationSettlement
                 }
             }
 
-            // This is the only success path that writes rollback_settled=1.
+            if (!ImportRecovery.ReleaseCancelledStaging(_catalog, unitId))
+                return new ImportCancellationSettlementResult(ImportCancellationSettlementStatus.PendingRetry,
+                    "CANCEL_STAGING_CLEANUP_PENDING");
+
+            // Settlement is terminal only after all exclusive bytes and draft authority have gone.
             await _unitWrites.MarkRollbackSettledAsync(unitId, cancellationToken).ConfigureAwait(false);
             return new ImportCancellationSettlementResult(
                 ImportCancellationSettlementStatus.Settled,
@@ -189,41 +211,60 @@ internal sealed class ImportCancellationSettlement
         }
     }
 
-    private async Task<bool> SettleDraftProfileTrashAsync(
-        Guid profileId,
-        CancellationToken cancellationToken)
+    private async Task RetireCancelledCandidatesAsync(Guid unitId, CancellationToken cancellationToken)
     {
-        if (await IsProfileTrashedAsync(profileId, cancellationToken).ConfigureAwait(false))
+        var ids = new List<Guid>();
+        await using (var connection = await _catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false))
+        await using (var command = connection.CreateCommand())
         {
-            return true;
+            command.CommandText = """
+                SELECT m.media_id FROM media m JOIN import_items item ON item.candidate_media_id=m.media_id
+                JOIN import_units unit ON unit.import_unit_id=item.import_unit_id
+                WHERE item.import_unit_id=$id AND unit.state='CANCELLED' AND m.state='CANDIDATE';
+                """;
+            command.Parameters.AddWithValue("$id", DbGuid.Format(unitId));
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) ids.Add(DbGuid.Parse(reader.GetString(0)));
         }
-
-        var plan = await _trashCoordinator.PrepareProfileTrashAsync(profileId, cancellationToken)
-            .ConfigureAwait(false);
-        if (!plan.IsSuccess || plan.Value is null)
-        {
-            // A concurrent/replayed completion is accepted only when durable profile authority
-            // proves that the Profile is already in Trash.
-            return await IsProfileTrashedAsync(profileId, cancellationToken).ConfigureAwait(false);
-        }
-
-        var dispositions = plan.Value.OwnedActiveMedias
-            .Select(asset => new ProfileOwnedMediaDisposition(
-                asset.MediaId,
-                ProfileOwnedMediaDispositionKind.TrashMedia,
-                NewOwnerProfileId: null))
-            .ToList();
-
-        var result = await _trashCoordinator.CommitProfileTrashAsync(
-                plan.Value,
-                dispositions,
-                cancellationToken)
-            .ConfigureAwait(false);
-        return result.IsSuccess
-            || await IsProfileTrashedAsync(profileId, cancellationToken).ConfigureAwait(false);
+        foreach (var id in ids)
+            await _catalog.ImportWrites.RetireCandidateAsync(id, MediaRetirementReason.Cancelled, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<IReadOnlyList<Guid>> ReadExclusiveActiveMediaIdsAsync(
+    private async Task<bool> PurgeAsync(Guid entryId, bool profile, CancellationToken cancellationToken)
+    {
+        var prepared = await (profile ? _purge.PreparePurgeProfileAsync(entryId, cancellationToken)
+            : _purge.PreparePurgeMediaAsync(entryId, cancellationToken)).ConfigureAwait(false);
+        if (!prepared.IsSuccess || prepared.Value is null) return false;
+        return (await (profile ? _purge.ConfirmPurgeProfileAsync(prepared.Value.PurgePlanId, true, cancellationToken)
+            : _purge.ConfirmPurgeMediaAsync(prepared.Value.PurgePlanId, true, cancellationToken)).ConfigureAwait(false)).IsSuccess;
+    }
+
+    private async Task<bool> SettleDraftProfileTrashAsync(Guid unitId, Guid profileId, CancellationToken cancellationToken)
+    {
+        await using (var connection = await _catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false))
+        await using (var read = connection.CreateCommand())
+        {
+            read.CommandText = "SELECT visibility FROM profiles WHERE profile_id=$id;";
+            read.Parameters.AddWithValue("$id", DbGuid.Format(profileId));
+            var visibility = await read.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+            if (visibility is null) return true;
+            if (!string.Equals(visibility as string, "DRAFT", StringComparison.Ordinal)) return false;
+        }
+        await _unitWrites.ReleaseCancelledDraftReferencesAsync(unitId, profileId, cancellationToken).ConfigureAwait(false);
+        var existing = await new TrashReads(_catalog).GetTrashEntryForEntityAsync(TrashEntityType.Profile, profileId, cancellationToken)
+            .ConfigureAwait(false);
+        if (existing is { State: TrashEntryState.InTrash })
+            return await _trashCoordinator.AdoptCancellationReceiptAsync(unitId, existing, cancellationToken).ConfigureAwait(false)
+                && await PurgeAsync(existing.TrashEntryId, true, cancellationToken).ConfigureAwait(false);
+        var prepared = await _trashCoordinator.PrepareProfileTrashAsync(profileId, cancellationToken, unitId).ConfigureAwait(false);
+        if (!prepared.IsSuccess || prepared.Value is null) return false;
+        // The canonical disposition planner preserves surviving shared originals and their ownership.
+        var dispositions = await new ProfileTrashDispositionPlanner(_catalog).BuildAsync(prepared.Value, cancellationToken).ConfigureAwait(false);
+        var result = await _trashCoordinator.CommitProfileTrashAsync(prepared.Value, dispositions, cancellationToken).ConfigureAwait(false);
+        return result.IsSuccess && await PurgeAsync(prepared.Value.TrashEntryId, true, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<IReadOnlyList<Guid>> ReadExclusiveMediaIdsAsync(
         Guid unitId,
         CancellationToken cancellationToken)
     {
@@ -238,7 +279,7 @@ internal sealed class ImportCancellationSettlement
             JOIN import_units self ON self.import_unit_id = item.import_unit_id
             WHERE item.import_unit_id = $unitId
               AND item.candidate_media_id IS NOT NULL
-              AND asset.state = 'ACTIVE'
+              AND asset.state IN ('ACTIVE', 'TRASHED')
               AND NOT EXISTS (
                   SELECT 1
                   FROM import_items other
@@ -281,23 +322,6 @@ internal sealed class ImportCancellationSettlement
         }
 
         return assetIds;
-    }
-
-    private async Task<bool> IsProfileTrashedAsync(Guid profileId, CancellationToken cancellationToken)
-    {
-        await using var connection = await _catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        await using var command = connection.CreateCommand();
-        command.CommandText =
-            """
-            SELECT CASE WHEN trashed_at_ms IS NOT NULL THEN 1 ELSE 0 END
-            FROM profiles
-            WHERE profile_id = $profileId;
-            """;
-        command.Parameters.AddWithValue("$profileId", DbGuid.Format(profileId));
-        var value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
-        return value is not null
-            && value is not DBNull
-            && Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture) == 1;
     }
 
     private async Task<DurableCancellationState?> ReadDurableStateAsync(

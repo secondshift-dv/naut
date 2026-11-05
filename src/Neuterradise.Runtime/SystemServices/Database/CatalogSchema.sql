@@ -1,6 +1,6 @@
 -- NeuTerradise initial database schema.
 -- Complete pre-release schema baseline for a new catalog.
--- Catalog Schema v1 is the only supported catalog shape in this build.
+-- Catalog Schema v2 retains the v1 data shape and adds an explicit compatibility boundary.
 
 -- Core catalog.
 CREATE TABLE activity_log (
@@ -526,6 +526,13 @@ WHEN NEW.state <> 'ACTIVE'
 BEGIN
     SELECT RAISE(ABORT, 'a non-ACTIVE media item cannot retain an OWNER');
 END;
+
+CREATE TABLE catalog_contract (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    schema_version INTEGER NOT NULL CHECK (schema_version = 2)
+);
+INSERT INTO catalog_contract(singleton, schema_version) VALUES(1, 2);
+PRAGMA user_version = 2;
 
 CREATE TRIGGER trg_media_storage_token_immutable
 BEFORE UPDATE OF media_storage_token ON media
@@ -1311,4 +1318,60 @@ WHEN NEW.figure_media_id IS NOT NULL AND (NEW.figure_media_id IS NOT OLD.figure_
       AND NOT EXISTS (SELECT 1 FROM trash_entries te WHERE te.entity_type = 'MEDIA' AND te.entity_id = m.media_id AND te.state IN ('PENDING','EXECUTING')))
 BEGIN
     SELECT RAISE(ABORT,'Figure source must be eligible public canonical Model media');
+END;
+
+-- Freeze new Profile intent after an authorized group deletion is durably reserved.
+CREATE TRIGGER trg_group_trash_profile_metadata
+BEFORE UPDATE OF display_name,category_id,rating,is_favorite,overview,notes ON profiles
+WHEN (NEW.display_name IS NOT OLD.display_name OR NEW.category_id IS NOT OLD.category_id OR NEW.rating IS NOT OLD.rating OR NEW.is_favorite IS NOT OLD.is_favorite OR NEW.overview IS NOT OLD.overview OR NEW.notes IS NOT OLD.notes) AND EXISTS (
+    SELECT 1 FROM trash_entries t WHERE t.entity_type='PROFILE' AND t.entity_id=NEW.profile_id
+      AND (t.state='EXECUTING' OR (t.state='PENDING'
+        AND json_extract(CASE WHEN json_valid(t.plan_json) THEN t.plan_json ELSE json_object() END,'$.isGroupOperation')=1))
+)
+BEGIN
+    SELECT RAISE(ABORT,'Profile group Trash has reserved this mutation');
+END;
+
+CREATE TRIGGER trg_group_trash_relation_insert
+BEFORE INSERT ON profile_media
+WHEN 1 AND EXISTS (
+    SELECT 1 FROM trash_entries t WHERE t.entity_type='PROFILE' AND t.entity_id=NEW.profile_id
+      AND (t.state='EXECUTING' OR (t.state='PENDING'
+        AND json_extract(CASE WHEN json_valid(t.plan_json) THEN t.plan_json ELSE json_object() END,'$.isGroupOperation')=1))
+)
+BEGIN
+    SELECT RAISE(ABORT,'Profile group Trash has reserved this mutation');
+END;
+
+CREATE TRIGGER trg_group_trash_relation_update
+BEFORE UPDATE OF profile_id ON profile_media
+WHEN NEW.profile_id IS NOT OLD.profile_id AND EXISTS (
+    SELECT 1 FROM trash_entries t WHERE t.entity_type='PROFILE' AND t.entity_id=NEW.profile_id
+      AND (t.state='EXECUTING' OR (t.state='PENDING'
+        AND json_extract(CASE WHEN json_valid(t.plan_json) THEN t.plan_json ELSE json_object() END,'$.isGroupOperation')=1))
+)
+BEGIN
+    SELECT RAISE(ABORT,'Profile group Trash has reserved this mutation');
+END;
+
+CREATE TRIGGER trg_group_trash_appearance_insert
+BEFORE INSERT ON profile_appearance
+WHEN (NEW.cover_media_asset_id IS NOT NULL OR NEW.banner_media_asset_id IS NOT NULL OR NEW.figure_media_id IS NOT NULL) AND EXISTS (
+    SELECT 1 FROM trash_entries t WHERE t.entity_type='PROFILE' AND t.entity_id=NEW.profile_id
+      AND (t.state='EXECUTING' OR (t.state='PENDING'
+        AND json_extract(CASE WHEN json_valid(t.plan_json) THEN t.plan_json ELSE json_object() END,'$.isGroupOperation')=1))
+)
+BEGIN
+    SELECT RAISE(ABORT,'Profile group Trash has reserved this mutation');
+END;
+
+CREATE TRIGGER trg_group_trash_appearance_update
+BEFORE UPDATE OF cover_media_asset_id,banner_media_asset_id,figure_media_id ON profile_appearance
+WHEN ((NEW.cover_media_asset_id IS NOT NULL AND NEW.cover_media_asset_id IS NOT OLD.cover_media_asset_id) OR (NEW.banner_media_asset_id IS NOT NULL AND NEW.banner_media_asset_id IS NOT OLD.banner_media_asset_id) OR (NEW.figure_media_id IS NOT NULL AND NEW.figure_media_id IS NOT OLD.figure_media_id)) AND EXISTS (
+    SELECT 1 FROM trash_entries t WHERE t.entity_type='PROFILE' AND t.entity_id=NEW.profile_id
+      AND (t.state='EXECUTING' OR (t.state='PENDING'
+        AND json_extract(CASE WHEN json_valid(t.plan_json) THEN t.plan_json ELSE json_object() END,'$.isGroupOperation')=1))
+)
+BEGIN
+    SELECT RAISE(ABORT,'Profile group Trash has reserved this mutation');
 END;

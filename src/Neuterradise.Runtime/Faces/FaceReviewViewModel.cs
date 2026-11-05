@@ -473,8 +473,22 @@ public sealed class FaceReviewViewModel : ScreenStateViewModel, IDisposable
         ReplenishQueueIfNeeded();
     }
 
+    public bool HasMoreReviews => _queueReads is not null && _nextQueueCursor is not null;
+
+    public Task LoadMoreReviewsAsync()
+    {
+        if (_disposed || !IsRouteActive || !HasMoreReviews
+            || Interlocked.CompareExchange(ref _queueLoadActive, 1, 0) != 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        return ReplenishQueueAsync(RouteCancellationToken);
+    }
+
     private void RefreshCollectionState()
     {
+        RaisePropertyChanged(nameof(HasMoreReviews));
         RaisePropertyChanged(nameof(HasReviews));
         RaisePropertyChanged(nameof(PendingReviewCount));
         // The bulk command scopes itself to the current unresolved collection. Queue refill,
@@ -494,6 +508,7 @@ public sealed class FaceReviewViewModel : ScreenStateViewModel, IDisposable
     private void ReplenishQueueIfNeeded()
     {
         if (_queueReads is null
+            || _nextQueueCursor is null
             || Reviews.Count >= QueueLowWatermark
             || Interlocked.CompareExchange(ref _queueLoadActive, 1, 0) != 0)
         {
@@ -1005,7 +1020,7 @@ public sealed class FaceReviewItemViewModel : ObservableObject
     public string StatusBadgeText => _decisionState switch
     {
         FaceDecisionState.Confirmed => SurfaceText.Get("Faces.Badge.Confirmed", "Confirmed"),
-        FaceDecisionState.Suggested => SurfaceText.Get("Faces.Badge.Suggested", "Suggested (Non-authoritative)"),
+        FaceDecisionState.Suggested => SurfaceText.Get("Faces.Badge.Suggested", "Suggested"),
         FaceDecisionState.Rejected => SurfaceText.Get("Faces.Badge.Rejected", "Rejected"),
         _ => SurfaceText.Get("Faces.Badge.Unresolved", "Unresolved")
     };

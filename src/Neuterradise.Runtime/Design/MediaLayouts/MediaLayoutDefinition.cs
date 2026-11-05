@@ -46,7 +46,7 @@ public sealed record MediaLayoutDefinition(
 
     public double CardHeight => MetadataPlacement switch
     {
-        MediaMetadataPlacement.Side => MediaWidth / Math.Max(0.5, Aspect),
+        MediaMetadataPlacement.Side => Math.Max(150, MediaWidth / Math.Max(0.5, Aspect)),
         MediaMetadataPlacement.Below => (CardWidth / Math.Max(0.5, Aspect)) + 48,
         _ => CardWidth / Math.Max(0.5, Aspect),
     };
@@ -54,21 +54,28 @@ public sealed record MediaLayoutDefinition(
 
 public static class MediaLayoutCatalog
 {
-    public const string FallbackLayoutId = "immersive";
+    public const string FallbackLayoutId = "mosaic";
 
     public static IReadOnlySet<string> BuiltInIds { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
-        "immersive",
-        "editorial",
-        "compact",
-        "clean",
-        "showcase",
-        "cinematic",
+        "mosaic", "editorial-grid", "workbench",
     };
 
-    public static bool IsBuiltInId(string? id) =>
-        id is not null && BuiltInIds.Contains(id);
+    public static IReadOnlySet<string> CompatibleLayoutIds { get; } =
+        new HashSet<string>(BuiltInIds.Concat(
+        [
+            "immersive", "clean", "showcase", "wall", "editorial", "compact", "cinematic", "reel",
+        ]), StringComparer.Ordinal);
 
-    public static string Normalize(string? id) =>
-        IsBuiltInId(id) ? id! : FallbackLayoutId;
+    public static bool IsBuiltInId(string? id) =>
+        id is not null && CompatibleLayoutIds.Contains(id);
+
+    // Old durable values are translated to the redesigned layouts; old layouts are not rendered.
+    public static string Normalize(string? id) => id switch
+    {
+        "immersive" or "clean" or "showcase" or "wall" => "mosaic",
+        "editorial" or "compact" => "workbench",
+        "cinematic" or "reel" => "mosaic",
+        _ => IsBuiltInId(id) ? id! : FallbackLayoutId,
+    };
 }

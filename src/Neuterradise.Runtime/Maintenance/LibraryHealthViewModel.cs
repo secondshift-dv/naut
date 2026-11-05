@@ -1,4 +1,7 @@
 using System.Collections.ObjectModel;
+using Neuterradise.App.Import;
+using Neuterradise.App.SystemServices.Recovery;
+using Neuterradise.App.Localization;
 using System.Globalization;
 using System.Windows.Input;
 using Neuterradise.App.Shell;
@@ -66,6 +69,26 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
         ClearCacheCommand = new AsyncRelayCommand(() => ClearCacheAsync());
         RunHealthCheckCommand = new AsyncRelayCommand(() => RunStandardScanAsync());
         RunDeepHealthCheckCommand = new AsyncRelayCommand(() => RunDeepScanAsync());
+        ImportActionCommand = new AsyncRelayCommand(async parameter =>
+        {
+            if (_catalog is null || parameter is not ValueTuple<HealthFinding, HealthImportAction> request
+                || request.Item1.ImportUnitId is not { } unitId
+                || request.Item1.ImportActions?.Contains(request.Item2) != true) return;
+            var controls = new ImportUnitControlAuthority(_catalog);
+            var succeeded = request.Item2 switch
+            {
+                HealthImportAction.CompleteCleanup or HealthImportAction.Cancel =>
+                    (await controls.CancelAsync(unitId, RouteCancellationToken).ConfigureAwait(true)).Result
+                        is ImportCancellationResult.Cancelled or ImportCancellationResult.AlreadyCancelled,
+                HealthImportAction.CleanupTemporary => await ImportRecovery.ReleaseTerminalStagingAsync(_catalog, unitId, RouteCancellationToken).ConfigureAwait(true),
+                HealthImportAction.Retry => await controls.RetryAsync(unitId, RouteCancellationToken).ConfigureAwait(true),
+                HealthImportAction.Resume => await controls.StartAsync(unitId, RouteCancellationToken).ConfigureAwait(true),
+                _ => false,
+            };
+            ActionFeedbackMessage = SurfaceText.Get(succeeded ? "Health.Import.ActionComplete" : "Health.Import.ActionPending",
+                succeeded ? "Import action completed." : "Import action remains pending. Review Import Activity for details.");
+            await RunStandardScanAsync(RouteCancellationToken).ConfigureAwait(true);
+        });
         PrepareRepairCommand = new AsyncRelayCommand(() => PrepareSelectedRepairAsync());
         ConfirmRepairCommand = new AsyncRelayCommand(() => ConfirmPendingRepairAsync());
         CancelRepairCommand = new RelayCommand(_ => CancelPendingRepair());
@@ -198,6 +221,8 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
     public ICommand RunHealthCheckCommand { get; }
 
     public ICommand RunDeepHealthCheckCommand { get; }
+
+    public ICommand ImportActionCommand { get; }
 
     public ICommand PrepareRepairCommand { get; }
 

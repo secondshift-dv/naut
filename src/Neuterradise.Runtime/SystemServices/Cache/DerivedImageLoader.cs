@@ -44,10 +44,13 @@ public sealed class SkiaDerivedImageDecoder : IDerivedImageDecoder
 /// </summary>
 public static class TargetSizeDecoder
 {
-    public static SKBitmap? Decode(string path, int decodeWidth, int? decodeHeight = null)
+    public static SKBitmap? Decode(string path, int decodeWidth, int? decodeHeight = null,
+        Neuterradise.App.SystemServices.MediaTools.ExternalToolResolver? tools = null)
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 64 * 1024);
-        return Decode(stream, decodeWidth, decodeHeight);
+        var decoded = Decode(stream, decodeWidth, decodeHeight);
+        return decoded ?? (Neuterradise.App.Media.Image.Jpeg2000Decoder.IsSource(path)
+            ? Neuterradise.App.Media.Image.Jpeg2000Decoder.Decode(path, decodeWidth, decodeHeight, tools) : null);
     }
 
     public static SKBitmap? Decode(Stream stream, int decodeWidth, int? decodeHeight = null)
@@ -409,6 +412,7 @@ public sealed class DerivedImageLoader : IDisposable
             await _decodeSlots.WaitAsync(_lifetime.Token).ConfigureAwait(false);
             try
             {
+                using var foregroundDisk = Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.EnterForegroundDiskWork();
                 var image = await Task.Run(() => Decode(key), _lifetime.Token).ConfigureAwait(false);
                 if (image is null)
                 {

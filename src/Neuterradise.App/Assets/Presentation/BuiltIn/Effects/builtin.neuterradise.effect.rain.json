@@ -22,7 +22,7 @@
             "direction": "down",
             "particleShape": "line",
             "count": 56,
-            "opacity": 0.30,
+            "opacity": 0.3,
             "speed": 2.8,
             "sizeMin": 1,
             "sizeMax": 2,
@@ -37,5 +37,6 @@
         "layers": []
       }
     }
-  }
+  },
+  "description": "Fine falling rain."
 }

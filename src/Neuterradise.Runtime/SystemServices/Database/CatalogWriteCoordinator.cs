@@ -83,6 +83,10 @@ public sealed class CatalogWriteCoordinator : IDisposable
     {
         private CatalogWriteCoordinator? _owner;
         internal Lease(CatalogWriteCoordinator owner) => _owner = owner;
+        internal void EnsureHeldBy(CatalogWriteCoordinator owner)
+        {
+            if (!ReferenceEquals(_owner, owner)) throw new InvalidOperationException("The catalog writer lease is not held by this operation.");
+        }
         public void Dispose() => Interlocked.Exchange(ref _owner, null)?.Exit();
         public ValueTask DisposeAsync() { Dispose(); return ValueTask.CompletedTask; }
     }

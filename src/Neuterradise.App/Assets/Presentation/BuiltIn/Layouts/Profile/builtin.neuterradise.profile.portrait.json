@@ -1,0 +1,116 @@
+{
+  "id": "builtin.neuterradise.profile.portrait",
+  "kind": "profile-layout",
+  "name": "Portrait",
+  "spec": {
+    "layout": {
+      "schemaVersion": 1,
+      "id": "portrait",
+      "name": "Portrait",
+      "bannerMode": "FullBleed",
+      "height": "Tall",
+      "coverPlacement": "BottomLeftOverlap",
+      "coverSize": "Large",
+      "coverDetailLevel": "Full",
+      "identityAlignment": "Left",
+      "contentWidth": "Wide",
+      "overlay": "Medium",
+      "blur": "Off",
+      "fade": "Bottom",
+      "sectionDensity": "Compact",
+      "modules": [
+        {
+          "id": "overview",
+          "order": 0,
+          "visible": true,
+          "width": "Full"
+        },
+        {
+          "id": "related",
+          "order": 1,
+          "visible": true,
+          "width": "Full"
+        },
+        {
+          "id": "faces",
+          "order": 2,
+          "visible": true,
+          "width": "Full"
+        },
+        {
+          "id": "recentMedia",
+          "order": 3,
+          "visible": true,
+          "width": "Full"
+        },
+        {
+          "id": "media",
+          "order": 4,
+          "visible": true,
+          "width": "Full"
+        }
+      ]
+    },
+    "surface": {
+      "type": "stack",
+      "spacing": 22,
+      "children": [
+        {
+          "type": "semantic",
+          "id": "identity"
+        },
+        {
+          "type": "columns",
+          "columns": [
+            "*",
+            "2.5*"
+          ],
+          "spacing": 24,
+          "children": [
+            {
+              "type": "stack",
+              "spacing": 16,
+              "children": [
+                {
+                  "type": "semantic",
+                  "id": "overview"
+                },
+                {
+                  "type": "semantic",
+                  "id": "related"
+                },
+                {
+                  "type": "semantic",
+                  "id": "actions"
+                }
+              ]
+            },
+            {
+              "type": "stack",
+              "spacing": 14,
+              "children": [
+                {
+                  "type": "semantic",
+                  "id": "media"
+                },
+                {
+                  "type": "semantic",
+                  "id": "recent-media"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "semantic",
+          "id": "review"
+        },
+        {
+          "type": "semantic",
+          "id": "faces"
+        }
+      ]
+    }
+  },
+  "description": "Cover-led identity with media beside a side panel."
+}

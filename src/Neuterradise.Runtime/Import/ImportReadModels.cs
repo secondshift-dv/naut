@@ -121,7 +121,8 @@ public sealed record ImportUnitSummary(
     int CleanupConsumedCount = 0,
     int CleanupPreservedCount = 0,
     int CleanupPendingCount = 0,
-    DateTimeOffset? StageTwoStartedAtUtc = null);
+    DateTimeOffset? StageTwoStartedAtUtc = null,
+    bool? RollbackSettled = null);
 
 /// <summary>
 /// Import-critical aggregate for one unit (see <c>ImportReads.ListUnitProgressAsync</c>). Admitted items
@@ -398,7 +399,7 @@ public static class ImportPresentation
 
     public static string OptionalProfilingNotice => SurfaceText.Get(
         "Import.OptionalProfilingNotice",
-        "Media is available now. Optional face profiling is still running in the background.");
+        "Face analysis is still running.");
 
     public static IReadOnlyList<string> Vocabulary { get; } =
     [

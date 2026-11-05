@@ -40,8 +40,9 @@ public sealed class MediaAssetFileValidator
             && (valid.PixelWidth > 1024 || valid.PixelHeight > 1024))
             throw new InvalidDataException("Canonical thumbnail exceeds its 1024 pixel edge contract.");
         if (role == MediaAssetRole.Hover
-            && (valid.PixelWidth > 1280 || valid.PixelHeight > 720))
-            throw new InvalidDataException("Canonical hover exceeds its 1280x720 pixel contract.");
+            && !((valid.PixelWidth <= 1280 && valid.PixelHeight <= 720)
+                || (valid.PixelWidth <= 720 && valid.PixelHeight <= 1280)))
+            throw new InvalidDataException("Canonical hover exceeds its orientation-aware 1280-by-720 pixel contract.");
         return valid;
     }
 

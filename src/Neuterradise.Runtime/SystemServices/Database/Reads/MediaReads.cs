@@ -32,8 +32,7 @@ public sealed class MediaReads
     public async Task<MediaDetailReadModel?> GetMediaDetailAsync(
         Guid assetId,
         CancellationToken cancellationToken = default,
-        bool includeRelations = true,
-        bool includeFileDetails = true)
+        bool includeRelations = true)
     {
         if (assetId == Guid.Empty)
         {
@@ -55,15 +54,14 @@ public sealed class MediaReads
                    coalesce(a.byte_length, 0) AS byte_length,
                    a.state,
                    coalesce(a.added_to_library_at_ms, a.created_at_ms) AS added_at_ms,
-                   a.source_display_name,
-                   a.source_kind,
-                   a.original_source_path,
-                   a.created_at_ms,
                    a.row_version,
                    a.dependency_status,
                    a.bundle_sha256,
                    a.is_favorite,
-                   am.width, am.height, am.duration_ms, am.captured_at_ms, am.metadata_json
+                   am.width, am.height, am.duration_ms, am.metadata_json,
+                   (SELECT state FROM media_assets WHERE media_id=a.media_id AND role='MODEL_RENDER'),
+                   (SELECT state FROM jobs WHERE owner_type='Media' AND owner_id=a.media_id AND kind='GenerateModelMediaAssets'
+                    ORDER BY created_at_ms DESC, job_id DESC LIMIT 1)
             FROM media a
             LEFT JOIN media_metadata am ON am.media_id = a.media_id
             WHERE a.media_id = $assetId;
@@ -80,10 +78,6 @@ public sealed class MediaReads
         long byteLength;
         MediaState status;
         DateTimeOffset addedAt;
-        string? sourceDisplayName;
-        string? sourceKind;
-        string? originalPath;
-        DateTimeOffset createdAt;
         long rowVersion;
         MediaDependencyStatus dependencyStatus;
         string? bundleSha256;
@@ -91,8 +85,8 @@ public sealed class MediaReads
         int? metaWidth = null;
         int? metaHeight = null;
         int? metaDurationMs = null;
-        DateTimeOffset? capturedAt = null;
         string? metadataJson = null;
+        var figurePreparation = ModelFigurePreparation.Unsupported;
 
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -112,22 +106,29 @@ public sealed class MediaReads
             status = DbEnum.ParseMediaState(reader.GetString(9));
             addedAt = DbTime.Parse(reader.GetInt64(10));
 
-            sourceDisplayName = reader.IsDBNull(11) ? null : reader.GetString(11);
-            sourceKind = reader.IsDBNull(12) ? null : reader.GetString(12);
-            originalPath = reader.IsDBNull(13) ? null : reader.GetString(13);
-            createdAt = DbTime.Parse(reader.GetInt64(14));
-            rowVersion = reader.GetInt64(15);
-            dependencyStatus = reader.IsDBNull(16)
+            rowVersion = reader.GetInt64(11);
+            dependencyStatus = reader.IsDBNull(12)
                 ? MediaDependencyStatus.SelfContained
-                : DbEnum.ParseMediaDependencyStatus(reader.GetString(16));
-            bundleSha256 = reader.IsDBNull(17) ? null : reader.GetString(17);
-            isFavorite = !reader.IsDBNull(18) && reader.GetInt64(18) != 0;
+                : DbEnum.ParseMediaDependencyStatus(reader.GetString(12));
+            bundleSha256 = reader.IsDBNull(13) ? null : reader.GetString(13);
+            isFavorite = !reader.IsDBNull(14) && reader.GetInt64(14) != 0;
 
-            metaWidth = reader.IsDBNull(19) ? null : reader.GetInt32(19);
-            metaHeight = reader.IsDBNull(20) ? null : reader.GetInt32(20);
-            metaDurationMs = reader.IsDBNull(21) ? null : reader.GetInt32(21);
-            capturedAt = reader.IsDBNull(22) ? null : DbTime.Parse(reader.GetInt64(22));
-            metadataJson = reader.IsDBNull(23) ? null : reader.GetString(23);
+            metaWidth = reader.IsDBNull(15) ? null : reader.GetInt32(15);
+            metaHeight = reader.IsDBNull(16) ? null : reader.GetInt32(16);
+            metaDurationMs = reader.IsDBNull(17) ? null : reader.GetInt32(17);
+            metadataJson = reader.IsDBNull(18) ? null : reader.GetString(18);
+            if (mType == MediaType.Model)
+            {
+                var eligible=ModelRenderEligibility.IsEligible(fileName, reader.GetString(12));
+                var state=reader.IsDBNull(19) ? null : reader.GetString(19);
+                var jobState=reader.IsDBNull(20) ? null : reader.GetString(20);
+                figurePreparation=state == "READY" ? ModelFigurePreparation.Ready
+                    : state == "NEEDS_REPAIR" ? ModelFigurePreparation.NeedsRepair
+                    : !eligible ? ModelRenderEligibility.IsEligible(fileName,"SELF_CONTAINED")
+                        ? ModelFigurePreparation.DependenciesMissing : ModelFigurePreparation.Unsupported
+                    : jobState is "FAILED_TERMINAL" or "FAILED_RETRYABLE" ? ModelFigurePreparation.Failed
+                    : ModelFigurePreparation.Pending;
+            }
         }
 
         // Published Profile relations — one query returns all visible relations.
@@ -145,7 +146,9 @@ public sealed class MediaReads
             await using (var relCmd = connection.CreateCommand())
             {
                 relCmd.CommandText = """
-                    SELECT pa.relation_type, p.profile_id, p.display_name, p.profile_storage_token
+                    SELECT pa.relation_type, p.profile_id,
+                           CASE WHEN p.kind='UNKNOWN' THEN 'Unknown ' || p.unknown_sequence ELSE p.display_name END,
+                           p.profile_storage_token
                     FROM profile_media pa
                     JOIN profiles p ON pa.profile_id = p.profile_id
                     WHERE pa.media_id = $assetId
@@ -197,7 +200,6 @@ public sealed class MediaReads
             {
                 metaWidth ??= imageMeta.Width;
                 metaHeight ??= imageMeta.Height;
-                capturedAt ??= imageMeta.CapturedAt;
 
                 info = new ImageMediaInfo(
                     Format: imageMeta.Format ?? Path.GetExtension(fileName).TrimStart('.').ToUpperInvariant(),
@@ -226,14 +228,13 @@ public sealed class MediaReads
                 metaWidth ??= videoMeta.Width;
                 metaHeight ??= videoMeta.Height;
                 metaDurationMs ??= (int?)videoMeta.Duration?.TotalMilliseconds;
-                capturedAt ??= videoMeta.CapturedAt;
 
                 info = new VideoMediaInfo(
                     Container: videoMeta.Container ?? Path.GetExtension(fileName).TrimStart('.').ToUpperInvariant(),
                     Duration: metaDurationMs.HasValue ? TimeSpan.FromMilliseconds(metaDurationMs.Value) : (videoMeta.Duration ?? TimeSpan.Zero),
                     PixelWidth: metaWidth ?? 0,
                     PixelHeight: metaHeight ?? 0,
-                    VideoCodec: videoMeta.VideoCodec ?? "H.264 / AVC",
+                    VideoCodec: videoMeta.VideoCodec ?? string.Empty,
                     FrameRate: videoMeta.FrameRate,
                     AudioCodec: videoMeta.AudioCodec);
             }
@@ -244,7 +245,7 @@ public sealed class MediaReads
                     Duration: metaDurationMs.HasValue ? TimeSpan.FromMilliseconds(metaDurationMs.Value) : TimeSpan.Zero,
                     PixelWidth: metaWidth ?? 0,
                     PixelHeight: metaHeight ?? 0,
-                    VideoCodec: "H.264 / AVC");
+                    VideoCodec: string.Empty);
             }
         }
         else if (mType == MediaType.Model)
@@ -259,85 +260,16 @@ public sealed class MediaReads
                     Format: modelMeta.Format ?? Path.GetExtension(fileName).TrimStart('.').ToUpperInvariant(),
                     MeshCount: modelMeta.MeshCount,
                     MaterialCount: modelMeta.MaterialCount,
-                    AnimationCount: modelMeta.AnimationCount);
+                    AnimationCount: modelMeta.AnimationCount,
+                    FigurePreparation: figurePreparation);
             }
             else
             {
                 info = new ModelMediaInfo(
-                    Format: Path.GetExtension(fileName).TrimStart('.').ToUpperInvariant());
+                    Format: Path.GetExtension(fileName).TrimStart('.').ToUpperInvariant(),
+                    FigurePreparation: figurePreparation);
             }
         }
-
-        var ownerName = ownerProfile?.DisplayName;
-
-        string who = peopleInMedia.Count > 0
-            ? string.Join(", ", peopleInMedia.Select(p => p.DisplayName))
-            : (!string.IsNullOrWhiteSpace(ownerName) ? ownerName : MediaCluesBuilder.MissingValue);
-
-        string where = !string.IsNullOrWhiteSpace(sourceDisplayName)
-            ? sourceDisplayName
-            : (!string.IsNullOrWhiteSpace(originalPath) ? originalPath : MediaCluesBuilder.MissingValue);
-
-        MediaClues clues;
-        if (imageMeta != null)
-        {
-            clues = MediaCluesBuilder.BuildForImage(imageMeta, who: who, fallbackWhere: where);
-        }
-        else if (videoMeta != null)
-        {
-            clues = MediaCluesBuilder.BuildForVideo(videoMeta, who: who, fallbackWhere: where);
-        }
-        else if (modelMeta != null)
-        {
-            clues = MediaCluesBuilder.BuildForModel(
-                modelMeta,
-                who: who,
-                fallbackWhere: where,
-                fallbackFormat: Path.GetExtension(fileName).TrimStart('.'),
-                fileSizeBytes: byteLength);
-        }
-        else
-        {
-            string when = capturedAt.HasValue
-                ? capturedAt.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
-                : MediaCluesBuilder.MissingValue;
-
-            string how = !string.IsNullOrWhiteSpace(sourceKind)
-                ? sourceKind
-                : (mType != MediaType.Model ? mType.ToString().ToUpperInvariant() : MediaCluesBuilder.MissingValue);
-
-            clues = MediaCluesBuilder.Build(who, where, when, how);
-        }
-
-        var baselineModel = new MediaDetailReadModel(
-            assetId,
-            mType,
-            fileName,
-            originalName,
-            currentLoc,
-            targetLoc,
-            pathState,
-            fingerprint,
-            byteLength,
-            status,
-            addedAt,
-            clues,
-            DependencyStatus: dependencyStatus,
-            BundleSha256: bundleSha256,
-            ImportSourcePath: originalPath,
-            ImportSourceName: sourceDisplayName);
-
-        var fileDetails = includeFileDetails
-            ? MediaFileDetailsBuilder.BuildGroups(
-                baselineModel,
-                metaWidth,
-                metaHeight,
-                metaDurationMs,
-                createdAt,
-                imageMetadata: imageMeta,
-                videoMetadata: videoMeta,
-                modelMetadata: modelMeta)
-            : [];
 
         // Resolve absolute file path during the read, off-UI.
         string? absoluteFilePath = null;
@@ -376,19 +308,15 @@ public sealed class MediaReads
             byteLength,
             status,
             addedAt,
-            clues,
             ownerProfile,
             peopleInMedia,
             linkedProfiles,
             info,
-            fileDetails,
             absoluteFilePath,
             RowVersion: rowVersion,
             DependencyStatus: dependencyStatus,
             BundleSha256: bundleSha256,
-            IsFavorite: isFavorite,
-            ImportSourcePath: originalPath,
-            ImportSourceName: sourceDisplayName);
+            IsFavorite: isFavorite);
     }
 
     public async Task<MediaRelationsReadModel> GetMediaRelationsAsync(

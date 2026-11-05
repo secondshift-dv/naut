@@ -25,18 +25,21 @@ public sealed class PooledElementFactory : ElementFactory
     private readonly Func<string, object?, FrameworkElement> _create;
     private readonly Action<FrameworkElement, object?> _bind;
     private readonly Action<FrameworkElement>? _recycle;
+    private readonly Action<FrameworkElement>? _discard;
     private readonly Dictionary<string, Stack<FrameworkElement>> _pools = new(StringComparer.Ordinal);
 
     public PooledElementFactory(
         Func<object?, string> kindOf,
         Func<string, object?, FrameworkElement> create,
         Action<FrameworkElement, object?> bind,
-        Action<FrameworkElement>? recycle = null)
+        Action<FrameworkElement>? recycle = null,
+        Action<FrameworkElement>? discard = null)
     {
         _kindOf = kindOf;
         _create = create;
         _bind = bind;
         _recycle = recycle;
+        _discard = discard;
     }
 
     protected override UIElement GetElementCore(ElementFactoryGetArgs args)
@@ -76,10 +79,22 @@ public sealed class PooledElementFactory : ElementFactory
         {
             pool.Push(element);
         }
+        else
+        {
+            _discard?.Invoke(element);
+        }
     }
 
     /// <summary>Drops pooled elements (after a card plan or theme-structural change).</summary>
-    public void Clear() => _pools.Clear();
+    public void Clear()
+    {
+        foreach (var element in _pools.Values.SelectMany(static pool => pool))
+        {
+            _discard?.Invoke(element);
+        }
+
+        _pools.Clear();
+    }
 }
 
 public static class Repeaters

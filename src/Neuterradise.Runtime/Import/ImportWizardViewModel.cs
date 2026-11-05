@@ -379,11 +379,14 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         }
     }
 
-    public string PreparationText => _totalCount > 0 && _preparedCount < _totalCount
+    // Reused Media has no new Candidate work count; Verify follows the required capability gate.
+    public string PreparationText => IsVerifyMode
+        ? HasPreparationPending ? SurfaceText.Get("Import.Stage.Preparing", "Preparing media") : string.Empty
+        : _totalCount > 0 && _preparedCount < _totalCount
         ? SurfaceText.Format("ImportWizard.Preparing", "Preparing in the background… {0} of {1} checked. You can carry on.", _preparedCount, _totalCount)
         : string.Empty;
 
-    public bool IsPreparing => _totalCount == 0 || _preparedCount < _totalCount;
+    public bool IsPreparing => IsVerifyMode ? !_candidatesLoaded || HasPreparationPending : _totalCount == 0 || _preparedCount < _totalCount;
 
     public ImportDestinationChoice Choice
     {
@@ -830,7 +833,7 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
 
     public bool HasError => !string.IsNullOrWhiteSpace(_errorMessage);
     public bool CanContinue => IsChooseProfileMode && IsProfileChoiceComplete && !_isImporting && _finalizer is not null;
-    public bool CanImport => IsVerifyMode && IsProfileChoiceComplete && !HasProblems && _admittedCount > 0 && !_isImporting && _publication is not null;
+    public bool CanImport => IsVerifyMode && !IsPreparing && IsProfileChoiceComplete && !HasProblems && _admittedCount > 0 && !_isImporting && _publication is not null;
 
     public bool IsProfileChoiceComplete => _choice switch
     {
@@ -1828,7 +1831,7 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         IsImporting = false;
         ErrorMessage = SurfaceText.Format(
             "ImportWizard.ImportFailed",
-            "Your choices could not be saved just now. Nothing was lost — try again. {0}",
+            "Could not save your choices. Try again. {0}",
             OperationExecution.SafeMessage(exception));
     }
 

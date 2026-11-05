@@ -1378,18 +1378,6 @@ public sealed class ImportCommitCoordinator
 
         public List<Guid> RetiredCandidateIds { get; init; } = [];
 
-        /// <summary>Previous cover asset ID before import applied its appearance override. Null if no previous cover.</summary>
-        public Guid? PreviousCoverMediaId { get; set; }
-
-        /// <summary>Previous banner asset ID before import applied its appearance override. Null if no previous banner.</summary>
-        public Guid? PreviousBannerMediaId { get; set; }
-
-        /// <summary>True if the pre-import appearance snapshot was captured (including null baseline).</summary>
-        public bool AppearanceSnapshotCaptured { get; set; }
-
-        /// <summary>Previous profile_appearance overrides_json before import applied its appearance. Null means default overrides.</summary>
-        public string? PreviousAppearanceOverridesJson { get; set; }
-
         public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
 
         public static CommitState FromJson(string? json)

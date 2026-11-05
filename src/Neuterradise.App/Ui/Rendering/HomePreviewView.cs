@@ -67,51 +67,112 @@ public sealed class HomePreviewView : Grid
     private FrameworkElement BuildHero()
     {
         var theme = ThemeRuntime.Current;
-        var hero = new Grid();
-        var art = new SkImageView
+        var geometry = _spotlight.GeometryFor(_compact ? 720 : 1000, _layout.HeroPlacement);
+        var split = geometry is SpotlightGeometry.ArtworkLeft or SpotlightGeometry.IdentityLeft;
+        var stacked = geometry is SpotlightGeometry.ArtworkAbove or SpotlightGeometry.IdentityAbove;
+        var separated = split || stacked;
+        var image = new SkImageView
         {
             Source = _data?.Banner ?? _data?.Cover,
             Transform = _data?.Banner is not null
                 ? _data.BannerTransform
                 : _data?.CoverTransform ?? MediaTransformState.Default,
             PlaceholderToken = "surface2",
+            Height = _compact ? 138 : 260,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
             IsHitTestVisible = false,
         };
-        if (_spotlight.Composition != "snapshot") hero.Children.Add(art);
-        var scrim = new Microsoft.UI.Xaml.Media.LinearGradientBrush
-        {
-            StartPoint = new Windows.Foundation.Point(0, 1),
-            EndPoint = new Windows.Foundation.Point(0.7, 0),
-        };
-        scrim.GradientStops.Add(new Microsoft.UI.Xaml.Media.GradientStop { Color = theme.Color("heroScrimStrong"), Offset = 0 });
-        scrim.GradientStops.Add(new Microsoft.UI.Xaml.Media.GradientStop { Color = Windows.UI.Color.FromArgb(0, 0, 0, 0), Offset = 1 });
-        hero.Children.Add(new Border { Background = scrim, IsHitTestVisible = false });
-
-        hero.Children.Add(_data is null
-            ? EmptyHero()
-            : BuildIdentity(_data));
-
+        var identity = _data is null ? EmptyHero() : BuildIdentity(_data, !separated);
+        var footer = UI.V(_compact ? 3 : 8, identity);
+        footer.VerticalAlignment = separated ? VerticalAlignment.Center : VerticalAlignment.Stretch;
         if (_spotlight.Pagination != "none")
         {
-            hero.Children.Add(UI.Text(
-                    _compact ? "‹  01 / 02  ›" : "‹   01 / 02   ›",
-                    "micro",
-                    "onHeroSecondary")
-                .Margin(_compact ? 5 : 12)
-                .Align(HorizontalAlignment.Right, VerticalAlignment.Bottom));
+            footer.Children.Add(UI.Text(
+                "?  01 / 02  ?", "micro", separated ? "textSecondary" : "onHeroSecondary")
+                .Align(HorizontalAlignment.Right));
         }
+        var footerPanel = new Border
+        {
+            Child = footer,
+            Background = theme.Brush(separated ? "surface2" : "transparent"),
+            BorderBrush = theme.Brush(separated ? "borderSubtle" : "transparent"),
+            BorderThickness = new Thickness(separated ? 1 : 0),
+            Padding = new Thickness(_compact ? 8 : 18),
+            VerticalAlignment = separated ? VerticalAlignment.Stretch : VerticalAlignment.Bottom,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
 
+        FrameworkElement composition;
+        if (split)
+        {
+            var identityFirst = geometry == SpotlightGeometry.IdentityLeft;
+            var identityShare = _spotlight.IdentityShare;
+            var first = identityFirst ? identityShare : 1 - identityShare;
+            var splitGrid = new Grid();
+            splitGrid.ColumnDefinitions.Add(new ColumnDefinition
+                { Width = new GridLength(first, GridUnitType.Star) });
+            splitGrid.ColumnDefinitions.Add(new ColumnDefinition
+                { Width = new GridLength(1 - first, GridUnitType.Star) });
+            splitGrid.Children.Add(image.At(0, identityFirst ? 1 : 0));
+            splitGrid.Children.Add(footerPanel.At(0, identityFirst ? 0 : 1));
+            composition = splitGrid;
+        }
+        else if (stacked)
+        {
+            var identityFirst = geometry == SpotlightGeometry.IdentityAbove;
+            var stackGrid = new Grid();
+            stackGrid.RowDefinitions.Add(new RowDefinition
+                { Height = identityFirst ? GridLength.Auto : new GridLength(1, GridUnitType.Star) });
+            stackGrid.RowDefinitions.Add(new RowDefinition
+                { Height = identityFirst ? new GridLength(1, GridUnitType.Star) : GridLength.Auto });
+            stackGrid.Children.Add(image.At(identityFirst ? 1 : 0, 0));
+            stackGrid.Children.Add(footerPanel.At(identityFirst ? 0 : 1, 0));
+            composition = stackGrid;
+        }
+        else
+        {
+            var layer = new Grid();
+            layer.Children.Add(image);
+            var strength = Math.Clamp(_spotlight.ScrimStrength, 0, 1);
+            var bottomShade = new LinearGradientBrush
+            {
+                StartPoint = new Windows.Foundation.Point(0.5, 1),
+                EndPoint = new Windows.Foundation.Point(0.5, 0),
+            };
+            var shade = theme.Color("heroScrimStrong");
+            bottomShade.GradientStops.Add(new GradientStop
+            {
+                Color = Windows.UI.Color.FromArgb(
+                    (byte)Math.Clamp(shade.A * strength * 0.82, 0, 255),
+                    shade.R, shade.G, shade.B),
+                Offset = 0,
+            });
+            bottomShade.GradientStops.Add(new GradientStop
+            {
+                Color = Windows.UI.Color.FromArgb(0, shade.R, shade.G, shade.B),
+                Offset = 0.58,
+            });
+            bottomShade.GradientStops.Add(new GradientStop
+            {
+                Color = Windows.UI.Color.FromArgb(0, shade.R, shade.G, shade.B),
+                Offset = 1,
+            });
+            layer.Children.Add(new Border
+            {
+                Background = bottomShade,
+                IsHitTestVisible = false,
+            });
+            layer.Children.Add(footerPanel);
+            composition = layer;
+        }
         return new Border
         {
-            Child = hero,
+            Child = composition,
             CornerRadius = new CornerRadius(
                 _layout.HeroPlacement == "inset" ? (_compact ? 6 : 12) : 0),
             Margin = _layout.HeroPlacement == "inset"
-                ? new Thickness(
-                    _compact ? 5 : 12,
-                    _compact ? 4 : 10,
-                    _compact ? 5 : 12,
-                    0)
+                ? new Thickness(_compact ? 5 : 12, _compact ? 4 : 10,
+                    _compact ? 5 : 12, 0)
                 : new Thickness(0),
             BorderBrush = _layout.HeroPlacement == "inset"
                 ? theme.Brush("borderSubtle")
@@ -119,121 +180,53 @@ public sealed class HomePreviewView : Grid
             BorderThickness = new Thickness(_layout.HeroPlacement == "inset" ? 1 : 0),
         };
     }
+
     private FrameworkElement EmptyHero()
     {
         return UI.Text(
                 UI.T("Customize.NoSample", "Add a Profile to see a live preview here."),
-                _compact ? "micro" : "body-muted",
-                _compact ? "onHeroSecondary" : "textSecondary",
-                2)
-            .Align(HorizontalAlignment.Center, VerticalAlignment.Center);
+                _compact ? "micro" : "body-muted", "textSecondary", 2)
+            .Align(HorizontalAlignment.Left, VerticalAlignment.Center);
     }
 
-    private FrameworkElement BuildIdentity(CardData data)
+    private FrameworkElement BuildIdentity(CardData data, bool onArtwork)
     {
-        var textOverArt = _layout.HeroPlacement != "split" && _spotlight.Composition is "editorial" or "centered-poster";
-        var primary = textOverArt ? "onHeroPrimary" : "textPrimary";
-        var secondary = textOverArt ? "onHeroSecondary" : "textSecondary";
-        var name = UI.Text(data.Name, _compact ? "micro" : "body-strong", primary, 1);
+        var name = UI.Text(data.Name, _compact ? "micro" : _spotlight.Composition == "editorial" ? "section-title" : "body-strong",
+            onArtwork ? "onHeroPrimary" : "textPrimary", 2);
         var meta = UI.Text(
-            string.Join(" · ", new[] { data.Category, data.TextFor(SemanticSlots.ProfileMediaCount) }
+            string.Join(" ? ", new[] { data.Category, data.TextFor(SemanticSlots.ProfileMediaCount) }
                 .Where(static value => !string.IsNullOrWhiteSpace(value))),
-            "micro",
-            secondary,
-            1);
+            "micro", onArtwork ? "onHeroSecondary" : "textSecondary", 1);
         var overview = _spotlight.ShowOverview
-            && !string.IsNullOrWhiteSpace(data.Overview)
-            && !_compact
-                ? UI.Text(data.Overview, "caption", secondary, 2)
+            && !string.IsNullOrWhiteSpace(data.Overview) && !_compact
+                ? UI.Text(data.Overview, "caption",
+                    onArtwork ? "onHeroSecondary" : "textSecondary", 2)
                 : null;
-        FrameworkElement? cover = null;
-        if (_spotlight.ShowCover && data.Cover is not null)
+        var details = _spotlight.Composition switch
         {
-            cover = new SkImageView
+            "cinema" => UI.V(4, name),
+            "editorial" => UI.V(_compact ? 4 : 12, meta, name, overview),
+            _ => UI.V(4, name, TagCapsules.Create(data.AssignedTags, _compact ? 2 : 4), meta, overview),
+        };
+        if (!_spotlight.ShowCover || data.Cover is null
+            || _spotlight.Composition is "cinema" or "editorial")
+            return details;
+
+        var identity = UI.Grid("auto", "auto,*",
+            new CoverFrameView
             {
                 Source = data.Cover,
                 Transform = data.CoverTransform,
-                Width = _compact ? 20 : 42,
-                Height = _compact ? 20 : 42,
-                CornerRadiusValue = _compact ? 6 : 10,
+                Appearance = data.Appearance, Plan = data.Frame,
+                Width = _compact ? 30 : 80,
+                Height = _compact ? 30 : 80,
                 IsHitTestVisible = false,
-            };
-        }
-
-        var content = UI.Grid("auto", cover is null ? "*" : "auto,*");
-        content.ColumnSpacing = _compact ? 4 : 8;
-        if (cover is not null)
-        {
-            content.Children.Add(cover.At(0, 0));
-        }
-        content.Children.Add(UI.V(_compact ? 1 : 3, name, meta, overview).At(0, cover is null ? 0 : 1));
-
-        return (_layout.HeroPlacement == "split" ? "split-glass" : _spotlight.Composition) switch
-        {
-            "centered-poster" => CenteredIdentity(cover, name, meta),
-            "split-glass" or "storefront" => SplitIdentity(content),
-            "editorial" or "cinema" => EditorialIdentity(content),
-            "snapshot" => UI.Surface(content, Material.Raised, 10, _compact ? 6 : 16),
-            _ => CinematicIdentity(content),
-        };
-    }
-    private FrameworkElement CenteredIdentity(
-        FrameworkElement? cover,
-        FrameworkElement name,
-        FrameworkElement meta)
-    {
-        var content = UI.V(
-            _compact ? 2 : 5,
-            cover?.Align(HorizontalAlignment.Center),
-            name.Align(HorizontalAlignment.Center),
-            _compact ? null : meta.Align(HorizontalAlignment.Center));
-        content.HorizontalAlignment = HorizontalAlignment.Center;
-        content.VerticalAlignment = VerticalAlignment.Center;
-        return content;
+            }.At(0, 0),
+            details.At(0, 1));
+        identity.ColumnSpacing = _compact ? 5 : 10;
+        return identity;
     }
 
-    private FrameworkElement SplitIdentity(FrameworkElement content)
-    {
-        var panel = UI.Surface(
-            content,
-            Material.Glass,
-            _compact ? 6 : 10,
-            _compact ? 5 : 10);
-        panel.MaxWidth = _compact ? 100 : 240;
-        panel.HorizontalAlignment = HorizontalAlignment.Right;
-        panel.VerticalAlignment = VerticalAlignment.Center;
-        panel.Margin = new Thickness(0, 0, _compact ? 5 : 12, 0);
-        return panel;
-    }
-    private FrameworkElement EditorialIdentity(FrameworkElement content)
-    {
-        content.HorizontalAlignment = HorizontalAlignment.Left;
-        content.VerticalAlignment = VerticalAlignment.Bottom;
-        content.Margin = new Thickness(
-            _compact ? 6 : 16,
-            0,
-            _compact ? 6 : 16,
-            _compact ? 12 : 24);
-        return content;
-    }
-
-    private FrameworkElement CinematicIdentity(FrameworkElement content)
-    {
-        var panel = UI.Surface(
-            content,
-            Material.Deep,
-            _compact ? 6 : 10,
-            _compact ? 5 : 10);
-        panel.MaxWidth = _compact ? 140 : 280;
-        panel.HorizontalAlignment = HorizontalAlignment.Left;
-        panel.VerticalAlignment = VerticalAlignment.Bottom;
-        panel.Margin = new Thickness(
-            _compact ? 6 : 16,
-            0,
-            _compact ? 6 : 16,
-            _compact ? 12 : 24);
-        return panel;
-    }
     private FrameworkElement BuildRails()
     {
         var rails = UI.V(_compact ? 2 : 5);
@@ -290,44 +283,13 @@ public sealed class HomePreviewView : Grid
     }
     private FrameworkElement BuildProfileTile(HomeRailPlan rail, CardData data)
     {
-        var width = _compact ? 28 : rail.Style == "poster" ? 54 : 68;
-        var height = rail.Style switch
-        {
-            "poster" => width * 1.25,
-            "strip" => _compact ? 20 : 34,
-            "compact" => _compact ? 22 : 38,
-            _ => _compact ? 24 : 44,
-        };
-        var tile = new Grid { Width = width, Height = height };
-        tile.Children.Add(new SkImageView
-        {
-            Source = data.Cover ?? data.Banner,
-            Transform = data.Cover is not null
-                ? data.CoverTransform
-                : data.BannerTransform,
-            PlaceholderToken = "surface2",
-            CornerRadiusValue = _compact ? 4 : 7,
-            IsHitTestVisible = false,
-        });
-        if (_compact)
-        {
-            return tile;
-        }
-
-        tile.Children.Add(new Border
-        {
-            Background = ThemeRuntime.Current.Brush("scrim"),
-            Opacity = 0.2,
-            IsHitTestVisible = false,
-        });
-        tile.Children.Add(UI.Text(
-                data.Name,
-                "micro",
-                "onHeroPrimary",
-                1)
-            .Margin(5)
-            .Align(HorizontalAlignment.Left, VerticalAlignment.Bottom));
-        return tile;
+        var width = rail.Style is "strip" or "compact" ? 156d : 98d;
+        var height = rail.Style is "strip" or "compact" ? 72d : 138d;
+        var tile = new HomeProfileTile(rail.Style, width, height);
+        tile.Bind(data.ProfileId, data.Name, data.Cover?.Path, data.TextFor(SemanticSlots.ProfileMediaCount), data.IsFavorite);
+        if (data.Frame is { } frame) tile.Apply(frame, data.Appearance, data.CoverTransform);
+        if (!_compact) return tile;
+        return new Viewbox { Width = rail.Style is "strip" or "compact" ? 58 : 32, Child = tile };
     }
 
     private FrameworkElement BuildUtilityTile(HomeRailPlan rail, int index)

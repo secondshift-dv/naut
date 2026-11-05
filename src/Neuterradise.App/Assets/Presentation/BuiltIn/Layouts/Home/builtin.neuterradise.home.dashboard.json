@@ -1,0 +1,78 @@
+{
+  "id": "builtin.neuterradise.home.dashboard",
+  "kind": "home-layout",
+  "name": "Dashboard",
+  "spec": {
+    "hero": {
+      "placement": "split",
+      "heightFraction": 0.38,
+      "minHeight": 180,
+      "maxHeight": 440
+    },
+    "rails": [
+      {
+        "id": "statistics",
+        "style": "compact",
+        "maxItems": 4
+      },
+      {
+        "id": "recent",
+        "style": "strip",
+        "maxItems": 8
+      },
+      {
+        "id": "activity",
+        "style": "compact",
+        "maxItems": 6
+      },
+      {
+        "id": "attention",
+        "style": "compact",
+        "maxItems": 5
+      }
+    ],
+    "surface": {
+      "type": "columns",
+      "columns": [
+        "2.1*",
+        "*"
+      ],
+      "spacing": 12,
+      "children": [
+        {
+          "type": "stack",
+          "spacing": 12,
+          "children": [
+            {
+              "type": "semantic",
+              "id": "featured"
+            },
+            {
+              "type": "semantic",
+              "id": "recent"
+            }
+          ]
+        },
+        {
+          "type": "stack",
+          "spacing": 12,
+          "children": [
+            {
+              "type": "semantic",
+              "id": "statistics"
+            },
+            {
+              "type": "semantic",
+              "id": "activity"
+            },
+            {
+              "type": "semantic",
+              "id": "attention"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "description": "Spotlight, activity and collection statistics."
+}

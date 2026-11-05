@@ -44,7 +44,7 @@ public sealed class ProfileLayoutResolver
 
     public const int SupportedSchemaVersion = 1;
 
-    public const string FallbackPresetId = "plain";
+    public const string FallbackPresetId = "portrait";
 
     public const int MaximumTextLength = 64;
 
@@ -82,6 +82,15 @@ public sealed class ProfileLayoutResolver
 
     public static bool TryGetBuiltInPreset(string? id, out ProfileLayoutDefinition definition)
     {
+        id = id switch
+        {
+            "cinematic" or "cinematic-wide" or "showcase" or "gallery-hero" or "prestige" or "plain" => "portrait",
+            "dock" or "playbook" or "split-left" or "split-right" or "profile-focus"
+                or "minimal" or "compact-hero" => "dossier",
+            "timeline" or "immersive" or "editorial" => "chronicle",
+            _ => id,
+        };
+
         if (id is not null)
         {
             foreach (var preset in Presets)
@@ -145,7 +154,7 @@ public sealed class ProfileLayoutResolver
         diagnostics.Add(new ProfileLayoutDiagnostic(
             ProfileLayoutDiagnosticCodes.FallbackApplied,
             FallbackPresetId,
-            "Fell back to the Plain built-in preset."));
+            "Fell back to the Portrait built-in preset."));
 
         var applied = string.IsNullOrWhiteSpace(perProfileOverrideId)
             && string.IsNullOrWhiteSpace(globalDefaultId);
@@ -646,191 +655,51 @@ public sealed class ProfileLayoutResolver
         return true;
     }
 
-    private static ProfileLayoutDefinition[] BuildPresets()
-    {
-        return
-        [
-            Preset(
-                "cinematic", "Cinematic",
-                    ProfileLayoutBannerMode.FullBleed, ProfileLayoutHeight.Tall,
-                    ProfileLayoutCoverPlacement.BottomLeftOverlap, ProfileLayoutCoverSize.Large,
-                    CoverFrameDetailLevel.Full, ProfileLayoutIdentityAlignment.Left,
-                    ProfileLayoutContentWidth.Wide, ProfileLayoutOverlay.Medium,
-                    ProfileLayoutBannerBlur.Off, ProfileLayoutFade.Bottom,
-                ProfileLayoutSectionDensity.Comfortable,
-                Modules(
-                    (ProfileLayoutModuleId.Overview, 10, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Media, 20, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Faces, 30, true, ProfileLayoutModuleWidth.Half),
-                    (ProfileLayoutModuleId.Related, 40, true, ProfileLayoutModuleWidth.Half),
-                    (ProfileLayoutModuleId.RecentMedia, 50, false, ProfileLayoutModuleWidth.Full))),
-
-            Preset(
-                "cinematic-wide", "Center Stage",
-                    ProfileLayoutBannerMode.FullBleed, ProfileLayoutHeight.Tall,
-                    ProfileLayoutCoverPlacement.BottomCenterOverlap, ProfileLayoutCoverSize.Large,
-                    CoverFrameDetailLevel.Full, ProfileLayoutIdentityAlignment.Center,
-                    ProfileLayoutContentWidth.Wide, ProfileLayoutOverlay.Medium,
-                    ProfileLayoutBannerBlur.Off, ProfileLayoutFade.Bottom,
-                ProfileLayoutSectionDensity.Comfortable,
-                Modules(
-                    (ProfileLayoutModuleId.Overview, 10, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.RecentMedia, 20, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Related, 30, true, ProfileLayoutModuleWidth.Half),
-                    (ProfileLayoutModuleId.Faces, 40, true, ProfileLayoutModuleWidth.Half),
-                    (ProfileLayoutModuleId.Media, 50, true, ProfileLayoutModuleWidth.Full))),
-
-            Preset(
-                "immersive", "Immersive",
-                    ProfileLayoutBannerMode.FullBleed, ProfileLayoutHeight.Tall,
-                    ProfileLayoutCoverPlacement.InlineCenter, ProfileLayoutCoverSize.ExtraLarge,
-                    CoverFrameDetailLevel.Full, ProfileLayoutIdentityAlignment.Center,
-                    ProfileLayoutContentWidth.Wide, ProfileLayoutOverlay.Strong,
-                    ProfileLayoutBannerBlur.Subtle, ProfileLayoutFade.Full,
-                ProfileLayoutSectionDensity.Spacious,
-                Modules(
-                    (ProfileLayoutModuleId.Media, 10, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Overview, 20, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.RecentMedia, 30, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Related, 40, true, ProfileLayoutModuleWidth.Half),
-                    (ProfileLayoutModuleId.Faces, 50, true, ProfileLayoutModuleWidth.Half))),
-
-            Preset(
-                "editorial", "Editorial",
-                    ProfileLayoutBannerMode.Contained, ProfileLayoutHeight.Medium,
-                    ProfileLayoutCoverPlacement.Left, ProfileLayoutCoverSize.Medium,
-                    CoverFrameDetailLevel.Full, ProfileLayoutIdentityAlignment.Left,
-                    ProfileLayoutContentWidth.Normal, ProfileLayoutOverlay.Soft,
-                    ProfileLayoutBannerBlur.Off, ProfileLayoutFade.None,
-                ProfileLayoutSectionDensity.Comfortable,
-                Modules(
-                    (ProfileLayoutModuleId.Overview, 10, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Faces, 20, true, ProfileLayoutModuleWidth.Half),
-                    (ProfileLayoutModuleId.Related, 30, true, ProfileLayoutModuleWidth.Half),
-                    (ProfileLayoutModuleId.RecentMedia, 40, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Media, 50, true, ProfileLayoutModuleWidth.Full))),
-
-            Preset(
-                "split-left", "Split View",
-                    ProfileLayoutBannerMode.Split, ProfileLayoutHeight.Medium,
-                    ProfileLayoutCoverPlacement.Left, ProfileLayoutCoverSize.Large,
-                    CoverFrameDetailLevel.Full, ProfileLayoutIdentityAlignment.Left,
-                    ProfileLayoutContentWidth.Normal, ProfileLayoutOverlay.Soft,
-                    ProfileLayoutBannerBlur.Off, ProfileLayoutFade.None,
-                ProfileLayoutSectionDensity.Comfortable,
-                Modules(
-                    (ProfileLayoutModuleId.Overview, 10, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Related, 20, true, ProfileLayoutModuleWidth.Half),
-                    (ProfileLayoutModuleId.Faces, 30, true, ProfileLayoutModuleWidth.Half),
-                    (ProfileLayoutModuleId.RecentMedia, 40, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Media, 50, true, ProfileLayoutModuleWidth.Full))),
-
-            Preset(
-                "split-right", "Split Right",
-                    ProfileLayoutBannerMode.Split, ProfileLayoutHeight.Medium,
-                    ProfileLayoutCoverPlacement.Right, ProfileLayoutCoverSize.Large,
-                    CoverFrameDetailLevel.Full, ProfileLayoutIdentityAlignment.Right,
-                    ProfileLayoutContentWidth.Normal, ProfileLayoutOverlay.Soft,
-                    ProfileLayoutBannerBlur.Off, ProfileLayoutFade.None,
-                ProfileLayoutSectionDensity.Comfortable,
-                Modules(
-                    (ProfileLayoutModuleId.Overview, 10, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Related, 20, true, ProfileLayoutModuleWidth.Half),
-                    (ProfileLayoutModuleId.Faces, 30, true, ProfileLayoutModuleWidth.Half),
-                    (ProfileLayoutModuleId.RecentMedia, 40, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Media, 50, true, ProfileLayoutModuleWidth.Full))),
-
-            Preset(
-                "profile-focus", "Portrait Focus",
-                    ProfileLayoutBannerMode.None, ProfileLayoutHeight.Low,
-                    ProfileLayoutCoverPlacement.InlineLeft, ProfileLayoutCoverSize.Large,
-                    CoverFrameDetailLevel.Full, ProfileLayoutIdentityAlignment.Left,
-                    ProfileLayoutContentWidth.Normal, ProfileLayoutOverlay.Soft,
-                    ProfileLayoutBannerBlur.Off, ProfileLayoutFade.None,
-                ProfileLayoutSectionDensity.Comfortable,
-                Modules(
-                    (ProfileLayoutModuleId.Overview, 10, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Faces, 20, true, ProfileLayoutModuleWidth.Half),
-                    (ProfileLayoutModuleId.Related, 30, true, ProfileLayoutModuleWidth.Half),
-                    (ProfileLayoutModuleId.RecentMedia, 40, false, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Media, 50, true, ProfileLayoutModuleWidth.Full))),
-
-            Preset(
-                "showcase", "Media First",
-                    ProfileLayoutBannerMode.Backdrop, ProfileLayoutHeight.Medium,
-                    ProfileLayoutCoverPlacement.InlineCenter, ProfileLayoutCoverSize.Large,
-                    CoverFrameDetailLevel.Full, ProfileLayoutIdentityAlignment.Center,
-                    ProfileLayoutContentWidth.Wide, ProfileLayoutOverlay.Medium,
-                    ProfileLayoutBannerBlur.Off, ProfileLayoutFade.Bottom,
-                ProfileLayoutSectionDensity.Spacious,
-                Modules(
-                    (ProfileLayoutModuleId.Media, 10, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Overview, 20, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Related, 30, true, ProfileLayoutModuleWidth.Half),
-                    (ProfileLayoutModuleId.Faces, 40, true, ProfileLayoutModuleWidth.Half),
-                    (ProfileLayoutModuleId.RecentMedia, 50, true, ProfileLayoutModuleWidth.Full))),
-
-            Preset(
-                "gallery-hero", "Gallery Hero",
-                    ProfileLayoutBannerMode.FullBleed, ProfileLayoutHeight.Medium,
-                    ProfileLayoutCoverPlacement.BottomLeftOverlap, ProfileLayoutCoverSize.Medium,
-                    CoverFrameDetailLevel.Full, ProfileLayoutIdentityAlignment.Left,
-                    ProfileLayoutContentWidth.Wide, ProfileLayoutOverlay.Medium,
-                    ProfileLayoutBannerBlur.Off, ProfileLayoutFade.Bottom,
-                ProfileLayoutSectionDensity.Comfortable,
-                Modules(
-                    (ProfileLayoutModuleId.Media, 10, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.RecentMedia, 20, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Overview, 30, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Related, 40, true, ProfileLayoutModuleWidth.Half),
-                    (ProfileLayoutModuleId.Faces, 50, true, ProfileLayoutModuleWidth.Half))),
-
-            Preset(
-                "compact-hero", "Compact Hero",
-                    ProfileLayoutBannerMode.Contained, ProfileLayoutHeight.Low,
-                    ProfileLayoutCoverPlacement.InlineLeft, ProfileLayoutCoverSize.Small,
-                    CoverFrameDetailLevel.Compact, ProfileLayoutIdentityAlignment.Left,
-                    ProfileLayoutContentWidth.Normal, ProfileLayoutOverlay.Soft,
-                    ProfileLayoutBannerBlur.Off, ProfileLayoutFade.None,
-                ProfileLayoutSectionDensity.Compact,
-                Modules(
-                    (ProfileLayoutModuleId.Overview, 10, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Media, 20, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Related, 30, true, ProfileLayoutModuleWidth.Third),
-                    (ProfileLayoutModuleId.Faces, 40, true, ProfileLayoutModuleWidth.Third),
-                    (ProfileLayoutModuleId.RecentMedia, 50, true, ProfileLayoutModuleWidth.Third))),
-
-            Preset(
-                "minimal", "Minimal",
-                    ProfileLayoutBannerMode.None, ProfileLayoutHeight.Low,
-                    ProfileLayoutCoverPlacement.InlineLeft, ProfileLayoutCoverSize.Small,
-                    CoverFrameDetailLevel.Hidden, ProfileLayoutIdentityAlignment.Left,
-                    ProfileLayoutContentWidth.Normal, ProfileLayoutOverlay.Soft,
-                    ProfileLayoutBannerBlur.Off, ProfileLayoutFade.None,
-                ProfileLayoutSectionDensity.Compact,
-                Modules(
-                    (ProfileLayoutModuleId.Overview, 10, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Media, 20, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Related, 30, false, ProfileLayoutModuleWidth.Half),
-                    (ProfileLayoutModuleId.Faces, 40, false, ProfileLayoutModuleWidth.Half),
-                    (ProfileLayoutModuleId.RecentMedia, 50, false, ProfileLayoutModuleWidth.Full))),
-
-            Preset(
-                "prestige", "Prestige",
-                    ProfileLayoutBannerMode.Backdrop, ProfileLayoutHeight.Tall,
-                    ProfileLayoutCoverPlacement.BottomCenterOverlap, ProfileLayoutCoverSize.ExtraLarge,
-                    CoverFrameDetailLevel.Full, ProfileLayoutIdentityAlignment.Center,
-                    ProfileLayoutContentWidth.Wide, ProfileLayoutOverlay.Strong,
-                    ProfileLayoutBannerBlur.Subtle, ProfileLayoutFade.Full,
-                ProfileLayoutSectionDensity.Spacious,
-                Modules(
-                    (ProfileLayoutModuleId.Overview, 10, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Faces, 20, true, ProfileLayoutModuleWidth.Half),
-                    (ProfileLayoutModuleId.Related, 30, true, ProfileLayoutModuleWidth.Half),
-                    (ProfileLayoutModuleId.RecentMedia, 40, true, ProfileLayoutModuleWidth.Full),
-                    (ProfileLayoutModuleId.Media, 50, true, ProfileLayoutModuleWidth.Full))),
-        ];
-    }
+    private static ProfileLayoutDefinition[] BuildPresets() =>
+    [
+        Preset(
+            "portrait", "Portrait",
+            ProfileLayoutBannerMode.FullBleed, ProfileLayoutHeight.Tall,
+            ProfileLayoutCoverPlacement.BottomLeftOverlap, ProfileLayoutCoverSize.Large,
+            CoverFrameDetailLevel.Full, ProfileLayoutIdentityAlignment.Left,
+            ProfileLayoutContentWidth.Wide, ProfileLayoutOverlay.Medium,
+            ProfileLayoutBannerBlur.Off, ProfileLayoutFade.Bottom,
+            ProfileLayoutSectionDensity.Spacious,
+            Modules(
+                (ProfileLayoutModuleId.Overview, 10, true, ProfileLayoutModuleWidth.Full),
+                (ProfileLayoutModuleId.Media, 20, true, ProfileLayoutModuleWidth.Full),
+                (ProfileLayoutModuleId.RecentMedia, 30, true, ProfileLayoutModuleWidth.Full),
+                (ProfileLayoutModuleId.Related, 40, true, ProfileLayoutModuleWidth.Half),
+                (ProfileLayoutModuleId.Faces, 50, true, ProfileLayoutModuleWidth.Half))),
+        Preset(
+            "dossier", "Dossier",
+            ProfileLayoutBannerMode.None, ProfileLayoutHeight.Low,
+            ProfileLayoutCoverPlacement.InlineLeft, ProfileLayoutCoverSize.Medium,
+            CoverFrameDetailLevel.Full, ProfileLayoutIdentityAlignment.Left,
+            ProfileLayoutContentWidth.Wide, ProfileLayoutOverlay.Soft,
+            ProfileLayoutBannerBlur.Off, ProfileLayoutFade.None,
+            ProfileLayoutSectionDensity.Compact,
+            Modules(
+                (ProfileLayoutModuleId.Overview, 10, true, ProfileLayoutModuleWidth.Full),
+                (ProfileLayoutModuleId.Related, 20, true, ProfileLayoutModuleWidth.Half),
+                (ProfileLayoutModuleId.Faces, 30, true, ProfileLayoutModuleWidth.Half),
+                (ProfileLayoutModuleId.Media, 40, true, ProfileLayoutModuleWidth.Full),
+                (ProfileLayoutModuleId.RecentMedia, 50, true, ProfileLayoutModuleWidth.Full))),
+        Preset(
+            "chronicle", "Chronicle",
+            ProfileLayoutBannerMode.Contained, ProfileLayoutHeight.Medium,
+            ProfileLayoutCoverPlacement.InlineLeft, ProfileLayoutCoverSize.Medium,
+            CoverFrameDetailLevel.Full, ProfileLayoutIdentityAlignment.Left,
+            ProfileLayoutContentWidth.Wide, ProfileLayoutOverlay.Medium,
+            ProfileLayoutBannerBlur.Off, ProfileLayoutFade.Bottom,
+            ProfileLayoutSectionDensity.Comfortable,
+            Modules(
+                (ProfileLayoutModuleId.Overview, 10, true, ProfileLayoutModuleWidth.Full),
+                (ProfileLayoutModuleId.RecentMedia, 20, true, ProfileLayoutModuleWidth.Full),
+                (ProfileLayoutModuleId.Media, 30, true, ProfileLayoutModuleWidth.Full),
+                (ProfileLayoutModuleId.Related, 40, true, ProfileLayoutModuleWidth.Half),
+                (ProfileLayoutModuleId.Faces, 50, true, ProfileLayoutModuleWidth.Half))),
+    ];
 
     private static ProfileLayoutDefinition Preset(
         string id,

@@ -370,6 +370,19 @@ public sealed class ProductionMediaToolPlanSource : IAuthorizedMediaToolPlanSour
                 {
                     metadata = _imageMetadata.ExtractFromFile(readablePath,
                         Path.GetExtension(source.SourcePath ?? readablePath));
+                    var extension = Path.GetExtension(source.SourcePath ?? readablePath);
+                    var jpeg2000 = Jpeg2000Decoder.IsSource(readablePath);
+                    if (!jpeg2000 && (extension.Equals(".jp2", StringComparison.OrdinalIgnoreCase)
+                        || extension.Equals(".j2k", StringComparison.OrdinalIgnoreCase)))
+                        throw new InvalidDataException("JPEG 2000 signature is missing or truncated.");
+                    if ((metadata.Width is null || metadata.Height is null) && jpeg2000)
+                    {
+                        var probe = await new Neuterradise.App.Media.Video.VideoMetadataAdapter(toolResolver: _tools)
+                            .ProbeAsync(readablePath, cancellationToken).ConfigureAwait(false);
+                        if (probe.Width is null or <= 0 || probe.Height is null or <= 0)
+                            throw new InvalidDataException("JPEG 2000 metadata is unavailable or invalid.");
+                        metadata = metadata with { Width = probe.Width, Height = probe.Height, Format = "JPEG 2000" };
+                    }
                 }
                 catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
                 {

@@ -8,6 +8,8 @@ public enum HealthSeverity
     Critical
 }
 
+public enum HealthImportAction { CompleteCleanup, CleanupTemporary, Resume, Retry, Cancel }
+
 public sealed record HealthFinding(
     string Code,
     HealthSeverity Severity,
@@ -17,4 +19,6 @@ public sealed record HealthFinding(
     string? OperationId,
     string Summary,
     bool RepairAvailable,
-    string? ManagedRelativePath = null);
+    string? ManagedRelativePath = null,
+    Guid? ImportUnitId = null,
+    IReadOnlyList<HealthImportAction>? ImportActions = null);

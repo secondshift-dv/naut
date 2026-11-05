@@ -1,4 +1,8 @@
 using System.Diagnostics;
+using Neuterradise.App.Localization;
+using Neuterradise.App.Import;
+using Neuterradise.App.Trash;
+using Neuterradise.App.SystemServices.Database.Reads;
 using System.IO;
 using System.Security.Cryptography;
 using Microsoft.Data.Sqlite;
@@ -96,6 +100,8 @@ public sealed class LibraryHealthEvaluator
 
         findings.AddRange(await ScanArtifactAuthorityAsync(opts, cancellationToken).ConfigureAwait(false));
 
+        findings.AddRange(await ScanImportLifecycleAsync(opts, cancellationToken).ConfigureAwait(false));
+
         progress?.Report(new HealthScanProgress("Scanning profiles and manifests", itemsScanned, null, findings.Count));
         var profiles = await _catalog.HealthReads.GetHealthProfileItemsAsync(opts.FocusedProfileId, cancellationToken)
             .ConfigureAwait(false);
@@ -109,6 +115,13 @@ public sealed class LibraryHealthEvaluator
         {
             cancellationToken.ThrowIfCancellationRequested();
             itemsScanned++;
+
+            foreach (var text in await new ProfileTextFiles(_catalog).InspectAsync(profile.ProfileId,
+                         cancellationToken, synchronize: false).ConfigureAwait(false))
+                if (text.State != ProfileTextState.Current)
+                    findings.Add(new HealthFinding("PROFILE_TEXT_" + text.State.ToString().ToUpperInvariant(),
+                        HealthSeverity.Warning, profile.ProfileId, null, null, null,
+                        $"{text.FileName}: {text.State}. Open the Profile to review or restore its text file.", false));
 
             knownProfileIds.Add(profile.ProfileId);
             if (!string.IsNullOrWhiteSpace(profile.StorageToken))
@@ -530,14 +543,31 @@ public sealed class LibraryHealthEvaluator
                 continue;
             }
 
-            var assetPlan = _pathPlanner.PlanMedia(
-                asset.OwnerProfileId.Value,
-                asset.OwnerDisplayName ?? "Profile",
-                new ProfileStorageToken(asset.OwnerStorageToken),
-                asset.MediaId,
-                new MediaStorageToken(asset.StorageToken),
-                asset.MediaType,
-                asset.Extension);
+            ManagedPathPlan assetPlan;
+            try
+            {
+                assetPlan = _pathPlanner.PlanMedia(
+                    asset.OwnerProfileId.Value,
+                    asset.OwnerDisplayName ?? "Profile",
+                    new ProfileStorageToken(asset.OwnerStorageToken),
+                    asset.MediaId,
+                    new MediaStorageToken(asset.StorageToken),
+                    asset.MediaType,
+                    asset.Extension);
+            }
+            catch (ArgumentException)
+            {
+                findings.Add(new HealthFinding(
+                    HealthFindingCode.StorageTokenPathMismatch,
+                    HealthSeverity.Error,
+                    asset.OwnerProfileId,
+                    asset.MediaId,
+                    null,
+                    null,
+                    "A managed Media or its owner has an invalid storage token; verify the stored identity before repair.",
+                    RepairAvailable: false));
+                continue;
+            }
 
             var expectedFileName = assetPlan.ManagedFileName!;
             knownMediaFileNames.Add(expectedFileName);
@@ -747,6 +777,15 @@ public sealed class LibraryHealthEvaluator
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var dirName = Path.GetFileName(stagingDir);
+                if (Guid.TryParse(dirName, out var unitId)
+                    && await _catalog.ImportReads.GetUnitSummaryAsync(unitId, cancellationToken).ConfigureAwait(false) is { } unit
+                    && (unit.State.IsUnitCommitted() || unit.State == Neuterradise.App.Import.ImportUnitState.Cancelled && unit.RollbackSettled == true))
+                {
+                    findings.Add(new HealthFinding(HealthFindingCode.ImportTemporaryCleanup, HealthSeverity.Info,
+                        null, null, null, unitId.ToString("D"),
+                        SurfaceText.Get("Health.Import.TemporaryRemaining", "A finished import still has temporary files."), false,
+                        ImportUnitId: unitId, ImportActions: [HealthImportAction.CleanupTemporary]));
+                }
                 if (!await IsOwnedStagingDirectoryAsync(dirName, cancellationToken).ConfigureAwait(false))
                 {
                     findings.Add(new HealthFinding(
@@ -799,6 +838,16 @@ public sealed class LibraryHealthEvaluator
             }
         }
 
+        if (opts.Mode != HealthScanMode.Focused)
+        {
+            var expired = await new TrashReads(_catalog).GetExpiredTrashEntriesAsync(
+                _timeProvider.GetUtcNow().Subtract(TrashRetentionPolicy.Retention), cancellationToken).ConfigureAwait(false);
+            if (expired.Count > 0)
+                findings.Add(new HealthFinding(HealthFindingCode.TrashRetentionPending, HealthSeverity.Info,
+                    null, null, null, null,
+                    SurfaceText.Get("Health.Trash.RetentionPending", "Expired Trash awaits automatic purge at startup or when Trash opens. Protected items remain until safe."), false));
+        }
+
         for (var index = 0; index < findings.Count; index++)
         {
             if (findings[index].RepairAvailable && !RepairPlanner.SupportsFinding(findings[index].Code))
@@ -814,6 +863,41 @@ public sealed class LibraryHealthEvaluator
             itemsScanned,
             elapsed,
             _timeProvider.GetUtcNow());
+    }
+
+    private async Task<IReadOnlyList<HealthFinding>> ScanImportLifecycleAsync(HealthScanOptions options, CancellationToken cancellationToken)
+    {
+        if (options.FocusedProfileId is not null || options.FocusedMediaId is not null) return [];
+        var findings = new List<HealthFinding>();
+        await using var connection = await _catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT import_unit_id,state FROM import_units
+            WHERE (state='CANCELLED' AND COALESCE(rollback_settled,0)=0)
+               OR state IN ('FAILED_RETRYABLE','FAILED_TERMINAL')
+               OR (state IN ('INTAKE','PREPARING','READY_FOR_VERIFICATION') AND is_paused=1);
+            """;
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var id = DbGuid.Parse(reader.GetString(0));
+            if (options.FocusedOperationId is { } focus && focus != id.ToString("D")) continue;
+            var state = reader.GetString(1);
+            var cleanup = state == "CANCELLED";
+            HealthImportAction[] actions = state switch
+            {
+                "CANCELLED" => [HealthImportAction.CompleteCleanup],
+                "FAILED_RETRYABLE" => [HealthImportAction.Retry, HealthImportAction.Cancel],
+                "FAILED_TERMINAL" => [HealthImportAction.Cancel],
+                _ => [HealthImportAction.Resume, HealthImportAction.Cancel],
+            };
+            findings.Add(new HealthFinding(cleanup ? HealthFindingCode.ImportCleanupPending : HealthFindingCode.ImportRecoveryPending,
+                HealthSeverity.Warning, null, null, null, id.ToString("D"),
+                cleanup ? SurfaceText.Get("Health.Import.CleanupPending", "Cancelled import still needs cleanup.")
+                    : SurfaceText.Get("Health.Import.RecoveryPending", "An import is paused or failed. Review its available actions."),
+                false, ImportUnitId: id, ImportActions: actions));
+        }
+        return findings;
     }
 
     private async Task<IReadOnlyList<HealthFinding>> ScanArtifactAuthorityAsync(
@@ -866,8 +950,8 @@ public sealed class LibraryHealthEvaluator
                         var physical = _paths.ResolveVaultRelativePath(VaultPathArea.MediaAssets,relativePath);
                         if (File.Exists(physical))
                         {
-                            var valid = await new MediaAssetFileValidator().ValidateAsync(physical,MediaAssetRole.ModelRender,
-                                cancellationToken,reader.GetString(9)).ConfigureAwait(false);
+                            var valid = await new ModelRenderValidationReceipts(_catalog).ValidateAsync(physical,
+                                reader.GetString(9), cancellationToken, deep: options.Mode == HealthScanMode.Deep).ConfigureAwait(false);
                             if (valid.ByteLength != reader.GetInt64(2) || valid.Sha256 != reader.GetString(3))
                                 throw new InvalidDataException("ModelRender catalog fingerprint differs from validated bytes.");
                             continue;

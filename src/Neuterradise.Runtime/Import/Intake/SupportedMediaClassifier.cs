@@ -7,12 +7,12 @@ public static class SupportedMediaClassifier
 {
     private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tiff", ".tif", ".avif", ".heic", ".heif", ".ico"
+        ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tiff", ".tif", ".avif", ".heic", ".heif", ".ico", ".jp2", ".j2k"
     };
 
     private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".mp4", ".mov", ".mkv", ".webm", ".avi", ".wmv", ".m4v", ".flv", ".3gp", ".ts", ".mpg", ".mpeg"
+        ".mp4", ".mov", ".mkv", ".webm", ".avi", ".wmv", ".m4v", ".flv", ".3gp", ".ts", ".mpg", ".mpeg", ".ogv", ".vob", ".mxf"
     };
 
     private static readonly HashSet<string> ModelExtensions = new(StringComparer.OrdinalIgnoreCase)

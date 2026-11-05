@@ -3,7 +3,7 @@ using Microsoft.Data.Sqlite;
 
 namespace Neuterradise.App.SystemServices.Database;
 
-/// <summary>Reconciles only the recognized Figure format predicates within the existing v1 catalog.</summary>
+/// <summary>Reconciles only the recognized Figure format predicates before catalog contract validation.</summary>
 internal static class ModelFigureSchemaAuthority
 {
     private static readonly string[] Names =
@@ -49,11 +49,5 @@ internal static class ModelFigureSchemaAuthority
         await transaction.CommitAsync(ct).ConfigureAwait(false);
     }
 
-    private static string Normalize(string sql)
-    {
-        var withoutComments = Regex.Replace(sql, @"/\*.*?\*/", "", RegexOptions.Singleline, TimeSpan.FromSeconds(1));
-        return Regex.Replace(withoutComments, @"'(?:''|[^'])*'|\s+",
-            match => match.Value.StartsWith("'") ? match.Value : "",
-            RegexOptions.None, TimeSpan.FromSeconds(1)).TrimEnd(';');
-    }
+    private static string Normalize(string sql) => CatalogSchemaInitializer.NormalizeDefinition(sql);
 }

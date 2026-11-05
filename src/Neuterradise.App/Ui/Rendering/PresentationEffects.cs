@@ -118,13 +118,8 @@ public static class PresentationEffects
     public static void Prewarm(PresentationRuntime runtime)
     {
         // Warm only the curated procedural families; no pack media decoding or unbounded library work.
-        var curated = new HashSet<string>(StringComparer.Ordinal)
-        {
-            "builtin.neuterradise.effect.none", "builtin.neuterradise.effect.bubbles",
-            "builtin.neuterradise.effect.rain", "builtin.neuterradise.effect.snow", "builtin.neuterradise.effect.silk",
-        };
         var plans = runtime.DefinitionsOf(DefinitionKinds.Effect)
-            .Where(definition => curated.Contains(definition.Ref.DefinitionId))
+            .Where(definition => definition.Origin == PackOrigin.BuiltIn && BuiltInPresentationCatalog.IsPrimary(definition.Ref))
             .Select(definition => definition.PlanAs<EffectPlan>().Environment)
             .ToArray();
         BackdropView.PrewarmEffects(plans);

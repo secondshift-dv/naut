@@ -280,7 +280,7 @@ public sealed class FigureRenderer : IDisposable
         depth.WriteMask = 0;
         FigureNative.Check(FigureNative.Method<FigureD3D.CreateDepth>(_device, 21)(_device, ref depth, out _blendDepth));
         var blend = new FigureD3D.BlendDescription { Targets = new FigureD3D.BlendTarget[8] };
-        blend.Targets[0] = new() { Enabled = 1, Source = 5, Destination = 6, Operation = 1,
+        blend.Targets[0] = new() { Enabled = 1, Source = 2, Destination = 6, Operation = 1,
             SourceAlpha = 2, DestinationAlpha = 6, AlphaOperation = 1, WriteMask = 15 };
         FigureNative.Check(FigureNative.Method<FigureD3D.CreateBlend>(_device, 20)(_device, ref blend, out _alphaBlend));
         _pedestal = CreateStageMesh(FigureStageGeometry.Pedestal());
@@ -583,7 +583,9 @@ public sealed class FigureRenderer : IDisposable
             color += ((1-ambientFresnel)*(1-metallic)*base.rgb*diffuseIrradiance+specularIBL)*ao;
             color += emissive;
             color = ToneMap(color);
-            return float4(color,extra.y > 1.5 ? base.a : 1);
+            float alpha = extra.y > 1.5 ? base.a : 1;
+            float3 encoded = lerp(12.92*color, 1.055*pow(max(color,0),1.0/2.4)-0.055, step(0.0031308,color));
+            return float4(encoded*alpha,alpha);
         }
         """;
 }

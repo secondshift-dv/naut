@@ -664,7 +664,8 @@ public sealed class ImportViewModel : ScreenStateViewModel, IDisposable
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(paths);
-        cancellationToken = cancellationToken.CanBeCanceled ? cancellationToken : RouteCancellationToken;
+        cancellationToken = cancellationToken.CanBeCanceled ? cancellationToken
+            : origin == IntakeOrigin.ProfileAddMedia ? _lifetime.Token : RouteCancellationToken;
 
         if (_intake is null)
         {
@@ -714,8 +715,7 @@ public sealed class ImportViewModel : ScreenStateViewModel, IDisposable
                     unsupported)
                 : null;
 
-            // Preparation (fingerprints, duplicate detection, previews) continues without holding the
-            // overlay; the user initiates wizard by clicking Choose Profile on the scheduler row.
+            // Admission and background preparation share the existing pipeline for every intake origin.
             if (_preparationCoordinator is not null)
             {
                 foreach (var unit in usableUnits)

@@ -978,12 +978,13 @@ public sealed class HomeSpotlightViewModel
     public HomeSpotlightViewModel(GalleryProfileSummary summary)
     {
         ArgumentNullException.ThrowIfNull(summary);
-        ProfileId = summary.ProfileId; DisplayName = summary.DisplayName; CategoryName = summary.CategoryName; Tags = summary.Tags; Rating = summary.Rating; IsFavorite = summary.IsFavorite; MediaCount = summary.ActiveOwnedMediaCount;
+        ProfileId = summary.ProfileId; DisplayName = summary.DisplayName; CategoryName = summary.CategoryName; Tags = summary.Tags; AssignedTags = summary.AssignedTags; Rating = summary.Rating; IsFavorite = summary.IsFavorite; MediaCount = summary.ActiveOwnedMediaCount;
     }
     public Guid ProfileId { get; }
     public string DisplayName { get; }
     public string? CategoryName { get; }
     public IReadOnlyList<string> Tags { get; }
+    public IReadOnlyList<ProfileTagAssignment> AssignedTags { get; }
     public int? Rating { get; }
     public bool IsFavorite { get; }
     public long MediaCount { get; }

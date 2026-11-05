@@ -1,0 +1,92 @@
+{
+  "id": "builtin.neuterradise.theme.obsidian",
+  "kind": "theme",
+  "name": "Obsidian",
+  "description": "Dark stone, pale text and crimson accents.",
+  "spec": {
+    "theme": {
+      "schemaVersion": 1,
+      "id": "obsidian",
+      "name": "Obsidian",
+      "isDark": true,
+      "colors": {
+        "canvas": "#FF0B0B0E",
+        "surface1": "#FF151519",
+        "surface2": "#FF202025",
+        "surface3": "#FF2B2B30",
+        "surfaceElevated": "#FF34343A",
+        "surfaceOverlay": "#F2151519",
+        "surfaceHover": "#FF34343B",
+        "surfacePressed": "#FF42424B",
+        "surfaceSelected": "#FF421C24",
+        "textPrimary": "#FFF5F2F1",
+        "textSecondary": "#FFCEC9C8",
+        "textMuted": "#FFA49B9B",
+        "textDisabled": "#FF6F717D",
+        "textInverse": "#FF172026",
+        "textOnAccent": "#FFFFFFFF",
+        "textLink": "#FFE8A5A9",
+        "borderSubtle": "#18FFFFFF",
+        "borderDefault": "#28FFFFFF",
+        "borderStrong": "#44FFFFFF",
+        "borderInteractive": "#FFBE3946",
+        "borderSelected": "#FFBE3946",
+        "focus": "#FFE05B66",
+        "accent": "#FFBE3946",
+        "accentHover": "#FFDA5661",
+        "accentPressed": "#FF96303A",
+        "accentSecondary": "#FFC3B6B5",
+        "selection": "#33BE3946",
+        "selectionHover": "#4DBE3946",
+        "info": "#FF8AB9E5",
+        "success": "#FF8DC5A3",
+        "warning": "#FFE1BD7A",
+        "danger": "#FFE89B9D",
+        "dangerHover": "#FFF0B2B3"
+      },
+      "typography": {
+        "displayFamily": "Segoe UI Variable Display",
+        "headingFamily": "Segoe UI Variable Display",
+        "bodyFamily": "Segoe UI Variable Text",
+        "monoFamily": "Cascadia Mono"
+      },
+      "shape": {
+        "xs": 3,
+        "sm": 5,
+        "md": 8,
+        "lg": 12,
+        "xl": 16
+      },
+      "motion": {
+        "fastMs": 120,
+        "normalMs": 180,
+        "slowMs": 280,
+        "cinematicMs": 500
+      },
+      "background": {
+        "kind": "RadialGlow"
+      },
+      "morphology": {
+        "navigationTreatment": "Underline",
+        "cardPersonality": "Framed",
+        "chromeTreatment": "Flush",
+        "focusTreatment": "Ring",
+        "borderWeight": 1,
+        "elevationStrength": 0.6,
+        "glowStrength": 0.08,
+        "panelOpacity": 0.94,
+        "motionIntensity": 0.65,
+        "navigationRadiusScale": 0.45
+      }
+    },
+    "material": {
+      "personality": "ink-glass",
+      "atmosphere": "ink",
+      "grain": 0.018,
+      "glassOpacity": 0.97,
+      "specular": 0.24,
+      "rimLight": 0.18
+    },
+    "artwork": "theme-icon-obsidian"
+  }
+}

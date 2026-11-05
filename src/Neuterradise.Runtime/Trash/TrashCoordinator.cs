@@ -42,9 +42,63 @@ public sealed class TrashCoordinator
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
+    internal async Task<bool> AdoptCancellationReceiptAsync(Guid unitId, TrashItemSummary entry, CancellationToken cancellationToken)
+    {
+        await using var lease = await _writeCoordinator.EnterAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await _catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = CatalogTransaction.Begin(connection, _writeCoordinator);
+        var current = await ReadTrashEntryAsync(connection, transaction, entry.TrashEntryId, cancellationToken).ConfigureAwait(false);
+        if (current is null || current.RowVersion != entry.RowVersion || current.State != TrashEntryState.InTrash) return false;
+        string json;
+        if (entry.EntityType == TrashEntityType.Media)
+        {
+            var plan = MediaTrashPlan.FromJson(current.PlanJson);
+            if (plan is null || plan.RestoreCheckpoint is not null
+                || plan.CancellationImportUnitId is { } origin && origin != unitId
+                || plan.RelationSnapshots.Count == 0
+                || plan.RelationSnapshots.Any(relation => relation.PublicationImportUnitId != unitId)
+                || !await IsCancellationRollbackMediaEligibleAsync(connection, transaction, unitId, entry.EntityId, cancellationToken).ConfigureAwait(false))
+                return false;
+            if (plan.CancellationImportUnitId == unitId) return true;
+            json = (plan with { CancellationImportUnitId = unitId }).ToJson();
+        }
+        else if (entry.EntityType == TrashEntityType.Profile)
+        {
+            var plan = ProfileTrashPlan.FromJson(current.PlanJson);
+            if (plan is null || plan.RestoreCheckpoint is not null
+                || plan.CancellationImportUnitId is { } origin && origin != unitId) return false;
+            await using var proof = transaction.CreateCommand("""
+                SELECT 1 FROM profiles p JOIN import_units u ON u.destination_profile_id=p.profile_id
+                JOIN storage_operations operation ON operation.operation_id=u.commit_operation_id
+                WHERE p.profile_id=$profileId AND p.visibility='DRAFT' AND u.import_unit_id=$unitId AND u.state='CANCELLED'
+                  AND json_valid(operation.checkpoint_json)
+                  AND COALESCE(json_extract(operation.checkpoint_json,'$.destinationProfileCreated'),
+                               json_extract(operation.checkpoint_json,'$.DestinationProfileCreated'))=1;
+                """);
+            proof.Parameters.AddWithValue("$profileId", DbGuid.Format(entry.EntityId));
+            proof.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
+            if (await proof.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is null) return false;
+            if (plan.CancellationImportUnitId == unitId) return true;
+            json = (plan with { CancellationImportUnitId = unitId }).ToJson();
+        }
+        else return false;
+        await using var update = transaction.CreateCommand("""
+            UPDATE trash_entries SET plan_json=$json, row_version=row_version+1
+            WHERE trash_entry_id=$id AND row_version=$version;
+            """);
+        update.Parameters.AddWithValue("$json", json);
+        update.Parameters.AddWithValue("$id", DbGuid.Format(entry.TrashEntryId));
+        update.Parameters.AddWithValue("$version", entry.RowVersion);
+        if (await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1) return false;
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
     public async Task<OperationResult<MediaTrashPlan>> PrepareMediaTrashAsync(
         Guid assetId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? cancellationImportUnitId = null,
+        Guid? parentProfileTrashEntryId = null)
     {
         EnsureNonEmpty(assetId, nameof(assetId));
 
@@ -60,6 +114,11 @@ public sealed class TrashCoordinator
                     OperationErrorCode.MediaNotFound,
                     "That media item no longer exists.");
             }
+
+            if (cancellationImportUnitId is { } unitId
+                && !await IsCancellationRollbackMediaEligibleAsync(connection, null, unitId, assetId, cancellationToken).ConfigureAwait(false))
+                return OperationResult<MediaTrashPlan>.Conflict(OperationErrorCode.TrashPlanStale,
+                    "Cancellation no longer exclusively owns this media.");
 
             var gate = ValidateMediaIsTrashable(asset);
             if (gate is not null)
@@ -129,6 +188,8 @@ public sealed class TrashCoordinator
                 asset.RowVersion,
                 packageComponents)
             {
+                CancellationImportUnitId = cancellationImportUnitId,
+                ParentProfileTrashEntryId = parentProfileTrashEntryId,
                 MediaAssets = await ReadMediaAssetPlansAsync(connection, assetId, cancellationToken)
                     .ConfigureAwait(false),
             };
@@ -153,7 +214,7 @@ public sealed class TrashCoordinator
     public Task<OperationResult<MediaTrashOutcome>> ExecuteMediaTrashAsync(
         MediaTrashPlan plan,
         CancellationToken cancellationToken = default) =>
-        ExecuteMediaTrashCoreAsync(plan, rollbackImportUnitId: null, cancellationToken);
+        TrashExecutionGate.RunAsync(_catalog, () => ExecuteMediaTrashCoreAsync(plan, rollbackImportUnitId: null, cancellationToken), cancellationToken);
 
     public Task<OperationResult<MediaTrashOutcome>> ExecuteMediaTrashAsync(
         MediaTrashPlan plan,
@@ -161,7 +222,7 @@ public sealed class TrashCoordinator
         CancellationToken cancellationToken = default)
     {
         EnsureNonEmpty(rollbackImportUnitId, nameof(rollbackImportUnitId));
-        return ExecuteMediaTrashCoreAsync(plan, rollbackImportUnitId, cancellationToken);
+        return TrashExecutionGate.RunAsync(_catalog, () => ExecuteMediaTrashCoreAsync(plan, rollbackImportUnitId, cancellationToken), cancellationToken);
     }
 
     private async Task<OperationResult<MediaTrashOutcome>> ExecuteMediaTrashCoreAsync(
@@ -388,9 +449,12 @@ public sealed class TrashCoordinator
 
     public async Task<OperationResult<ProfileTrashPlan>> PrepareProfileTrashAsync(
         Guid profileId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? cancellationImportUnitId = null,
+        bool groupOperation = false)
     {
         EnsureNonEmpty(profileId, nameof(profileId));
+        await using var writerLease = await _writeCoordinator.EnterAsync(cancellationToken).ConfigureAwait(false);
 
         ProfileTrashPlan plan;
 
@@ -435,13 +499,15 @@ public sealed class TrashCoordinator
                 Guid.NewGuid(),
                 _timeProvider.GetUtcNow())
             {
+                IsGroupOperation = groupOperation,
+                CancellationImportUnitId = cancellationImportUnitId,
                 ExpectedCoverMediaId = profile.CoverMediaId,
                 ExpectedBannerMediaId = profile.BannerMediaId,
                 CurrentManagedRelativePath = profile.CurrentManagedRelativePath,
             };
         }
 
-        await _catalog.TrashWrites.PersistEntryAsync(
+        await _catalog.TrashWrites.PersistEntryUnderLeaseAsync(
                 new TrashEntryPersistence(
                     plan.TrashEntryId,
                     TrashEntityType.Profile,
@@ -451,13 +517,17 @@ public sealed class TrashCoordinator
                     plan.ToJson(),
                     plan.PreparedAtUtc,
                     plan.PreparedAtUtc),
-                cancellationToken)
+                writerLease, cancellationToken)
             .ConfigureAwait(false);
 
         return OperationResult<ProfileTrashPlan>.Success(plan, plan.OperationId);
     }
 
-    public async Task<OperationResult<ProfileTrashOutcome>> CommitProfileTrashAsync(
+    public Task<OperationResult<ProfileTrashOutcome>> CommitProfileTrashAsync(ProfileTrashPlan plan,
+        IReadOnlyList<ProfileOwnedMediaDisposition> dispositions, CancellationToken cancellationToken = default) =>
+        TrashExecutionGate.RunAsync(_catalog, () => CommitProfileTrashCoreAsync(plan, dispositions, cancellationToken), cancellationToken);
+
+    private async Task<OperationResult<ProfileTrashOutcome>> CommitProfileTrashCoreAsync(
         ProfileTrashPlan plan,
         IReadOnlyList<ProfileOwnedMediaDisposition> dispositions,
         CancellationToken cancellationToken = default)
@@ -547,7 +617,8 @@ public sealed class TrashCoordinator
 
             if (disposition.Kind == ProfileOwnedMediaDispositionKind.TrashMedia)
             {
-                var prepared = await PrepareMediaTrashAsync(disposition.MediaId, cancellationToken)
+                var prepared = await PrepareMediaTrashAsync(disposition.MediaId, cancellationToken,
+                    parentProfileTrashEntryId: plan.TrashEntryId)
                     .ConfigureAwait(false);
                 if (!prepared.IsSuccess || prepared.Value is null)
                 {
@@ -579,6 +650,26 @@ public sealed class TrashCoordinator
                 return Propagate<ChangePrimaryProfileOutcome, ProfileTrashOutcome>(transfer);
             }
 
+        }
+
+        // OWNER changes are durable before their I/O. Converge that journal before retiring the
+        // source Profile, including a retry where the OWNER transition already completed.
+        var reconciler = new PathReconciler(_catalog.Paths, _catalog.ProfileWrites, _catalog.MediaWrites,
+            new ManagedFileVerifier(), new WindowsVolumeIdentityProvider());
+        foreach (var shared in dispositions.Where(item => item.Kind == ProfileOwnedMediaDispositionKind.ChangeOwner))
+        {
+            var relocated = await reconciler.ReconcileOwnerRelocationAsync(shared.MediaId, cancellationToken).ConfigureAwait(false);
+            if (!relocated.IsSuccess)
+                return OperationResult<ProfileTrashOutcome>.NeedsAttention(OperationErrorCode.ProfilePathReconciliationBlocked,
+                    "Shared media relocation must finish before this Profile can enter Trash.", plan.OperationId);
+        }
+
+        foreach (var file in plan.TextFiles)
+        {
+            var movedText = await _moveExecutor.ExecuteProfileTextTransferAsync(plan.CurrentManagedRelativePath!,
+                VaultPathArea.Profiles, $"_trash/profiles/{plan.ProfileId:D}", VaultPathArea.TrashProfiles,
+                file, cancellationToken).ConfigureAwait(false);
+            if (!movedText.IsSuccess) return MapProfileManifestMoveFailure(movedText);
         }
 
         var profileRecovery = await MoveProfileManifestToRecoveryAsync(plan.ProfileId, cancellationToken)
@@ -647,7 +738,17 @@ public sealed class TrashCoordinator
                 $"Profile Trash plan {plan.TrashEntryId:D} is not pending or executing.");
         }
 
-        var checkpointed = currentPlan with { SelectedDispositions = ordered };
+        var textFiles = new List<ProfileTextTrashSnapshot>();
+        if (currentPlan.CurrentManagedRelativePath is { } sourceFolder)
+            foreach (var name in new[] { "overview.txt", "private-note.txt" })
+            {
+                var path = _catalog.Paths.ResolveVaultRelativePath(VaultPathArea.Profiles, sourceFolder + "/" + name);
+                if (!File.Exists(path)) continue;
+                await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+                var sha = Convert.ToHexString(await System.Security.Cryptography.SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false)).ToLowerInvariant();
+                textFiles.Add(new ProfileTextTrashSnapshot(name, stream.Length, sha));
+            }
+        var checkpointed = currentPlan with { SelectedDispositions = ordered, TextFiles = textFiles };
         await CheckpointTrashEntryAsync(
             transaction,
             plan.TrashEntryId,
@@ -925,7 +1026,8 @@ public sealed class TrashCoordinator
             cancellationToken,
             committedPlan.ToJson()).ConfigureAwait(false);
 
-        await AppendActivityAsync(
+        if (plan.CancellationImportUnitId is null)
+            await AppendActivityAsync(
             transaction,
             ActivityEventType.MediaMovedToTrash,
             plan.OwnerProfileId,
@@ -1085,7 +1187,8 @@ public sealed class TrashCoordinator
             cancellationToken,
             committedPlan.ToJson()).ConfigureAwait(false);
 
-        await AppendActivityAsync(
+        if (plan.CancellationImportUnitId is null)
+            await AppendActivityAsync(
             transaction,
             ActivityEventType.ProfileTrashed,
             plan.ProfileId,
@@ -1366,6 +1469,10 @@ public sealed class TrashCoordinator
 
             if (disposition.Kind == ProfileOwnedMediaDispositionKind.TrashMedia)
             {
+                if (asset.State == MediaState.Active && await ProfileTrashDispositionPlanner.FindOtherConsumerAsync(
+                        connection, disposition.MediaId, plan.ProfileId, cancellationToken).ConfigureAwait(false) is not null)
+                    return ProfileTrashValidation.Rejected(OperationResult<ProfileTrashOutcome>.Conflict(
+                        OperationErrorCode.TrashPlanStale, "This media acquired another active consumer. Reload the Profile before deleting it."));
                 if (disposition.NewOwnerProfileId is not null)
                 {
                     return ProfileTrashValidation.Rejected(OperationResult<ProfileTrashOutcome>.Validation(
@@ -2044,6 +2151,20 @@ public sealed class TrashCoordinator
 
     private static OperationResult<TTarget> Propagate<TSource, TTarget>(OperationResult<TSource> source) =>
         new(source.Status, default, source.ErrorCode, source.UserMessage, source.OperationId);
+
+    internal static async Task<bool> HasGroupPurgeAsync(SqliteConnection connection, MediaTrashPlan? plan, CancellationToken ct)
+    {
+        if (plan?.ParentProfileTrashEntryId is not { } parentId) return false;
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT EXISTS(SELECT 1 FROM trash_entries parent JOIN trash_entries purge
+                ON purge.entity_id=parent.entity_id AND purge.entity_type='PURGE_PROFILE'
+                WHERE parent.trash_entry_id=$id AND parent.entity_type='PROFILE'
+                  AND purge.state IN ('PURGE_PENDING','PURGE_EXECUTING','PURGE_RETRY_REQUIRED'));
+            """;
+        command.Parameters.AddWithValue("$id", parentId.ToString("D"));
+        return Convert.ToInt64(await command.ExecuteScalarAsync(ct).ConfigureAwait(false)) == 1;
+    }
 
     private static void EnsureNonEmpty(Guid value, string parameterName)
     {

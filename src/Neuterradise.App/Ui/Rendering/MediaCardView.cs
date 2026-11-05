@@ -172,7 +172,8 @@ public sealed class MediaCardView : Grid, IDisposable
         _metadataBelow = new Border
         {
             Child = _belowText,
-            Padding = new Thickness(3, 6, 3, 0),
+            Padding = new Thickness(8, 5, 8, 6),
+            Background = ThemeRuntime.Current.Brush("surface2"),
             Visibility = Visibility.Collapsed,
         };
         Children.Add(_metadataBelow.At(1, 0));
@@ -201,6 +202,8 @@ public sealed class MediaCardView : Grid, IDisposable
 
     public void ApplyLayout(MediaLayoutDefinition layout)
     {
+        MaxWidth = layout.CardWidth;
+        MaxHeight = layout.CardHeight;
         _layout = layout;
         var theme = ThemeRuntime.Current;
         var side = layout.MetadataPlacement == MediaMetadataPlacement.Side;
@@ -225,7 +228,14 @@ public sealed class MediaCardView : Grid, IDisposable
         _metadataOverlay.Background = theme.Brush("mediaOverlay");
         _selectionOutline.CornerRadius = new CornerRadius(Math.Max(0, layout.FrameRadius - layout.FrameThickness));
 
-        _frame.CornerRadius = new CornerRadius(layout.FrameRadius);
+        var below = layout.MetadataPlacement == MediaMetadataPlacement.Below;
+        _frame.CornerRadius = below
+            ? new CornerRadius(layout.FrameRadius, layout.FrameRadius, 0, 0)
+            : new CornerRadius(layout.FrameRadius);
+        _metadataBelow.CornerRadius = below
+            ? new CornerRadius(0, 0, layout.FrameRadius, layout.FrameRadius)
+            : new CornerRadius(0);
+        _metadataBelow.Background = theme.Brush("surface2");
         _image.CornerRadiusValue = Math.Max(0, layout.FrameRadius - layout.FrameThickness);
         _innerFrame.CornerRadius = new CornerRadius(Math.Max(0, layout.FrameRadius - 4));
 
@@ -288,6 +298,9 @@ public sealed class MediaCardView : Grid, IDisposable
         var thickness = _layout.FrameStyle == MediaFrameStyle.None ? 0 : _layout.FrameThickness;
         _frame.BorderBrush = theme.Brush(_layout.FrameColor.Replace("token:", string.Empty, StringComparison.Ordinal));
         _frame.BorderThickness = new Thickness(thickness);
+        _metadataBelow.BorderBrush = _frame.BorderBrush;
+        _metadataBelow.BorderThickness = _layout.MetadataPlacement == MediaMetadataPlacement.Below
+            ? new Thickness(thickness, 0, thickness, thickness) : new Thickness(0);
         _selectionOutline.BorderBrush = theme.Brush(_layout.SelectedFrameColor.Replace("token:", string.Empty, StringComparison.Ordinal));
         _selectionOutline.Visibility = card.IsSelected ? Visibility.Visible : Visibility.Collapsed;
 
@@ -310,9 +323,14 @@ public sealed class MediaCardView : Grid, IDisposable
 
         if (_favorite.Content is IconView icon)
         {
-            icon.ColorToken = card.IsFavorite ? "danger" : "onMediaSecondary";
+            icon.ColorToken = card.IsFavorite ? "warning" : "onMediaSecondary";
         }
         _favorite.Opacity = card.IsFavorite ? 1 : 0.72;
+        var favoriteLabel = card.IsFavorite
+            ? UI.T("Media.Favorite.Remove", "Remove from favorites")
+            : UI.T("Media.Favorite.Add", "Mark as favorite");
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(_favorite, favoriteLabel);
+        ToolTipService.SetToolTip(_favorite, favoriteLabel);
     }
 
     private void UpdateMetadata(StackPanel panel, MediaGridCardViewModel card)
@@ -331,6 +349,12 @@ public sealed class MediaCardView : Grid, IDisposable
         if (_layout.MetadataFields.Contains("type"))
         {
             detailParts.Add(MediaSurfaceText.Type(card.MediaType));
+        }
+        if (_layout.MetadataFields.Contains("format"))
+        {
+            var format = Path.GetExtension(card.DisplayFileName ?? string.Empty).TrimStart('.');
+            detailParts.Add(string.IsNullOrWhiteSpace(format)
+                ? MediaSurfaceText.Type(card.MediaType) : format.ToUpperInvariant());
         }
         if (_layout.MetadataFields.Contains("duration") && card.IsVideo && !string.IsNullOrWhiteSpace(card.FormattedDuration))
         {

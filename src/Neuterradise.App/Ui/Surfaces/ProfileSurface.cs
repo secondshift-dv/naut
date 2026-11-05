@@ -47,7 +47,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
     {
         _vm = vm;
         _figureView = new ProfileFigureView(services);
-        _media = new MediaGridPanel(services, vm.MediaGrid, () => Context, ResolvePresentation);
+        _media = new MediaGridPanel(services, vm.MediaGrid, () => Context, ResolvePresentation, BringMediaIntoView);
         ProfileLayoutResolver.TryGetBuiltInPreset(ProfileLayoutResolver.FallbackPresetId, out _layout);
 
         _root.Background = ThemeRuntime.Current.Brush("canvas");
@@ -59,7 +59,10 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         main.Children.Add(_backdrop);
         main.Children.Add(PresentationEffects.View(PresentationSlots.ProfileEffect, () => Context));
         _pageScroll = UI.Scroll(_page);
-        _pageScroll.SizeChanged += (_, args) => QueueModulesRefreshForResize(args.NewSize.Width);
+        _pageScroll.SizeChanged += (_, args) =>
+        {
+            QueueModulesRefreshForResize(args.NewSize.Width);
+        };
         main.Children.Add(_pageScroll);
         _root.Children.Add(main.At(0, 0));
         SidebarDismissal.Observe(_root, point =>
@@ -71,8 +74,10 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         _root.Children.Add(_inspectorHost.At(0, 1));
         _root.SizeChanged += (_, args) =>
         {
-            _inspectorHost.Width = Math.Min(320, Math.Max(240, _root.ActualWidth * 0.38));
-            var floatingInspector = _root.ActualWidth < 840;
+            var floatingInspector = _root.ActualWidth < 960;
+            _inspectorHost.Width = floatingInspector
+                ? Math.Min(Math.Max(260, _root.ActualWidth - 24), Math.Clamp(_root.ActualWidth * 0.84, 300, 390))
+                : Math.Clamp(_root.ActualWidth * 0.27, 320, 420);
             _inspectorHost.At(0, floatingInspector ? 0 : 1, columnSpan: floatingInspector ? 2 : 1);
             _inspectorHost.HorizontalAlignment = HorizontalAlignment.Right;
             QueueModulesRefreshForResize(args.NewSize.Width);
@@ -90,6 +95,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             nameof(ProfileDetailViewModel.DisplayName),
             nameof(ProfileDetailViewModel.CategoryName),
             nameof(ProfileDetailViewModel.Tags),
+            nameof(ProfileDetailViewModel.TextFileIssues),
             nameof(ProfileDetailViewModel.Rating),
             nameof(ProfileDetailViewModel.IsFavorite),
             nameof(ProfileDetailViewModel.CoverSource),
@@ -256,6 +262,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
 
     protected override void OnSuspended()
     {
+        _vm.ClearFolderStatus();
         _vm.CloseInspector();
         _profileHeader.SetActive(false);
         _backdrop.IsSurfaceActive = false;
@@ -335,7 +342,8 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             frame,
             () => Identity(identityAlignment),
             ReducedMotionAuthority.IsReduced, Context,
-            FigureView: figureSource is null ? null : _figureView),
+            FigureView: figureSource is null ? null : _figureView, Tags: _vm.AssignedTags,
+            DetailsFactory: _layout.Id == "chronicle" ? ChronicleDetails : null),
             rebuildIdentity: forceIdentity || previousLayout != _layout);
         _profileHeader.SetActive(IsActive);
     }
@@ -380,7 +388,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             UI.Button(UI.T("Common.Back", "Back"), null, ButtonKind.Ghost, "icon.action.back", _vm.GoBackCommand),
             UI.Button(UI.T("Profile.Edit", "Edit details"), () => Services.RunUserAction(EditDetailsAsync(), "ProfileSurface.EditDetailsAsync", UI.T("Profile.EditFailed", "Profile details could not be saved.")), ButtonKind.Secondary, "icon.action.edit"),
             UI.Button(UI.T("Profile.PrivateNote", "Private note"), () => Services.RunUserAction(EditPrivateNoteAsync(), "ProfileSurface.EditPrivateNoteAsync", "Private note could not be saved."), ButtonKind.Secondary, "icon.action.note"),
-            UI.Button(UI.T("Profile.AddMedia", "Add media"), () => Services.RunUserAction(AddMediaAsync(), "ProfileSurface.AddMediaAsync", UI.T("Profile.AddMediaFailed", "Media could not be added.")), ButtonKind.Secondary, "icon.media.add"),
+            UI.Button(UI.T("Profile.AddMedia", "Add media"), () => Services.RunUserAction(AddMediaAsync(), "ProfileSurface.AddMediaAsync", UI.T("Profile.AddMediaFailed", "Media could not be added.")), ButtonKind.Primary, "icon.media.add"),
             UI.Button(UI.T("Profile.OpenFolder", "Open folder"), null, ButtonKind.Ghost, "icon.action.open-folder", _vm.OpenProfileFolderCommand));
         var statusText = _vm.HasError
             ? _vm.ErrorMessage
@@ -388,10 +396,16 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         FrameworkElement? status = string.IsNullOrWhiteSpace(statusText)
             ? null
             : UI.WrappedText(statusText, "caption", _vm.HasError ? "danger" : "accent");
+        if (_vm.TextFileIssues.Count > 0)
+            status = UI.V(8, status, UI.Button(
+                UI.T("Profile.TextFiles.Review", "Review changed text files"),
+                () => Services.RunUserAction(ReviewTextFilesAsync(), "ProfileSurface.ReviewTextFilesAsync",
+                    UI.T("Profile.TextFiles.Failed", "Text files could not be resolved.")), ButtonKind.Secondary));
         return ProfileIdentityView.Create(
             _vm.DisplayName, _vm.CategoryName, _vm.Tags, _vm.Rating, _vm.IsFavorite, alignment,
             actions: actions,
-            status: status);
+            status: status, assignedTags: _vm.AssignedTags,
+            showTags: _layout.Id != "portrait" || string.IsNullOrWhiteSpace(_vm.BannerVideoPath));
     }
     private void QueueModulesRefresh() => QueueModulesRefresh(force: true);
 
@@ -432,6 +446,15 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         RefreshModules(fallbackForce);
     }
 
+    private void BringMediaIntoView()
+    {
+        // Wait for the loaded page, then scroll its section through the owning page viewport.
+        if (!IsActive || !_media.View.IsLoaded || !_pageScroll.IsLoaded) return;
+        var section = _media.View.Parent as FrameworkElement ?? _media.View;
+        var top = section.TransformToVisual(_pageScroll).TransformPoint(new Windows.Foundation.Point(0, 0)).Y + _pageScroll.VerticalOffset;
+        _pageScroll.ChangeView(null, Math.Clamp(top, 0, _pageScroll.ScrollableHeight), null, disableAnimation: true);
+    }
+
     private double ModulesLayoutWidth()
     {
         // ScrollViewer.ViewportWidth includes the vertical scrollbar and can oscillate by the
@@ -464,6 +487,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         if (_surface is null) _page.Children.Add(_profileHeader);
         _page.Children.Add(_modulesHost);
         _modulesHost.Content = Modules();
+        _profileHeader.RefreshDetails();
         _profileActionsHost.Content = _surface is null ? ProfileActions() : null;
         _page.Children.Add(_profileActionsHost);
 
@@ -483,7 +507,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             UI.F(
                 "Profile.Delete.Retention",
                 "Moves this Profile to Trash for {0} days. Its media stays in the Vault.",
-                ProfileTrashRetentionPolicy.ProfileRetentionDays),
+                TrashRetentionPolicy.RetentionDays),
             "caption",
             "textMuted",
             2);
@@ -509,6 +533,32 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
     {
         UpdateInspector();
         QueueModulesRefresh();
+    }
+
+    private FrameworkElement ChronicleDetails()
+    {
+        var overviewEnabled = _layout.Modules.Any(m => m.Id == ProfileLayoutModuleId.Overview && m.Visible);
+        var relatedEnabled = _layout.Modules.Any(m => m.Id == ProfileLayoutModuleId.Related && m.Visible);
+        var horizontal = ModulesLayoutWidth() >= 760 && overviewEnabled && relatedEnabled;
+        var columns = UI.Grid(horizontal ? "auto" : "auto,auto", horizontal ? "*,*" : "*");
+        columns.ColumnSpacing = 12;
+        columns.RowSpacing = 12;
+        var index = 0;
+        if (overviewEnabled)
+        {
+            var overview = UI.V(8,
+                DetailLayout.Heading(UI.T("Profile.Overview", "Overview"), null, "icon.status.info"),
+                string.IsNullOrWhiteSpace(_vm.Overview)
+                    ? UI.Text(UI.T("Profile.Overview.EmptyDetail", "Use Edit details to add a short description for this Profile."), "caption", "textMuted", 3)
+                    : UI.Text(_vm.Overview, "body", maxLines: 6));
+            columns.Children.Add(UI.Surface(overview, Material.Raised, 12, 10)
+                .At(horizontal ? 0 : index, horizontal ? index : 0));
+            index++;
+        }
+        if (relatedEnabled)
+            columns.Children.Add(UI.Surface(Related(), Material.Raised, 12, 10)
+                .At(horizontal ? 0 : index, horizontal ? index : 0));
+        return columns;
     }
 
     private FrameworkElement Modules()
@@ -550,6 +600,8 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         var appearance = Context.Profile?.Overrides ?? _vm.AppearanceOverrides ?? ProfileAppearanceOverrides.Default;
         foreach (var module in _layout.Modules
             .Where(module => module.Visible
+                && (_layout.Id != "chronicle"
+                    || module.Id is not (ProfileLayoutModuleId.Overview or ProfileLayoutModuleId.Related))
                 && (module.Id != ProfileLayoutModuleId.RecentMedia || appearance.ShowRecentMedia))
             .OrderBy(module => module.Order))
         {
@@ -805,6 +857,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         if (files.Count > 0)
         {
             await Services.ImportAsync(files, _vm.ProfileId, IntakeOrigin.ProfileAddMedia).ConfigureAwait(true);
+            Services.Toast(UI.T("Profile.AddMediaStarted", "Adding media in the background."));
         }
     }
 
@@ -865,6 +918,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
                 UI.Guidance(
                     UI.T("Profile.PrivateNote.GuidanceTitle", "Private information"),
                     UI.T("Profile.PrivateNote.GuidanceDetail", "Use this for context you want to keep with the Profile without showing it in the Profile presentation.")),
+                UI.WrappedText(UI.T("Profile.PrivateNote.FileNotice", "Saved as private-note.txt in the Profile folder. This is plaintext and can be read by anyone with filesystem access."), "caption", "textSecondary"),
                 note,
                 counter,
                 status,
@@ -892,6 +946,45 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         };
 
         await completion.Task.ConfigureAwait(true);
+    }
+
+    private async Task ReviewTextFilesAsync()
+    {
+        await _vm.RefreshTextFilesAsync().ConfigureAwait(true);
+        foreach (var issue in _vm.TextFileIssues.ToArray())
+        {
+            if (issue.State == ProfileTextState.Invalid)
+            {
+                Services.Toast(UI.T("Profile.TextFiles.Invalid", "A text file is unreadable, invalid or unsafe. Check the file before retrying."));
+                continue;
+            }
+            var completion = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+            FrameworkElement? dialog = null;
+            void Choose(int choice)
+            {
+                Services.Root!.Dialogs.Close(dialog!, () => completion.TrySetResult(choice));
+            }
+            var preview = new TextBox
+            {
+                Text = issue.ExternalText ?? string.Empty, IsReadOnly = true, AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap, MinHeight = 100, MaxHeight = 240,
+            };
+            var actions = new VariableWrap(8);
+            if (issue.ExternalText is not null)
+                actions.Children.Add(UI.Button(UI.T("Profile.TextFiles.Adopt", "Use file text"), () => Choose(1), ButtonKind.Primary));
+            actions.Children.Add(UI.Button(issue.ImportOfferId is not null
+                ? UI.T("Profile.TextFiles.Ignore", "Ignore imported text")
+                : UI.T("Profile.TextFiles.Replace", "Write catalog text"), () => Choose(2), ButtonKind.Secondary));
+            actions.Children.Add(UI.Button(UI.T("Overlay.Cancel", "Cancel"), () => Choose(0), ButtonKind.Ghost));
+            dialog = Services.Root!.Dialogs.Show(UI.V(12,
+                UI.Text(issue.ImportOfferId is null ? issue.FileName : UI.T("Profile.TextFiles.Imported", "Imported overview"), "section-title"),
+                UI.WrappedText(UI.T("Profile.TextFiles.Conflict", "The file and catalog differ. Review the file text below. Writing catalog text replaces external edits; Cancel preserves both."), "body"),
+                preview, actions), 640,
+                onDismiss: () => completion.TrySetResult(0), dismissOnScrim: true);
+            var choice = await completion.Task.ConfigureAwait(true);
+            if (choice != 0 && !await _vm.ResolveTextFileAsync(issue, choice == 1).ConfigureAwait(true))
+                Services.Toast(UI.T("Profile.TextFiles.Stale", "The text changed again. Review the latest version before retrying."));
+        }
     }
 
     private async Task EditDetailsAsync()
@@ -1200,7 +1293,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
                 UI.F(
                     "Profile.Delete.Moved",
                     "Profile moved to Trash. It can be restored for {0} days.",
-                    ProfileTrashRetentionPolicy.ProfileRetentionDays),
+                    TrashRetentionPolicy.RetentionDays),
                 "success");
             Services.Navigation.ResetToTopLevel(new GalleryRoute());
         };
@@ -1212,9 +1305,9 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
                 UI.Text(
                     UI.F(
                         "Profile.Delete.Message",
-                        "This removes {0} from the active Vault. The Profile can be restored for {1} days, then it is permanently deleted automatically. Its media stays in the Vault. Settings > Trash can permanently delete it sooner.",
+                        "Move {0} to Trash Bin. You can restore this Profile for {1} days before automatic permanent deletion. Its media stays in the Vault. Settings > Trash Bin can permanently delete the Profile sooner.",
                         _vm.DisplayName,
-                        ProfileTrashRetentionPolicy.ProfileRetentionDays),
+                        TrashRetentionPolicy.RetentionDays),
                     "body",
                     maxLines: 8),
                 status,

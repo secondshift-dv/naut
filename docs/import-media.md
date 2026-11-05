@@ -23,6 +23,14 @@ A duplicate with identical content can reuse compatible preparation that already
 
 The import review can suggest presentation media, but **Cover and Banner can always be changed later**.
 
+## Imports, recovery and supported containers
+
+In v0.0.7, **Add media** from a Profile imports eligible files directly into that Profile. The general **Import** surface still supports explicit review. Durable Import Activity records successes and exceptions; compatible exact duplicates can reuse existing content.
+
+Transfers retain a staged copy and incremental SHA-256, with durable Resume and safe Cancel. Cancel settles an active copy at a checkpoint before cleaning interrupted staging; **Settings → Vault → Vault Health** can help resume, retry or finish interrupted cleanup. The copied originals in the Vault and original files outside the Vault are not silently removed by cancelling.
+
+Additional eligible inputs include JPEG 2000 (`.jp2`, `.j2k`), OGV/Theora, VOB and representative MXF containers. Actual support depends on the contained codec; damaged or unsupported media can still require attention. Video previews use prepared Thumbnail and Hover assets where supported.
+
 ## Originals and prepared media
 
 Import remains a copy operation. The source file outside Naut is not cut or replaced. Prepared derivatives exist to make Naut responsive and presentation-aware; they are not destructive edits to the original file.

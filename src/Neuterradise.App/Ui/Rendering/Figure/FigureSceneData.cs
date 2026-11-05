@@ -25,11 +25,14 @@ public sealed class FigureSceneData
     public long ByteLength { get; }
 
     public static async Task<FigureSceneData> LoadAsync(string nfigPath, string? expectedSourceSha256 = null,
-        int preferredLod = 1, CancellationToken ct = default, int maximumTextureDimension = 2048)
+        int preferredLod = 1, CancellationToken ct = default, int maximumTextureDimension = 2048,
+        ModelRenderFile? validatedFile = null)
     {
         if (preferredLod is < 0 or > 3) throw new ArgumentOutOfRangeException(nameof(preferredLod));
         if (maximumTextureDimension is < 1 or > 8192) throw new ArgumentOutOfRangeException(nameof(maximumTextureDimension));
-        var file = await ModelRenderContainer.ValidateAsync(nfigPath, expectedSourceSha256, ct).ConfigureAwait(false);
+        var file = validatedFile ?? await ModelRenderContainer.ValidateAsync(nfigPath, expectedSourceSha256, ct).ConfigureAwait(false);
+        if (expectedSourceSha256 is not null && file.Header.SourceSha256 != expectedSourceSha256)
+            throw new InvalidDataException("Figure source provenance differs from its validated descriptor.");
         var selected = new List<ModelRenderMesh>();
         var group = new List<ModelRenderMesh>();
         foreach (var mesh in file.Header.Meshes)

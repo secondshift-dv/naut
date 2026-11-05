@@ -357,8 +357,15 @@ public sealed class MediaGridViewModel : INotifyPropertyChanged, IDisposable
         get => _totalCount;
         set
         {
-            if (SetField(ref _totalCount, value))
+            if (SetField(ref _totalCount, Math.Max(0, value)))
             {
+                if (_currentPage > TotalPages)
+                {
+                    _currentPage = TotalPages;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CurrentPage)));
+                    QueryChangedAction?.Invoke();
+                }
+
                 NotifyPaginationChanged();
             }
         }

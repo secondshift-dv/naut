@@ -122,7 +122,7 @@ public sealed partial class CustomizationCenter
                 CardDataFactory.AppearanceFor(working.Overrides, frame, ReducedMotionAuthority.IsReduced),
                 subjectMedia.Cover,
                 subjectMedia.Banner,
-                frame);
+                frame) { AssignedTags = subject.Detail.AssignedTags };
         }
 
         var card = _services.Root?.SampleCard(_session.Context.ProfileId);
@@ -194,7 +194,8 @@ public sealed partial class CustomizationCenter
                 model?.TagList ?? _subject?.Detail.Tags ?? [],
                 model?.Rating ?? _subject?.Detail.Rating,
                 model?.IsFavorite ?? _subject?.Detail.IsFavorite ?? false,
-                layout.IdentityAlignment);
+                layout.IdentityAlignment, assignedTags: _subject?.Detail.AssignedTags,
+                showTags: layout.Id != "portrait" || string.IsNullOrWhiteSpace(_bannerVideoPath));
         }
 
         var figurePreview = UpdateFigurePreviewSource();
@@ -207,7 +208,7 @@ public sealed partial class CustomizationCenter
             IdentityPreview,
             ReducedMotionAuthority.IsReduced, _session.LiveContext,
             FigureView: figurePreview,
-            FigureSize: _figureEditorOpen ? 240 : 300));
+            FigureSize: _figureEditorOpen ? 240 : 300, Tags: _subject?.Detail.AssignedTags));
         _profilePreviewHeader.SetActive(true);
         AttachFraming(_profilePreviewHeader.CoverFramingSurface, false);
         AttachFraming(_profilePreviewHeader.BannerFramingSurface, true);
@@ -298,9 +299,9 @@ public sealed partial class CustomizationCenter
             || layout.CoverPlacement == ProfileLayoutCoverPlacement.None;
         return (bannerHidden, frameHidden) switch
         {
-            (true, true) => UI.T("Customize.PreviewNotice.BannerAndFrameHidden", "This Profile Layout hides the Banner and Cover Frame. You can edit them here, but choose a layout that displays them to make them visible."),
-            (true, false) => UI.T("Customize.PreviewNotice.BannerHidden", "This Profile Layout hides the Banner. You can edit it here, but choose a layout with a Banner to make it visible."),
-            (false, true) => UI.T("Customize.PreviewNotice.FrameHidden", "This Profile Layout hides the Cover Frame. You can edit it here, but choose a layout that displays the frame to make it visible."),
+            (true, true) => UI.T("Customize.PreviewNotice.BannerAndFrameHidden", "This layout hides the Banner and Frame. Saving keeps your changes. To show them, choose a layout that includes them."),
+            (true, false) => UI.T("Customize.PreviewNotice.BannerHidden", "This layout hides the Banner. Saving keeps your choice. To show it, choose a layout with a Banner."),
+            (false, true) => UI.T("Customize.PreviewNotice.FrameHidden", "This layout hides the Frame. Saving keeps your choice. To show it, choose a layout with a Frame."),
             _ => null,
         };
     }

@@ -4,6 +4,8 @@ Naut is a local-first media collection manager for Windows. Start here if you ar
 
 ## Using Naut
 
+- [Naut v0.0.7 release notes](releases/v0.0.7.md) — changes since v0.0.6, update instructions, Vault compatibility and verification limits.
+
 - [Getting Started](getting-started.md) — download, extract, create or pick a Vault, and start using Naut.
 - [Import Media](import-media.md) — bring images, videos, folders, and supported 3D models into a Vault.
 - [Face Intelligence](face-intelligence.md) — how YuNet, SFace, local identity samples, and reviewable Profile candidates fit together.
@@ -13,7 +15,7 @@ Naut is a local-first media collection manager for Windows. Start here if you ar
 - [Languages](languages.md) — the eight interface languages and what changing language does and does not affect.
 - [3D Figures](figures.md) — optional interactive 3D presentation and its performance tier.
 - [Model formats](model-formats.md) — GLB, FBX, OBJ, STL and 3MF preparation, textures and package dependencies.
-- [System Requirements](system-requirements.md) — minimum and recommended requirements for Naut v0.0.4.
+- [System Requirements](system-requirements.md) — minimum and recommended requirements for Naut v0.0.7.
 - [FAQ & Troubleshooting](troubleshooting.md) — common installation, media, face analysis, video, Figure, and update questions.
 
 ## Developers and contributors

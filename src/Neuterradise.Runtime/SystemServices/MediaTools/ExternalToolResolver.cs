@@ -42,7 +42,7 @@ public sealed class ExternalToolResolver
 
     private static ExternalToolResolver CreateForInstall(InstallPaths install)
     {
-        var catalog = DeploymentArtifactCatalog.TryLoad(install);
+        var catalog = DeploymentArtifactCatalog.TryLoad(install.RuntimeRoot);
         return catalog is null
             ? new ExternalToolResolver(null, install.RuntimeRoot)
             : new ExternalToolResolver(catalog, install.RuntimeRoot);

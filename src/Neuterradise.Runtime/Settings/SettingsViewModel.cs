@@ -477,7 +477,7 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
         UpdateCoordinator.StatusChecking => SurfaceText.Get("Settings.Update.Status.Checking", "Checking for updates…"),
         UpdateCoordinator.StatusAvailable => SurfaceText.Get("Settings.Update.Status.Available", "Update available"),
         UpdateCoordinator.StatusUnavailable => SurfaceText.Get("Settings.Update.Status.Unavailable", "No update available"),
-        UpdateCoordinator.StatusPlanning => SurfaceText.Get("Settings.Update.Status.Planning", "Planning update…"),
+        UpdateCoordinator.StatusPlanning => SurfaceText.Get("Settings.Update.Status.Planning", "Preparing update…"),
         UpdateCoordinator.StatusDownloading => _updateState.Transfer is { TotalBytes: not null } transfer
             ? $"{SurfaceText.Get("Settings.Update.Status.Downloading", "Downloading update…")} {transfer.Percentage:0}% — {transfer.CompletedBytes / 1048576d:0.0} / {transfer.TotalBytes / 1048576d:0.0} MB"
             : SurfaceText.Get("Settings.Update.Status.Downloading", "Downloading update…"),
@@ -551,7 +551,7 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
         try
         {
             var install = InstallPaths.CreateProduction();
-            var artifacts = DeploymentArtifactCatalog.TryLoad(install);
+            var artifacts = DeploymentArtifactCatalog.TryLoad(install.RuntimeRoot);
             ThirdPartyComponents = artifacts?.Sources
                 .Where(source => source.LicenseUrl is not null)
                 .Select(source =>
@@ -592,7 +592,7 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
     private DiagnosticVersionReport CreateVersionReport()
     {
 
-        var artifacts = DeploymentArtifactCatalog.TryLoad(InstallPaths.CreateProduction());
+        var artifacts = DeploymentArtifactCatalog.TryLoad(InstallPaths.CreateProduction().RuntimeRoot);
         if (artifacts is null)
         {
             Trace.TraceWarning(

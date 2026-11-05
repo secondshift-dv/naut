@@ -8,7 +8,7 @@ using Windows.Storage.Pickers;
 
 namespace Neuterradise.App.Ui;
 
-/// <summary>Compact focused dialogs : fit 800 × 600, never substitute pages.</summary>
+/// <summary>Focused dialogs with a scrolling body bounded by the available window.</summary>
 public sealed class DialogService(ProductRoot root)
 {
     private readonly List<DialogEntry> _openDialogs = [];
@@ -201,7 +201,7 @@ public sealed class OverlayPresenter(AppServices services, ProductRoot root)
         "Select a Profile to assign this face detection to:" => UI.T("Faces.Picker.AssignPrompt", "Choose a Profile to assign this face detection to:"),
         "Choose a Profile to assign this face detection to:" => UI.T("Faces.Picker.AssignPrompt", "Choose a Profile to assign this face detection to:"),
         "Choose a Profile. Gallery will show Profiles related to it." => UI.T("Gallery.RelatedPicker.Prompt", "Choose a Profile. Gallery will show Profiles related to it."),
-        "Choose a Profile to link:" => UI.T("SurfaceText.Select.Existing.Profile.7B23D2D3", "Choose a Profile"),
+        "Choose a Profile to link:" => UI.T("SurfaceText.Select.Existing.Profile.7B23D2D3", "Choose a profile"),
         _ => prompt,
     };
 
@@ -359,7 +359,7 @@ public static class StartupScreens
         var root = new Grid { Background = theme.Brush("canvas") };
         root.Children.Add(new BackdropView { Plan = BackdropPlan.Still(), IsSurfaceActive = false });
         root.Children.Add(UI.V(16,
-            BrandAssets.Lockup(64, 36, animateMark: true).Align(HorizontalAlignment.Center),
+            BrandAssets.Lockup(40, 12, animateMark: true).Align(HorizontalAlignment.Center),
             UI.Text(status, "caption", "textSecondary", 2).Align(HorizontalAlignment.Center),
             new ProgressBar { IsIndeterminate = true, Width = 128, Height = 3 }
                 .Align(HorizontalAlignment.Center)).Align(HorizontalAlignment.Center, VerticalAlignment.Center));

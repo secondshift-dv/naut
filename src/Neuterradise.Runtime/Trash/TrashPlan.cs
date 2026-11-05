@@ -90,6 +90,10 @@ public sealed record MediaTrashPlan(
     [JsonInclude]
     public int Version { get; init; } = SchemaVersion;
 
+    public Guid? CancellationImportUnitId { get; init; }
+
+    public Guid? ParentProfileTrashEntryId { get; init; }
+
     public MediaRestoreCheckpoint? RestoreCheckpoint { get; init; }
 
     public IReadOnlyList<MediaProfileRelationSnapshot> RelationSnapshots { get; init; } = [];
@@ -133,6 +137,8 @@ public sealed record MediaTrashPlan(
 
         return other is not null
             && Version == other.Version
+            && CancellationImportUnitId == other.CancellationImportUnitId
+            && ParentProfileTrashEntryId == other.ParentProfileTrashEntryId
             && TrashEntryId == other.TrashEntryId
             && MediaId == other.MediaId
             && OwnerProfileId == other.OwnerProfileId
@@ -160,6 +166,7 @@ public sealed record MediaTrashPlan(
         var hash = new HashCode();
         hash.Add(Version);
         hash.Add(TrashEntryId);
+        hash.Add(CancellationImportUnitId);
         hash.Add(MediaId);
         hash.Add(OwnerProfileId);
         hash.Add(MediaStorageToken);
@@ -235,6 +242,8 @@ public sealed record ProfileIdentitySnapshot(
 public sealed record ProfileTrashCheckpoint(
     string RecoveryRelativePath);
 
+public sealed record ProfileTextTrashSnapshot(string FileName, long ByteLength, string Sha256);
+
 public sealed record ProfileRestoreCheckpoint(
     string RecoveryRelativePath,
     string TargetManagedRelativePath);
@@ -274,6 +283,10 @@ public sealed record ProfileTrashPlan(
     [JsonInclude]
     public int Version { get; init; } = SchemaVersion;
 
+    public Guid? CancellationImportUnitId { get; init; }
+
+    public bool IsGroupOperation { get; init; }
+
     public Guid? ExpectedCoverMediaId { get; init; }
 
     public Guid? ExpectedBannerMediaId { get; init; }
@@ -281,6 +294,8 @@ public sealed record ProfileTrashPlan(
     public long? ExpectedAppearanceRowVersion { get; init; }
 
     public IReadOnlyList<ProfileOwnedMediaDisposition> SelectedDispositions { get; init; } = [];
+
+    public IReadOnlyList<ProfileTextTrashSnapshot> TextFiles { get; init; } = [];
 
     public IReadOnlyList<ProfileOwnerTransferReceipt> OwnerTransferReceipts { get; init; } = [];
 
@@ -306,7 +321,10 @@ public sealed record ProfileTrashPlan(
         try
         {
             var plan = JsonSerializer.Deserialize<ProfileTrashPlan>(json, TrashPlanJson.Options);
-            return plan is null || plan.Version != SchemaVersion ? null : plan;
+            return plan is null || plan.Version != SchemaVersion || plan.TextFiles is null || plan.TextFiles.Count > 2
+                || plan.TextFiles.Any(file => file is null || file.FileName is not ("overview.txt" or "private-note.txt")
+                    || file.ByteLength < 0 || file.Sha256 is not { Length: 64 } || file.Sha256.Any(c => !char.IsAsciiHexDigit(c)))
+                || plan.TextFiles.Select(file => file.FileName).Distinct().Count() != plan.TextFiles.Count ? null : plan;
         }
         catch (JsonException)
         {
@@ -327,6 +345,8 @@ public sealed record ProfileTrashPlan(
 
         return other is not null
             && Version == other.Version
+            && CancellationImportUnitId == other.CancellationImportUnitId
+            && IsGroupOperation == other.IsGroupOperation
             && TrashEntryId == other.TrashEntryId
             && ProfileId == other.ProfileId
             && ExpectedProfileRowVersion == other.ExpectedProfileRowVersion
@@ -341,6 +361,7 @@ public sealed record ProfileTrashPlan(
             && RestoreCheckpoint == other.RestoreCheckpoint
             && OwnedActiveMedias.SequenceEqual(other.OwnedActiveMedias)
             && SelectedDispositions.SequenceEqual(other.SelectedDispositions)
+            && TextFiles.SequenceEqual(other.TextFiles)
             && OwnerTransferReceipts.SequenceEqual(other.OwnerTransferReceipts)
             && RelationSnapshots.SequenceEqual(other.RelationSnapshots)
             && CurrentManagedRelativePath == other.CurrentManagedRelativePath;
@@ -351,6 +372,7 @@ public sealed record ProfileTrashPlan(
         var hash = new HashCode();
         hash.Add(Version);
         hash.Add(TrashEntryId);
+        hash.Add(CancellationImportUnitId);
         hash.Add(ProfileId);
         hash.Add(ExpectedProfileRowVersion);
         hash.Add(ExpectedCoverMediaId);

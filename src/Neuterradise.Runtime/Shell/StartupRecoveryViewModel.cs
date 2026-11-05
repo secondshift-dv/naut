@@ -149,7 +149,7 @@ public sealed class StartupRecoveryViewModel
             "VAULT_ROOT_IO_FAILURE" => "Windows reported an I/O failure while opening the vault folder. No data was changed.",
             "CONFIGURATION_UNREADABLE" => "The configuration file exists but is not valid. The original file was preserved next to it for diagnosis and no settings were overwritten.",
             "CONFIGURATION_ACCESS_DENIED" => "Application configuration and diagnostics live in the application data folder, which this account may not read or write.",
-            "DATABASE_INITIALIZATION_FAILED" => "The catalog database could not be created or did not match Catalog Schema v1. No database upgrade was attempted.",
+            "DATABASE_INITIALIZATION_FAILED" => "The catalog could not be opened safely. Check access and use a build that supports this Vault's catalog format.",
             "RECOVERY_FAILED" => "Persisted recovery work could not reach a safe checkpoint. No repair was guessed and nothing was deleted.",
             "CRITICAL_INTEGRITY_VIOLATION" => "The Vault contains an authority conflict that must be resolved before writable access is safe. Opening it anyway could corrupt the Vault.",
             "STARTUP_CANCELLED" => "Startup stopped before writable access was established. Nothing was changed.",

@@ -2,13 +2,14 @@ using System.IO;
 using System.Threading;
 using Neuterradise.Profiling.Protocol;
 using Neuterradise.Release.Contracts;
+using Neuterradise.App.SystemServices.MediaTools;
 
 namespace Neuterradise.Profiling.Worker;
 
 /// <summary>
 /// Process-lifetime deployment authority for the Profiling Worker. The trusted parent app supplies
-/// InstallRoot explicitly; the worker never infers model locations from its working directory or
-/// executable placement.
+/// InstallRoot explicitly; model and verified frame-decoder locations never come from the working
+/// directory or PATH. Tool eligibility reuses the shared deployment artifact contract.
 /// </summary>
 internal sealed class WorkerRuntimeEnvironment
 {
@@ -35,6 +36,22 @@ internal sealed class WorkerRuntimeEnvironment
     public string RuntimeRoot { get; }
 
     public string ModelsRoot { get; }
+
+    private readonly Lock _toolLock = new();
+    private bool _frameDecoderResolved;
+    private string? _frameDecoder;
+
+    public string? ResolveFrameDecoder()
+    {
+        lock (_toolLock)
+        {
+            if (_frameDecoderResolved) return _frameDecoder;
+            var status = DeploymentArtifactCatalog.TryLoad(RuntimeRoot)?.DescribeTool("ffmpeg", RuntimeRoot);
+            _frameDecoder = status?.IsUsable == true ? status.ResolvedPath : null;
+            _frameDecoderResolved = true;
+            return _frameDecoder;
+        }
+    }
 
     public string ResolveModelPath(string modelId, string artifactFileName)
     {

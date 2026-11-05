@@ -94,10 +94,15 @@ public sealed class TrashOperations
         return await _trashCoordinator.ExecuteMediaTrashAsync(prepareResult.Value, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<OperationResult<ProfileTrashOutcome>> MoveProfileToTrashAsync(
+    public Task<OperationResult<ProfileTrashOutcome>> MoveProfileToTrashAsync(Guid profileId,
+        CancellationToken cancellationToken = default) =>
+        TrashExecutionGate.RunAsync(_catalog, () => MoveProfileToTrashCoreAsync(profileId, cancellationToken), cancellationToken);
+
+    private async Task<OperationResult<ProfileTrashOutcome>> MoveProfileToTrashCoreAsync(
         Guid profileId,
         CancellationToken cancellationToken = default)
     {
+        using var admission = _catalog.MutationAdmission.Enter(nameof(MoveProfileToTrashAsync));
         if (profileId == Guid.Empty)
         {
             return OperationResult<ProfileTrashOutcome>.Validation(
@@ -122,7 +127,7 @@ public sealed class TrashOperations
             }
         }
 
-        var prepare = await PrepareTrashProfileAsync(profileId, cancellationToken)
+        var prepare = await _trashCoordinator.PrepareProfileTrashAsync(profileId, cancellationToken, groupOperation: true)
             .ConfigureAwait(false);
         if (!prepare.IsSuccess || prepare.Value is null)
         {

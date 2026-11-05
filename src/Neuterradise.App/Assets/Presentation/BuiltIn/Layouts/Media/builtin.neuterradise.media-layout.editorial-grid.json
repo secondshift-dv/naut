@@ -1,0 +1,29 @@
+{
+  "id": "builtin.neuterradise.media-layout.editorial-grid",
+  "kind": "profile-media-layout",
+  "name": "Editorial",
+  "spec": {
+    "layoutId": "editorial-grid",
+    "cardWidth": 230,
+    "aspect": 1.32,
+    "mediaWidthFraction": 1,
+    "fit": "fill",
+    "metadataPlacement": "below",
+    "metadataFields": [
+      "name",
+      "duration",
+      "format"
+    ],
+    "metadataLines": 2,
+    "frameStyle": "hairline",
+    "frameRadius": 8,
+    "frameThickness": 2,
+    "frameColor": "token:borderDefault",
+    "selectedFrameColor": "token:accent",
+    "frameGlow": 0,
+    "hoverStyle": "lift",
+    "showTypeBadge": false,
+    "browse": "editorial"
+  },
+  "description": "Framed editorial images with persistent captions, distinct from the dense Mosaic."
+}

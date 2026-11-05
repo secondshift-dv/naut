@@ -2,6 +2,10 @@ namespace Neuterradise.App.Maintenance;
 
 public static class HealthFindingCode
 {
+    public const string ImportTemporaryCleanup = "IMPORT_TEMPORARY_CLEANUP";
+    public const string TrashRetentionPending = "TRASH_RETENTION_PENDING";
+    public const string ImportCleanupPending = "IMPORT_CLEANUP_PENDING";
+    public const string ImportRecoveryPending = "IMPORT_RECOVERY_PENDING";
     public const string ProfileFolderMissing = "PROFILE_FOLDER_MISSING";
 
     public const string ProfileFolderNameMismatch = "PROFILE_FOLDER_NAME_MISMATCH";

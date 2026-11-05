@@ -80,7 +80,7 @@ public static class ModelRenderContainer
     }
 
     public static async Task<ModelRenderFile> ValidateAsync(string path, string? expectedSourceSha256 = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default, bool backgroundIo = false)
     {
         await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
             65536, FileOptions.Asynchronous | FileOptions.SequentialScan);
@@ -110,6 +110,8 @@ public static class ModelRenderContainer
             var remaining = chunk.Length;
             while (remaining > 0)
             {
+                if (backgroundIo)
+                    await Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.YieldBackgroundDiskAsync(ct).ConfigureAwait(false);
                 var count = Math.Min(remaining, buffer.Length);
                 // Geometry values are validated in aligned blocks without allocating a full scene.
                 if (chunk.Kind == "VERTICES" && count < remaining) count -= count % VertexStride;
@@ -141,6 +143,28 @@ public static class ModelRenderContainer
         if (Convert.ToHexStringLower(SHA256.HashData(bytes)) != chunk.Sha256) throw Invalid("changed chunk");
         ValidateValues(file.Header, index, bytes);
         return bytes;
+    }
+
+    internal static async Task<ModelRenderFile> ReadTrustedDescriptorAsync(string path, string sourceSha256,
+        string assetSha256, long byteLength, CancellationToken ct)
+    {
+        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+            65536, FileOptions.Asynchronous);
+        if (stream.Length != byteLength || byteLength is < 12 or > MaxBytes) throw Invalid("file length");
+        var prefix = new byte[12];
+        await ReadExactlyAsync(stream, prefix, ct).ConfigureAwait(false);
+        var length = BinaryPrimitives.ReadInt32LittleEndian(prefix.AsSpan(8));
+        if (BinaryPrimitives.ReadUInt32LittleEndian(prefix) != Magic
+            || BinaryPrimitives.ReadInt32LittleEndian(prefix.AsSpan(4)) != ContractVersion
+            || length is < 2 or > MaxHeaderBytes || length > byteLength - 12) throw Invalid("header");
+        var json = new byte[length];
+        await ReadExactlyAsync(stream, json, ct).ConfigureAwait(false);
+        ModelRenderHeader header;
+        try { header = JsonSerializer.Deserialize<ModelRenderHeader>(json, JsonOptions) ?? throw Invalid("empty header"); }
+        catch (JsonException ex) { throw new InvalidDataException("Malformed NFIG descriptors.", ex); }
+        ValidateHeader(header, byteLength - stream.Position);
+        if (header.SourceSha256 != sourceSha256) throw Invalid("source provenance");
+        return new(header, stream.Position, byteLength, assetSha256);
     }
 
     private static void ValidateHeader(ModelRenderHeader h, long payloadLength)

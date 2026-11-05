@@ -141,18 +141,8 @@ public sealed class AutomaticImportAssignmentService
                 {
                     var identityId = DbGuid.Parse(reader.GetString(6));
                     var suggestion = FaceSuggestionEvidenceV1.TryParse(reader.GetString(8));
-                    var ordered = (suggestion?.Candidates ?? [])
-                        .OrderByDescending(static candidate => candidate.Similarity)
-                        .ThenBy(static candidate => candidate.IdentityId)
-                        .ToArray();
-                    var top = ordered.FirstOrDefault();
-                    var second = ordered.Skip(1).FirstOrDefault();
-                    if (top is not null
-                        && top.IdentityId == identityId
-                        && top.Similarity >= AutomaticMediaAssignmentPolicy.StrongFaceSimilarity
-                        && (second is null
-                            || top.Similarity - second.Similarity
-                                >= AutomaticMediaAssignmentPolicy.StrongFaceMargin))
+                    var top = AutomaticMediaAssignmentPolicy.GetStrongFaceSuggestion(suggestion);
+                    if (top is not null && top.IdentityId == identityId)
                     {
                         profileId = DbGuid.Parse(reader.GetString(7));
                         similarity = top.Similarity;

@@ -22,7 +22,7 @@
             "direction": "down",
             "particleShape": "dot",
             "count": 56,
-            "opacity": 0.30,
+            "opacity": 0.3,
             "speed": 0.55,
             "sizeMin": 1,
             "sizeMax": 3,
@@ -37,5 +37,6 @@
         "layers": []
       }
     }
-  }
+  },
+  "description": "Soft drifting snow."
 }

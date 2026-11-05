@@ -41,7 +41,11 @@ public sealed class RestoreExecutor
             ?? new ProfileOwnershipRestoreCoordinator(catalog);
     }
 
-    public async Task<OperationResult<MediaRestoreOutcome>> RestoreMediaAsync(
+    public Task<OperationResult<MediaRestoreOutcome>> RestoreMediaAsync(Guid trashEntryId,
+        Guid? targetOwnerProfileId = null, CancellationToken cancellationToken = default) =>
+        TrashExecutionGate.RunAsync(_catalog, () => RestoreMediaCoreAsync(trashEntryId, targetOwnerProfileId, cancellationToken), cancellationToken);
+
+    private async Task<OperationResult<MediaRestoreOutcome>> RestoreMediaCoreAsync(
         Guid trashEntryId,
         Guid? targetOwnerProfileId = null,
         CancellationToken cancellationToken = default)
@@ -63,6 +67,9 @@ public sealed class RestoreExecutor
             }
 
             var parsed = MediaTrashPlan.FromJson(entry.PlanJson);
+            if (parsed?.CancellationImportUnitId is not null)
+                return OperationResult<MediaRestoreOutcome>.Conflict(OperationErrorCode.TrashPlanStale,
+                    "This is unfinished import cleanup, not a restorable deletion.");
             if (parsed is null || entry.RecoveryRelativePath is null)
             {
                 return OperationResult<MediaRestoreOutcome>.NeedsAttention(
@@ -71,6 +78,10 @@ public sealed class RestoreExecutor
             }
 
             plan = parsed;
+
+            if (await TrashCoordinator.HasGroupPurgeAsync(connection, plan, cancellationToken).ConfigureAwait(false))
+                return OperationResult<MediaRestoreOutcome>.Conflict(OperationErrorCode.PurgeStateInvalid,
+                    "This media belongs to an active Profile group Purge.");
 
             var current = await TrashCoordinator.ReadMediaTrashStateAsync(
                     connection, transaction: null, entry.EntityId, cancellationToken).ConfigureAwait(false);
@@ -303,7 +314,11 @@ public sealed class RestoreExecutor
             "The destination Profile kept changing while this media item was being restored. Retry when that change is finished.");
     }
 
-    public async Task<OperationResult<ProfileRestoreOutcome>> RestoreProfileAsync(
+    public Task<OperationResult<ProfileRestoreOutcome>> RestoreProfileAsync(Guid trashEntryId,
+        CancellationToken cancellationToken = default) =>
+        TrashExecutionGate.RunAsync(_catalog, () => RestoreProfileCoreAsync(trashEntryId, cancellationToken), cancellationToken);
+
+    private async Task<OperationResult<ProfileRestoreOutcome>> RestoreProfileCoreAsync(
         Guid trashEntryId,
         CancellationToken cancellationToken = default)
     {
@@ -327,6 +342,9 @@ public sealed class RestoreExecutor
 
             entry = currentEntry;
             var parsedPlan = ProfileTrashPlan.FromJson(entry.PlanJson);
+            if (parsedPlan?.CancellationImportUnitId is not null)
+                return OperationResult<ProfileRestoreOutcome>.Conflict(OperationErrorCode.TrashPlanStale,
+                    "This is unfinished import cleanup, not a restorable deletion.");
             if (parsedPlan is null)
             {
                 return OperationResult<ProfileRestoreOutcome>.NeedsAttention(
@@ -432,6 +450,13 @@ public sealed class RestoreExecutor
         }
 
         var restoreCheckpoint = plan.RestoreCheckpoint!;
+        foreach (var file in plan.TextFiles)
+        {
+            var restoredText = await _moveExecutor.ExecuteProfileTextTransferAsync(restoreCheckpoint.RecoveryRelativePath,
+                VaultPathArea.TrashProfiles, restoreCheckpoint.TargetManagedRelativePath, VaultPathArea.Profiles,
+                file, cancellationToken).ConfigureAwait(false);
+            if (!restoredText.IsSuccess) return MapProfileManifestRestoreFailure(restoredText);
+        }
         var move = await _moveExecutor.ExecuteProfileManifestRestoreMoveAsync(
                 new ManagedProfileManifestRestoreRequest(
                     profile.ProfileId,
@@ -693,6 +718,27 @@ public sealed class RestoreExecutor
         Guid operationId,
         CancellationToken cancellationToken)
     {
+        // The parent remains RESTORE_FINALIZING until each member of this exact group converges.
+        // Independently trashed or subsequently changed media is never adopted by the group.
+        await using (var groupConnection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var parent = await TrashCoordinator.ReadTrashEntryAsync(groupConnection,
+                knownEntry?.TrashEntryId ?? committed.Value!.TrashEntryId, cancellationToken).ConfigureAwait(false);
+            var group = ProfileTrashPlan.FromJson(parent?.PlanJson);
+            if (group is null)
+                return OperationResult<ProfileRestoreOutcome>.NeedsAttention(OperationErrorCode.TrashPlanUnreadable,
+                    "The Profile group receipt cannot be read safely.", operationId);
+            foreach (var member in group.SelectedDispositions.Where(item => item.Kind == ProfileOwnedMediaDispositionKind.TrashMedia))
+            {
+                var child = await TrashCoordinator.ReadActiveTrashEntryAsync(groupConnection,
+                    TrashEntityType.Media, member.MediaId, cancellationToken).ConfigureAwait(false);
+                if (MediaTrashPlan.FromJson(child?.PlanJson)?.ParentProfileTrashEntryId != group.TrashEntryId) continue;
+                var restored = await RestoreMediaAsync(child!.TrashEntryId, profileId, cancellationToken).ConfigureAwait(false);
+                if (!restored.IsSuccess)
+                    return OperationResult<ProfileRestoreOutcome>.NeedsAttention(restored.ErrorCode ?? OperationErrorCode.TrashPlanStale,
+                        restored.UserMessage ?? "A group member still needs recovery.", operationId);
+            }
+        }
         var refresh = await _manifestWriter.RegenerateManifestAsync(_catalog, profileId, cancellationToken)
             .ConfigureAwait(false);
         if (!refresh.IsSuccess)

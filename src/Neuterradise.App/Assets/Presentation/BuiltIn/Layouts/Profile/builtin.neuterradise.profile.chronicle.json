@@ -1,0 +1,104 @@
+{
+  "id": "builtin.neuterradise.profile.chronicle",
+  "kind": "profile-layout",
+  "name": "Chronicle",
+  "spec": {
+    "layout": {
+      "schemaVersion": 1,
+      "id": "chronicle",
+      "name": "Chronicle",
+      "bannerMode": "Contained",
+      "height": "Medium",
+      "coverPlacement": "InlineLeft",
+      "coverSize": "Medium",
+      "coverDetailLevel": "Full",
+      "identityAlignment": "Left",
+      "contentWidth": "Wide",
+      "overlay": "Medium",
+      "blur": "Off",
+      "fade": "Bottom",
+      "sectionDensity": "Compact",
+      "modules": [
+        {
+          "id": "overview",
+          "order": 0,
+          "visible": true,
+          "width": "Full"
+        },
+        {
+          "id": "related",
+          "order": 1,
+          "visible": true,
+          "width": "Full"
+        },
+        {
+          "id": "faces",
+          "order": 2,
+          "visible": true,
+          "width": "Full"
+        },
+        {
+          "id": "recentMedia",
+          "order": 3,
+          "visible": true,
+          "width": "Full"
+        },
+        {
+          "id": "media",
+          "order": 4,
+          "visible": true,
+          "width": "Full"
+        }
+      ]
+    },
+    "surface": {
+      "type": "stack",
+      "spacing": 10,
+      "children": [
+        {
+          "type": "semantic",
+          "id": "identity"
+        },
+        {
+          "type": "columns",
+          "columns": [
+            "*",
+            "*"
+          ],
+          "spacing": 0,
+          "children": [
+            {
+              "type": "semantic",
+              "id": "overview"
+            },
+            {
+              "type": "semantic",
+              "id": "related"
+            }
+          ]
+        },
+        {
+          "type": "semantic",
+          "id": "faces"
+        },
+        {
+          "type": "semantic",
+          "id": "recent-media"
+        },
+        {
+          "type": "semantic",
+          "id": "media"
+        },
+        {
+          "type": "semantic",
+          "id": "review"
+        },
+        {
+          "type": "semantic",
+          "id": "actions"
+        }
+      ]
+    }
+  },
+  "description": "Identity with paired Overview and Related beside the Figure; media and deletion follow below."
+}

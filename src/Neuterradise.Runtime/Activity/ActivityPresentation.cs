@@ -84,7 +84,7 @@ public static class ActivityPresentation
             "MediaRestored" or "ASSET_RESTORED" => SurfaceText.Get("Activity.MediaRestored", "Media restored"),
             "MediaPurged" or "ASSET_PURGED" => SurfaceText.Get("Activity.MediaPurged", "Media permanently deleted"),
             "ASSET_ACTIVATED" => SurfaceText.Get("Activity.MediaActivated", "Media added to Vault"),
-            "PrimaryProfileChanged" or "OWNER_CHANGED" => SurfaceText.Get("Activity.OwnerChanged", "Primary Profile changed"),
+            "PrimaryProfileChanged" or "OWNER_CHANGED" => SurfaceText.Get("Activity.OwnerChanged", "Primary profile changed"),
             "ManualRelatedAdded" => SurfaceText.Get("Activity.ManualRelatedAdded", "Related Profile added"),
             "ManualRelatedRemoved" => SurfaceText.Get("Activity.ManualRelatedRemoved", "Related Profile removed"),
             "UnknownResolved" => SurfaceText.Get("Activity.UnknownResolved", "Unknown person resolved"),

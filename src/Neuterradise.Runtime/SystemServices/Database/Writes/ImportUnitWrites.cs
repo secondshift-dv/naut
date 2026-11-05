@@ -9,7 +9,7 @@ public sealed class ImportUnitWrites
 {
     private const string ClearableHistoryPredicate = """
         (
-            state = 'CANCELLED'
+            (state = 'CANCELLED' AND rollback_settled = 1)
             OR (
                 state IN ('COMMITTED','COMPLETED')
                 AND NOT EXISTS (
@@ -141,11 +141,7 @@ public sealed class ImportUnitWrites
     /// <summary>Minimal probe for CommitState JSON to read rollback-relevant fields.</summary>
     private sealed record CommitStateProbe(
         bool? DestinationProfileCreated,
-        Guid? DestinationProfileId,
-        Guid? PreviousCoverMediaId,
-        Guid? PreviousBannerMediaId,
-        bool? AppearanceSnapshotCaptured,
-        string? PreviousAppearanceOverridesJson);
+        Guid? DestinationProfileId);
 
     /// <summary>
     /// Pauses or resumes one import. The unit's own flag is what the activity surface and the import
@@ -472,16 +468,14 @@ public sealed class ImportUnitWrites
     /// This method handles only the remaining DB-only cleanup:
     ///
     /// - Reused MANUAL associations with provenance "import:{unitId}".
-    /// - Draft presentation overrides on import_items.
-    /// - Previous Profile appearance restored for existing Profiles.
+    /// - Draft presentation intent on import_units.
+    /// - Existing Profile appearance is preserved; unpublished import intent owns no appearance writes.
     ///
     /// Does NOT delete OWNER relations — those are handled by the Trash authority which
     /// requires them to be intact when preparing Trash plans.
     /// </summary>
     internal async Task RollbackCommittedMediaDeltaAsync(
         Guid unitId,
-        Guid? destinationProfileId,
-        CommitStateSnapshot? commitSnapshot,
         CancellationToken cancellationToken)
     {
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
@@ -501,88 +495,23 @@ public sealed class ImportUnitWrites
             await removeImportRelations.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        // 2. Clear draft presentation overrides on import_items.
+        // The cancelled unit owns its verification draft; appearance intent is not an import_items column.
         await using (var clearAppearance = connection.CreateCommand())
         {
             clearAppearance.CommandText =
                 """
-                UPDATE import_items
-                SET cover_media_id = NULL, banner_media_id = NULL,
-                    row_version = row_version + 1
-                WHERE import_unit_id = $unitId;
+                UPDATE import_units
+                SET verification_draft_json = json_set(
+                        CASE WHEN json_valid(verification_draft_json) THEN verification_draft_json ELSE '{}' END,
+                        '$.appearance', json('{}')),
+                    updated_at_ms = $now, row_version = row_version + 1
+                WHERE import_unit_id = $unitId AND state = 'CANCELLED';
                 """;
             clearAppearance.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
+            clearAppearance.Parameters.AddWithValue("$now", DbTime.Format(_timeProvider.GetUtcNow()));
             await clearAppearance.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        // 3. Restore previous Profile appearance for existing Profiles.
-        //    Restores when AppearanceSnapshotCaptured is true, including null baseline
-        //    (cover=NULL, banner=NULL before import).
-        //    For new Profiles, the Profile will be trashed by the caller.
-        if (destinationProfileId is { } profileId
-            && commitSnapshot is { DestinationProfileCreated: false, AppearanceSnapshotCaptured: true })
-        {
-            await using (var restoreCover = connection.CreateCommand())
-            {
-                restoreCover.CommandText =
-                    """
-                    UPDATE profiles
-                    SET cover_media_id = $coverId,
-                        row_version = row_version + 1
-                    WHERE profile_id = $profileId;
-                    """;
-                restoreCover.Parameters.AddWithValue("$profileId", DbGuid.Format(profileId));
-                restoreCover.Parameters.AddWithValue("$coverId",
-                    commitSnapshot.PreviousCoverMediaId is { } cc ? DbGuid.Format(cc) : DBNull.Value);
-                await restoreCover.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            }
-
-            await using (var restoreBanner = connection.CreateCommand())
-            {
-                restoreBanner.CommandText =
-                    """
-                    UPDATE profile_appearance
-                    SET banner_media_asset_id = CASE
-                            WHEN $bannerId IS NULL THEN NULL
-                            ELSE (
-                                SELECT media_asset_id
-                                FROM media_assets
-                                WHERE media_id = $bannerId
-                                  AND role = 'HOVER'
-                                  AND state = 'READY'
-                                LIMIT 1
-                            )
-                        END,
-                        row_version = row_version + 1
-                    WHERE profile_id = $profileId;
-                    """;
-                restoreBanner.Parameters.AddWithValue("$profileId", DbGuid.Format(profileId));
-                restoreBanner.Parameters.AddWithValue("$bannerId",
-                    commitSnapshot.PreviousBannerMediaId is { } bb ? DbGuid.Format(bb) : DBNull.Value);
-                await restoreBanner.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            }
-
-            // Restore previous appearance overrides JSON (cover source kind, banner source kind,
-            // video timestamps, clip start/duration, etc.).
-            if (commitSnapshot.PreviousAppearanceOverridesJson is { } overridesJson)
-            {
-                await using (var restoreOverrides = connection.CreateCommand())
-                {
-                    restoreOverrides.CommandText =
-                        """
-                        UPDATE profile_appearance
-                        SET overrides_json = $overridesJson,
-                            updated_at_ms = $now,
-                            row_version = row_version + 1
-                        WHERE profile_id = $profileId;
-                        """;
-                    restoreOverrides.Parameters.AddWithValue("$profileId", DbGuid.Format(profileId));
-                    restoreOverrides.Parameters.AddWithValue("$overridesJson", overridesJson);
-                    restoreOverrides.Parameters.AddWithValue("$now", DbTime.Format(_timeProvider.GetUtcNow()));
-                    await restoreOverrides.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-                }
-            }
-        }
     }
 
     internal async Task<bool> TryReserveCancellationMediaRollbackAsync(
@@ -629,7 +558,7 @@ public sealed class ImportUnitWrites
                 WHERE self.import_unit_id = $unitId
                   AND self.state = 'CANCELLED'
                   AND mine.candidate_media_id = $assetId
-                  AND asset.state = 'ACTIVE'
+                  AND asset.state IN ('ACTIVE', 'TRASHED')
                   AND NOT EXISTS (
                       SELECT 1
                       FROM import_items other
@@ -670,6 +599,23 @@ public sealed class ImportUnitWrites
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         return reserved;
+    }
+
+    internal async Task ReleaseCancelledDraftReferencesAsync(Guid unitId, Guid profileId, CancellationToken cancellationToken)
+    {
+        await using var lease = await _writeCoordinator.EnterAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            DELETE FROM import_assignment_clusters
+            WHERE import_unit_id = $unitId
+              AND (candidate_profile_id = $profileId OR decided_profile_id = $profileId)
+              AND EXISTS (SELECT 1 FROM import_units WHERE import_unit_id=$unitId AND state='CANCELLED')
+              AND EXISTS (SELECT 1 FROM profiles WHERE profile_id=$profileId AND visibility='DRAFT');
+            """;
+        command.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
+        command.Parameters.AddWithValue("$profileId", DbGuid.Format(profileId));
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Marks a cancelled import's rollback as fully settled.</summary>
@@ -748,7 +694,7 @@ public sealed class ImportUnitWrites
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>Reads the CommitState snapshot needed for appearance rollback.</summary>
+    /// <summary>Reads the CommitState snapshot needed for destination ownership.</summary>
     internal async Task<CommitStateSnapshot?> ReadCommitSnapshotAsync(Guid unitId, CancellationToken cancellationToken)
     {
         var importWrites = new ImportWrites(_catalog, _timeProvider);
@@ -760,11 +706,7 @@ public sealed class ImportUnitWrites
                 new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             return cs is null ? null : new CommitStateSnapshot(
                 cs.DestinationProfileCreated == true,
-                cs.DestinationProfileId,
-                cs.PreviousCoverMediaId,
-                cs.PreviousBannerMediaId,
-                cs.AppearanceSnapshotCaptured == true,
-                cs.PreviousAppearanceOverridesJson);
+                cs.DestinationProfileId);
         }
         catch
         {
@@ -777,14 +719,10 @@ public sealed class ImportUnitWrites
             .Where(id => !state.ReusedMediaIds.Contains(id))
             .ToList();
 
-    /// <summary>Snapshot of CommitState fields needed for appearance rollback.</summary>
+    /// <summary>Snapshot of CommitState fields needed for destination ownership.</summary>
     internal sealed record CommitStateSnapshot(
         bool DestinationProfileCreated,
-        Guid? DestinationProfileId,
-        Guid? PreviousCoverMediaId,
-        Guid? PreviousBannerMediaId,
-        bool AppearanceSnapshotCaptured,
-        string? PreviousAppearanceOverridesJson);
+        Guid? DestinationProfileId);
 
     private async Task<ImportCancellationState?> ReadCancellationStateAsync(Guid unitId, CancellationToken cancellationToken)
     {

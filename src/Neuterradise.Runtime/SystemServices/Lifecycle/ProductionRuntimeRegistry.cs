@@ -16,6 +16,7 @@ using Neuterradise.App.SystemServices.Jobs.Handlers;
 using Neuterradise.App.SystemServices.Jobs.Transport;
 using Neuterradise.App.SystemServices.MediaTools;
 using Neuterradise.App.SystemServices.Storage;
+using Neuterradise.App.SystemServices.Recovery;
 
 namespace Neuterradise.App.SystemServices.Lifecycle;
 
@@ -35,6 +36,8 @@ public sealed class ProductionRuntimeRegistry : IAsyncDisposable
     private ProfilingWorkerConnection? _worker;
     private CancellationTokenSource? _statusLoop;
     private Task? _statusTask;
+    private readonly CancellationTokenSource _mediaRecoveryCancellation = new();
+    private Task? _mediaRecoveryTask;
     private Channel<byte>? _statusSignals;
     private int _statusSignalsSubscribed;
     private int _started;
@@ -226,6 +229,13 @@ public sealed class ProductionRuntimeRegistry : IAsyncDisposable
         }
 
         await Scheduler.StartAsync(cancellationToken).ConfigureAwait(false);
+        _mediaRecoveryTask = Task.Run(async () =>
+        {
+            var result = await new RecoveryCoordinator(_context.Catalog)
+                .RecoverMediaAssetsAsync(_mediaRecoveryCancellation.Token).ConfigureAwait(false);
+            foreach (var finding in result.Findings.Where(item => item.Outcome is RecoveryOutcome.NeedsAttention or RecoveryOutcome.Fatal))
+                Trace.TraceWarning("MediaAsset recovery: {0}", finding.Code);
+        }, _mediaRecoveryCancellation.Token);
 
         try
         {
@@ -275,6 +285,7 @@ public sealed class ProductionRuntimeRegistry : IAsyncDisposable
         CancellationToken cancellationToken)
     {
         await StopStatusLoopAsync().ConfigureAwait(false);
+        await StopMediaRecoveryAsync().ConfigureAwait(false);
 
         var releaseWorker = Volatile.Read(ref _worker) is null
             ? (Func<CancellationToken, Task>?)null
@@ -283,6 +294,17 @@ public sealed class ProductionRuntimeRegistry : IAsyncDisposable
         return await Scheduler
             .ShutdownAsync(gracePeriod, releaseWorker, cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    private async Task StopMediaRecoveryAsync()
+    {
+        await _mediaRecoveryCancellation.CancelAsync().ConfigureAwait(false);
+        if (_mediaRecoveryTask is not null)
+        {
+            try { await _mediaRecoveryTask.ConfigureAwait(false); }
+            catch (OperationCanceledException) { }
+            catch (Exception exception) { Trace.TraceWarning("MediaAsset recovery stopped: {0}", exception.GetType().Name); }
+        }
     }
 
     public async Task<ProfilingEnvelope> SendToWorkerAsync(
@@ -345,6 +367,8 @@ public sealed class ProductionRuntimeRegistry : IAsyncDisposable
         }
 
         await StopStatusLoopAsync().ConfigureAwait(false);
+        await StopMediaRecoveryAsync().ConfigureAwait(false);
+        _mediaRecoveryCancellation.Dispose();
 
         try
         {

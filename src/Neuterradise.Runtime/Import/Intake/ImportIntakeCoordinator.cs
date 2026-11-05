@@ -56,6 +56,17 @@ public sealed class ImportIntakeCoordinator
         }
 
         var plan = IntakeMapper.MapIntake(request, sessionId, cancellationToken);
+        // Independent media units let an exceptional item wait for attention without blocking
+        // other Profile additions. Each uses the same admission, jobs, commit and recovery graph.
+        if (plan.Origin == IntakeOrigin.ProfileAddMedia && plan.SuggestedDestinationProfileId is { } profileId && profileId != Guid.Empty)
+        {
+            plan = plan with
+            {
+                Units = plan.Units.SelectMany(unit => unit.Items.Select(item => new MappedUnitPlan(
+                    DeriveDeterministicId(unit.ImportUnitId, "profile-media:" + item.FullSourcePath),
+                    unit.SourceKind, Path.GetFileName(item.FullSourcePath), item.FullSourcePath, [item]))).ToArray(),
+            };
+        }
         var unitResults = new List<ImportIntakeUnitResult>();
         var totalDiscovered = 0;
         var totalAllocated = 0;
@@ -123,6 +134,8 @@ public sealed class ImportIntakeCoordinator
                     _timeProvider.GetUtcNow().ToUnixTimeMilliseconds()) with
                 {
                     CurrentStep = (int)ImportWizardStep.Details,
+                    ImportRequested = plan.Origin == IntakeOrigin.ProfileAddMedia ? true : null,
+                    PublishWhenReady = plan.Origin == IntakeOrigin.ProfileAddMedia,
                     Destination = new VerificationDestinationDraft(
                         DestinationKind.ExistingNormal,
                         explicitProfileId,

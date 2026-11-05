@@ -11,6 +11,7 @@ public sealed class PaginationBar : IDisposable
     private readonly Func<string> _range;
     private readonly Func<int> _page;
     private readonly Func<int> _pages;
+    private readonly Func<int> _readPageSize;
     private readonly Action<int> _goToPage;
     private readonly StackPanel _navigation = UI.H(4);
     private readonly TextBlock _rangeText = UI.Text(string.Empty, "metadata");
@@ -33,6 +34,7 @@ public sealed class PaginationBar : IDisposable
         _range = range;
         _page = page;
         _pages = pages;
+        _readPageSize = pageSize;
         _goToPage = goToPage;
         _pageSize = new ComboBox
         {
@@ -87,8 +89,20 @@ public sealed class PaginationBar : IDisposable
     private void Refresh()
     {
         _syncing = true;
-        _rangeText.Text = _range();
-        _syncing = false;
+        try
+        {
+            _rangeText.Text = _range();
+            var desiredSize = _readPageSize();
+            if (_pageSize.SelectedItem is not int selectedSize || selectedSize != desiredSize)
+            {
+                _pageSize.SelectedItem = desiredSize;
+            }
+        }
+        finally
+        {
+            _syncing = false;
+        }
+
         _navigation.Children.Clear();
 
         var current = Math.Clamp(_page(), 1, Math.Max(1, _pages()));

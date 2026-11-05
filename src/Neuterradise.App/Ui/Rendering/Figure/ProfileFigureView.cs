@@ -370,6 +370,9 @@ public sealed class ProfileFigureView : Grid, IDisposable
 
     private void UpdateControls()
     {
+        // The durable preview has its own baked stage background. Keep it for fallback,
+        // but remove it from the composition once the transparent live viewport is ready.
+        _thumbnail.Visibility = IsLive ? Visibility.Collapsed : Visibility.Visible;
         _reset.IsEnabled = _lease is { IsDisposed: false, IsActive: true };
         _state.Text = IsLive ? string.Empty : _load is not null
             ? UI.T("Figure.Loading", "Loading 3D...")

@@ -175,7 +175,7 @@ public sealed partial class CustomizationCenter
         {
             root.Children.Add(UI.Section(
                 UI.T("Customize.SuggestedMedia", "Suggested"),
-                UI.T("Customize.SuggestedMediaNote", "Top-ranked prepared media for this Profile."),
+                UI.T("Customize.SuggestedMediaNote", "Recommended media for this Profile."),
                 BuildGrid(suggested)));
         }
 
@@ -190,7 +190,7 @@ public sealed partial class CustomizationCenter
             if (items.Count == 0)
             {
                 browseHost.Children.Add(UI.Text(
-                    UI.T("Customize.NoEligibleMedia", "No prepared Profile media is eligible for this source."),
+                    UI.T("Customize.NoEligibleMedia", "No Profile media is available for this choice."),
                     "body-muted"));
                 return;
             }
@@ -240,8 +240,8 @@ public sealed partial class CustomizationCenter
 
         RenderBrowsePage();
         root.Children.Add(UI.Section(
-            banner ? UI.T("Customize.BannerBrowseAll", "Browse all banner media")
-                : UI.T("Customize.CoverBrowseAll", "Browse all cover media"),
+            banner ? UI.T("Customize.BannerBrowseAll", "Browse all")
+                : UI.T("Customize.CoverBrowseAll", "Browse all"),
             UI.T(
                 "Customize.SourceNote",
                 "Choosing new media only changes the preview; the source and its framing are saved together when you choose Save changes."),

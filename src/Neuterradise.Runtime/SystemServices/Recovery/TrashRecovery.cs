@@ -15,7 +15,7 @@ public sealed class TrashRecovery
         SELECT trash_entry_id, entity_type, entity_id, state, plan_json
         FROM trash_entries
         WHERE state IN (
-            'EXECUTING','IN_TRASH',
+            'PENDING','EXECUTING','IN_TRASH',
             'RESTORE_EXECUTING','RESTORE_FINALIZING',
             'PURGE_EXECUTING','PURGE_RETRY_REQUIRED'
         )
@@ -26,7 +26,7 @@ public sealed class TrashRecovery
     private readonly TrashCoordinator _trash;
     private readonly RestoreExecutor _restore;
     private readonly PurgeExecutor _purge;
-    private readonly ProfileTrashRetentionService _retention;
+    private readonly TrashRetentionService _retention;
 
     public TrashRecovery(CatalogDb catalog, ManagedMoveExecutor moveExecutor)
     {
@@ -36,7 +36,7 @@ public sealed class TrashRecovery
         _trash = new TrashCoordinator(catalog, moveExecutor, new MediaOperations(catalog));
         _restore = new RestoreExecutor(catalog, moveExecutor);
         _purge = new PurgeExecutor(catalog, moveExecutor);
-        _retention = new ProfileTrashRetentionService(new TrashReads(catalog), _purge);
+        _retention = new TrashRetentionService(new TrashReads(catalog), _purge);
     }
 
     public async Task<IReadOnlyList<RecoveryFinding>> RecoverAsync(
@@ -54,14 +54,14 @@ public sealed class TrashRecovery
         }
 
         var retention = await _retention
-            .PurgeExpiredProfilesAsync(cancellationToken)
+            .PurgeExpiredAsync(cancellationToken)
             .ConfigureAwait(false);
         foreach (var failure in retention.Failures)
         {
             findings.Add(new RecoveryFinding(
                 failure.TrashEntryId,
-                "Profile",
-                failure.ProfileId,
+                failure.EntityType,
+                failure.EntityId,
                 RecoveryOutcome.NeedsAttention,
                 "TRASH_RETENTION_PURGE_FAILED",
                 failure.SafeDetail));
@@ -78,6 +78,9 @@ public sealed class TrashRecovery
         {
             return entry.State switch
             {
+                TrashEntryState.Pending when entry.EntityType == TrashEntityType.Profile
+                    && ProfileTrashPlan.FromJson(entry.PlanJson)?.IsGroupOperation == true =>
+                    await ResumeProfileTrashAsync(entry, cancellationToken).ConfigureAwait(false),
                 TrashEntryState.Executing when entry.EntityType == TrashEntityType.Media =>
                     await ResumeMediaTrashAsync(entry, cancellationToken).ConfigureAwait(false),
                 TrashEntryState.Executing when entry.EntityType == TrashEntityType.Profile =>
@@ -150,7 +153,7 @@ public sealed class TrashRecovery
             return UnreadablePlanFinding(entry);
         }
 
-        if (plan.OwnedActiveMedias.Count > 0 && plan.SelectedDispositions.Count == 0)
+        if (plan.OwnedActiveMedias.Count > 0 && plan.SelectedDispositions.Count == 0 && !plan.IsGroupOperation)
         {
             return entry.ToFinding(
                 plan.OperationId,
@@ -159,9 +162,12 @@ public sealed class TrashRecovery
                 "The interrupted Profile Trash predates durable disposition authority and needs attention.");
         }
 
+        var dispositions = plan.SelectedDispositions.Count == 0
+            ? await new ProfileTrashDispositionPlanner(_catalog).BuildAsync(plan, cancellationToken).ConfigureAwait(false)
+            : plan.SelectedDispositions;
         var result = await _trash.CommitProfileTrashAsync(
                 plan,
-                plan.SelectedDispositions,
+                dispositions,
                 cancellationToken)
             .ConfigureAwait(false);
         return entry.ToFinding(

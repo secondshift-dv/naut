@@ -1,0 +1,16 @@
+{
+  "id": "builtin.neuterradise.spotlight.editorial-v2",
+  "kind": "spotlight-style",
+  "name": "Editorial",
+  "description": "Full-bleed banner with a translucent lower information layer.",
+  "spec": {
+    "composition": "editorial",
+    "motion": "ken-burns",
+    "transition": "fade",
+    "rotationSeconds": 18,
+    "showCover": true,
+    "showOverview": false,
+    "pagination": "counter",
+    "scrimStrength": 0.3
+  }
+}

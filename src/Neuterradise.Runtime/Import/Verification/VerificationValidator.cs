@@ -117,6 +117,13 @@ public sealed class VerificationValidator
             }
         }
 
+        if (draft.PublishWhenReady && (draft.Destination.Kind != DestinationKind.ExistingNormal
+            || draft.Appearance.CoverIntent != VerificationAppearanceIntent.Unchanged
+            || draft.Appearance.BannerIntent != VerificationAppearanceIntent.Unchanged
+            || draft.Appearance.CoverMediaId is not null || draft.Appearance.BannerMediaId is not null))
+            blockers.Add(new VerificationBlocker(null, "AUTOMATIC_PROFILE_INTENT_INVALID",
+                "Automatic Profile additions require an existing destination and unchanged appearance."));
+
         foreach (var faceDecision in draft.FaceDecisions)
         {
             if (faceDecision.FaceId == Guid.Empty)

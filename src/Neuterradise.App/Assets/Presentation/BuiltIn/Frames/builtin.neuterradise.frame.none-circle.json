@@ -2,7 +2,7 @@
   "id": "builtin.neuterradise.frame.none-circle",
   "kind": "cover-frame",
   "name": "Circle",
-  "description": "Circular Cover without a decoration.",
+  "description": "Circular Cover without decoration.",
   "spec": {
     "frameId": "none-circle"
   }

@@ -15,7 +15,6 @@ public sealed class PresentationManagementView
         "frames",
         "backdrops",
         "effects",
-        "control-styles",
         "packs",
     };
 
@@ -48,7 +47,6 @@ public sealed class PresentationManagementView
             ("frames", "Settings.Presentation.Frames", "Frames"),
             ("backdrops", "Settings.Presentation.Backdrops", "Backdrops"),
             ("effects", "Settings.Presentation.Effects", "Effects"),
-            ("control-styles", "Settings.Presentation.ControlStyles", "Control Styles"),
             ("packs", "Settings.Presentation.PacksAdvanced", "Packs / Advanced"),
         })
         {
@@ -57,6 +55,10 @@ public sealed class PresentationManagementView
             tabs.Children.Add(UI.Chip(UI.T(key, fallback), _tab == value, () => SelectTab(value)));
         }
 
+        _editor.Children.Add(UI.V(4,
+            UI.Text(UI.T("Settings.Presentation.Library.Title", "Installed component library"), "card-title"),
+            UI.WrappedText(UI.T("Settings.Presentation.Library.Notice",
+                "Previews only. Choose Theme, Font and Control Style in Appearance; select other components in Customize."), "body")));
         _editor.Children.Add(UI.V(4,
             UI.Text(UI.T("Settings.Presentation.Assets", "Importable assets"), "micro", "textMuted"), assets,
             UI.Text(UI.T("Settings.Presentation.Components", "Pack components"), "micro", "textMuted").Margin(0, 4, 0, 0), components));
@@ -129,15 +131,24 @@ public sealed class PresentationManagementView
                 Grid.SetRow(card, index / 3);
                 Grid.SetColumn(card, index % 3);
             }
-            else card.Width = 224;
             card.MinHeight = 218;
+            if (_tab != "frames") card.Width = 224;
             cards.Children.Add(card);
         }
+
+        if (cards is VariableWrap wrap)
+            wrap.SizeChanged += (_, _) =>
+            {
+                if (wrap.ActualWidth <= 0) return;
+                var columns = Math.Max(1, (int)((wrap.ActualWidth + 10) / 234));
+                var width = Math.Min(300, Math.Max(1, (wrap.ActualWidth - (columns - 1) * 10) / columns));
+                foreach (var card in wrap.Children.OfType<FrameworkElement>()) card.Width = width;
+            };
 
         FrameworkElement libraryBody = definitions.Count == 0
             ? UI.Guidance(
                 UI.T("Settings.Presentation.Empty.Title", "Nothing here yet"),
-                UI.T("Settings.Presentation.Empty.Library", "No presentation items are available in this library yet."))
+                UI.T("Settings.Presentation.Empty.Library", "No components installed."))
             : cards;
 
         _editor.Children.Add(UI.Section(
@@ -156,7 +167,7 @@ public sealed class PresentationManagementView
                 () => Run(
                     ImportAssetAsync(font: true),
                     "PresentationManagementView.ImportFont",
-                    UI.T("Customize.InstallFailed", "This pack can''t be installed")),
+                    UI.T("Customize.InstallFailed", "This pack can't be installed")),
                 ButtonKind.Secondary,
                 "icon.action.add"));
         }
@@ -168,7 +179,7 @@ public sealed class PresentationManagementView
                 () => Run(
                     ImportAssetAsync(font: false),
                     "PresentationManagementView.ImportBackdrop",
-                    UI.T("Customize.InstallFailed", "This pack can''t be installed")),
+                    UI.T("Customize.InstallFailed", "This pack can't be installed")),
                 ButtonKind.Secondary,
                 "icon.action.add"));
         }
@@ -180,7 +191,7 @@ public sealed class PresentationManagementView
                 () => Run(
                     ImportCustomFrameAsync(),
                     "PresentationManagementView.ImportFrame",
-                    UI.T("Customize.Frame.AddFailedDetail", "Could not add the frame.")),
+                    UI.T("Customize.Frame.AddFailedDetail", "The frame could not be installed. Check the image and try again.")),
                 ButtonKind.Secondary,
                 "icon.action.add"));
         }
@@ -196,7 +207,6 @@ public sealed class PresentationManagementView
             "frames" => DefinitionKinds.CoverFrame,
             "backdrops" => DefinitionKinds.Backdrop,
             "effects" => DefinitionKinds.Effect,
-            "control-styles" => DefinitionKinds.ControlSkin,
             _ => string.Empty,
         };
 
@@ -221,9 +231,9 @@ public sealed class PresentationManagementView
     private static int BackdropLibraryOrder(CompiledDefinition definition) => definition.Ref.DefinitionId switch
     {
         "builtin.neuterradise.backdrop.none" => 0,
-        "builtin.neuterradise.backdrop.calm-yellow" => 1,
-        "builtin.neuterradise.backdrop.calm-blue" => 2,
-        "builtin.neuterradise.backdrop.gray" => 3,
+        "builtin.neuterradise.backdrop.night-chamber" => 1,
+        "builtin.neuterradise.backdrop.archive-paper" => 2,
+        "builtin.neuterradise.backdrop.tidal-glass" => 3,
         _ => definition.Origin == PackOrigin.User ? 100 : 50,
     };
 
@@ -233,17 +243,15 @@ public sealed class PresentationManagementView
         "frames" => UI.T("Settings.Presentation.Frames", "Frames"),
         "backdrops" => UI.T("Settings.Presentation.Backdrops", "Backdrops"),
         "effects" => UI.T("Settings.Presentation.Effects", "Effects"),
-        "control-styles" => UI.T("Settings.Presentation.ControlStyles", "Control Styles"),
         _ => UI.T("Settings.Presentation.Fonts", "Fonts"),
     };
 
     private string CurrentLibraryDescription() => _tab switch
     {
-        "fonts" => UI.T("Settings.Presentation.Fonts.ImportHelp", "Add a local .ttf or .otf font. Choose it in Appearance → Fonts."),
-        "frames" => UI.T("Settings.Presentation.Frames.ImportHelp", "Add a square .png or .webp, 256–4096 px, with a transparent center. Choose it in Profile Customize → Frame."),
-        "backdrops" => UI.T("Settings.Presentation.Backdrops.ImportHelp", "Add .png, .jpg, .jpeg, .webp or .mp4. Choose it in Home or Profile Customize → Backdrop."),
-        "effects" => UI.T("Settings.Presentation.Effects.PackHelp", "Built-in effects and installed pack effects. Add custom effects through Packs / Advanced; choose them in Customize."),
-        "control-styles" => UI.T("Settings.Presentation.ControlStyles.PackHelp", "Styles for buttons, inputs and tabs. Add custom styles through Packs / Advanced."),
+        "fonts" => UI.T("Settings.Presentation.Fonts.ImportHelp", "Add a .ttf or .otf font. Choose it in Appearance → Fonts."),
+        "frames" => UI.T("Settings.Presentation.Frames.ImportHelp", "Add a square .png or .webp, 256–4096 px, with a transparent center. Choose it in Profile Customize → Frames."),
+        "backdrops" => UI.T("Settings.Presentation.Backdrops.ImportHelp", "Add .png, .jpg, .jpeg, .webp or .mp4. Choose it in Home or Profile Customize → Backdrops."),
+        "effects" => UI.T("Settings.Presentation.Effects.PackHelp", "Add custom effects in Packs / Advanced; choose them in Customize."),
         _ => string.Empty,
     };
 
@@ -251,7 +259,7 @@ public sealed class PresentationManagementView
     {
         DefinitionKinds.Theme => UI.T("Customize.Theme", "Theme"),
         DefinitionKinds.Typography => UI.T("Customize.Typography", "Typography"),
-        DefinitionKinds.ControlSkin => UI.T("Customize.ControlSkin", "Control Style"),
+        DefinitionKinds.ControlSkin => UI.T("Customize.ControlSkin", "Control Skin"),
         DefinitionKinds.Backdrop => UI.T("Customize.Profile.Backdrop", "Backdrop"),
         DefinitionKinds.CoverFrame => UI.T("Customize.Profile.Frame", "Frame"),
         DefinitionKinds.Effect => UI.T("Settings.Presentation.Effects", "Effects"),
@@ -299,8 +307,6 @@ public sealed class PresentationManagementView
                 CornerRadius = new CornerRadius(8),
                 Background = theme.Brush("canvas"),
             };
-        if (definition.Plan is ThemePlan themePlan)
-            return ThemePreviewView.Create(themePlan, 92);
         if (definition.Plan is TypographyPlan typography)
         {
             TextBlock Sample(string text, TypographyFace face, double size) => new()
@@ -311,15 +317,12 @@ public sealed class PresentationManagementView
                 Foreground = theme.Brush("textPrimary"),
             };
             var preview = UI.Surface(UI.V(3,
-                Sample("Aa Naut", typography.Heading, 20),
+                Sample("Aa Naut", typography.Heading, 12),
                 Sample("A Navigator for Your Things Worth Keeping", typography.Body, 11)),
                 Material.Grounded, 8, 10);
             preview.Height = 92;
             return preview;
         }
-        if (definition.Plan is ControlSkinPlan skin)
-            return UI.ControlSheet(skin);
-
         var schematic = new Grid { Height = 92, Background = theme.Brush("surface2") };
         schematic.Children.Add(new Border
         {
@@ -353,7 +356,7 @@ public sealed class PresentationManagementView
                 () => Run(
                     InstallAsync(folder: false),
                     "PresentationManagementView.InstallFileAsync",
-                    UI.T("Customize.InstallFailed", "This pack can''t be installed")),
+                    UI.T("Customize.InstallFailed", "This pack can't be installed")),
                 ButtonKind.Primary,
                 "icon.action.add"),
             UI.Button(
@@ -361,7 +364,7 @@ public sealed class PresentationManagementView
                 () => Run(
                     InstallAsync(folder: true),
                     "PresentationManagementView.InstallFolderAsync",
-                    UI.T("Customize.InstallFailed", "This pack can''t be installed")),
+                    UI.T("Customize.InstallFailed", "This pack can't be installed")),
                 ButtonKind.Secondary));
 
         var list = UI.V(10);
@@ -456,7 +459,7 @@ public sealed class PresentationManagementView
             UI.T("Settings.Presentation.PacksAdvanced", "Packs / Advanced"),
             UI.T(
                 "Settings.Presentation.PacksAdvanced.FormatHelp",
-                "Install .ntpack or .zip, or a folder containing pack.json. Packs contain declarative layouts, themes, fonts, frames, backdrops, effects or control styles and their assets. Scripts and executables are not supported."),
+                "Install .ntpack, .zip, or a folder with pack.json. Include schemaVersion 1, packId, version, a supported definition and relative asset paths. Scripts and executables are not allowed."),
             actions,
             list));
     }
@@ -493,7 +496,7 @@ public sealed class PresentationManagementView
                     Environment.NewLine,
                     result.Diagnostics.Where(diagnostic => diagnostic.IsError).Take(4).Select(diagnostic => diagnostic.Detail));
             await _services.ConfirmAsync(
-                UI.T("Customize.InstallFailed", "This pack can''t be installed"),
+                UI.T("Customize.InstallFailed", "This pack can't be installed"),
                 reason,
                 UI.T("Common.Ok", "OK")).ConfigureAwait(true);
         }
@@ -619,9 +622,9 @@ public sealed class PresentationManagementView
             return;
         }
 
-        using var package = font
+        using var package = await Task.Run(() => font
             ? PresentationAssetImportBuilder.Font(source)
-            : PresentationAssetImportBuilder.Backdrop(source);
+            : PresentationAssetImportBuilder.Backdrop(source)).ConfigureAwait(true);
         var result = await _services.Presentation.InstallPackAsync(package.StagingPath, replaceExisting: false).ConfigureAwait(true);
         if (!result.Succeeded
             && !result.Diagnostics.Any(diagnostic => diagnostic.Code == PackDiagnosticCodes.AlreadyInstalled))

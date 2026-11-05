@@ -41,8 +41,26 @@ public sealed class ThemeRuntime
         {
             var skin = preview?.For(family) ?? ControlFamily(family);
             value.CornerRadius = new CornerRadius(skin.Radius);
-            value.BorderThickness = new Thickness(skin.BorderWidth);
+            value.BorderThickness = ControlEdge(skin);
             value.FocusVisualPrimaryBrush = Brush(skin.Focus);
+            value.FocusVisualPrimaryThickness = new Thickness(Math.Max(2, skin.BorderWidth));
+            foreach (var prefix in new[] { "Button", "ToggleButton", "TextControl", "ComboBox" })
+            {
+                value.Resources[prefix + "BackgroundDisabled"] = Brush("surface2");
+                value.Resources[prefix + "ForegroundDisabled"] = Brush("textDisabled");
+                value.Resources[prefix + "BorderBrushDisabled"] = Brush("borderSubtle");
+            }
+            if (family == "input")
+            {
+                foreach (var prefix in new[] { "TextControl", "ComboBox" })
+                {
+                    value.Resources[prefix + "Background"] = ControlFill(skin, skin.Fill);
+                    value.Resources[prefix + "BackgroundPointerOver"] = ControlFill(skin, skin.HoverFill);
+                    value.Resources[prefix + "BackgroundFocused"] = ControlFill(skin, skin.Fill);
+                    value.Resources[prefix + "BorderBrushFocused"] = Brush(skin.Focus);
+                    value.Resources[prefix + "BorderBrushPointerOver"] = Brush(skin.Focus);
+                }
+            }
             if (!compact)
             {
                 value.MinHeight = skin.Height;
@@ -50,13 +68,23 @@ public sealed class ThemeRuntime
                     value.Padding = new Thickness(skin.HorizontalPadding, skin.VerticalPadding, skin.HorizontalPadding, skin.VerticalPadding);
             }
             value.FontFamily = Font("body");
+            value.FontSize = TokenAuthority.Foundations.TypeStyles["control"].Size;
             if (family == "slider")
             {
-                value.Resources["SliderTrackFill"] = Brush(skin.Fill);
+                value.Resources["SliderTrackFill"] = ControlFill(skin, skin.Fill);
+                value.Resources["SliderThumbBackground"] = ControlFill(skin, "accent");
+                value.Resources["SliderThumbBackgroundPointerOver"] = ControlFill(skin, "accentHover");
+                value.Resources["SliderThumbBackgroundPressed"] = ControlFill(skin, "accentPressed", pressed: true);
                 value.Resources["SliderThumbBorderBrush"] = Brush(skin.Border);
                 value.Resources["SliderThumbCornerRadius"] = new CornerRadius(skin.Radius);
-                value.Resources["SliderThumbWidth"] = Math.Clamp(skin.Radius * 2 + 8, 12, 24);
-                value.Resources["SliderThumbHeight"] = Math.Clamp(skin.Radius * 2 + 8, 12, 24);
+                foreach (var orientation in new[] { "Horizontal", "Vertical" })
+                {
+                    value.Resources["Slider" + orientation + "ThumbWidth"] = skin.ThumbWidth;
+                    value.Resources["Slider" + orientation + "ThumbHeight"] = skin.ThumbHeight;
+                }
+                value.Resources["SliderInnerThumbWidth"] = Math.Max(6, skin.ThumbWidth - 6);
+                value.Resources["SliderInnerThumbHeight"] = Math.Max(6, skin.ThumbHeight - 6);
+                if (value.IsLoaded) ProjectSliderGeometry(value, skin);
             }
             if (family == "toggle")
             {
@@ -70,10 +98,17 @@ public sealed class ThemeRuntime
                     ("ToggleSwitchFillOff", skin.Fill), ("ToggleSwitchFillOffPointerOver", skin.HoverFill),
                     ("ToggleSwitchFillOffPressed", skin.PressedFill), ("ToggleSwitchStrokeOff", skin.Border),
                 }) value.Resources[key] = Brush(reference);
+                foreach (var prefix in new[] { "ToggleButtonBackground", "ToggleSwitchFillOff", "ToggleSwitchFillOn" })
+                {
+                    var on = prefix == "ToggleSwitchFillOn";
+                    value.Resources[prefix] = ControlFill(skin, on ? "accent" : skin.Fill);
+                    value.Resources[prefix + "PointerOver"] = ControlFill(skin, on ? "accentHover" : skin.HoverFill);
+                    value.Resources[prefix + "Pressed"] = ControlFill(skin, on ? "accentPressed" : skin.PressedFill, pressed: true);
+                }
             }
             if (neutral && family is not ("slider" or "toggle" or "scrollbar"))
             {
-                value.Background = Brush(skin.Fill);
+                value.Background = ControlFill(skin, skin.Fill);
                 value.BorderBrush = Brush(skin.Border);
             }
             if (value is Microsoft.UI.Xaml.Controls.Primitives.ButtonBase)
@@ -81,17 +116,74 @@ public sealed class ThemeRuntime
                 var primary = kind == ButtonKind.Primary;
                 var danger = kind == ButtonKind.Destructive;
                 var ghost = kind == ButtonKind.Ghost;
-                value.Resources["ButtonBackground"] = Brush(primary ? "accent" : ghost ? "transparent" : skin.Fill);
-                value.Resources["ButtonBackgroundPointerOver"] = Brush(primary ? "accentHover" : skin.HoverFill);
-                value.Resources["ButtonBackgroundPressed"] = Brush(primary ? "accentPressed" : skin.PressedFill);
+                value.Background = ghost ? Brush("transparent") : ControlFill(skin, primary ? "accent" : skin.Fill);
+                value.BorderBrush = Brush(primary ? "accent" : danger ? "danger" : ghost ? "transparent" : skin.Border);
+                value.Resources["ButtonBackground"] = ghost ? Brush("transparent") : ControlFill(skin, primary ? "accent" : skin.Fill);
+                value.Resources["ButtonBackgroundPointerOver"] = ControlFill(skin, primary ? "accentHover" : skin.HoverFill);
+                value.Resources["ButtonBackgroundPressed"] = ControlFill(skin, primary ? "accentPressed" : skin.PressedFill, pressed: true);
                 value.Resources["ButtonBorderBrush"] = Brush(primary ? "accent" : danger ? "danger" : ghost ? "transparent" : skin.Border);
                 value.Resources["ButtonForeground"] = Brush(primary ? "textOnAccent" : danger ? "textDanger" : "textPrimary");
                 value.Resources["ButtonForegroundPointerOver"] = value.Resources["ButtonForeground"];
                 value.Resources["ButtonForegroundPressed"] = value.Resources["ButtonForeground"];
-                value.Resources["ButtonBorderBrushPointerOver"] = value.Resources["ButtonBorderBrush"];
-                value.Resources["ButtonBorderBrushPressed"] = value.Resources["ButtonBorderBrush"];
+                value.Resources["ButtonBorderBrushPointerOver"] = Brush(primary ? "accentHover" : danger ? "danger" : skin.Focus);
+                value.Resources["ButtonBorderBrushPressed"] = Brush(primary ? "accentPressed" : danger ? "danger" : skin.Focus);
             }
         });
+    }
+
+    public static Thickness ControlEdge(ControlSkinPlan skin) => skin.Edge switch
+    {
+        "bottom" => new Thickness(0, 0, 0, Math.Max(1, skin.BorderWidth)),
+        "leading" => new Thickness(Math.Max(1, skin.BorderWidth), 0, 0, 0),
+        _ => new Thickness(skin.BorderWidth),
+    };
+
+    private static void ProjectSliderGeometry(DependencyObject root, ControlSkinPlan skin)
+    {
+        // Native template dimensions bind resources once; live style changes must update the
+        // existing parts without replacing the Slider or disturbing its focus/value/drag state.
+        if (root is Microsoft.UI.Xaml.Controls.Primitives.Thumb thumb && thumb.Name is "HorizontalThumb" or "VerticalThumb")
+        {
+            thumb.Width = skin.ThumbWidth;
+            thumb.Height = skin.ThumbHeight;
+        }
+        if (root is FrameworkElement { Name: "SliderInnerThumb" } inner)
+        {
+            inner.Width = Math.Max(6, skin.ThumbWidth - 6);
+            inner.Height = Math.Max(6, skin.ThumbHeight - 6);
+            if (inner is Border border) border.CornerRadius = new CornerRadius(skin.Radius);
+        }
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+            ProjectSliderGeometry(VisualTreeHelper.GetChild(root, index), skin);
+    }
+
+    public Brush SurfaceBrush(bool raised = false)
+    {
+        if (Theme.EffectiveMorphology.CardPersonality == ThemeCardPersonality.Glass) return GlassBrush();
+        if (Theme.EffectiveMorphology.CardPersonality == ThemeCardPersonality.Flat) return Brush(raised ? "surface2" : "surface1");
+        var brush = new LinearGradientBrush { StartPoint = new Windows.Foundation.Point(0, 0), EndPoint = new Windows.Foundation.Point(0, 1) };
+        brush.GradientStops.Add(new GradientStop { Color = Color(raised ? "surfaceElevated" : "surface2"), Offset = 0 });
+        brush.GradientStops.Add(new GradientStop { Color = Color("surface1"), Offset = 1 });
+        return brush;
+    }
+
+    public Brush ControlFill(ControlSkinPlan skin, string reference, bool pressed = false)
+    {
+        if (skin.Material == "flat" || skin.Relief == 0) return Brush(reference);
+        var baseColor = ResolveColor(reference);
+        Windows.UI.Color Mix(Windows.UI.Color target, double amount) => Windows.UI.Color.FromArgb(baseColor.A,
+            (byte)Math.Round(baseColor.R + (target.R - baseColor.R) * amount),
+            (byte)Math.Round(baseColor.G + (target.G - baseColor.G) * amount),
+            (byte)Math.Round(baseColor.B + (target.B - baseColor.B) * amount));
+        var light = skin.Material == "luminous" ? Color("accent") : Windows.UI.Color.FromArgb(255, 255, 255, 255);
+        var high = Mix(light, skin.Relief);
+        var low = Mix(Windows.UI.Color.FromArgb(255, 0, 0, 0), skin.Relief * .6);
+        var inset = pressed || skin.Material == "inset";
+        var brush = new LinearGradientBrush { StartPoint = new Windows.Foundation.Point(0, 0), EndPoint = new Windows.Foundation.Point(0, 1) };
+        brush.GradientStops.Add(new GradientStop { Color = inset ? low : high, Offset = 0 });
+        brush.GradientStops.Add(new GradientStop { Color = baseColor, Offset = skin.Material == "bevel" ? .18 : .6 });
+        brush.GradientStops.Add(new GradientStop { Color = inset ? high : low, Offset = 1 });
+        return brush;
     }
 
     public void TrackControlBorder(Border border, Action<Border> apply)
@@ -124,9 +216,18 @@ public sealed class ThemeRuntime
         ControlSkin?.HorizontalPadding ?? 9, ControlSkin?.VerticalPadding ?? 4);
     public void TrackControl(Control control, Action<Control> apply)
     {
-        if (!_controls.TryGetValue(control, out _)) _controlList.Add(new WeakReference<Control>(control));
+        if (!_controls.TryGetValue(control, out _))
+        {
+            _controlList.Add(new WeakReference<Control>(control));
+            control.Loaded += OnTrackedControlLoaded;
+        }
         _controls.AddOrUpdate(control, apply);
         apply(control);
+    }
+
+    private void OnTrackedControlLoaded(object sender, RoutedEventArgs args)
+    {
+        if (sender is Control control && _controls.TryGetValue(control, out var apply)) apply(control);
     }
 
     public ThemeRuntime()
@@ -513,13 +614,12 @@ public sealed class ThemeRuntime
                 }
             }
             var scrollbar = ControlFamily("scrollbar");
-            resources["ScrollBarThumbMinWidth"] = scrollbar.ScrollbarWidth;
-            resources["ScrollBarThumbMinHeight"] = scrollbar.ScrollbarWidth;
-            resources["ScrollBarMinWidth"] = scrollbar.ScrollbarWidth;
-            resources["ScrollBarMinHeight"] = scrollbar.ScrollbarWidth;
-            resources["ScrollBarThumbFill"] = Brush(scrollbar.Border);
-            resources["ScrollBarThumbFillPointerOver"] = Brush(scrollbar.HoverFill);
-            resources["ScrollBarThumbFillPressed"] = Brush(scrollbar.PressedFill);
+            resources["ScrollBarVerticalThumbMinWidth"] = Math.Max(9, scrollbar.ScrollbarWidth);
+            resources["ScrollBarHorizontalThumbMinHeight"] = Math.Max(10, scrollbar.ScrollbarWidth);
+            resources["ScrollBarCornerRadius"] = new CornerRadius(scrollbar.Radius);
+            resources["ScrollBarThumbFill"] = ControlFill(scrollbar, "textSecondary");
+            resources["ScrollBarThumbFillPointerOver"] = ControlFill(scrollbar, "textPrimary");
+            resources["ScrollBarThumbFillPressed"] = ControlFill(scrollbar, "accent", pressed: true);
             resources["SliderTrackFill"] = Brush(ControlFamily("slider").Fill);
             resources["SliderThumbCornerRadius"] = new CornerRadius(ControlFamily("slider").Radius);
             resources["ToggleSwitchFillOff"] = Brush(ControlFamily("toggle").Fill);

@@ -40,7 +40,7 @@ Yes. Figure is optional and independent from the rest of the Profile experience.
 
 ## Which interface languages are included?
 
-Naut v0.0.4 includes English, Bahasa Indonesia, 日本語, 한국어, 简体中文, Deutsch, Français, and Español. See [Languages](languages.md).
+Naut v0.0.7 includes English, Bahasa Indonesia, 日本語, 한국어, 简体中文, Deutsch, Français, and Español. See [Languages](languages.md).
 
 ## Where should I put the Vault?
 
@@ -49,6 +49,18 @@ Choose a normal folder you control with enough space for the collection. Keep th
 ## Can I move to a different PC?
 
 Keep a complete copy of the Vault together. Install/extract Naut separately on the destination PC, then use Naut's Vault selection flow to open the compatible Vault.
+
+## What if an import is interrupted?
+
+Open **Import → Activity / Needs attention** to review exceptional items. A cancelled transfer is settled at a safe checkpoint before staging cleanup. If cleanup or recovery remains incomplete, use **Settings → Vault → Vault Health** to resume, retry or finish the pending operation. Retain the original external files until import has succeeded.
+
+## Can I use an older Naut build after opening a Vault in v0.0.7?
+
+A recognized Catalog Schema v1 Vault is upgraded to v2 on first compatible open. Older v1 binaries reject that upgraded database; restore a complete pre-upgrade Vault backup if you must downgrade. Do not replace individual catalog files independently.
+
+## Why does a Profile Overview or Private Note report an external edit?
+
+Managed NORMAL Profiles can mirror these fields to readable UTF-8 files inside the Vault. A change made outside Naut is not silently accepted; review the conflict in the application before choosing which content to keep. These files are plaintext and should be protected as part of the Vault.
 
 ## How are updates delivered?
 

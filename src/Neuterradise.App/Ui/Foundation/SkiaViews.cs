@@ -400,6 +400,7 @@ public sealed class CoverFrameView : SKCanvasElement
         get => _plan;
         set
         {
+            if (Equals(_plan, value)) return;
             _plan = value;
             ReleaseOverlay();
             EnsureOverlay();
@@ -515,7 +516,7 @@ public sealed class CoverFrameView : SKCanvasElement
             return;
         }
 
-        var cached = DerivedImageLoader.Shared.TryGetCached(path, 512);
+        var cached = DerivedImageLoader.Shared.TryGetCached(_plan.OverlayAssetIdentity ?? path, path, 512);
         if (cached?.Image is SKImage image)
         {
             _overlayLease = cached;
@@ -534,7 +535,7 @@ public sealed class CoverFrameView : SKCanvasElement
     private async Task LoadOverlayAsync(string path, int generation)
     {
         var loaded = await DerivedImageLoader.Shared
-            .LoadAsync(path, 512)
+            .LoadAsync(_plan?.OverlayAssetIdentity ?? path, path, 512)
             .ConfigureAwait(false);
 
         UiDispatch.Run(() =>

@@ -9,18 +9,13 @@ namespace Neuterradise.App.Shell;
 /// </summary>
 public static class WindowGeometry
 {
-    /// <summary>Smallest supported window. 800 × 600 is a real, reachable size.</summary>
-    public const double MinimumWidth = 800;
+    /// <summary>Smallest supported outer desktop-window rectangle in device-independent units, including native chrome.</summary>
+    public const double MinimumWidth = 640;
 
-    public const double MinimumHeight = 600;
+    public const double MinimumHeight = 480;
 
-    /// <summary>Preferred startup width before monitor clamping is applied.</summary>
-    public const double PreferredWidth = 1400;
-
-    public const double PreferredHeight = 900;
-
-    /// <summary>Fraction of the work area used for the initial size when the preferred size does not fit.</summary>
-    public const double WorkAreaFraction = 0.92;
+    /// <summary>Independent fraction of each work-area dimension used at fresh startup.</summary>
+    public const double WorkAreaFraction = 0.5;
 
     /// <summary>How much of the window must remain on a monitor for a saved position to be usable.</summary>
     public const double RequiredVisibleWidth = 220;
@@ -38,8 +33,8 @@ public static class WindowGeometry
     public static Size DefaultSize(Rect workArea)
     {
         var minimum = MinimumFor(workArea);
-        var width = Math.Min(PreferredWidth, workArea.Width * WorkAreaFraction);
-        var height = Math.Min(PreferredHeight, workArea.Height * WorkAreaFraction);
+        var width = workArea.Width * WorkAreaFraction;
+        var height = workArea.Height * WorkAreaFraction;
         width = Math.Max(minimum.Width, width);
         height = Math.Max(minimum.Height, height);
         return new Size(Math.Floor(width), Math.Floor(height));

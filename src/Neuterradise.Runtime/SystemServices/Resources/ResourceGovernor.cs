@@ -100,6 +100,7 @@ public sealed class ResourceGovernor : IDisposable
     private bool _reducedMotion;
     private bool _memoryPressure;
     private int _importPressure;
+    private int _foregroundDiskWork;
     private long _workingSet;
     private InteractionMode _mode = InteractionMode.ForegroundIdle;
     private PresentationTier _tier = PresentationTier.Full;
@@ -255,6 +256,19 @@ public sealed class ResourceGovernor : IDisposable
             Interlocked.Decrement(ref _importPressure);
             Update();
         });
+    }
+
+    public IDisposable EnterForegroundDiskWork()
+    {
+        Interlocked.Increment(ref _foregroundDiskWork);
+        return new Scope(() => Interlocked.Decrement(ref _foregroundDiskWork));
+    }
+
+    public async ValueTask YieldBackgroundDiskAsync(CancellationToken ct = default)
+    {
+        var delay = Volatile.Read(ref _foregroundDiskWork) > 0 ? 16
+            : Mode == InteractionMode.ForegroundInteractive ? 4 : 0;
+        if (delay != 0) await Task.Delay(delay, ct).ConfigureAwait(false);
     }
 
     public ValueTask<ResourcePermit> AcquireAsync(ResourceClass resourceClass, CancellationToken cancellationToken = default)

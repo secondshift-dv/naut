@@ -106,7 +106,7 @@ public static class NavigationContextResolver
         SettingsRoute settings => SettingsBreadcrumb(settings),
         TrashRoute => [
             new(SurfaceText.Get("Nav.Settings", "Settings"), new SettingsRoute()),
-            new(SurfaceText.Get("Settings.Trash.Title", "Trash"), new SettingsRoute(SettingsSection.Trash))],
+            new(SurfaceText.Get("Settings.Trash.Title", "Trash Bin"), new SettingsRoute(SettingsSection.Trash))],
         VaultHealthRoute => [
             new(SurfaceText.Get("Nav.Settings", "Settings"), new SettingsRoute()),
             new(SurfaceText.Get("Settings.Vault.Title", "Vault"), new SettingsRoute(SettingsSection.Vault)),

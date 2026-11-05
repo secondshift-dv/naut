@@ -63,7 +63,10 @@ public sealed class PurgeExecutor
         return ConfirmAsync(purgePlanId, PurgeEntityType.Profile, irreversibleConfirmation, cancellationToken);
     }
 
-    private async Task<OperationResult<PurgePlan>> PrepareAsync(
+    private Task<OperationResult<PurgePlan>> PrepareAsync(Guid trashEntryId, string expectedEntityType, CancellationToken cancellationToken) =>
+        TrashExecutionGate.RunAsync(_catalog, () => PrepareCoreAsync(trashEntryId, expectedEntityType, cancellationToken), cancellationToken);
+
+    private async Task<OperationResult<PurgePlan>> PrepareCoreAsync(
         Guid trashEntryId,
         string expectedEntityType,
         CancellationToken cancellationToken)
@@ -88,6 +91,11 @@ public sealed class PurgeExecutor
                     OperationErrorCode.PurgeStateInvalid,
                     "Only an entity that is currently in Trash can be permanently purged.");
             }
+
+            if (expectedEntityType == PurgeEntityType.Media && await TrashCoordinator.HasGroupPurgeAsync(connection,
+                    MediaTrashPlan.FromJson(trashEntry.PlanJson), cancellationToken).ConfigureAwait(false))
+                return OperationResult<PurgePlan>.Conflict(OperationErrorCode.PurgeDependencyBlocked,
+                    "This media belongs to an active Profile group Purge.");
 
             var existing = await ReadActivePurgeEntryAsync(
                     connection, expectedEntityType, trashEntry.EntityId, cancellationToken)
@@ -151,6 +159,33 @@ public sealed class PurgeExecutor
             var affected = await ReadAffectedDataAsync(
                     connection, transaction: null, expectedEntityType, trashEntry.EntityId, cancellationToken)
                 .ConfigureAwait(false);
+            var groupMembers = new List<PurgeGroupMember>();
+            if (expectedEntityType == PurgeEntityType.Profile)
+            {
+                var group = ProfileTrashPlan.FromJson(trashEntry.PlanJson);
+                if (group is null)
+                    return OperationResult<PurgePlan>.NeedsAttention(OperationErrorCode.TrashPlanUnreadable,
+                        "The Profile group receipt cannot be read safely.");
+                var combinedTargets = targets.ToList();
+                foreach (var member in group.SelectedDispositions.Where(item => item.Kind == ProfileOwnedMediaDispositionKind.TrashMedia))
+                {
+                    var child = await TrashCoordinator.ReadActiveTrashEntryAsync(connection, TrashEntityType.Media,
+                        member.MediaId, cancellationToken).ConfigureAwait(false);
+                    if (MediaTrashPlan.FromJson(child?.PlanJson)?.ParentProfileTrashEntryId != group.TrashEntryId) continue;
+                    var version = await ReadAndValidateEntityVersionAsync(connection, null, PurgeEntityType.Media,
+                        member.MediaId, cancellationToken).ConfigureAwait(false);
+                    if (version is null || child!.State != TrashEntryState.InTrash
+                        || await CountBlockingDependenciesAsync(connection, null, PurgeEntityType.Media, member.MediaId, cancellationToken).ConfigureAwait(false) != 0
+                        || await ReadActivePurgeEntryAsync(connection, PurgeEntityType.Media, member.MediaId, cancellationToken).ConfigureAwait(false) is not null)
+                        return OperationResult<PurgePlan>.Conflict(OperationErrorCode.PurgeDependencyBlocked,
+                            "A group member is protected or has another active operation.");
+                    combinedTargets.AddRange(await BuildMediaTargetsAsync(connection, child, cancellationToken).ConfigureAwait(false));
+                    groupMembers.Add(new PurgeGroupMember(member.MediaId, child.TrashEntryId, version.Value,
+                        child.RowVersion, await ReadAffectedDataAsync(connection, null, PurgeEntityType.Media,
+                            member.MediaId, cancellationToken).ConfigureAwait(false)));
+                }
+                targets = combinedTargets;
+            }
             var now = _timeProvider.GetUtcNow();
             plan = new PurgePlan(
                 Guid.NewGuid(),
@@ -167,7 +202,13 @@ public sealed class PurgeExecutor
                 expectedEntityType == PurgeEntityType.Media
                     ? "This permanently and irreversibly removes the media and its recovery material."
                     : "This permanently and irreversibly removes the Profile and its recovery material.",
-                Guid.NewGuid());
+                Guid.NewGuid())
+            {
+                GroupMembers = groupMembers,
+                CancellationImportUnitId = expectedEntityType == PurgeEntityType.Media
+                    ? MediaTrashPlan.FromJson(trashEntry.PlanJson)?.CancellationImportUnitId
+                    : ProfileTrashPlan.FromJson(trashEntry.PlanJson)?.CancellationImportUnitId,
+            };
         }
 
         try
@@ -197,7 +238,12 @@ public sealed class PurgeExecutor
         return OperationResult<PurgePlan>.Success(plan, plan.OperationId);
     }
 
-    private async Task<OperationResult<PurgeOutcome>> ConfirmAsync(
+    private Task<OperationResult<PurgeOutcome>> ConfirmAsync(Guid purgePlanId, string expectedEntityType,
+        bool irreversibleConfirmation, CancellationToken cancellationToken) =>
+        TrashExecutionGate.RunAsync(_catalog, () => ConfirmCoreAsync(purgePlanId, expectedEntityType,
+            irreversibleConfirmation, cancellationToken), cancellationToken);
+
+    private async Task<OperationResult<PurgeOutcome>> ConfirmCoreAsync(
         Guid purgePlanId,
         string expectedEntityType,
         bool irreversibleConfirmation,
@@ -343,12 +389,19 @@ public sealed class PurgeExecutor
         }
         else
         {
+            foreach (var member in plan.GroupMembers)
+            {
+                await DeleteMediaAuthorityAsync(transaction, member.MediaId, cancellationToken).ConfigureAwait(false);
+                await MarkPurgedAsync(transaction, member.TrashEntryId, nowMs, cancellationToken).ConfigureAwait(false);
+                transaction.QueueInvalidation(CatalogInvalidationDomain.Media);
+            }
             await DeleteProfileAuthorityAsync(transaction, plan.EntityId, cancellationToken).ConfigureAwait(false);
         }
 
         await MarkPurgedAsync(transaction, plan.TrashEntryId, nowMs, cancellationToken).ConfigureAwait(false);
         await MarkPurgedAsync(transaction, plan.PurgePlanId, nowMs, cancellationToken).ConfigureAwait(false);
-        await TrashCoordinator.AppendActivityAsync(
+        if (plan.CancellationImportUnitId is null)
+            await TrashCoordinator.AppendActivityAsync(
                 transaction,
                 plan.EntityType == PurgeEntityType.Media ? ActivityEventType.MediaPurged : ActivityEventType.ProfilePurged,
                 plan.EntityType == PurgeEntityType.Profile ? plan.EntityId : null,
@@ -440,6 +493,24 @@ public sealed class PurgeExecutor
         var affected = await ReadAffectedDataAsync(
                 connection, transaction, plan.EntityType, plan.EntityId, cancellationToken)
             .ConfigureAwait(false);
+        foreach (var member in plan.GroupMembers)
+        {
+            var child = await TrashCoordinator.ReadTrashEntryAsync(connection, transaction, member.TrashEntryId, cancellationToken).ConfigureAwait(false);
+            var childPlan = MediaTrashPlan.FromJson(child?.PlanJson);
+            var childVersion = await ReadAndValidateEntityVersionAsync(connection, transaction, PurgeEntityType.Media,
+                member.MediaId, cancellationToken).ConfigureAwait(false);
+            var childAffected = await ReadAffectedDataAsync(connection, transaction, PurgeEntityType.Media,
+                member.MediaId, cancellationToken).ConfigureAwait(false);
+            if (child?.State != TrashEntryState.InTrash || child.EntityType != TrashEntityType.Media
+                || child.EntityId != member.MediaId || childPlan?.MediaId != member.MediaId
+                || childPlan.TrashEntryId != member.TrashEntryId || child.RowVersion != member.TrashRowVersion
+                || childPlan?.ParentProfileTrashEntryId != plan.TrashEntryId || childVersion != member.MediaRowVersion
+                || !childAffected.SequenceEqual(member.DependentDataAffected)
+                || await CountBlockingDependenciesAsync(connection, transaction, PurgeEntityType.Media,
+                    member.MediaId, cancellationToken).ConfigureAwait(false) != 0)
+                return OperationResult<PurgeOutcome>.Conflict(OperationErrorCode.PurgePlanStale,
+                    "A Profile group member changed after Purge was prepared.");
+        }
         return affected.SequenceEqual(plan.DependentDataAffected)
             ? null
             : OperationResult<PurgeOutcome>.Conflict(
@@ -735,7 +806,13 @@ public sealed class PurgeExecutor
                   AND state IN ('PENDING','RUNNABLE','RUNNING','PAUSED','FAILED_RETRYABLE')) +
                 (SELECT COUNT(*) FROM import_units WHERE destination_profile_id = $id AND completed_at_ms IS NULL) +
                 (SELECT COUNT(*) FROM import_assignment_clusters
-                  WHERE candidate_profile_id = $id OR decided_profile_id = $id);
+                  WHERE candidate_profile_id = $id OR decided_profile_id = $id) +
+                (SELECT COUNT(*) FROM face_detections f JOIN media m ON m.media_id=f.media_id AND m.state='ACTIVE'
+                  JOIN identities i ON i.identity_id=f.confirmed_identity_id OR i.identity_id=f.suggested_identity_id
+                  WHERE i.profile_id=$id) +
+                (SELECT COUNT(*) FROM identity_samples s JOIN identities i ON i.identity_id=s.identity_id
+                  JOIN face_detections f ON f.face_id=s.face_id JOIN media m ON m.media_id=f.media_id
+                  WHERE i.profile_id=$id AND m.state='ACTIVE');
               """;
         return await ReadCountAsync(connection, transaction, sql, entityId, cancellationToken).ConfigureAwait(false);
     }
@@ -806,6 +883,8 @@ public sealed class PurgeExecutor
             "DELETE FROM media_capability_readiness WHERE media_id = $id;",
             cancellationToken,
             ("$id", id)).ConfigureAwait(false);
+        await ExecuteAsync(transaction, "DELETE FROM storage_operations WHERE kind='MODEL_RENDER_VALIDATED' AND entity_type='MEDIA' AND entity_id=$id;",
+            cancellationToken, ("$id", id)).ConfigureAwait(false);
         await ExecuteAsync(transaction, "DELETE FROM media WHERE media_id = $id;", cancellationToken, ("$id", id)).ConfigureAwait(false);
     }
 
@@ -826,6 +905,7 @@ public sealed class PurgeExecutor
         await ExecuteAsync(transaction, "DELETE FROM profile_media WHERE profile_id = $id;", cancellationToken, ("$id", id)).ConfigureAwait(false);
         await ExecuteAsync(transaction, "UPDATE import_units SET destination_profile_id = NULL WHERE destination_profile_id = $id;", cancellationToken, ("$id", id)).ConfigureAwait(false);
         await ExecuteAsync(transaction, "DELETE FROM identities WHERE profile_id = $id;", cancellationToken, ("$id", id)).ConfigureAwait(false);
+        await ExecuteAsync(transaction, "DELETE FROM storage_operations WHERE kind IN ('PROFILE_TEXT_SYNC','PROFILE_OVERVIEW_IMPORT') AND entity_id=$id;", cancellationToken, ("$id", id)).ConfigureAwait(false);
         await ExecuteAsync(transaction, "DELETE FROM profiles WHERE profile_id = $id;", cancellationToken, ("$id", id)).ConfigureAwait(false);
     }
 

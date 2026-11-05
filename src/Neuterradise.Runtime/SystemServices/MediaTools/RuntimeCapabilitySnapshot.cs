@@ -55,7 +55,7 @@ public sealed class RuntimeCapabilitySnapshot
             byId[toolId] = toolResolver.Resolve(toolId);
         }
 
-        var catalog = DeploymentArtifactCatalog.TryLoad(install);
+        var catalog = DeploymentArtifactCatalog.TryLoad(install.RuntimeRoot);
         foreach (var modelId in new[]
                  {
                      RuntimeCapabilityIds.FaceDetectionModel,

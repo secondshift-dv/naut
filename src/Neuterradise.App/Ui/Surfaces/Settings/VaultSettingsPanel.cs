@@ -296,6 +296,83 @@ public FrameworkElement Build()
                 UI.T("Settings.Vault.ChangeFailed", "The selected folder could not be used as a Vault.")),
             ButtonKind.Secondary);
         changeButton.IsEnabled = hasVault;
+        var logoStatus = UI.WrappedText(string.Empty, "caption", "textSecondary");
+        logoStatus.Visibility = Visibility.Collapsed;
+        var logoPreview = new Border
+        {
+            Width = 64,
+            Height = 64,
+            CornerRadius = new CornerRadius(10),
+            Background = ThemeRuntime.Current.Brush("surface2"),
+        };
+        Button? removeLogoButton = null;
+
+        void RefreshLogo()
+        {
+            var image = VaultLogoStore.Read(_services.Paths);
+            logoPreview.Child = image is null
+                ? new IconView("icon.vault.identity", 30, "accent")
+                    .Align(HorizontalAlignment.Center, VerticalAlignment.Center)
+                : new SkImageView
+                {
+                    Source = image,
+                    Width = 60,
+                    Height = 60,
+                    CornerRadiusValue = 9,
+                };
+            if (removeLogoButton is not null) removeLogoButton.IsEnabled = image is not null;
+        }
+
+        async Task ChooseLogoAsync()
+        {
+            var selected = await _services.PickFilesAsync(false, ".png", ".jpg", ".jpeg", ".webp")
+                .ConfigureAwait(true);
+            if (selected.Count == 0) return;
+
+            await Task.Run(() => VaultLogoStore.Save(_services.Paths, selected[0]))
+                .ConfigureAwait(true);
+            RefreshLogo();
+            _services.Root?.RefreshVaultLogo();
+            logoStatus.Text = UI.T("Settings.Vault.LogoSaved", "Vault logo updated.");
+            logoStatus.Visibility = Visibility.Visible;
+        }
+
+        async Task RestoreLogoAsync()
+        {
+            var confirmed = await _services.ConfirmAsync(
+                UI.T("Settings.Vault.LogoResetTitle", "Restore the default Vault icon?"),
+                UI.T("Settings.Vault.LogoResetConfirm",
+                    "This removes the custom logo from this Vault only."),
+                UI.T("Settings.Vault.LogoReset", "Restore default"))
+                .ConfigureAwait(true);
+            if (!confirmed) return;
+            VaultLogoStore.Remove(_services.Paths);
+            RefreshLogo();
+            _services.Root?.RefreshVaultLogo();
+            logoStatus.Text = UI.T("Settings.Vault.LogoRestored", "Default Vault icon restored.");
+            logoStatus.Visibility = Visibility.Visible;
+        }
+
+        var chooseLogoButton = UI.Button(
+            UI.T("Settings.Vault.LogoChoose", "Choose image..."),
+            () => _services.RunUserAction(ChooseLogoAsync(), "Settings.VaultLogo",
+                UI.T("Settings.Vault.LogoFailed", "The Vault logo could not be updated.")),
+            ButtonKind.Secondary);
+        removeLogoButton = UI.Button(
+            UI.T("Settings.Vault.LogoReset", "Restore default"),
+            () => _services.RunUserAction(RestoreLogoAsync(), "Settings.VaultLogoReset",
+                UI.T("Settings.Vault.LogoFailed", "The Vault logo could not be updated.")),
+            ButtonKind.Ghost);
+        chooseLogoButton.IsEnabled = hasVault;
+        RefreshLogo();
+        var logoSection = UI.Section(
+            UI.T("Settings.Vault.LogoTitle", "Vault logo"),
+            UI.T("Settings.Vault.LogoDesc",
+                "Each Vault has its own logo. It stays with the Vault when renamed, moved or reopened. Choose a PNG, JPEG or WebP image up to 8 MB."),
+            UI.Wrap(12, logoPreview, UI.V(6,
+                UI.Wrap(8, chooseLogoButton, removeLogoButton),
+                logoStatus)));
+
         var identity = UI.Section(
             UI.T("Settings.Vault.IdentityTitle", "Vault identity"),
             UI.T("Settings.Vault.IdentityDesc", "The folder name is the Vault name shown in the app. Renaming safely restarts naut."),
@@ -311,6 +388,7 @@ public FrameworkElement Build()
         return UI.V(
             12,
             identity,
+            logoSection,
             UI.Section(
                 UI.T("Settings.Vault.StorageTitle", "Vault storage"),
                 null,

@@ -6,16 +6,17 @@ using Microsoft.Data.Sqlite;
 namespace Neuterradise.App.SystemServices.Database;
 
 /// <summary>
-/// Owns the one supported catalog schema for this product build.
-///
-/// There is intentionally no database upgrade history or upgrade loop. A catalog is either empty
-/// (Catalog Schema v1 is created atomically) or it already matches the current schema exactly.
-/// Existing incompatible catalogs are rejected. The supported Model Figure trigger predicate
-/// transition is reconciled atomically within v1; no tables or user data are rewritten.
+/// Owns the current schema and the single recognized, append-only v1-to-v2 transition.
+/// Existing user rows are never reset or rewritten. The contract object makes older binaries
+/// reject a newer Vault instead of misinterpreting its destructive lifecycle journals.
 /// </summary>
 public sealed class CatalogSchemaInitializer
 {
-    public const int SchemaVersion = 1;
+    public const int SchemaVersion = 2;
+    private const string ContractTable = "catalog_contract";
+    private static readonly string[] TransitionObjects = [ContractTable,
+        "trg_group_trash_profile_metadata", "trg_group_trash_relation_insert", "trg_group_trash_relation_update",
+        "trg_group_trash_appearance_insert", "trg_group_trash_appearance_update"];
 
     private const string SchemaResourceSuffix = ".SystemServices.Database.CatalogSchema.sql";
 
@@ -68,10 +69,73 @@ public sealed class CatalogSchemaInitializer
             await CreateSchemaAsync(connection, schemaSql, cancellationToken).ConfigureAwait(false);
         }
 
+        else
+        {
+            var legacy = !existingObjects.Contains(ContractTable);
+            await ValidateSchemaAsync(connection, schemaSql, cancellationToken, legacy).ConfigureAwait(false);
+            await using var versionRead = connection.CreateCommand();
+            versionRead.CommandText = "PRAGMA user_version;";
+            var version = Convert.ToInt32(await versionRead.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
+            if (legacy ? version is not (0 or 1) : version != SchemaVersion)
+                throw new CatalogSchemaException("The catalog format is newer than or incompatible with this build.");
+            await ModelFigureSchemaAuthority.ReconcileAsync(connection, schemaSql, cancellationToken).ConfigureAwait(false);
+            await ReconcileContractAsync(connection, schemaSql, legacy, cancellationToken).ConfigureAwait(false);
+        }
+
         await ValidateSchemaAsync(connection, schemaSql, cancellationToken).ConfigureAwait(false);
-        await ModelFigureSchemaAuthority.ReconcileAsync(connection, schemaSql, cancellationToken).ConfigureAwait(false);
+        await using var contractRead = connection.CreateCommand();
+        contractRead.CommandText = "SELECT COUNT(*) FROM catalog_contract WHERE singleton=1 AND schema_version=$version;";
+        contractRead.Parameters.AddWithValue("$version", SchemaVersion);
+        if (Convert.ToInt32(await contractRead.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) != 1)
+            throw new CatalogSchemaException("The catalog format contract is missing or invalid.");
         return new CatalogInitializationResult(created, SchemaVersion);
     }
+
+    private static async Task ReconcileContractAsync(SqliteConnection connection, string schemaSql,
+        bool legacy, CancellationToken ct)
+    {
+        await using var expected = new SqliteConnection("Data Source=:memory:");
+        await expected.OpenAsync(ct).ConfigureAwait(false);
+        await using (var create = expected.CreateCommand())
+        {
+            create.CommandText = schemaSql;
+            await create.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+        var expectedDefinitions = await ReadDefinitionsAsync(expected, ct).ConfigureAwait(false);
+        var actualDefinitions = await ReadDefinitionsAsync(connection, ct).ConfigureAwait(false);
+        foreach (var (name, sql) in actualDefinitions)
+            if (!expectedDefinitions.TryGetValue(name, out var canonical)
+                || NormalizeDefinition(sql) != NormalizeDefinition(canonical))
+                throw new CatalogSchemaException("Unrecognized catalog object definition: " + name);
+        if (!legacy) return;
+
+        // SQLite journals the compatibility object, marker and header version in one commit.
+        // Interruption before commit leaves v1 intact; re-entry after commit validates v2.
+        await using var transaction = connection.BeginTransaction(deferred: false);
+        await using var upgrade = connection.CreateCommand();
+        upgrade.Transaction = transaction;
+        upgrade.CommandText = string.Join(";", TransitionObjects.Select(name => expectedDefinitions[name])) + ";"
+            + "INSERT INTO catalog_contract(singleton,schema_version) VALUES(1,$version);"
+            + "PRAGMA user_version=2;";
+        upgrade.Parameters.AddWithValue("$version", SchemaVersion);
+        await upgrade.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        await transaction.CommitAsync(ct).ConfigureAwait(false);
+    }
+
+    private static async Task<Dictionary<string, string>> ReadDefinitionsAsync(SqliteConnection connection, CancellationToken ct)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT name,sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND name NOT LIKE 'sqlite_%';";
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        while (await reader.ReadAsync(ct).ConfigureAwait(false)) result.Add(reader.GetString(0), reader.GetString(1));
+        return result;
+    }
+
+    internal static string NormalizeDefinition(string sql) => Regex.Replace(sql,
+        @"'(?:''|[^'])*'|/\*.*?\*/|--[^\r\n]*|\s+",
+        match => match.Value.StartsWith("'", StringComparison.Ordinal) ? match.Value : string.Empty,
+        RegexOptions.Singleline, TimeSpan.FromSeconds(1)).TrimEnd(';');
 
     private static string LoadSchemaSql()
     {
@@ -79,11 +143,11 @@ public sealed class CatalogSchemaInitializer
         var resourceName = assembly.GetManifestResourceNames()
             .SingleOrDefault(name => name.EndsWith(SchemaResourceSuffix, StringComparison.Ordinal))
             ?? throw new CatalogSchemaException(
-                "The embedded Catalog Schema v1 resource is missing.");
+                "The embedded Catalog Schema v2 resource is missing.");
 
         using var stream = assembly.GetManifestResourceStream(resourceName)
             ?? throw new CatalogSchemaException(
-                "The embedded Catalog Schema v1 resource could not be opened.");
+                "The embedded Catalog Schema v2 resource could not be opened.");
         using var reader = new StreamReader(
             stream,
             new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true),
@@ -139,7 +203,7 @@ public sealed class CatalogSchemaInitializer
             }
 
             throw new CatalogSchemaException(
-                "Catalog Schema v1 could not be created atomically.",
+                "Catalog Schema v2 could not be created atomically.",
                 exception);
         }
     }
@@ -147,15 +211,16 @@ public sealed class CatalogSchemaInitializer
     private static async Task ValidateSchemaAsync(
         SqliteConnection connection,
         string schemaSql,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool legacy = false)
     {
         var expectedObjects = SchemaObjectDeclaration.Matches(schemaSql)
             .Select(match => match.Groups["name"].Value)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (legacy) expectedObjects.ExceptWith(TransitionObjects);
         if (expectedObjects.Count == 0)
         {
             throw new CatalogSchemaException(
-                "Catalog Schema v1 declares no database objects.");
+                "Catalog Schema v2 declares no database objects.");
         }
 
         var actualObjects = await ReadCatalogObjectsAsync(connection, cancellationToken)
@@ -167,7 +232,7 @@ public sealed class CatalogSchemaInitializer
         if (missing.Length != 0)
         {
             throw new CatalogSchemaException(
-                "Catalog Schema v1 is incomplete. Missing objects: "
+                "Catalog Schema v2 is incomplete. Missing objects: "
                 + string.Join(", ", missing));
         }
 
@@ -178,7 +243,7 @@ public sealed class CatalogSchemaInitializer
         if (unexpected.Length != 0)
         {
             throw new CatalogSchemaException(
-                "Catalog Schema v1 contains unsupported objects: "
+                "Catalog Schema v2 contains unsupported objects: "
                 + string.Join(", ", unexpected));
         }
 
@@ -189,7 +254,7 @@ public sealed class CatalogSchemaInitializer
         if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             throw new CatalogSchemaException(
-                "Catalog Schema v1 contains a foreign-key integrity violation.");
+                "Catalog Schema v2 contains a foreign-key integrity violation.");
         }
     }
 }

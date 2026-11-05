@@ -1,0 +1,92 @@
+{
+  "id": "builtin.neuterradise.theme.foundry",
+  "kind": "theme",
+  "name": "Foundry",
+  "description": "Graphite, copper and brushed brass.",
+  "spec": {
+    "theme": {
+      "schemaVersion": 1,
+      "id": "foundry",
+      "name": "Foundry",
+      "isDark": true,
+      "colors": {
+        "canvas": "#FF18191A",
+        "surface1": "#FF232425",
+        "surface2": "#FF2D2D2C",
+        "surface3": "#FF373633",
+        "surfaceElevated": "#FF41403B",
+        "surfaceOverlay": "#F2232425",
+        "surfaceHover": "#FF45413A",
+        "surfacePressed": "#FF51483C",
+        "surfaceSelected": "#FF57432D",
+        "textPrimary": "#FFF2E5D1",
+        "textSecondary": "#FFD0BCA1",
+        "textMuted": "#FFAD957A",
+        "textDisabled": "#FF6F717D",
+        "textInverse": "#FF172026",
+        "textOnAccent": "#FF172026",
+        "textLink": "#FFE0BA78",
+        "borderSubtle": "#18FFFFFF",
+        "borderDefault": "#28FFFFFF",
+        "borderStrong": "#44FFFFFF",
+        "borderInteractive": "#FFE0BA78",
+        "borderSelected": "#FFE0BA78",
+        "focus": "#FFE0BA78",
+        "accent": "#FFE0BA78",
+        "accentHover": "#FFF0D19D",
+        "accentPressed": "#FFC0995E",
+        "accentSecondary": "#FF82B5A7",
+        "selection": "#33E0BA78",
+        "selectionHover": "#4DE0BA78",
+        "info": "#FF8AB9E5",
+        "success": "#FF8DC5A3",
+        "warning": "#FFE1BD7A",
+        "danger": "#FFE7957B",
+        "dangerHover": "#FFF0B2B3"
+      },
+      "typography": {
+        "displayFamily": "Segoe UI Variable Display",
+        "headingFamily": "Segoe UI Variable Display",
+        "bodyFamily": "Segoe UI Variable Text",
+        "monoFamily": "Consolas"
+      },
+      "shape": {
+        "xs": 1,
+        "sm": 2,
+        "md": 4,
+        "lg": 6,
+        "xl": 8
+      },
+      "motion": {
+        "fastMs": 120,
+        "normalMs": 180,
+        "slowMs": 280,
+        "cinematicMs": 500
+      },
+      "background": {
+        "kind": "RadialGlow"
+      },
+      "morphology": {
+        "navigationTreatment": "AccentEdge",
+        "cardPersonality": "Framed",
+        "chromeTreatment": "Accented",
+        "focusTreatment": "Ring",
+        "borderWeight": 1.1,
+        "elevationStrength": 0.6,
+        "glowStrength": 0.12,
+        "panelOpacity": 1,
+        "motionIntensity": 0.5,
+        "navigationRadiusScale": 0.5
+      }
+    },
+    "material": {
+      "personality": "brass-metal",
+      "atmosphere": "dust",
+      "grain": 0.045,
+      "glassOpacity": 1,
+      "specular": 0.16,
+      "rimLight": 0.3
+    },
+    "artwork": "theme-icon-foundry"
+  }
+}

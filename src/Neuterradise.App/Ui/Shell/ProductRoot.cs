@@ -160,13 +160,14 @@ public sealed class ProductRoot : Grid
             () => NavigateTop(new SettingsRoute(SettingsSection.Vault)),
             secondaryLabel: vaultName)
         {
-            MinWidth = 128,
+            MinWidth = 0,
             MaxWidth = 280,
-            Margin = new Thickness(10, 0, 14, 0),
+            Margin = new Thickness(12, 0, 12, 0),
             HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Center,
         };
         _vaultButton.Tip(_services.Paths.Root);
+        RefreshVaultLogo();
         navigation.Children.Add(_vaultButton.At(0, 0));
 
         var nav = UI.H(4);
@@ -229,6 +230,7 @@ public sealed class ProductRoot : Grid
         _breadcrumbHost.Background = theme.Brush("surface2");
         _breadcrumbHost.BorderBrush = theme.Brush("borderSubtle");
         _breadcrumbHost.BorderThickness = new Thickness(0, 0, 0, 1);
+        _breadcrumbHost.SizeChanged += (_, _) => FitBreadcrumb();
         return _breadcrumbHost;
     }
 
@@ -260,13 +262,22 @@ public sealed class ProductRoot : Grid
             }
             if (item.Target is null)
             {
-                _breadcrumb.Children.Add(UI.Text(item.Label, "caption", "textPrimary").Align(vertical: VerticalAlignment.Center));
+                _breadcrumb.Children.Add(UI.Text(item.Label, "caption", "textPrimary").Tip(item.Label).Align(vertical: VerticalAlignment.Center));
             }
             else
             {
                 _breadcrumb.Children.Add(UI.Button(item.Label, () => _services.Navigation.Navigate(item.Target), ButtonKind.Ghost));
             }
         }
+        FitBreadcrumb();
+    }
+
+    private void FitBreadcrumb()
+    {
+        if (_breadcrumbHost.ActualWidth <= 0 || _breadcrumb.Children.LastOrDefault() is not TextBlock current) return;
+        var used = _breadcrumb.Children.OfType<FrameworkElement>().Where(child => !ReferenceEquals(child, current))
+            .Sum(child => child.ActualWidth + 4);
+        current.MaxWidth = Math.Max(40, _breadcrumbHost.ActualWidth - used - 24);
     }
 
     private void ObserveBreadcrumbProfile()
@@ -417,10 +428,14 @@ public sealed class ProductRoot : Grid
             _activityProgress.Width = compactUtilities ? 44 : 72;
         }
 
-        foreach (var item in _navButtons) item.Button.SetCompact(width < 600);
+        foreach (var item in _navButtons) item.Button.SetCompact(width < 820);
         _customizeButton?.SetCompact(width < 900);
+        _vaultButton?.SetCompact(width < 700);
         _vaultButton?.SetSecondaryMaxWidth(width < 920 ? 82 : 150);
     }
+
+    public void RefreshVaultLogo() =>
+        _vaultButton?.SetVaultLogo(VaultLogoStore.Read(_services.Paths));
 
     private void NavigateTop(AppRoute route)
     {
@@ -695,7 +710,7 @@ public sealed class ProductRoot : Grid
     {
         // Native children occupy HWND airspace; XAML modal scrims cannot cover them.
         if (_current is ProfileSurface profile)
-            profile.SetFigureOccluded(Dialogs.HasOpenDialog || _customization?.IsEditor == true);
+            profile.SetFigureOccluded(Dialogs.HasOpenDialog || _customization is not null && (_customization.IsEditor || ActualWidth < 900));
         _customization?.SetFigureOccluded(Dialogs.HasOpenDialog);
     }
 
@@ -713,13 +728,15 @@ public sealed class ProductRoot : Grid
         var inspectorWidth = 320d;
         if (ActualWidth > 0)
         {
-            inspectorWidth = Math.Min(inspectorWidth, Math.Max(280, ActualWidth * 0.42));
+            inspectorWidth = ActualWidth < 900
+                ? Math.Max(1, Math.Min(420, ActualWidth - 24))
+                : Math.Min(inspectorWidth, Math.Max(280, ActualWidth * 0.42));
         }
 
         Grid.SetColumn(_customizationLayer, 0);
         Grid.SetColumnSpan(_customizationLayer, 2);
         _customization.SetInspectorWidth(inspectorWidth);
-        _presentationWorkspace.ColumnDefinitions[1].Width = new GridLength(_customization.IsCardOnly ? 0 : inspectorWidth);
+        _presentationWorkspace.ColumnDefinitions[1].Width = new GridLength(_customization.IsCardOnly || ActualWidth < 900 ? 0 : inspectorWidth);
     }
 
     public Neuterradise.App.Gallery.GalleryCardViewModel? SampleCard(Guid? profileId) =>
@@ -734,7 +751,8 @@ public sealed class ProductRoot : Grid
         IntakeOrigin origin = IntakeOrigin.Picker)
     {
         var import = (ImportSurface)ResolveSurface(new ImportRoute());
-        _services.Navigation.ResetToTopLevel(new ImportRoute());
+        if (origin != IntakeOrigin.ProfileAddMedia)
+            _services.Navigation.ResetToTopLevel(new ImportRoute());
         return import.IntakeAsync(paths, destinationProfileId, origin);
     }
 

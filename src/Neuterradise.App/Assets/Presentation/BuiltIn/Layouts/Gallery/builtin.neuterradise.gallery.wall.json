@@ -1,0 +1,15 @@
+{
+  "id": "builtin.neuterradise.gallery.wall",
+  "kind": "gallery-layout",
+  "name": "Wall",
+  "spec": {
+    "primitive": "VirtualizedAdaptiveWall",
+    "toolbar": "catalog",
+    "itemMinWidth": 200,
+    "itemMaxWidth": 360,
+    "rowHeight": 270,
+    "spacing": 12,
+    "maxColumns": 5
+  },
+  "description": "An even grid of Profile cards."
+}

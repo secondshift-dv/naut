@@ -41,6 +41,15 @@ public sealed record PurgeAffectedData(string Name, long RowCount);
 
 public sealed record PurgeAuthorityVersion(string EntityType, Guid EntityId, long RowVersion);
 
+public sealed record PurgeGroupMember(Guid MediaId, Guid TrashEntryId, long MediaRowVersion,
+    long TrashRowVersion, IReadOnlyList<PurgeAffectedData> DependentDataAffected)
+{
+    public bool Equals(PurgeGroupMember? other) => other is not null && MediaId == other.MediaId
+        && TrashEntryId == other.TrashEntryId && MediaRowVersion == other.MediaRowVersion
+        && TrashRowVersion == other.TrashRowVersion && DependentDataAffected.SequenceEqual(other.DependentDataAffected);
+    public override int GetHashCode() => HashCode.Combine(MediaId, TrashEntryId, MediaRowVersion, TrashRowVersion);
+}
+
 public sealed record PurgePlan(
     Guid PurgePlanId,
     string EntityType,
@@ -57,6 +66,10 @@ public sealed record PurgePlan(
 
     [JsonInclude]
     public int Version { get; init; } = SchemaVersion;
+
+    public Guid? CancellationImportUnitId { get; init; }
+
+    public IReadOnlyList<PurgeGroupMember> GroupMembers { get; init; } = [];
 
     public int CompletedPhysicalTargetCount { get; init; }
 
@@ -94,6 +107,7 @@ public sealed record PurgePlan(
         }
 
         return other is not null
+            && CancellationImportUnitId == other.CancellationImportUnitId
             && Version == other.Version
             && PurgePlanId == other.PurgePlanId
             && EntityType == other.EntityType
@@ -103,6 +117,7 @@ public sealed record PurgePlan(
             && WarningSummary == other.WarningSummary
             && OperationId == other.OperationId
             && CompletedPhysicalTargetCount == other.CompletedPhysicalTargetCount
+            && GroupMembers.SequenceEqual(other.GroupMembers)
             && PhysicalDeletionTargets.SequenceEqual(other.PhysicalDeletionTargets)
             && DependentDataAffected.SequenceEqual(other.DependentDataAffected)
             && PreparedAuthorityVersions.SequenceEqual(other.PreparedAuthorityVersions);
@@ -112,6 +127,7 @@ public sealed record PurgePlan(
     {
         var hash = new HashCode();
         hash.Add(Version);
+        hash.Add(CancellationImportUnitId);
         hash.Add(PurgePlanId);
         hash.Add(EntityType);
         hash.Add(EntityId);
@@ -143,6 +159,11 @@ public sealed record PurgePlan(
         && PhysicalDeletionTargets is not null
         && DependentDataAffected is not null
         && PreparedAuthorityVersions is not null
+        && GroupMembers is not null
+        && (GroupMembers.Count == 0 || EntityType == PurgeEntityType.Profile)
+        && GroupMembers.All(item => item is not null && item.MediaId != Guid.Empty && item.TrashEntryId != Guid.Empty
+            && item.MediaRowVersion >= 0 && item.TrashRowVersion >= 0 && item.DependentDataAffected is not null)
+        && GroupMembers.Select(item => item.MediaId).Distinct().Count() == GroupMembers.Count
         && CompletedPhysicalTargetCount >= 0
         && CompletedPhysicalTargetCount <= PhysicalDeletionTargets.Count;
 }

@@ -20,7 +20,7 @@ internal static class FrameChoicePreview
         {
             return new SkImageView
             {
-                Source = new ImageRef(artworkPath, 256),
+                Source = ImageRef.FromPath(artworkPath, 256, plan.OverlayAssetIdentity),
                 Transform = MediaTransformState.Default with { Fit = "fit" },
                 Width = size,
                 Height = size,

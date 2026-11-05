@@ -108,10 +108,11 @@ public sealed record VerificationDraftV1(
     bool? ImportRequested = null,
     IReadOnlyList<Guid>? AttentionItemIds = null,
     IReadOnlyList<StagedDuplicateDecision>? DuplicateDecisions = null,
-    IReadOnlyList<StagedProfileCollisionDecision>? ProfileCollisionDecisions = null)
+    IReadOnlyList<StagedProfileCollisionDecision>? ProfileCollisionDecisions = null,
+    bool PublishWhenReady = false)
 {
     /// <summary>
-    /// True once the user pressed Import in the two-step overlay. It is the durable record of intent:
+    /// True once the user authorized import through the overlay or Profile picker. It is the durable record of intent:
     /// <see cref="Neuterradise.App.Import.ImportFinalizer"/> finishes the import when preparation
     /// allows, including after an application restart. Older drafts simply omit it.
     /// </summary>

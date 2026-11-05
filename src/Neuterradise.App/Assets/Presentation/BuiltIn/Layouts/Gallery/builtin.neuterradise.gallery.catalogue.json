@@ -1,0 +1,15 @@
+{
+  "id": "builtin.neuterradise.gallery.catalogue",
+  "kind": "gallery-layout",
+  "name": "Catalogue",
+  "spec": {
+    "primitive": "VirtualizedAdaptiveWall",
+    "toolbar": "feed",
+    "itemMinWidth": 340,
+    "itemMaxWidth": 730,
+    "rowHeight": 240,
+    "spacing": 14,
+    "maxColumns": 2
+  },
+  "description": "Two-column Profile catalogue with supplementary information."
+}

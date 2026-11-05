@@ -98,7 +98,7 @@ public sealed class ImportReads
                        AND source_cleanup_state = 'SOURCE_CONSUMED') AS cleanup_consumed_count,
                    (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id
                        AND source_cleanup_state = 'SOURCE_PRESERVED') AS cleanup_preserved_count,
-                   u.preparation_started_at_ms
+                   u.preparation_started_at_ms, u.rollback_settled
             FROM import_units u
             WHERE u.import_unit_id = $unitId;
             """;
@@ -147,7 +147,8 @@ public sealed class ImportReads
             CleanupConsumedCount: reader.GetInt32(20),
             CleanupPreservedCount: reader.GetInt32(21),
             CleanupPendingCount: reader.GetInt32(19),
-            StageTwoStartedAtUtc: reader.IsDBNull(22) ? null : DbTime.Parse(reader.GetInt64(22)));
+            StageTwoStartedAtUtc: reader.IsDBNull(22) ? null : DbTime.Parse(reader.GetInt64(22)),
+            RollbackSettled: reader.IsDBNull(23) ? null : reader.GetBoolean(23));
     }
 
     public async Task<VerificationReadModel?> GetVerificationReadModelAsync(
@@ -545,7 +546,7 @@ public sealed class ImportReads
                    SUM(CASE WHEN i.source_cleanup_state IN ('LIBRARY_COMMITTED','SOURCE_DELETE_PENDING') THEN 1 ELSE 0 END) AS cleanup_pending_count,
                    SUM(CASE WHEN i.source_cleanup_state = 'SOURCE_CONSUMED' THEN 1 ELSE 0 END) AS cleanup_consumed_count,
                    SUM(CASE WHEN i.source_cleanup_state = 'SOURCE_PRESERVED' THEN 1 ELSE 0 END) AS cleanup_preserved_count,
-                   u.preparation_started_at_ms
+                   u.preparation_started_at_ms, u.rollback_settled
             FROM import_units u
             LEFT JOIN import_items i ON i.import_unit_id = u.import_unit_id
             WHERE u.import_session_id = $sessionId
@@ -582,7 +583,8 @@ public sealed class ImportReads
                 CleanupConsumedCount: reader.IsDBNull(20) ? 0 : reader.GetInt32(20),
                 CleanupPreservedCount: reader.IsDBNull(21) ? 0 : reader.GetInt32(21),
                 CleanupPendingCount: reader.IsDBNull(19) ? 0 : reader.GetInt32(19),
-                StageTwoStartedAtUtc: reader.IsDBNull(22) ? null : DbTime.Parse(reader.GetInt64(22))));
+                StageTwoStartedAtUtc: reader.IsDBNull(22) ? null : DbTime.Parse(reader.GetInt64(22)),
+            RollbackSettled: reader.IsDBNull(23) ? null : reader.GetBoolean(23)));
         }
 
         return list;
@@ -870,7 +872,7 @@ public sealed class ImportReads
                    SUM(CASE WHEN i.source_cleanup_state IN ('LIBRARY_COMMITTED','SOURCE_DELETE_PENDING') THEN 1 ELSE 0 END) AS cleanup_pending_count,
                    SUM(CASE WHEN i.source_cleanup_state = 'SOURCE_CONSUMED' THEN 1 ELSE 0 END) AS cleanup_consumed_count,
                    SUM(CASE WHEN i.source_cleanup_state = 'SOURCE_PRESERVED' THEN 1 ELSE 0 END) AS cleanup_preserved_count,
-                   u.preparation_started_at_ms
+                   u.preparation_started_at_ms, u.rollback_settled
             FROM import_units u
             LEFT JOIN import_items i ON i.import_unit_id = u.import_unit_id
             WHERE u.hidden_from_history = 0
@@ -909,7 +911,8 @@ public sealed class ImportReads
                 CleanupConsumedCount: reader.IsDBNull(20) ? 0 : reader.GetInt32(20),
                 CleanupPreservedCount: reader.IsDBNull(21) ? 0 : reader.GetInt32(21),
                 CleanupPendingCount: reader.IsDBNull(19) ? 0 : reader.GetInt32(19),
-                StageTwoStartedAtUtc: reader.IsDBNull(22) ? null : DbTime.Parse(reader.GetInt64(22))));
+                StageTwoStartedAtUtc: reader.IsDBNull(22) ? null : DbTime.Parse(reader.GetInt64(22)),
+            RollbackSettled: reader.IsDBNull(23) ? null : reader.GetBoolean(23)));
         }
 
         return list;

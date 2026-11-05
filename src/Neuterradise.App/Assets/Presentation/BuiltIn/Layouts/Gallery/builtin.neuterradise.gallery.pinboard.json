@@ -5,17 +5,21 @@
   "spec": {
     "primitive": "VirtualizedAdaptiveWall",
     "toolbar": "drawer",
-    "itemMinWidth": 210,
-    "itemMaxWidth": 360,
-    "rowHeight": 320,
-    "spacing": 14,
-    "maxColumns": 8,
+    "itemMinWidth": 244,
+    "itemMaxWidth": 405,
+    "rowHeight": 280,
+    "spacing": 17,
+    "maxColumns": 5,
     "heightPattern": [
-      0.66,
-      0.9,
-      0.76,
-      1.1,
-      0.6
+      0.86,
+      1.12,
+      0.94,
+      1.24,
+      0.82,
+      1.05,
+      1.17,
+      0.91
     ]
-  }
+  },
+  "description": "Larger staggered cards with a varied pinboard rhythm."
 }

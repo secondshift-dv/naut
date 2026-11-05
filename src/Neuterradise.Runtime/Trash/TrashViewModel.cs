@@ -28,7 +28,7 @@ public sealed class TrashViewModel : ScreenStateViewModel, IDisposable
     private bool _disposed;
     private readonly TrashReads? _trashReads;
     private readonly PurgeExecutor? _purgeExecutor;
-    private readonly ProfileTrashRetentionService? _retentionService;
+    private readonly TrashRetentionService? _retentionService;
     private readonly AsyncRelayCommand _confirmPurgeCommand;
     private readonly AsyncRelayCommand _loadMoreCommand;
 
@@ -60,7 +60,7 @@ public sealed class TrashViewModel : ScreenStateViewModel, IDisposable
             _trashOperations = trashOperations ?? new TrashOperations(_catalog, moveExecutor: moveExecutor);
             _trashReads = trashReads ?? new TrashReads(_catalog);
             _purgeExecutor = purgeExecutor ?? new PurgeExecutor(_catalog, moveExecutor);
-            _retentionService = new ProfileTrashRetentionService(_trashReads, _purgeExecutor);
+            _retentionService = new TrashRetentionService(_trashReads, _purgeExecutor);
         }
         else
         {
@@ -179,12 +179,12 @@ public sealed class TrashViewModel : ScreenStateViewModel, IDisposable
             if (_retentionService is not null)
             {
                 var sweep = await _retentionService
-                    .PurgeExpiredProfilesAsync(cancellationToken)
+                    .PurgeExpiredAsync(cancellationToken)
                     .ConfigureAwait(true);
                 ActionMessage = sweep.Failures.Count > 0
-                    ? $"{sweep.Failures.Count} expired Profile(s) could not be deleted automatically. You can retry from Trash."
+                    ? Localization.SurfaceText.Format("Trash.Retention.SweepBlocked", "{0} expired item(s) could not be deleted automatically. Retry from Trash.", sweep.Failures.Count)
                     : sweep.PurgedCount > 0
-                        ? $"{sweep.PurgedCount} Profile(s) older than {ProfileTrashRetentionPolicy.ProfileRetentionDays} days were permanently deleted."
+                        ? Localization.SurfaceText.Format("Trash.Retention.SweepCompleted", "{0} item(s) older than {1} days were permanently deleted.", sweep.PurgedCount, TrashRetentionPolicy.RetentionDays)
                         : null;
             }
 
@@ -520,7 +520,7 @@ public sealed class TrashViewModel : ScreenStateViewModel, IDisposable
         entry.EntityType,
         entry.EntityId,
         entry.DisplayName ?? $"{entry.EntityType} ({entry.EntityId.ToString()[..8]})",
-        entry.CreatedAtUtc,
+        entry.TrashedAtUtc ?? entry.CreatedAtUtc,
         entry.RecoveryRelativePath,
         entry.State);
 

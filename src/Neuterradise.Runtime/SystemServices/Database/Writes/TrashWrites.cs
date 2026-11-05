@@ -18,18 +18,22 @@ public sealed class TrashWrites
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
-    public async Task PersistEntryAsync(
-        TrashEntryPersistence entry,
-        CancellationToken cancellationToken = default)
+    public async Task PersistEntryAsync(TrashEntryPersistence entry, CancellationToken cancellationToken = default)
     {
+        await using var lease = await _writeCoordinator.EnterAsync(cancellationToken).ConfigureAwait(false);
+        await PersistEntryUnderLeaseAsync(entry, lease, cancellationToken).ConfigureAwait(false);
+    }
+
+    internal async Task PersistEntryUnderLeaseAsync(TrashEntryPersistence entry,
+        CatalogWriteCoordinator.Lease lease, CancellationToken cancellationToken)
+    {
+        lease.EnsureHeldBy(_writeCoordinator);
         Validate(entry);
         entry = entry with
         {
             CreatedAtUtc = DbTime.Parse(DbTime.Format(entry.CreatedAtUtc)),
             UpdatedAtUtc = DbTime.Parse(DbTime.Format(entry.UpdatedAtUtc)),
         };
-        await using var lease = await _writeCoordinator.EnterAsync(cancellationToken)
-            .ConfigureAwait(false);
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken)
             .ConfigureAwait(false);
         await using var transaction = CatalogTransaction.Begin(connection);

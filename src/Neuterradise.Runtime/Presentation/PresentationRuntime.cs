@@ -435,10 +435,16 @@ public sealed class PresentationRuntime
 
         return slot switch
         {
-            PresentationSlots.ProfileLayout when id.StartsWith("builtin.neuterradise.profile.", StringComparison.Ordinal) => id["builtin.neuterradise.profile.".Length..],
+            PresentationSlots.ProfileLayout when id.StartsWith("builtin.neuterradise.profile.", StringComparison.Ordinal)
+                && ProfileLayoutResolver.IsBuiltInPresetId(id["builtin.neuterradise.profile.".Length..])
+                => id["builtin.neuterradise.profile.".Length..],
             PresentationSlots.ProfileCard when id == "builtin.neuterradise.card.hero" => "hero-card",
-            PresentationSlots.ProfileCard when id.StartsWith("builtin.neuterradise.card.", StringComparison.Ordinal) => id["builtin.neuterradise.card.".Length..],
-            PresentationSlots.ProfileMediaLayout when id.StartsWith("builtin.neuterradise.media-layout.", StringComparison.Ordinal) => id["builtin.neuterradise.media-layout.".Length..],
+            PresentationSlots.ProfileCard when id.StartsWith("builtin.neuterradise.card.", StringComparison.Ordinal)
+                && ProfileCardCatalog.IsKnownVariant(id["builtin.neuterradise.card.".Length..])
+                => id["builtin.neuterradise.card.".Length..],
+            PresentationSlots.ProfileMediaLayout when id.StartsWith("builtin.neuterradise.media-layout.", StringComparison.Ordinal)
+                && MediaLayoutCatalog.IsBuiltInId(id["builtin.neuterradise.media-layout.".Length..])
+                => id["builtin.neuterradise.media-layout.".Length..],
             PresentationSlots.ProfileFrame when id.StartsWith("builtin.neuterradise.frame.", StringComparison.Ordinal) => id["builtin.neuterradise.frame.".Length..],
             PresentationSlots.Theme when id.StartsWith("builtin.neuterradise.theme.", StringComparison.Ordinal) => id["builtin.neuterradise.theme.".Length..],
             _ => null,

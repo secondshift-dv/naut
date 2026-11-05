@@ -684,8 +684,9 @@ public sealed class VerificationOperations
             .OrderBy(problem => problem.SourceFileName, StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
         var verification = await LoadVerificationReadModelAsync(unitId, cancellationToken).ConfigureAwait(false);
-        var pending = verification?.LibraryCommitState.HasReachedDomainCommit() == true
-            && !await new CapabilityReads(_catalog)
+        var pending = verification is null
+            || verification.State is not (ImportUnitState.ReadyForVerification or ImportUnitState.Committing)
+            || !await new CapabilityReads(_catalog)
                 .AreAllRequiredCapabilitiesSettledAsync(unitId, cancellationToken)
                 .ConfigureAwait(false);
 

@@ -57,9 +57,9 @@ public sealed partial class CustomizationCenter
     private static int BackdropChoiceOrder(CompiledDefinition definition) => definition.Ref.DefinitionId switch
     {
         "builtin.neuterradise.backdrop.none" => 0,
-        "builtin.neuterradise.backdrop.calm-yellow" => 1,
-        "builtin.neuterradise.backdrop.calm-blue" => 2,
-        "builtin.neuterradise.backdrop.gray" => 3,
+        "builtin.neuterradise.backdrop.night-chamber" => 1,
+        "builtin.neuterradise.backdrop.archive-paper" => 2,
+        "builtin.neuterradise.backdrop.tidal-glass" => 3,
         _ => definition.Origin == PackOrigin.User ? 100 : 50,
     };
 
@@ -96,11 +96,8 @@ public sealed partial class CustomizationCenter
         PresentationRuntime.SupportsSlot(definition, descriptor.Id)
         && (definition.Origin == PackOrigin.User
             || (descriptor.Kind == DefinitionKinds.Effect
-                ? CuratedBuiltInEffects.Contains(definition.Ref.DefinitionId)
-                : descriptor.Kind == DefinitionKinds.Backdrop
-                    ? definition.Ref.DefinitionId is "builtin.neuterradise.backdrop.none" or "builtin.neuterradise.backdrop.gray"
-                        or "builtin.neuterradise.backdrop.calm-yellow" or "builtin.neuterradise.backdrop.calm-blue"
-                    : definition.Ref == selected || BuiltInPresentationCatalog.IsPrimary(definition.Ref)));
+                ? BuiltInPresentationCatalog.IsPrimary(definition.Ref)
+                : definition.Ref == selected || BuiltInPresentationCatalog.IsPrimary(definition.Ref)));
 
     private FrameworkElement DefinitionPreviewStage(SlotDescriptor descriptor, CompiledDefinition definition)
     {

@@ -24,6 +24,9 @@ internal static class FigureNative
     internal const uint Show = 0x0018;
     internal static readonly Guid Texture2D = new("6f15aaf2-d208-4e89-9ab4-489535d34f9c");
     internal static readonly Guid Factory1 = new("770aae78-f26f-4dba-a829-253c83d1b387");
+    internal static readonly Guid Factory2 = new("50c83a1c-e072-4c48-87b0-3630fa36a6d0");
+    internal static readonly Guid DxgiDevice = new("54ec77fa-1377-44e6-8c32-88fd5f44c84c");
+    internal static readonly Guid CompositionDevice = new("c37ea93a-e7aa-450d-b16f-9746cb0407f3");
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     internal delegate IntPtr WindowProcedure(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
@@ -55,34 +58,28 @@ internal static class FigureNative
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    internal struct Rational { public uint Numerator; public uint Denominator; }
-
-    [StructLayout(LayoutKind.Sequential)]
-    internal struct ModeDescription
-    {
-        public uint Width;
-        public uint Height;
-        public Rational RefreshRate;
-        public uint Format;
-        public uint ScanlineOrdering;
-        public uint Scaling;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
     internal struct SampleDescription { public uint Count; public uint Quality; }
 
     [StructLayout(LayoutKind.Sequential)]
-    internal struct SwapChainDescription
+    internal struct CompositionSwapChainDescription
     {
-        public ModeDescription Buffer;
+        public uint Width, Height, Format;
+        public int Stereo;
         public SampleDescription Sample;
-        public uint BufferUsage;
-        public uint BufferCount;
-        public IntPtr OutputWindow;
-        public int Windowed;
-        public uint SwapEffect;
-        public uint Flags;
+        public uint BufferUsage, BufferCount, Scaling, SwapEffect, AlphaMode, Flags;
     }
+
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    internal delegate int CreateCompositionSwapChain(IntPtr self, IntPtr device,
+        ref CompositionSwapChainDescription description, IntPtr restrictOutput, out IntPtr swapChain);
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    internal delegate int CompositionCreateTarget(IntPtr self, IntPtr hwnd, int topmost, out IntPtr target);
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    internal delegate int CompositionCreateVisual(IntPtr self, out IntPtr visual);
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    internal delegate int CompositionSetObject(IntPtr self, IntPtr value);
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    internal delegate int CompositionCommit(IntPtr self);
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct RenderTargetDescription
@@ -94,8 +91,6 @@ internal static class FigureNative
         public uint UnionPadding2;
     }
 
-    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-    internal delegate int CreateSwapChain(IntPtr self, IntPtr device, ref SwapChainDescription description, out IntPtr swapChain);
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     internal delegate int GetBuffer(IntPtr self, uint index, ref Guid iid, out IntPtr buffer);
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
@@ -128,6 +123,9 @@ internal static class FigureNative
 
     [DllImport("dxgi.dll", ExactSpelling = true)]
     internal static extern int CreateDXGIFactory1(ref Guid iid, out IntPtr factory);
+
+    [DllImport("dcomp.dll", ExactSpelling = true)]
+    internal static extern int DCompositionCreateDevice(IntPtr dxgiDevice, ref Guid iid, out IntPtr device);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
     internal static extern IntPtr GetModuleHandleW(string? module);

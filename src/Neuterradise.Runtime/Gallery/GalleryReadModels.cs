@@ -81,6 +81,9 @@ public sealed record GalleryProfileSummary(
     Guid? BannerMediaAssetId = null)
 {
 
+    public IReadOnlyList<ProfileTagAssignment> AssignedTags { get; init; } = [];
+    public string? Overview { get; init; }
+
     public ProfileAppearanceOverrides EffectiveAppearance =>
         Appearance ?? ProfileAppearanceOverrides.Default;
 

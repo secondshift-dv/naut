@@ -64,9 +64,7 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
     private string? _presentationPreviewPath;
     private string? _previewUnavailableReason;
     private bool _peopleLoaded;
-    private bool _fileLoaded;
     private bool _isPeopleLoading;
-    private bool _isFileLoading;
     private ContentIdentity? _currentContentIdentity;
     private long _presentationPreviewGeneration;
     private bool _isDisposed;
@@ -120,7 +118,6 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
         ShowInFolderCommand = new AsyncRelayCommand(() => ShowInFolderAsync());
         CopyPathCommand = new AsyncRelayCommand(_ => CopyPathAsync());
         CopyFilenameCommand = new AsyncRelayCommand(_ => CopyFilenameAsync());
-        RefreshMetadataCommand = new AsyncRelayCommand(() => RefreshMetadataAsync(), () => CanRefreshMetadata);
 
         SetAsCoverCommand = new AsyncRelayCommand(() => SetAsCoverAsync(), () => CanSetCover);
         ChangePrimaryProfileCommand = new AsyncRelayCommand(async param =>
@@ -195,7 +192,7 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
 
     public string FileFingerprint => _detail?.FileFingerprint ?? string.Empty;
     public long ByteLength => _detail?.ByteLength ?? 0;
-    public string ByteLengthText => MediaFileDetailsBuilder.FormatByteLength(ByteLength);
+    public string ByteLengthText => Neuterradise.App.Maintenance.LibraryHealthViewModel.FormatBytes(ByteLength);
     public DateTimeOffset AddedToLibraryAt => _detail?.AddedToLibraryAt ?? DateTimeOffset.MinValue;
     public string AddedToLibraryAtText => AddedToLibraryAt.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture);
 
@@ -204,12 +201,6 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
     public bool HasMissingDependencies => DependencyStatus == MediaDependencyStatus.DependenciesMissing;
     public bool HasUnknownDependencies => DependencyStatus == MediaDependencyStatus.DependenciesUnknown;
     public bool IsFullPreviewReady => !HasMissingDependencies && !HasUnknownDependencies;
-
-    public MediaClues Clues => _detail?.Clues ?? MediaCluesBuilder.Build();
-    public string Who => Clues.Who;
-    public string Where => Clues.Where;
-    public string When => Clues.When;
-    public string How => Clues.How;
 
     public MediaOwnerProfile? OwnerProfile => _detail?.OwnerProfile;
     public string PrimaryProfileName => OwnerProfile?.DisplayName ?? "\u2014";
@@ -222,7 +213,6 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
     public IReadOnlyList<MediaLinkedProfileItem> LinkedProfiles => _detail?.LinkedProfiles ?? [];
     public bool HasLinkedProfiles => LinkedProfiles.Count > 0;
 
-    public IReadOnlyList<MediaFileDetailGroup> FileDetailGroups => _detail?.FileDetails ?? [];
     public object? Info => _detail?.Info;
     public string? PresentationPreviewPath => _presentationPreviewPath;
     public string? PreviewUnavailableReason => _previewUnavailableReason;
@@ -234,20 +224,17 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
         {
             if (_activeTab != value)
             {
-                _activeTab = value;
+                _activeTab = value == "People" ? "People" : "Info";
                 RaisePropertyChanged(nameof(ActiveTab));
                 RaisePropertyChanged(nameof(IsInfoTabActive));
                 RaisePropertyChanged(nameof(IsPeopleTabActive));
-                RaisePropertyChanged(nameof(IsFileDetailsTabActive));
             }
         }
     }
 
     public bool IsInfoTabActive => ActiveTab == "Info";
     public bool IsPeopleTabActive => ActiveTab == "People";
-    public bool IsFileDetailsTabActive => ActiveTab == "Exif";
     public bool IsPeopleLoading => _isPeopleLoading;
-    public bool IsFileLoading => _isFileLoading;
 
     public Guid? PreviousMediaId
     {
@@ -298,7 +285,7 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
 
     /// <summary>
     /// The absolute path to the canonical media file, resolved by the data layer through the single
-    /// media-location authority (TRUNK_AUTHORITY_MASTER §12). Returns the precomputed value from
+    /// media-location authority. Returns the precomputed value from
     /// MediaReads; no synchronous filesystem probing in the property getter.
     /// </summary>
     public string? PreviewFilePath
@@ -427,8 +414,6 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
 
     public bool CanSetCover => MediaType is MediaType.Image or MediaType.Video && HasPrimaryProfile && MediaStatus == MediaState.Active;
     public bool CanMoveToTrash => MediaStatus == MediaState.Active;
-    public bool CanRefreshMetadata => _detail is not null && MediaStatus == MediaState.Active
-        && MediaType is MediaType.Image or MediaType.Video && _mediaOperations is not null;
 
     /// <summary>
     /// Media Favorite, shown to the user as the fire mark. The override mirrors the grid:
@@ -448,7 +433,6 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
     public ICommand NextCommand { get; }
 
     public ICommand OpenInDefaultAppCommand { get; }
-    public ICommand RefreshMetadataCommand { get; }
     public ICommand ShowInFolderCommand { get; }
     public ICommand CopyPathCommand { get; }
     public ICommand CopyFilenameCommand { get; }
@@ -512,8 +496,7 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
             var model = await _catalog.MediaReads.GetMediaDetailAsync(
                     MediaId,
                     cancellationToken,
-                    includeRelations: false,
-                    includeFileDetails: false)
+                    includeRelations: false)
                 .ConfigureAwait(true);
 
             if (model is null)
@@ -568,7 +551,6 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
         _peopleLoaded = model.OwnerProfile is not null
             || (model.PeopleInMedia?.Count ?? 0) > 0
             || (model.LinkedProfiles?.Count ?? 0) > 0;
-        _fileLoaded = (model.FileDetails?.Count ?? 0) > 0;
 
         if (model.Info is VideoMediaInfo videoInfo)
         {
@@ -598,11 +580,7 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
         RaisePropertyChanged(nameof(ByteLengthText));
         RaisePropertyChanged(nameof(AddedToLibraryAt));
         RaisePropertyChanged(nameof(AddedToLibraryAtText));
-        RaisePropertyChanged(nameof(Clues));
-        RaisePropertyChanged(nameof(Who));
-        RaisePropertyChanged(nameof(Where));
-        RaisePropertyChanged(nameof(When));
-        RaisePropertyChanged(nameof(How));
+
         RaisePropertyChanged(nameof(OwnerProfile));
         RaisePropertyChanged(nameof(PrimaryProfileName));
         RaisePropertyChanged(nameof(HasPrimaryProfile));
@@ -611,13 +589,10 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
         RaisePropertyChanged(nameof(IsPeopleTabVisible));
         RaisePropertyChanged(nameof(LinkedProfiles));
         RaisePropertyChanged(nameof(HasLinkedProfiles));
-        RaisePropertyChanged(nameof(FileDetailGroups));
         RaisePropertyChanged(nameof(Info));
         RaisePropertyChanged(nameof(CanSetCover));
-        RaisePropertyChanged(nameof(CanRefreshMetadata));
         RaisePropertyChanged(nameof(CanMoveToTrash));
         (SetAsCoverCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (RefreshMetadataCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
         (MoveToTrashCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
         RaisePropertyChanged(nameof(PreviewFilePath));
         RaisePropertyChanged(nameof(HasHoverFile));
@@ -723,9 +698,6 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
             case "People":
                 await EnsurePeopleLoadedAsync(cancellationToken).ConfigureAwait(true);
                 break;
-            case "Exif":
-                await EnsureFileLoadedAsync(cancellationToken).ConfigureAwait(true);
-                break;
         }
     }
 
@@ -771,40 +743,6 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
         {
             _isPeopleLoading = false;
             RaisePropertyChanged(nameof(IsPeopleLoading));
-        }
-    }
-
-    private async Task EnsureFileLoadedAsync(CancellationToken cancellationToken)
-    {
-        if (_catalog is null || _detail is null || _fileLoaded || _isFileLoading)
-        {
-            return;
-        }
-
-        _isFileLoading = true;
-        RaisePropertyChanged(nameof(IsFileLoading));
-        try
-        {
-            var fileModel = await _catalog.MediaReads.GetMediaDetailAsync(
-                    MediaId,
-                    cancellationToken,
-                    includeRelations: false,
-                    includeFileDetails: true)
-                .ConfigureAwait(true);
-            if (fileModel is null || !IsRouteActive || cancellationToken.IsCancellationRequested || _detail is null)
-            {
-                return;
-            }
-
-            _detail = _detail with { FileDetails = fileModel.FileDetails };
-            _fileLoaded = true;
-            RaisePropertyChanged(nameof(Detail));
-            RaisePropertyChanged(nameof(FileDetailGroups));
-        }
-        finally
-        {
-            _isFileLoading = false;
-            RaisePropertyChanged(nameof(IsFileLoading));
         }
     }
 
@@ -861,15 +799,6 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
 
         var result = await _mediaOperations.OpenInDefaultAppAsync(MediaId);
         ReportExternalActionResult(result, "Failed to open in default application.");
-    }
-
-    public async Task RefreshMetadataAsync()
-    {
-        if (_mediaOperations is null) return;
-        var result = await _mediaOperations.RefreshMetadataAsync(MediaId).ConfigureAwait(true);
-        ActionFeedbackMessage = result.IsSuccess
-            ? SurfaceText.Get("Media.Exif.RefreshQueued", "Metadata refresh queued.")
-            : SurfaceText.Get("Media.Exif.RefreshFailed", "Metadata could not be refreshed.");
     }
 
     public async Task ShowInFolderAsync()

@@ -802,6 +802,16 @@ public sealed class ManagedMoveExecutor
             cancellationToken);
     }
 
+    public Task<StorageOperationResult> ExecuteProfileTextTransferAsync(string sourceFolder,
+        VaultPathArea sourceArea, string targetFolder, VaultPathArea targetArea,
+        ProfileTextTrashSnapshot file, CancellationToken cancellationToken = default)
+    {
+        if (file.FileName is not ("overview.txt" or "private-note.txt") || file.ByteLength < 0)
+            return Task.FromResult(new StorageOperationResult(StorageOperationStatus.PathOutsideVault));
+        return ExecuteRecoveryTransferAsync(sourceFolder, file.FileName, sourceArea,
+            CombineRelative(targetFolder, file.FileName), targetArea, file.ByteLength, file.Sha256, cancellationToken);
+    }
+
     public async Task<StorageOperationResult> InspectProfileManifestTrashDestinationAsync(
         Guid profileId,
         string recoveryRelativePath,

@@ -118,11 +118,11 @@
             "bodyFamily": "Inter"
           },
           "shape": {
-            "xl": 4,
-            "lg": 4,
             "xs": 0,
-            "sm": 2,
-            "md": 2
+            "sm": 0,
+            "md": 2,
+            "lg": 3,
+            "xl": 4
           },
           "motion": {
             "slowMs": 320,
@@ -134,17 +134,22 @@
             "kind": "RadialGlow"
           },
           "morphology": {
-            "motionIntensity": 0.25,
+            "motionIntensity": 0.35,
             "focusTreatment": "Ring",
             "glowStrength": 0,
-            "borderWeight": 1,
+            "borderWeight": 1.5,
             "elevationStrength": 0.15,
-            "cardPersonality": "Flat",
+            "cardPersonality": "Framed",
             "chromeTreatment": "Elevated",
-            "panelOpacity": 0.98,
+            "panelOpacity": 1,
             "navigationRadiusScale": 0.2,
-            "navigationTreatment": "SelectedSurface"
+            "navigationTreatment": "StrongBorder"
           }
+        },
+        "artwork": "backdrop-meadow",
+        "material": {
+          "personality": "milky-paper",
+          "atmosphere": "editorial"
         }
       }
     },

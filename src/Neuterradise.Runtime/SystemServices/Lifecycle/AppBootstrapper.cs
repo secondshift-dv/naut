@@ -156,7 +156,7 @@ public sealed class AppBootstrapper
             CompleteStage(StartupStage.DbOpenedToSchemaReady);
 
             TransitionTo(StartupState.Recovering);
-            var recovery = await new RecoveryCoordinator(catalog, _diagnostics).RecoverAsync(cancellationToken)
+            var recovery = await new RecoveryCoordinator(catalog, _diagnostics).RecoverAsync(cancellationToken, includeMediaAssets: false)
                 .ConfigureAwait(true);
             if (recovery.HasFatal || recovery.BlocksWritableStartup)
             {

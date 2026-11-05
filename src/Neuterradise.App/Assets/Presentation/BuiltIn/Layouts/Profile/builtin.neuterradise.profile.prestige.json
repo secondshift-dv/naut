@@ -1,9 +1,0 @@
-{
-  "id": "builtin.neuterradise.profile.prestige",
-  "kind": "profile-layout",
-  "name": "Prestige",
-  "description": "Legacy decorative Profile layout retained for existing Profile selections.",
-  "spec": {
-    "preset": "prestige"
-  }
-}

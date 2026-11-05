@@ -1,0 +1,53 @@
+{
+  "id": "builtin.neuterradise.home.journey",
+  "kind": "home-layout",
+  "name": "Journey",
+  "spec": {
+    "hero": {
+      "placement": "inset",
+      "heightFraction": 0.31,
+      "minHeight": 180,
+      "maxHeight": 370
+    },
+    "rails": [
+      {
+        "id": "recent",
+        "style": "strip",
+        "maxItems": 6
+      },
+      {
+        "id": "activity",
+        "style": "compact",
+        "maxItems": 5
+      },
+      {
+        "id": "statistics",
+        "style": "compact",
+        "maxItems": 4
+      }
+    ],
+    "surface": {
+      "type": "stack",
+      "spacing": 12,
+      "children": [
+        {
+          "type": "semantic",
+          "id": "featured"
+        },
+        {
+          "type": "semantic",
+          "id": "recent"
+        },
+        {
+          "type": "semantic",
+          "id": "activity"
+        },
+        {
+          "type": "semantic",
+          "id": "statistics"
+        }
+      ]
+    }
+  },
+  "description": "Sequential recent Profiles, activity, and Vault pulse."
+}

@@ -1,11 +1,5 @@
 namespace Neuterradise.App.Media;
 
-public sealed record MediaClues(
-    string Who,
-    string Where,
-    string When,
-    string How);
-
 public sealed record ImageMediaInfo(
     string Format,
     int PixelWidth,
@@ -23,13 +17,16 @@ public sealed record VideoMediaInfo(
     double? FrameRate = null,
     string? AudioCodec = null);
 
+public enum ModelFigurePreparation { Unsupported, DependenciesMissing, Pending, Ready, NeedsRepair, Failed }
+
 public sealed record ModelMediaInfo(
     string Format,
     int? SceneCount = null,
     int? NodeCount = null,
     int? MeshCount = null,
     int? MaterialCount = null,
-    int? AnimationCount = null);
+    int? AnimationCount = null,
+    ModelFigurePreparation FigurePreparation = ModelFigurePreparation.Unsupported);
 
 public sealed record MediaTileReadModel(
     Guid MediaId,
@@ -95,14 +92,6 @@ public sealed record MediaRelationsReadModel(
     IReadOnlyList<MediaPersonItem> PeopleInMedia,
     IReadOnlyList<MediaLinkedProfileItem> LinkedProfiles);
 
-public sealed record MediaFileDetailRow(
-    string Label,
-    string Value);
-
-public sealed record MediaFileDetailGroup(
-    string GroupName,
-    IReadOnlyList<MediaFileDetailRow> Rows);
-
 public sealed record MediaDetailReadModel(
     Guid MediaId,
     MediaType MediaType,
@@ -115,19 +104,15 @@ public sealed record MediaDetailReadModel(
     long ByteLength,
     MediaState Status,
     DateTimeOffset AddedToLibraryAt,
-    MediaClues Clues,
     MediaOwnerProfile? OwnerProfile = null,
     IReadOnlyList<MediaPersonItem>? PeopleInMedia = null,
     IReadOnlyList<MediaLinkedProfileItem>? LinkedProfiles = null,
     object? Info = null,
-    IReadOnlyList<MediaFileDetailGroup>? FileDetails = null,
     string? AbsoluteFilePath = null,
     long RowVersion = 0,
     MediaDependencyStatus DependencyStatus = MediaDependencyStatus.SelfContained,
     string? BundleSha256 = null,
-    bool IsFavorite = false,
-    string? ImportSourcePath = null,
-    string? ImportSourceName = null);
+    bool IsFavorite = false);
 
 public enum MediaRelationFilter
 {

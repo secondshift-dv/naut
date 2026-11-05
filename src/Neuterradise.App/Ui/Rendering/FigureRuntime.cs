@@ -6,6 +6,8 @@ using Microsoft.UI.Xaml.Media;
 using Uno.UI.NativeElementHosting;
 using Neuterradise.App.Ui.Figure;
 using Neuterradise.App.SystemServices.Resources;
+using Neuterradise.App.SystemServices.Database;
+using Neuterradise.App.SystemServices.Storage;
 
 namespace Neuterradise.App.Ui;
 
@@ -44,6 +46,8 @@ public sealed class FigureRuntime : IDisposable
     private string? _lastError;
     private FigureRenderer? _renderer;
     private readonly ResourceGovernor _governor;
+    private readonly ModelRenderValidationReceipts? _validationReceipts;
+    private readonly string? _vaultIdentityPath;
     private readonly ThemeRuntime _theme = ThemeRuntime.Current;
     private bool _deviceRecoveryAttempted;
     private PresentationTier _appliedTier;
@@ -60,7 +64,7 @@ public sealed class FigureRuntime : IDisposable
     private long _sceneCacheBytes;
 
     private readonly record struct FigureSceneCacheKey(
-        string Path, string SourceSha256, int Lod, int TextureDimension, long Length, long LastWriteTicks);
+        string Path, string SourceSha256, int Lod, int TextureDimension, long Length, long LastWriteTicks, string ChangeMarker);
 
     private sealed record FigureSceneCacheEntry(FigureSceneCacheKey Key, FigureSceneData Scene);
 
@@ -72,7 +76,10 @@ public sealed class FigureRuntime : IDisposable
         var request = CancellationTokenSource.CreateLinkedTokenSource(ct, _lifetime.Token);
         var task = Task.Run(async () =>
         {
+            using var foregroundDisk = _governor.EnterForegroundDiskWork();
             request.Token.ThrowIfCancellationRequested();
+            var validated = _validationReceipts is null ? null
+                : await _validationReceipts.ValidateAsync(path, sourceSha256, request.Token).ConfigureAwait(false);
             var key = CreateSceneCacheKey(path, sourceSha256, lod, textureDimension);
             if (TryGetCachedScene(key, out var cached)) return cached;
 
@@ -81,13 +88,13 @@ public sealed class FigureRuntime : IDisposable
             try
             {
                 scene = await FigureSceneData.LoadAsync(
-                    key.Path, sourceSha256, lod, request.Token, textureDimension).ConfigureAwait(false);
+                    key.Path, sourceSha256, lod, request.Token, textureDimension, validated).ConfigureAwait(false);
             }
             catch (InvalidDataException exception) when (textureDimension > 2048
                 && exception.Message.Contains("resident allocation budget", StringComparison.Ordinal))
             {
                 scene = await FigureSceneData.LoadAsync(
-                    key.Path, sourceSha256, lod, request.Token, 2048).ConfigureAwait(false);
+                    key.Path, sourceSha256, lod, request.Token, 2048, validated).ConfigureAwait(false);
             }
 
             StoreCachedScene(key, scene);
@@ -139,19 +146,31 @@ public sealed class FigureRuntime : IDisposable
         }
     }
 
-    private static FigureSceneCacheKey CreateSceneCacheKey(
+    private FigureSceneCacheKey CreateSceneCacheKey(
         string path, string sourceSha256, int lod, int textureDimension)
     {
         var fullPath = Path.GetFullPath(path);
         var info = new FileInfo(fullPath);
         if (!info.Exists) throw new FileNotFoundException("Prepared Figure scene is missing.", fullPath);
+        using var file = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        var stamp = NtfsChangeStamp.TryRead(file, fullPath);
+        var marker = stamp is null ? Guid.NewGuid().ToString("N")
+            : $"{stamp.VolumeId}:{stamp.FileId}:{stamp.JournalId}:{stamp.FileUsn}:{stamp.LowestValidUsn}";
+        if (_vaultIdentityPath is not null)
+        {
+            using var identityFile = new FileStream(_vaultIdentityPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var identityStamp = NtfsChangeStamp.TryRead(identityFile, _vaultIdentityPath);
+            marker += identityStamp is null ? Guid.NewGuid().ToString("N")
+                : $":vault:{identityStamp.VolumeId}:{identityStamp.FileId}:{identityStamp.JournalId}:{identityStamp.FileUsn}";
+        }
         return new(
             fullPath,
             sourceSha256.Trim().ToLowerInvariant(),
             lod,
             textureDimension,
             info.Length,
-            info.LastWriteTimeUtc.Ticks);
+            info.LastWriteTimeUtc.Ticks,
+            marker);
     }
 
     private bool TryGetCachedScene(FigureSceneCacheKey key, out FigureSceneData scene)
@@ -246,9 +265,11 @@ public sealed class FigureRuntime : IDisposable
         renderer.Render(target, width, height, camera, reduced: Tier == PresentationTier.Reduced);
     }
 
-    public FigureRuntime(ResourceGovernor? governor = null)
+    public FigureRuntime(ResourceGovernor? governor = null, CatalogDb? catalog = null)
     {
         _governor = governor ?? ResourceGovernor.Shared;
+        _validationReceipts = catalog is null ? null : new ModelRenderValidationReceipts(catalog);
+        _vaultIdentityPath = catalog?.Paths.IdentityFilePath;
         _appliedTier = Tier;
         _procedure = WindowProcedure;
         try
@@ -278,7 +299,7 @@ public sealed class FigureRuntime : IDisposable
 
     private void CreateHardware()
     {
-        FigureNative.Check(FigureNative.D3D11CreateDevice(IntPtr.Zero, 1, IntPtr.Zero, 0,
+        FigureNative.Check(FigureNative.D3D11CreateDevice(IntPtr.Zero, 1, IntPtr.Zero, 0x20,
             [0xB000, 0xA100], 2, 7, out _device, out _, out _context));
         _deviceCreates++;
         var iid = FigureNative.Factory1;
@@ -493,23 +514,12 @@ public sealed class FigureRuntime : IDisposable
 /// <summary>An exclusive viewport lease; release detaches Uno content before native resources and HWND destruction.</summary>
 public sealed class FigureViewportLease : IDisposable
 {
-    private static float[] ClearColor
-    {
-        get
-        {
-            var canvas = ThemeRuntime.Current.Color("canvas");
-            static float Linear(byte value)
-            {
-                var component = value / 255f;
-                return component <= 0.04045f ? component / 12.92f : MathF.Pow((component + 0.055f) / 1.055f, 2.4f);
-            }
-            return [Linear(canvas.R), Linear(canvas.G), Linear(canvas.B), 1f];
-        }
-    }
+    private static readonly float[] ClearColor = [0, 0, 0, 0];
     private readonly FigureRuntime _runtime;
     private readonly ContentControl _host;
     private Win32NativeWindow? _nativeContent;
     private IntPtr _swapChain;
+    private IntPtr _compositionDevice, _compositionTarget, _compositionVisual;
     private IntPtr _target;
     private bool _disposed;
     private bool _active = true;
@@ -566,22 +576,44 @@ public sealed class FigureViewportLease : IDisposable
 
     internal void Initialize(string className, IntPtr instance)
     {
-        Hwnd = FigureNative.CreateWindowExW(0, className, string.Empty,
+        Hwnd = FigureNative.CreateWindowExW(0x00200000, className, string.Empty,
             FigureNative.Child | FigureNative.ClipSiblings | FigureNative.ClipChildren,
             0, 0, 256, 256, ParentHwnd, IntPtr.Zero, instance, IntPtr.Zero);
         if (Hwnd == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error());
-        var description = new FigureNative.SwapChainDescription
+        // A windowless premultiplied swapchain lets DWM composite the Figure over the
+        // actual parent pixels. The child HWND retains native input and lifetime ownership.
+        var description = new FigureNative.CompositionSwapChainDescription
         {
-            Buffer = new FigureNative.ModeDescription { Width = 256, Height = 256, Format = 87 },
+            Width = 256, Height = 256, Format = 87,
             Sample = new FigureNative.SampleDescription { Count = 1 },
-            BufferUsage = 0x20,
-            BufferCount = 2,
-            OutputWindow = Hwnd,
-            Windowed = 1,
-            SwapEffect = 4,
+            BufferUsage = 0x20, BufferCount = 2, SwapEffect = 4, AlphaMode = 1,
         };
-        FigureNative.Check(FigureNative.Method<FigureNative.CreateSwapChain>(_runtime.Factory, 10)(
-            _runtime.Factory, _runtime.Device, ref description, out _swapChain));
+        IntPtr factory = IntPtr.Zero, dxgiDevice = IntPtr.Zero;
+        try
+        {
+            var factoryId = FigureNative.Factory2;
+            FigureNative.Check(Marshal.QueryInterface(_runtime.Factory, in factoryId, out factory));
+            FigureNative.Check(FigureNative.Method<FigureNative.CreateCompositionSwapChain>(factory, 24)(
+                factory, _runtime.Device, ref description, IntPtr.Zero, out _swapChain));
+            var dxgiId = FigureNative.DxgiDevice;
+            FigureNative.Check(Marshal.QueryInterface(_runtime.Device, in dxgiId, out dxgiDevice));
+            var compositionId = FigureNative.CompositionDevice;
+            FigureNative.Check(FigureNative.DCompositionCreateDevice(dxgiDevice, ref compositionId, out _compositionDevice));
+            FigureNative.Check(FigureNative.Method<FigureNative.CompositionCreateTarget>(_compositionDevice, 6)(
+                _compositionDevice, Hwnd, 1, out _compositionTarget));
+            FigureNative.Check(FigureNative.Method<FigureNative.CompositionCreateVisual>(_compositionDevice, 7)(
+                _compositionDevice, out _compositionVisual));
+            FigureNative.Check(FigureNative.Method<FigureNative.CompositionSetObject>(_compositionVisual, 15)(
+                _compositionVisual, _swapChain));
+            FigureNative.Check(FigureNative.Method<FigureNative.CompositionSetObject>(_compositionTarget, 3)(
+                _compositionTarget, _compositionVisual));
+            FigureNative.Check(FigureNative.Method<FigureNative.CompositionCommit>(_compositionDevice, 3)(_compositionDevice));
+        }
+        finally
+        {
+            FigureNative.Release(ref dxgiDevice);
+            FigureNative.Release(ref factory);
+        }
         Width = Height = 256;
         CreateTarget();
         _nativeContent = new Win32NativeWindow(Hwnd);
@@ -758,8 +790,8 @@ public sealed class FigureViewportLease : IDisposable
         FigureNative.Check(FigureNative.Method<FigureNative.GetBuffer>(_swapChain, 9)(_swapChain, 0, ref iid, out var buffer));
         try
         {
-            // The swapchain remains BGRA UNORM; the sRGB view blends linear shader output before encoding.
-            var description = new FigureNative.RenderTargetDescription { Format = 91, Dimension = 4 };
+            // DirectComposition consumes encoded premultiplied BGRA, produced by the shader.
+            var description = new FigureNative.RenderTargetDescription { Format = 87, Dimension = 4 };
             var pointer = Marshal.AllocHGlobal(Marshal.SizeOf<FigureNative.RenderTargetDescription>());
             try
             {
@@ -807,6 +839,14 @@ public sealed class FigureViewportLease : IDisposable
         }
         FigureNative.Method<FigureNative.ContextOperation>(_runtime.Context, 110)(_runtime.Context);
         FigureNative.Release(ref _target);
+        if (_compositionTarget != IntPtr.Zero)
+        {
+            FigureNative.Method<FigureNative.CompositionSetObject>(_compositionTarget, 3)(_compositionTarget, IntPtr.Zero);
+            FigureNative.Method<FigureNative.CompositionCommit>(_compositionDevice, 3)(_compositionDevice);
+        }
+        FigureNative.Release(ref _compositionVisual);
+        FigureNative.Release(ref _compositionTarget);
+        FigureNative.Release(ref _compositionDevice);
         FigureNative.Release(ref _swapChain);
         var hwnd = Hwnd;
         Hwnd = IntPtr.Zero;

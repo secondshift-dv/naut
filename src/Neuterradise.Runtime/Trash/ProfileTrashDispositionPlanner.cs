@@ -1,109 +1,57 @@
+using Microsoft.Data.Sqlite;
 using Neuterradise.App.SystemServices.Database;
 using Neuterradise.App.SystemServices.Storage;
 
 namespace Neuterradise.App.Trash;
 
 /// <summary>
-/// Builds the internal ownership-transition plan for Profile Trash. The user expresses the destructive
-/// intent once; the application preserves media automatically. Exactly one other durable Profile
-/// relationship is treated as an unambiguous owner candidate. No candidate, or conflicting candidates,
-/// falls back to one operation-stable Unknown Profile rather than asking for per-media data entry.
+/// Exclusive media follows its deleted Profile. Shared media keeps an existing consumer as its
+/// storage custodian; deterministic ordering does not assert or change face identity.
 /// </summary>
-public sealed class ProfileTrashDispositionPlanner
+public sealed class ProfileTrashDispositionPlanner(CatalogDb catalog)
 {
-    private readonly CatalogDb _catalog;
-    private readonly StorageTokenAllocator _tokenAllocator = new();
-
-    public ProfileTrashDispositionPlanner(CatalogDb catalog)
-    {
-        _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
-    }
-
     public async Task<IReadOnlyList<ProfileOwnedMediaDisposition>> BuildAsync(
-        ProfileTrashPlan plan,
-        CancellationToken cancellationToken = default)
+        ProfileTrashPlan plan, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(plan);
-        if (plan.OwnedActiveMedias.Count == 0)
+        if (plan.SelectedDispositions.Count > 0) return plan.SelectedDispositions;
+        var result = new List<ProfileOwnedMediaDisposition>(plan.OwnedActiveMedias.Count);
+        await using var connection = await catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        foreach (var media in plan.OwnedActiveMedias)
         {
-            return [];
+            var consumer = await FindOtherConsumerAsync(connection, media.MediaId, plan.ProfileId, cancellationToken).ConfigureAwait(false);
+            if (consumer is { } id)
+                await catalog.ProfileWrites.AssignStorageTokenAsync(id,
+                    new StorageTokenAllocator().CreateProfileCandidateProvider(id), cancellationToken).ConfigureAwait(false);
+            result.Add(new ProfileOwnedMediaDisposition(media.MediaId,
+                consumer is null ? ProfileOwnedMediaDispositionKind.TrashMedia : ProfileOwnedMediaDispositionKind.ChangeOwner, consumer));
         }
+        return result;
+    }
 
-        var targetByMedia = new Dictionary<Guid, Guid?>();
-        var targetProfiles = new HashSet<Guid>();
-        var needsUnknown = false;
-
-        await using (var connection = await _catalog.ConnectionFactory
-            .OpenConnectionAsync(cancellationToken).ConfigureAwait(false))
-        {
-            foreach (var asset in plan.OwnedActiveMedias)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                await using var command = connection.CreateCommand();
-                command.CommandText = """
-                    SELECT DISTINCT pa.profile_id
-                    FROM profile_media pa
-                    JOIN profiles p ON p.profile_id = pa.profile_id
-                    WHERE pa.media_id = $assetId
-                      AND pa.profile_id <> $sourceProfileId
-                      AND pa.relation_type IN ('APPEARS', 'MANUAL')
-                      AND p.trashed_at_ms IS NULL
-                    ORDER BY pa.profile_id
-                    LIMIT 2;
-                    """;
-                command.Parameters.AddWithValue("$assetId", DbGuid.Format(asset.MediaId));
-                command.Parameters.AddWithValue("$sourceProfileId", DbGuid.Format(plan.ProfileId));
-
-                var candidates = new List<Guid>(2);
-                await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                {
-                    candidates.Add(DbGuid.Parse(reader.GetString(0)));
-                }
-
-                if (candidates.Count == 1)
-                {
-                    targetByMedia[asset.MediaId] = candidates[0];
-                    targetProfiles.Add(candidates[0]);
-                }
-                else
-                {
-                    // Zero candidates means ownership is unresolved. More than one is genuine identity
-                    // ambiguity. Both are safe to preserve under Unknown; neither is guessed.
-                    targetByMedia[asset.MediaId] = null;
-                    needsUnknown = true;
-                }
-            }
-        }
-
-        foreach (var targetProfileId in targetProfiles)
-        {
-            await _catalog.ProfileWrites.AssignStorageTokenAsync(
-                targetProfileId,
-                _tokenAllocator.CreateProfileCandidateProvider(targetProfileId),
-                cancellationToken).ConfigureAwait(false);
-        }
-
-        Guid? unknownProfileId = null;
-        if (needsUnknown)
-        {
-            // The persisted Trash operation id is stable across retries, so using it as the Unknown
-            // Profile id makes fallback creation idempotent and prevents retry-created orphan Profiles.
-            unknownProfileId = plan.OperationId;
-            await _catalog.ProfileWrites.CreateUnknownProfileAsync(unknownProfileId.Value, cancellationToken)
-                .ConfigureAwait(false);
-            await _catalog.ProfileWrites.AssignStorageTokenAsync(
-                unknownProfileId.Value,
-                _tokenAllocator.CreateProfileCandidateProvider(unknownProfileId.Value),
-                cancellationToken).ConfigureAwait(false);
-        }
-
-        return plan.OwnedActiveMedias
-            .Select(asset => new ProfileOwnedMediaDisposition(
-                asset.MediaId,
-                ProfileOwnedMediaDispositionKind.ChangeOwner,
-                targetByMedia[asset.MediaId] ?? unknownProfileId
-                    ?? throw new InvalidOperationException("Profile Trash ownership planning produced no destination.")))
-            .ToArray();
+    internal static async Task<Guid?> FindOtherConsumerAsync(SqliteConnection connection, Guid mediaId,
+        Guid sourceProfileId, CancellationToken ct)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            WITH consumers AS (
+                SELECT profile_id FROM profile_media WHERE media_id=$media
+                UNION SELECT profile_id FROM profile_appearance WHERE figure_media_id=$media
+                    OR cover_media_asset_id IN (SELECT media_asset_id FROM media_assets WHERE media_id=$media)
+                    OR banner_media_asset_id IN (SELECT media_asset_id FROM media_assets WHERE media_id=$media)
+                UNION SELECT i.profile_id FROM face_detections f JOIN identities i
+                    ON i.identity_id=f.confirmed_identity_id OR i.identity_id=f.suggested_identity_id
+                    WHERE f.media_id=$media AND i.is_active=1
+                UNION SELECT i.profile_id FROM identity_samples s JOIN identities i ON i.identity_id=s.identity_id
+                    JOIN face_detections f ON f.face_id=s.face_id WHERE f.media_id=$media AND i.is_active=1
+                UNION SELECT profile_id_low FROM related_profile_evidence WHERE media_id=$media
+                UNION SELECT profile_id_high FROM related_profile_evidence WHERE media_id=$media
+            )
+            SELECT p.profile_id FROM consumers c JOIN profiles p ON p.profile_id=c.profile_id
+            WHERE p.profile_id<>$source AND p.trashed_at_ms IS NULL ORDER BY p.profile_id LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$source", sourceProfileId.ToString("D"));
+        command.Parameters.AddWithValue("$media", mediaId.ToString("D"));
+        return await command.ExecuteScalarAsync(ct).ConfigureAwait(false) is string id ? Guid.Parse(id) : null;
     }
 }

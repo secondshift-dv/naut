@@ -62,7 +62,7 @@
       "id": "neuterradise.celestial.theme-violet",
       "kind": "theme",
       "name": "Celestial Violet",
-      "description": "Deep coordinated surfaces with luminous, readable accents.",
+      "description": "Luminous violet glass, pearl accents and softly curved surfaces.",
       "previewAccent": "#FFA78BFA",
       "spec": {
         "theme": {
@@ -94,9 +94,9 @@
             "borderSelected": "#FFA78BFA",
             "focus": "#FFA78BFA",
             "accent": "#FFA78BFA",
-            "accentHover": "#FF60A5FA",
-            "accentPressed": "#FF8B5CF6",
-            "accentSecondary": "#FF60A5FA",
+            "accentHover": "#FFC4AAFF",
+            "accentPressed": "#FF9070D8",
+            "accentSecondary": "#FFE2B8E8",
             "selection": "#30A78BFA",
             "selectionHover": "#48A78BFA",
             "info": "#FF7DD3FC",
@@ -112,11 +112,11 @@
             "monoFamily": "Noto Sans Mono"
           },
           "shape": {
-            "xs": 3,
-            "sm": 5,
-            "md": 9,
-            "lg": 14,
-            "xl": 18
+            "xs": 4,
+            "sm": 9,
+            "md": 12,
+            "lg": 18,
+            "xl": 24
           },
           "motion": {
             "fastMs": 110,
@@ -128,20 +128,20 @@
             "kind": "RadialGlow"
           },
           "morphology": {
-            "navigationTreatment": "SelectedSurface",
-            "cardPersonality": "Flat",
-            "chromeTreatment": "Elevated",
+            "navigationTreatment": "Glow",
+            "cardPersonality": "Glass",
+            "chromeTreatment": "Accented",
             "focusTreatment": "Ring",
-            "borderWeight": 1,
+            "borderWeight": 0.8,
             "elevationStrength": 0.55,
             "glowStrength": 0.16,
-            "panelOpacity": 0.96,
-            "motionIntensity": 0.65,
+            "panelOpacity": 0.88,
+            "motionIntensity": 0.8,
             "navigationRadiusScale": 0.65
           }
         },
         "material": {
-          "personality": "smoked-glass",
+          "personality": "energy-glass",
           "atmosphere": "electric",
           "grain": 0.008,
           "glassOpacity": 0.94,
@@ -150,14 +150,15 @@
           "rimLight": 0.28,
           "ambientPrimary": "#FFA78BFA",
           "ambientSecondary": "#FF60A5FA"
-        }
+        },
+        "artwork": "palace"
       }
     },
     {
       "id": "neuterradise.celestial.theme-azure",
       "kind": "theme",
       "name": "Moonlit Azure",
-      "description": "Deep coordinated surfaces with luminous, readable accents.",
+      "description": "Crystalline blue, silver rules and quiet framed surfaces.",
       "previewAccent": "#FF7DD3FC",
       "spec": {
         "theme": {
@@ -175,9 +176,9 @@
             "surfaceHover": "#FF223449",
             "surfacePressed": "#FF19283B",
             "surfaceSelected": "#FF223449",
-            "textPrimary": "#FFF5F1FC",
-            "textSecondary": "#FFD1C9DE",
-            "textMuted": "#FFA59CB6",
+            "textPrimary": "#FFEDF6FF",
+            "textSecondary": "#FFB8CFDF",
+            "textMuted": "#FF90AFC4",
             "textDisabled": "#FF777080",
             "textInverse": "#FF080F1C",
             "textOnAccent": "#FF080F1C",
@@ -189,9 +190,9 @@
             "borderSelected": "#FF7DD3FC",
             "focus": "#FF7DD3FC",
             "accent": "#FF7DD3FC",
-            "accentHover": "#FFA5B4FC",
-            "accentPressed": "#FF38BDF8",
-            "accentSecondary": "#FFA5B4FC",
+            "accentHover": "#FFA8E4FF",
+            "accentPressed": "#FF50ACDA",
+            "accentSecondary": "#FFC1E4ED",
             "selection": "#307DD3FC",
             "selectionHover": "#487DD3FC",
             "info": "#FF7DD3FC",
@@ -207,11 +208,11 @@
             "monoFamily": "Noto Sans Mono"
           },
           "shape": {
-            "xs": 3,
-            "sm": 5,
-            "md": 9,
-            "lg": 14,
-            "xl": 18
+            "xs": 1,
+            "sm": 3,
+            "md": 5,
+            "lg": 10,
+            "xl": 14
           },
           "motion": {
             "fastMs": 110,
@@ -223,21 +224,21 @@
             "kind": "RadialGlow"
           },
           "morphology": {
-            "navigationTreatment": "SelectedSurface",
-            "cardPersonality": "Flat",
+            "navigationTreatment": "AccentEdge",
+            "cardPersonality": "Framed",
             "chromeTreatment": "Elevated",
             "focusTreatment": "Ring",
-            "borderWeight": 1,
+            "borderWeight": 1.2,
             "elevationStrength": 0.55,
             "glowStrength": 0.16,
-            "panelOpacity": 0.96,
-            "motionIntensity": 0.65,
+            "panelOpacity": 0.98,
+            "motionIntensity": 0.4,
             "navigationRadiusScale": 0.65
           }
         },
         "material": {
-          "personality": "smoked-glass",
-          "atmosphere": "electric",
+          "personality": "white-frost",
+          "atmosphere": "fog",
           "grain": 0.008,
           "glassOpacity": 0.94,
           "glassBlur": 16,
@@ -245,7 +246,8 @@
           "rimLight": 0.28,
           "ambientPrimary": "#FF7DD3FC",
           "ambientSecondary": "#FFA5B4FC"
-        }
+        },
+        "artwork": "citadel"
       }
     },
     {

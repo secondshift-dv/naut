@@ -1,0 +1,63 @@
+{
+  "id": "builtin.neuterradise.home.showcase",
+  "kind": "home-layout",
+  "name": "Showcase",
+  "spec": {
+    "hero": {
+      "placement": "full-bleed",
+      "heightFraction": 0.68,
+      "minHeight": 250,
+      "maxHeight": 520
+    },
+    "rails": [
+      {
+        "id": "recent",
+        "style": "poster",
+        "maxItems": 8
+      },
+      {
+        "id": "statistics",
+        "style": "strip",
+        "maxItems": 4
+      },
+      {
+        "id": "activity",
+        "style": "compact",
+        "maxItems": 4
+      }
+    ],
+    "surface": {
+      "type": "stack",
+      "spacing": 12,
+      "children": [
+        {
+          "type": "semantic",
+          "id": "featured"
+        },
+        {
+          "type": "semantic",
+          "id": "recent"
+        },
+        {
+          "type": "stack",
+          "spacing": 12,
+          "children": [
+            {
+              "type": "semantic",
+              "id": "statistics"
+            },
+            {
+              "type": "semantic",
+              "id": "activity"
+            }
+          ]
+        },
+        {
+          "type": "semantic",
+          "id": "attention"
+        }
+      ]
+    }
+  },
+  "description": "Cinematic spotlight above artwork-led rails."
+}

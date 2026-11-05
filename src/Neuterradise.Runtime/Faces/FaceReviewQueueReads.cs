@@ -58,7 +58,7 @@ internal sealed class FaceReviewQueueReads
                     JOIN profiles rp ON rp.profile_id = pa.profile_id
                     WHERE pa.media_id = fd.media_id
                       AND pa.publication_import_unit_id IS NULL
-                      AND (rp.kind <> 'NORMAL' OR (rp.visibility = 'PUBLISHED' AND rp.trashed_at_ms IS NULL))
+                      AND (rp.trashed_at_ms IS NULL AND (rp.kind <> 'NORMAL' OR rp.visibility = 'PUBLISHED'))
                 )
                 """;
         }
@@ -71,7 +71,7 @@ internal sealed class FaceReviewQueueReads
               AND EXISTS (
                   SELECT 1 FROM profiles target
                   WHERE target.profile_id = $profileId
-                    AND (target.kind <> 'NORMAL' OR (target.visibility = 'PUBLISHED' AND target.trashed_at_ms IS NULL))
+                    AND (target.trashed_at_ms IS NULL AND (target.kind <> 'NORMAL' OR target.visibility = 'PUBLISHED'))
               )
               AND EXISTS (
                   SELECT 1
@@ -79,7 +79,7 @@ internal sealed class FaceReviewQueueReads
                   JOIN profiles public_profile ON public_profile.profile_id = public_pa.profile_id
                   WHERE public_pa.media_id = fd.media_id
                     AND public_pa.publication_import_unit_id IS NULL
-                    AND (public_profile.kind <> 'NORMAL' OR (public_profile.visibility = 'PUBLISHED' AND public_profile.trashed_at_ms IS NULL))
+                    AND (public_profile.trashed_at_ms IS NULL AND (public_profile.kind <> 'NORMAL' OR public_profile.visibility = 'PUBLISHED'))
               )
               AND (
                     si.profile_id = $profileId
@@ -91,7 +91,7 @@ internal sealed class FaceReviewQueueReads
                         WHERE pa.media_id = fd.media_id
                           AND pa.profile_id = $profileId
                           AND pa.publication_import_unit_id IS NULL
-                          AND (rp.kind <> 'NORMAL' OR (rp.visibility = 'PUBLISHED' AND rp.trashed_at_ms IS NULL))
+                          AND (rp.trashed_at_ms IS NULL AND (rp.kind <> 'NORMAL' OR rp.visibility = 'PUBLISHED'))
                     )
               )
               """;

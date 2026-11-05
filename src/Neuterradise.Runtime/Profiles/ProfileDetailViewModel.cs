@@ -78,6 +78,7 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
     private string? _currentManagedRelativePath;
 
     private string? _folderStatusMessage;
+    private int _folderRequestGeneration;
     private string? _renameStatusMessage;
     private string? _unknownStatusNotice;
     private bool _isRenaming;
@@ -916,6 +917,7 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
 
     public string? CategoryId => _categoryId;
     public IReadOnlyList<string> Tags => _tags;
+    public IReadOnlyList<ProfileTagAssignment> AssignedTags => _tagAssignments;
 
     public int? Rating
     {
@@ -1245,7 +1247,7 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
         RaisePropertyChanged(nameof(PresentationModel));
     }
 
-    public void PopulateMedia(IEnumerable<ProfileMediaItemReadModel> items, int? totalCount = null)
+    public void PopulateMedia(IEnumerable<ProfileMediaItemReadModel> items, int? totalCount = null, IEnumerable<ProfileMediaItemReadModel>? recentItems = null)
     {
         ArgumentNullException.ThrowIfNull(items);
         MediaItems.Clear();
@@ -1284,12 +1286,18 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
                 item.OriginalFileName,
                 thumbnailPath,
                 hoverPath));
-            if (count < 12)
-            {
-                RecentMedia.Add(vm);
-            }
-
             count++;
+        }
+
+        if (recentItems is null)
+        {
+            foreach (var item in MediaItems.Take(12))
+                RecentMedia.Add(item);
+        }
+        else
+        {
+            foreach (var item in recentItems.Take(12))
+                RecentMedia.Add(new ProfileMediaItemViewModel(item));
         }
 
         MediaGrid.SetItems(gridItems, totalCount: totalCount);
@@ -1498,6 +1506,7 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
         CancellationToken cancellationToken,
         bool includeMedia)
     {
+        StartRouteTask(RefreshTextFilesAsync, "Profile text files could not be checked.");
         if (includeMedia)
         {
             TaskObserver.Observe(
@@ -1581,6 +1590,13 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
                 sort: sort,
                 pageIndex: currentPage).ConfigureAwait(false);
 
+            var recentPage = await _profileReads.GetMediaPageAsync(
+                ProfileId,
+                pageSize: 12,
+                cancellationToken: cancellationToken,
+                sort: MediaGridSort.NewestFirst,
+                pageIndex: 1).ConfigureAwait(false);
+
             await UiDispatch.InvokeAsync(() =>
             {
                 if (generation != _mediaLoadGeneration || _isDisposed || !IsRouteActive)
@@ -1590,7 +1606,7 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
 
                 try
                 {
-                    PopulateMedia(page.Items, page.TotalCount);
+                    PopulateMedia(page.Items, page.TotalCount, recentPage.Items);
                 }
                 catch (Exception exception)
                 {
@@ -1774,6 +1790,8 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
 
     public async Task OpenProfileFolderAsync(CancellationToken cancellationToken = default)
     {
+        ClearFolderStatus();
+        var generation = _folderRequestGeneration;
         if (_profileOperations is null)
         {
             FolderStatusMessage = "Profile operations service unavailable.";
@@ -1784,12 +1802,43 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
         try
         {
             var result = await _profileOperations.OpenProfileFolderAsync(ProfileId, cancellationToken).ConfigureAwait(true);
-            FolderStatusMessage = result.IsSuccess ? "Opened in Windows Explorer." : result.UserMessage ?? "Could not open Profile folder.";
+            if (!_isDisposed && IsRouteActive && generation == _folderRequestGeneration)
+                FolderStatusMessage = result.IsSuccess ? Neuterradise.App.Localization.SurfaceText.Get("Profile.Folder.RequestSent", "Sent the folder request to Windows Explorer.") : result.UserMessage ?? "Could not open Profile folder.";
         }
         catch (Exception ex)
         {
-            FolderStatusMessage = OperationExecution.SafeMessage(ex);
+            if (!_isDisposed && IsRouteActive && generation == _folderRequestGeneration)
+                FolderStatusMessage = OperationExecution.SafeMessage(ex);
         }
+    }
+
+    public void ClearFolderStatus()
+    {
+        Interlocked.Increment(ref _folderRequestGeneration);
+        FolderStatusMessage = null;
+    }
+
+    public IReadOnlyList<ProfileTextInspection> TextFileIssues { get; private set; } = [];
+
+    public async Task RefreshTextFilesAsync(CancellationToken cancellationToken = default)
+    {
+        if (_catalog is null) return;
+        var files = await new ProfileTextFiles(_catalog).InspectAsync(ProfileId, cancellationToken).ConfigureAwait(false);
+        await UiDispatch.InvokeAsync(() =>
+        {
+            if (_isDisposed || !IsRouteActive) return;
+            TextFileIssues = files.Where(file => file.State != ProfileTextState.Current).ToArray();
+            RaisePropertyChanged(nameof(TextFileIssues));
+        }).ConfigureAwait(false);
+    }
+
+    public async Task<bool> ResolveTextFileAsync(ProfileTextInspection file, bool adoptFile)
+    {
+        if (_catalog is null) return false;
+        var resolved = await new ProfileTextFiles(_catalog).ResolveAsync(file, adoptFile, RouteCancellationToken).ConfigureAwait(true);
+        await RefreshTextFilesAsync(RouteCancellationToken).ConfigureAwait(true);
+        if (resolved) await LoadAsync(RouteCancellationToken).ConfigureAwait(true);
+        return resolved;
     }
 
     public async Task<bool> MoveToTrashAsync(CancellationToken cancellationToken = default)

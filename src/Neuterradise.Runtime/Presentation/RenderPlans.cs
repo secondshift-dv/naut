@@ -50,7 +50,7 @@ public sealed record MaterialSpec(
         "token:accent", "token:accentSecondary", []);
 }
 
-public sealed record ThemePlan(ThemeDefinition Theme, MaterialSpec Material);
+public sealed record ThemePlan(ThemeDefinition Theme, MaterialSpec Material, string? ArtworkPath = null, string? ArtworkIdentity = null);
 
 public sealed record TypeStyle(string FontRole, double Size, int Weight, double LineHeight, string ColorRole, bool Trim, bool Wrap);
 
@@ -83,7 +83,10 @@ public sealed record BackdropLayer(
     string? Source = null,
     string Blend = "normal",
     string Direction = "up",
-    string ParticleShape = "dot");
+    string ParticleShape = "dot",
+    double Drift = 0.015,
+    double Twinkle = 0.45,
+    string SpawnRegion = "all");
 
 public sealed record BackdropVariant(IReadOnlyList<BackdropLayer> Layers, bool Static = false)
 {
@@ -126,6 +129,8 @@ public sealed record HomeLayoutPlan(
     IReadOnlyList<HomeRailPlan> Rails,
     SurfaceNode? Surface = null);
 
+public enum SpotlightGeometry { FullBleed, ArtworkLeft, IdentityLeft, ArtworkAbove, IdentityAbove }
+
 public sealed record SpotlightPlan(
     string Composition,
     string Motion,
@@ -134,7 +139,16 @@ public sealed record SpotlightPlan(
     bool ShowCover,
     bool ShowOverview,
     string Pagination,
-    double ScrimStrength);
+    double ScrimStrength)
+{
+    public SpotlightGeometry GeometryFor(double width, string homePlacement) => Composition switch
+    {
+        "storefront" or "editorial" or "cinema" => SpotlightGeometry.FullBleed,
+        _ => homePlacement == "split" && width >= 840 ? SpotlightGeometry.ArtworkLeft : SpotlightGeometry.FullBleed,
+    };
+
+    public double IdentityShare => Composition == "storefront" ? 0.43 : Composition == "editorial" ? 0.44 : 0.4;
+}
 
 /// <summary>Only renderer-approved virtualized primitives exist here; no layout can request unbounded realization.</summary>
 public static class CollectionPrimitives
@@ -172,7 +186,7 @@ public sealed record GalleryLayoutPlan(
 
 public sealed record ProfileLayoutPlan(ProfileLayoutDefinition Layout, SurfaceNode? Surface = null);
 
-public sealed record FramePlan(CoverFrameDefinition Frame, string? OverlayAssetPath, double? CoverInsetFraction = null);
+public sealed record FramePlan(CoverFrameDefinition Frame, string? OverlayAssetPath, double? CoverInsetFraction = null, string? OverlayAssetIdentity = null);
 
 public sealed record ProfileMediaLayoutPlan(Neuterradise.App.Design.MediaLayouts.MediaLayoutDefinition Layout, string Browse = "wall");
 

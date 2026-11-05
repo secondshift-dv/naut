@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Media;
 using Neuterradise.App.Import;
 using Neuterradise.App.Import.Intake;
 using Neuterradise.App.Presentation;
+using Neuterradise.App.Profiles;
 using Neuterradise.App.Shell;
 using Windows.ApplicationModel.DataTransfer;
 
@@ -31,6 +32,7 @@ public sealed class ImportSurface : Surface
     private ImportWizardViewModel? _wizard;
     private Disposables? _wizardBag;
     private Disposables? _wizardRenderBag;
+    private bool _isSurfaceActive;
 
     public ImportSurface(AppServices services, ImportViewModel vm) : base(services)
     {
@@ -62,11 +64,15 @@ public sealed class ImportSurface : Surface
     {
         // ImportActivityService owns the live polling loop. Entering the page only wakes that loop;
         // it must not turn a transient database read into a page-level "could not refresh" notice.
+        _isSurfaceActive = true;
+        foreach (var row in _rows.Values) row.SetSurfaceActive(true);
         Services.ImportActivity.RequestRefresh();
     }
 
     protected override void OnSuspended()
     {
+        _isSurfaceActive = false;
+        foreach (var row in _rows.Values) row.SetSurfaceActive(false);
         CloseVisualPicker();
         HoverVideoCoordinator.Shared.StopAll();
     }
@@ -81,6 +87,72 @@ public sealed class ImportSurface : Surface
     private FrameworkElement DropZone()
     {
         var theme = ThemeRuntime.Current;
+        var stripes = new Canvas
+        {
+            Opacity = 0.18,
+            Height = 142,
+            VerticalAlignment = VerticalAlignment.Stretch,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            IsHitTestVisible = false,
+        };
+        var lastStripeWidth = 0.0;
+        stripes.SizeChanged += (_, args) =>
+        {
+            var width = args.NewSize.Width;
+            if (width <= 0 || Math.Abs(width - lastStripeWidth) < 8) return;
+            lastStripeWidth = width;
+            stripes.Children.Clear();
+            for (var x = -140.0; x < width + 140; x += 30)
+            {
+                stripes.Children.Add(new Microsoft.UI.Xaml.Shapes.Line
+                {
+                    X1 = x,
+                    Y1 = 0,
+                    X2 = x + 142,
+                    Y2 = 142,
+                    Stroke = theme.Brush("borderInteractive"),
+                    StrokeThickness = 1,
+                    IsHitTestVisible = false,
+                });
+            }
+        };
+
+        var emblem = new Border
+        {
+            Width = 46,
+            Height = 46,
+            CornerRadius = new CornerRadius(12),
+            Background = theme.Brush("surface2"),
+            BorderBrush = theme.Brush("borderInteractive"),
+            BorderThickness = new Thickness(1),
+            Child = new IconView("icon.action.download", 24, "accent")
+                .Align(HorizontalAlignment.Center, VerticalAlignment.Center),
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        var actions = new VariableWrap(
+            8,
+            UI.Button(UI.T("Import.ChooseFiles", "Choose files"),
+                () => Services.RunUserAction(PickFilesAsync(), "ImportSurface.PickFilesAsync",
+                    UI.T("Import.PickerFailed", "The requested items could not be selected.")),
+                ButtonKind.Primary),
+            UI.Button(UI.T("Import.ChooseFolder", "Choose folder"),
+                () => Services.RunUserAction(PickFolderAsync(), "ImportSurface.PickFolderAsync",
+                    UI.T("Import.PickerFailed", "The requested items could not be selected."))))
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        var content = UI.V(8,
+            emblem,
+            UI.Text(UI.T("Import.Drop", "Drop photos, videos, 3D models or folders here"),
+                    "body-strong", maxLines: 2)
+                .Align(HorizontalAlignment.Center),
+            actions);
+        content.HorizontalAlignment = HorizontalAlignment.Center;
+        content.VerticalAlignment = VerticalAlignment.Center;
+
+        var composition = new Grid();
+        composition.Children.Add(stripes);
+        composition.Children.Add(content);
         var zone = new Border
         {
             AllowDrop = true,
@@ -88,15 +160,8 @@ public sealed class ImportSurface : Surface
             BorderBrush = theme.Brush("borderDefault"),
             BorderThickness = new Thickness(1.5),
             Background = theme.Brush("surface1"),
-            Padding = new Thickness(12),
-            Child = UI.V(10,
-                new IconView("icon.navigation.import", 24, "accent").Align(HorizontalAlignment.Center),
-                UI.Text(UI.T("Import.Drop", "Drop photos, videos, 3D models or folders here"), "body-strong", maxLines: 2).Align(HorizontalAlignment.Center),
-                new VariableWrap(
-                    8,
-                    UI.Button(UI.T("Import.ChooseFiles", "Choose files"), () => Services.RunUserAction(PickFilesAsync(), "ImportSurface.PickFilesAsync", UI.T("Import.PickerFailed", "The requested items could not be selected.")), ButtonKind.Primary),
-                    UI.Button(UI.T("Import.ChooseFolder", "Choose folder"), () => Services.RunUserAction(PickFolderAsync(), "ImportSurface.PickFolderAsync", UI.T("Import.PickerFailed", "The requested items could not be selected.")))
-                    .Align(HorizontalAlignment.Center))),
+            Padding = new Thickness(16),
+            Child = composition,
         };
         zone.DragOver += (_, e) =>
         {
@@ -199,6 +264,7 @@ public sealed class ImportSurface : Surface
             if (!_rows.TryGetValue(unit.UnitId, out var row))
             {
                 row = new ImportUnitRow(_vm, unit);
+                row.SetSurfaceActive(_isSurfaceActive);
                 _rows.Add(unit.UnitId, row);
             }
 
@@ -259,6 +325,8 @@ public sealed class ImportSurface : Surface
         }
 
         public FrameworkElement View { get; }
+
+        public void SetSurfaceActive(bool active) => _progress.SetSurfaceActive(active);
 
         private void Apply()
         {
@@ -324,7 +392,7 @@ public sealed class ImportSurface : Surface
                     {
                         _owner.IntakeStatusMessage = UI.T(
                             "Import.CancelRequested",
-                            "Cancellation requested. Running work will stop at the next safe interruption point.");
+                            "Cancellation requested. Work will stop when safe.");
                         _owner.CancelUnitCommand.Execute(_unit);
                     },
                     ButtonKind.Ghost));
@@ -357,6 +425,7 @@ public sealed class ImportSurface : Surface
         private double _value;
         private double _phase;
         private bool _shouldAnimate;
+        private bool _surfaceActive;
         private bool _disposed;
 
         public ImportProgressView()
@@ -398,10 +467,22 @@ public sealed class ImportSurface : Surface
             Children.Add(_activityClip);
 
             SizeChanged += OnSizeChanged;
+            Loaded += OnLoaded;
+            Unloaded += OnUnloaded;
             _timer.Tick += OnTick;
             ReducedMotionAuthority.Changed += OnReducedMotionChanged;
             UpdateAnimation();
         }
+
+        public void SetSurfaceActive(bool active)
+        {
+            _surfaceActive = active;
+            UpdateAnimation();
+        }
+
+        private void OnLoaded(object sender, RoutedEventArgs e) => UpdateAnimation();
+
+        private void OnUnloaded(object sender, RoutedEventArgs e) => _timer.Stop();
 
         public void Update(bool visible, bool indeterminate, double value, bool active)
         {
@@ -449,7 +530,8 @@ public sealed class ImportSurface : Surface
 
         private void UpdateAnimation()
         {
-            var animate = _shouldAnimate && !ReducedMotionAuthority.IsReduced && Visibility == Visibility.Visible;
+            var animate = _surfaceActive && IsLoaded && _shouldAnimate
+                && !ReducedMotionAuthority.IsReduced && Visibility == Visibility.Visible;
             _sweep.Visibility = animate ? Visibility.Visible : Visibility.Collapsed;
             if (animate)
             {
@@ -476,6 +558,8 @@ public sealed class ImportSurface : Surface
             _disposed = true;
             _timer.Stop();
             _timer.Tick -= OnTick;
+            Loaded -= OnLoaded;
+            Unloaded -= OnUnloaded;
             SizeChanged -= OnSizeChanged;
             ReducedMotionAuthority.Changed -= OnReducedMotionChanged;
         }
@@ -752,10 +836,10 @@ public sealed class ImportSurface : Surface
         }
 
         body.Children.Add(DetailLayout.Heading(
-            UI.T("Import.ProfilePicker.GuidanceTitle", "Choose where these media belong"),
+            UI.T("Import.ProfilePicker.GuidanceTitle", "Choose Profile"),
             UI.T(
                 "Import.ProfilePicker.GuidanceText",
-                "Use an existing Profile when the person is already in your Vault. Create a new Profile only for a new person."), "icon.profile.person"));
+                "Choose an existing Profile, or create one for a new person."), "icon.profile.person"));
 
         var choiceGrid = UI.FormColumns(
             SelectionCard(
@@ -839,7 +923,7 @@ public sealed class ImportSurface : Surface
 
             body.Children.Add(DetailLayout.Section(
                 UI.T("Import.NewProfile.Title", "Create Profile"),
-                UI.T("Import.NewProfile.Description", "Start with the person's name. Category, tags and appearance can be reviewed before the import is added to Vault."),
+                UI.T("Import.NewProfile.Description", "Enter a name, then review the Profile details."),
                 "icon.profile.person",
                 name,
                 validation));
@@ -892,7 +976,7 @@ public sealed class ImportSurface : Surface
                     list.Children.Add(UI.Text(
                         string.IsNullOrWhiteSpace(wizard.ExistingSearchText)
                             ? UI.T("Import.ProfilePicker.SearchPrompt", "Profiles will appear here. Start typing to narrow the list.")
-                            : UI.T("Import.ProfilePicker.NoResults", "No Profile matches that search."),
+                            : UI.T("Import.ProfilePicker.NoResults", "No matching Profiles."),
                         "caption",
                         "textMuted",
                         3));
@@ -1099,14 +1183,14 @@ public sealed class ImportSurface : Surface
 
         var identityFields = UI.V(
             7,
-            UI.Text(UI.T("Import.Passport.NameLabel", "Profile name"), "micro", "textMuted"),
+            UI.Text(UI.T("Import.Passport.NameLabel", "PROFILE NAME"), "micro", "textMuted"),
             profileSummary);
         var documentHeader = UI.Grid(
             "auto",
             "*,auto",
             UI.V(
                     0,
-                    UI.Text(UI.T("Import.Passport.Kicker", "Profile"), "micro", "textMuted"),
+                    UI.Text(UI.T("Import.Passport.Kicker", "naut / PROFILE RECORD"), "micro", "textMuted"),
                     UI.Text(UI.T("Import.Passport.Title", "Identity"), "body-strong"))
                 .At(0, 0),
             UI.Badge(UI.T("Import.Passport.Verify", "REVIEW"), "accent")
@@ -1124,7 +1208,7 @@ public sealed class ImportSurface : Surface
             documentHeader,
             UI.V(
                 5,
-                UI.Text(UI.T("Import.Passport.BannerLabel", "Banner"), "micro", "textMuted"),
+                UI.Text(UI.T("Import.Passport.BannerLabel", "BANNER"), "micro", "textMuted"),
                 bannerButton),
             UI.Guidance(
                 UI.T("Import.Passport.AppearanceLaterTitle", "You can change these later"),
@@ -1322,11 +1406,11 @@ public sealed class ImportSurface : Surface
             lifetime.Add(Observe.Collection(wizard.TagSuggestions, FillSuggestions));
 
             var classification = DetailLayout.Section(
-                UI.T("Import.Verify.Organize", "Organization"),
+                UI.T("Import.Verify.Organize", "Category and tags"),
                 UI.T("Import.Verify.Organize.Description", "Category and tags make this Profile easier to browse and filter later."),
                 "icon.profile.category",
-                UI.V(5, UI.Text(UI.T("Import.Passport.CategoryLabel", "Category"), "control"), categoryRow, categoryEditor),
-                UI.V(5, UI.Text(UI.T("Import.Passport.TagsLabel", "Tags"), "control"), tags, tagInput, suggestions));
+                UI.V(5, UI.Text(UI.T("Import.Passport.CategoryLabel", "CATEGORY"), "control"), categoryRow, categoryEditor),
+                UI.V(5, UI.Text(UI.T("Import.Passport.TagsLabel", "TAGS"), "control"), tags, tagInput, suggestions));
 
             var rating = UI.H(4);
             var ratingIcons = new List<IconView>();
@@ -1404,6 +1488,15 @@ public sealed class ImportSurface : Surface
                 MinHeight = 80,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
             };
+            var overviewCount = UI.Text(string.Empty, "caption", "textMuted");
+            void UpdateOverviewCount()
+            {
+                overviewCount.Text = UI.F("Profile.PrivateNote.Count", "{0:N0} / {1:N0} characters",
+                    overview.Text.Length, ProfileRules.MaximumOverviewLength);
+                overviewCount.Foreground = theme.Brush(ProfileRules.IsOverviewValid(overview.Text)
+                    ? "textMuted" : "textWarning");
+            }
+
             var synchronizingOverview = false;
             overview.TextChanged += (_, _) =>
             {
@@ -1411,7 +1504,10 @@ public sealed class ImportSurface : Surface
                 {
                     wizard.Overview = overview.Text;
                 }
+
+                UpdateOverviewCount();
             };
+            UpdateOverviewCount();
             lifetime.Add(Observe.Props(wizard, () =>
             {
                 if (string.Equals(overview.Text, wizard.Overview, StringComparison.Ordinal))
@@ -1422,6 +1518,7 @@ public sealed class ImportSurface : Surface
                 synchronizingOverview = true;
                 overview.Text = wizard.Overview;
                 synchronizingOverview = false;
+                UpdateOverviewCount();
             }, nameof(ImportWizardViewModel.Overview)));
 
             var details = DetailLayout.Section(
@@ -1429,7 +1526,8 @@ public sealed class ImportSurface : Surface
                 UI.T("Import.Details.Description", "Rating, favorite state and Overview are personal Profile details."),
                 "icon.profile.person",
                 preferenceGrid,
-                UI.V(5, UI.Text(UI.T("Import.Passport.OverviewLabel", "Overview"), "control"), overview));
+                UI.V(5, UI.Text(UI.T("Import.Passport.OverviewLabel", "OVERVIEW"), "control"), overview,
+                    overviewCount.Align(HorizontalAlignment.Right)));
 
             body.Children.Add(new Border
             {
@@ -1477,7 +1575,7 @@ public sealed class ImportSurface : Surface
                 2,
                 UI.Text(UI.T("Import.Problems", "Review required"), "body-strong"),
                 UI.Text(
-                    UI.T("Import.Problems.Description", "Resolve these items before this import can be added to Vault."),
+                    UI.T("Import.Problems.Description", "Fix these issues to continue."),
                     "caption",
                     "textSecondary",
                     3)));
@@ -1692,8 +1790,8 @@ public sealed class ImportSurface : Surface
             else if (hasNoOptions)
             {
                 status.Text = isCover
-                    ? UI.T("Import.NoCoverSuggestion", "No suitable Cover suggestion was prepared.")
-                    : UI.T("Import.NoBannerSuggestion", "No suitable Banner suggestion was prepared.");
+                    ? UI.T("Import.NoCoverSuggestion", "No Cover suggestion available.")
+                    : UI.T("Import.NoBannerSuggestion", "No Banner suggestion available.");
                 status.Visibility = Visibility.Visible;
                 scroll.Visibility = Visibility.Collapsed;
             }
@@ -1783,7 +1881,7 @@ public sealed class ImportSurface : Surface
             if (selected is not null)
             {
                 actions.Children.Add(UI.Button(
-                    UI.T("Import.Appearance.Clear", "Clear selection"),
+                    UI.T("Import.Appearance.Clear", "Clear"),
                     () =>
                     {
                         (isCover ? wizard.ClearCoverCommand : wizard.ClearBannerCommand).Execute(null);

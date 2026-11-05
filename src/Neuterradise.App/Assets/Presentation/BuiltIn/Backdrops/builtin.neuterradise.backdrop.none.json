@@ -2,7 +2,7 @@
   "id": "builtin.neuterradise.backdrop.none",
   "kind": "backdrop",
   "name": "None",
-  "description": "No backdrop decoration.",
+  "description": "No decorative background.",
   "spec": {
     "variants": {
       "full": {

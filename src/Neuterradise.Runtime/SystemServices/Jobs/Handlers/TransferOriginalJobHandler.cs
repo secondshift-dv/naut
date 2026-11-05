@@ -12,9 +12,10 @@ public sealed class TransferOriginalJobHandler : AuthorizedJobHandler
 {
     internal static Guid ProcessNonce { get; } = Guid.NewGuid();
 
-    public TransferOriginalJobHandler(CatalogDb catalog, ImportPreparationCoordinator preparation)
+    public TransferOriginalJobHandler(CatalogDb catalog, ImportPreparationCoordinator preparation,
+        long checkpointIntervalBytes = 64L * 1024 * 1024)
         : base("TransferOriginal", [JobLane.Io], "Media",
-            new TransferOriginalOperation(catalog, preparation), runOffCallingThread: false)
+            new TransferOriginalOperation(catalog, preparation, checkpointIntervalBytes), runOffCallingThread: false)
     {
     }
 }
@@ -22,13 +23,16 @@ public sealed class TransferOriginalJobHandler : AuthorizedJobHandler
 internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
 {
     private const int BufferSize = 1024 * 1024;
-    private const long CheckpointInterval = 16L * 1024 * 1024;
+    private readonly long _checkpointInterval;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
     private readonly CatalogDb _catalog;
     private readonly ImportPreparationCoordinator _preparation;
 
-    public TransferOriginalOperation(CatalogDb catalog, ImportPreparationCoordinator preparation)
+    public TransferOriginalOperation(CatalogDb catalog, ImportPreparationCoordinator preparation, long checkpointIntervalBytes)
     {
+        if (checkpointIntervalBytes is not (16L * 1024 * 1024 or 64L * 1024 * 1024 or 128L * 1024 * 1024))
+            throw new ArgumentOutOfRangeException(nameof(checkpointIntervalBytes));
+        _checkpointInterval = checkpointIntervalBytes;
         _catalog = catalog;
         _preparation = preparation;
     }
@@ -71,8 +75,13 @@ internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
                     || checkpoint.ExpectedLength != length))
                 return Failed("SOURCE_CHANGED", "The source file object changed since the safe checkpoint.");
 
-            await using var partial = new FileStream(partialPath, FileMode.OpenOrCreate, FileAccess.ReadWrite,
-                FileShare.None, BufferSize, FileOptions.Asynchronous | FileOptions.SequentialScan);
+            var partialExists = File.Exists(partialPath);
+            await using var partial = new FileStream(partialPath, new FileStreamOptions
+            {
+                Mode = partialExists ? FileMode.Open : FileMode.CreateNew, Access = FileAccess.ReadWrite, Share = FileShare.None,
+                BufferSize = BufferSize, Options = FileOptions.Asynchronous | FileOptions.SequentialScan,
+                PreallocationSize = partialExists ? 0 : length,
+            });
             using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
             var safeOffset = checkpoint.SourceIdentity is null ? 0 : checkpoint.SafeOffset;
             if (safeOffset < 0 || safeOffset > length || partial.Length < safeOffset)
@@ -106,6 +115,8 @@ internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
                 var lastCheckpoint = safeOffset;
                 while (written < length && !cancellationToken.IsCancellationRequested)
                 {
+                    await Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared
+                        .YieldBackgroundDiskAsync(cancellationToken).ConfigureAwait(false);
                     var read = await source.ReadAsync(buffer.AsMemory(0, (int)Math.Min(BufferSize, length - written)),
                         cancellationToken).ConfigureAwait(false);
                     if (read == 0) return Failed("SOURCE_CHANGED", "The source ended before its expected length.");
@@ -114,7 +125,7 @@ internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
                     written += read;
                     await context.Progress.ReportProgressAsync(written, length, "Transferring", cancellationToken)
                         .ConfigureAwait(false);
-                    if (written - lastCheckpoint >= CheckpointInterval)
+                    if (written - lastCheckpoint >= _checkpointInterval)
                     {
                         await SaveCheckpointAsync(context, partial, item.UnitId, identity, length,
                             written, relativePath, hash).ConfigureAwait(false);

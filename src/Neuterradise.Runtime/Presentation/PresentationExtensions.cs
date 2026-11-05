@@ -11,6 +11,11 @@ public sealed record TypographyPlan(TypographyFace Display, TypographyFace Headi
 public sealed record ControlSkinPlan(double Radius, double BorderWidth, double HorizontalPadding, double VerticalPadding,
     double Height, double ScrollbarWidth, string Fill, string HoverFill, string PressedFill, string Border, string Focus)
 {
+    public string Material { get; init; } = "flat";
+    public string Edge { get; init; } = "all";
+    public double Relief { get; init; } = 0;
+    public double ThumbWidth { get; init; } = 20;
+    public double ThumbHeight { get; init; } = 20;
     public IReadOnlyDictionary<string, ControlSkinPlan> Families { get; init; } = new Dictionary<string, ControlSkinPlan>();
     public ControlSkinPlan For(string family) => Families.TryGetValue(family, out var plan) ? plan : this;
 }
@@ -101,13 +106,20 @@ public sealed partial class PresentationCompiler
         return fallback with { Families = families };
     }
 
-    private static ControlSkinPlan ReadControlSkin(JsonElement spec, SpecContext context, ControlSkinPlan? fallback = null) => new(
+    private static ControlSkinPlan ReadControlSkin(JsonElement spec, SpecContext context, ControlSkinPlan? fallback = null) => new ControlSkinPlan(
         context.Number(spec, "radius", fallback?.Radius ?? 6, 0, 24), context.Number(spec, "borderWidth", fallback?.BorderWidth ?? 1, 0, 3),
         context.Number(spec, "horizontalPadding", fallback?.HorizontalPadding ?? 10, 4, 24), context.Number(spec, "verticalPadding", fallback?.VerticalPadding ?? 5, 2, 12),
-        context.Number(spec, "height", fallback?.Height ?? 30, 28, 48), context.Number(spec, "scrollbarWidth", fallback?.ScrollbarWidth ?? 8, 6, 16),
+        context.Number(spec, "height", fallback?.Height ?? 30, 24, 48), context.Number(spec, "scrollbarWidth", fallback?.ScrollbarWidth ?? 8, 6, 16),
         context.Color(spec, "fill", fallback?.Fill ?? "token:surface3"), context.Color(spec, "hoverFill", fallback?.HoverFill ?? "token:surfaceHover"),
         context.Color(spec, "pressedFill", fallback?.PressedFill ?? "token:surfacePressed"), context.Color(spec, "border", fallback?.Border ?? "token:borderDefault"),
-        context.Color(spec, "focus", fallback?.Focus ?? "token:focus"));
+        context.Color(spec, "focus", fallback?.Focus ?? "token:focus"))
+    {
+        Material = context.Enum(spec, "material", ["flat", "bevel", "inset", "luminous"], fallback?.Material ?? "flat"),
+        Edge = context.Enum(spec, "edge", ["all", "bottom", "leading"], fallback?.Edge ?? "all"),
+        Relief = context.Number(spec, "relief", fallback?.Relief ?? 0, 0, 0.45),
+        ThumbWidth = context.Number(spec, "thumbWidth", fallback?.ThumbWidth ?? 20, 12, 28),
+        ThumbHeight = context.Number(spec, "thumbHeight", fallback?.ThumbHeight ?? 20, 12, 28),
+    };
 
     private static EffectPlan? CompileEffect(JsonElement spec, SpecContext context)
     {

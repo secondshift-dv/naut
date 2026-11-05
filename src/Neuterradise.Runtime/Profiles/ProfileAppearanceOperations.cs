@@ -726,9 +726,9 @@ public sealed record ProfileAppearanceOverrides(
         BannerFocusX: ProfileAppearanceRules.DefaultBannerFocus,
         BannerFocusY: ProfileAppearanceRules.DefaultBannerFocus,
         BannerZoom: ProfileAppearanceRules.MinimumBannerZoom,
-        ProfileCardVariantId: "editorial",
+        ProfileCardVariantId: "editorial-v2",
         CoverSourceKind: null,
-        MediaLayoutId: MediaLayoutCatalog.FallbackLayoutId,
+        MediaLayoutId: "mosaic",
         CoverVideoTimestampMilliseconds: null,
         ShowRecentMedia: true);
 

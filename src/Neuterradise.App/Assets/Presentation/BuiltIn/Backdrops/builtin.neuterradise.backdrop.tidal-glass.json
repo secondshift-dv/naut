@@ -1,0 +1,92 @@
+{
+  "id": "builtin.neuterradise.backdrop.tidal-glass",
+  "kind": "backdrop",
+  "name": "Tidal Glass",
+  "description": "Layered reflections and gently moving light.",
+  "spec": {
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:surface2",
+                "offset": 1
+              }
+            ]
+          },
+          {
+            "kind": "radial-glow",
+            "color": "token:ambientSecondary",
+            "opacity": 0.22,
+            "centerX": 0.22,
+            "centerY": 0.3,
+            "radius": 0.95,
+            "amplitude": 0.025,
+            "period": 38
+          },
+          {
+            "kind": "fog",
+            "color": "token:accentSecondary",
+            "opacity": 0.12,
+            "count": 5,
+            "speed": 0.2
+          },
+          {
+            "kind": "light-sweep",
+            "color": "token:lightSpecular",
+            "opacity": 0.12,
+            "width": 0.28,
+            "period": 24,
+            "angle": 145
+          }
+        ]
+      },
+      "reduced": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:surface2",
+                "offset": 1
+              }
+            ]
+          }
+        ]
+      },
+      "fallback": {
+        "layers": [
+          {
+            "kind": "gradient",
+            "stops": [
+              {
+                "color": "token:canvas",
+                "offset": 0
+              },
+              {
+                "color": "token:surface2",
+                "offset": 1
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "performance": {
+    "tier": "cinematic",
+    "continuousAnimation": true,
+    "offscreenPolicy": "suspend",
+    "maxAnimatedLayers": 3
+  }
+}

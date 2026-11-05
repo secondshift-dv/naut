@@ -1,11 +1,16 @@
 using Neuterradise.Profiling.Protocol;
 using OpenCvSharp;
+using Neuterradise.App.SystemServices.MediaTools;
 
 namespace Neuterradise.Profiling.Worker.FaceAnalysis;
 public sealed class OpenCvFaceImageSource : IFaceImageSource
 {
     private const int MaximumDiscoverySamples = 12;
     private const int MaximumShortlistSamples = 4;
+    private readonly Func<string?> _frameDecoder;
+
+    public OpenCvFaceImageSource(Func<string?>? frameDecoder = null) =>
+        _frameDecoder = frameDecoder ?? (() => WorkerRuntimeEnvironment.Current.ResolveFrameDecoder());
 
     public IFaceImage LoadImage(string path)
     {
@@ -15,6 +20,10 @@ public sealed class OpenCvFaceImageSource : IFaceImageSource
             throw new FaceInputException($"Analyzed image does not exist: {path}.");
         }
 
+        var extension = Path.GetExtension(path);
+        if (extension.Equals(".jp2", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".j2k", StringComparison.OrdinalIgnoreCase))
+            return new OpenCvFaceImage(DecodeFrame(path, null));
         var mat = Cv2.ImRead(path, ImreadModes.Color);
         if (mat is null || mat.Empty())
         {
@@ -39,8 +48,12 @@ public sealed class OpenCvFaceImageSource : IFaceImageSource
             throw new FaceInputException($"Analyzed video does not exist: {path}.");
         }
 
-        using var capture = new VideoCapture(path);
-        if (!capture.IsOpened())
+        var extension = Path.GetExtension(path);
+        var pipeDecoder = extension.Equals(".ogv", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".vob", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".mxf", StringComparison.OrdinalIgnoreCase);
+        using var capture = pipeDecoder ? null : new VideoCapture(path);
+        if (!pipeDecoder && capture?.IsOpened() != true)
         {
             throw new FaceInputException($"Analyzed video could not be opened: {path}.");
         }
@@ -50,9 +63,10 @@ public sealed class OpenCvFaceImageSource : IFaceImageSource
         {
             foreach (var timestamp in plan.SampleTimestampMilliseconds.Distinct().Order().Take(MaximumDiscoverySamples))
             {
-                capture.Set(VideoCaptureProperties.PosMsec, timestamp);
-                using var frame = new Mat();
-                if (!capture.Read(frame) || frame.Empty())
+                using var frame = pipeDecoder ? TryDecodeVideoFrame(path, timestamp) : new Mat();
+                if (frame is null) continue;
+                if (!pipeDecoder) capture!.Set(VideoCaptureProperties.PosMsec, timestamp);
+                if ((!pipeDecoder && !capture!.Read(frame)) || frame.Empty())
                 {
                     continue;
                 }
@@ -116,6 +130,33 @@ public sealed class OpenCvFaceImageSource : IFaceImageSource
         using var difference = new Mat();
         Cv2.Absdiff(left, right, difference);
         return Cv2.Mean(difference).Val0;
+    }
+
+    private Mat DecodeFrame(string path, long? timestamp)
+    {
+        var executable = _frameDecoder();
+        if (executable is null) throw new FaceInputException("The approved frame decoder is unavailable.");
+        try
+        {
+            var bytes = BoundedMediaFrameDecoder.DecodeAsync(executable, path, 4096, 4096, timestamp)
+                .GetAwaiter().GetResult();
+            if (bytes is not null)
+            {
+                var frame = Cv2.ImDecode(bytes, ImreadModes.Color);
+                if (!frame.Empty()) return frame;
+                frame.Dispose();
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+            or OperationCanceledException or System.ComponentModel.Win32Exception)
+        { throw new FaceInputException("The approved frame decoder could not read this input."); }
+        throw new FaceInputException("The approved frame decoder produced no usable frame.");
+    }
+
+    private Mat? TryDecodeVideoFrame(string path, long timestamp)
+    {
+        try { return DecodeFrame(path, timestamp); }
+        catch (FaceInputException) { return null; }
     }
 
     public void Dispose()

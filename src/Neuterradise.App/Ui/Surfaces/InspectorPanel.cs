@@ -43,9 +43,9 @@ public sealed class InspectorPanel : IDisposable
         _modelControls.Children.Add(UI.Button(UI.T("Inspector.Rotate", "Rotate"), null, ButtonKind.Ghost, command: _vm.RotateCommand));
         _modelControls.Children.Add(UI.Button(UI.T("Inspector.ResetCamera", "Reset camera"), null, ButtonKind.Ghost, command: _vm.ResetCameraCommand));
 
-        var tabs = UI.Grid("auto", "*,*,*");
+        var tabs = UI.Grid("auto", "*,*");
         tabs.ColumnSpacing = 4;
-        foreach (var name in new[] { "Info", "People", "Exif" })
+        foreach (var name in new[] { "Info", "People" })
         {
             var tabName = name;
             var button = UI.Button(UI.T("Inspector." + name, name), () => _vm.SelectTabCommand.Execute(tabName), ButtonKind.Ghost);
@@ -151,8 +151,6 @@ public sealed class InspectorPanel : IDisposable
         {
             "People" => DetailLayout.Heading(UI.T("Inspector.Guidance.People.Title", "People & associations"),
                 UI.T("Inspector.Guidance.People.Detail", "Shows the owning Profile and other Profiles linked to or detected in this media."), "icon.profile.related"),
-            "Exif" => DetailLayout.Heading(UI.T("Inspector.Guidance.Exif.Title", "Original metadata"),
-                UI.T("Inspector.Guidance.Exif.Detail", "Evidence from embedded metadata and the recorded import source: creator, source, time and tools. Import paths do not establish the upstream origin."), "icon.status.info"),
             _ => DetailLayout.Heading(UI.T("Inspector.Guidance.Summary.Title", "Media summary"),
                 null, "icon.media.image"),
         });
@@ -211,34 +209,6 @@ public sealed class InspectorPanel : IDisposable
                     "icon.action.add"));
                 break;
 
-            case "Exif":
-                if (_vm.IsFileLoading)
-                {
-                    _tab.Children.Add(UI.Text(UI.T("Inspector.Metadata.Loading", "Reading original metadata…"), "body-muted"));
-                    break;
-                }
-
-                foreach (var section in MediaProvenanceProjection.Build(_vm.FileDetailGroups))
-                {
-                    var title = section.GroupName switch
-                    {
-                        "Who" => UI.T("Inspector.Metadata.Who", "Who"),
-                        "Where" => UI.T("Inspector.Metadata.Where", "Where"),
-                        "When" => UI.T("Inspector.Metadata.When", "When"),
-                        _ => UI.T("Inspector.Metadata.How", "How"),
-                    };
-                    AddExifSection(title, section.Rows);
-                }
-                if (_tab.Children.Count == 1)
-                {
-                    _tab.Children.Add(UI.Text(
-                        UI.T("Inspector.Metadata.Empty", "No embedded provenance or recorded import source was found."),
-                        "body-muted"));
-                }
-                _tab.Children.Add(UI.Button(
-                    UI.T("Media.Exif.Refresh", "Read metadata again"),
-                    null, ButtonKind.Secondary, "icon.action.restore", _vm.RefreshMetadataCommand));
-                break;
             default:
                 _tab.Children.Add(Row(UI.T("Inspector.FileName", "Filename"), _vm.OriginalName));
                 _tab.Children.Add(Row(UI.T("Inspector.Type", "Type"), MediaSurfaceText.Type(_vm.MediaType)));
@@ -267,6 +237,16 @@ public sealed class InspectorPanel : IDisposable
                         break;
                     case ModelMediaInfo model:
                         _tab.Children.Add(Row(UI.T("Inspector.Format", "Format"), model.Format));
+                        var preparation = model.FigurePreparation switch
+                        {
+                            ModelFigurePreparation.Ready => UI.T("Inspector.Figure.Ready", "Prepared"),
+                            ModelFigurePreparation.Pending => UI.T("Inspector.Figure.Pending", "Not prepared yet"),
+                            ModelFigurePreparation.NeedsRepair => UI.T("Inspector.Figure.Repair", "Needs repair"),
+                            ModelFigurePreparation.Failed => UI.T("Inspector.Figure.Failed", "Preparation failed"),
+                            ModelFigurePreparation.DependenciesMissing => UI.T("Inspector.Figure.Dependencies", "Required components unavailable"),
+                            _ => UI.T("Inspector.Figure.Unsupported", "Not supported for this format"),
+                        };
+                        _tab.Children.Add(Row(UI.T("Inspector.Figure", "3D Figure"), preparation));
                         if (model.MeshCount is { } meshes)
                         {
                             _tab.Children.Add(Row(UI.T("Inspector.Meshes", "Meshes"), meshes.ToString(System.Globalization.CultureInfo.CurrentCulture)));
@@ -284,9 +264,9 @@ public sealed class InspectorPanel : IDisposable
                 if (_vm.Detail is { } detail)
                 {
                     if (!string.IsNullOrWhiteSpace(detail.CurrentLibraryLocation))
-                        _tab.Children.Add(Row(MediaSurfaceText.DetailField("Vault Location (current)"), detail.CurrentLibraryLocation));
+                        _tab.Children.Add(Row(UI.T("Inspector.Field.VaultLocationCurrent", "Vault location"), detail.CurrentLibraryLocation));
                     if (!string.IsNullOrWhiteSpace(detail.TargetLibraryLocation))
-                        _tab.Children.Add(Row(MediaSurfaceText.DetailField("Pending Target Location"), detail.TargetLibraryLocation));
+                        _tab.Children.Add(Row(UI.T("Inspector.Field.PendingTargetLocation", "Pending location"), detail.TargetLibraryLocation));
                 }
                 if (_vm.HasActionFeedback)
                 {
@@ -368,22 +348,6 @@ public sealed class InspectorPanel : IDisposable
         var slotHeight = _preview.ActualHeight > 1 ? _preview.ActualHeight : 260.0;
         var fittedScale = Math.Min(slotWidth / image.PixelWidth, slotHeight / image.PixelHeight);
         return fittedScale > 0 ? 1.0 / fittedScale : 1.0;
-    }
-
-    private void AddExifSection(string title, IReadOnlyList<MediaFileDetailRow> rows)
-    {
-        if (rows.Count == 0)
-        {
-            return;
-        }
-
-        _tab.Children.Add(UI.Text(title, "body-strong").Margin(0, 8, 0, 0));
-        foreach (var row in rows)
-        {
-            _tab.Children.Add(Row(
-                MediaSurfaceText.DetailField(row.Label),
-                MediaSurfaceText.DetailValue(row.Label, row.Value)));
-        }
     }
 
     private static FrameworkElement Row(string label, string? value) =>

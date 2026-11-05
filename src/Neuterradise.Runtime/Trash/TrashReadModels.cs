@@ -11,7 +11,8 @@ public sealed record TrashItemSummary(
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc,
     DateTimeOffset? CompletedAtUtc,
-    long RowVersion);
+    long RowVersion,
+    DateTimeOffset? TrashedAtUtc = null);
 
 public sealed record TrashHistoryPage(
     IReadOnlyList<TrashItemSummary> Items,

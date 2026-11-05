@@ -8,7 +8,7 @@ using Neuterradise.App.SystemServices.Lifecycle;
 namespace Neuterradise.App.Ui;
 
 /// <summary>
-/// People & Face Review: optional post-import enrichment with explicit human confirmation. Suggestions
+/// People & Face Review records explicit human confirmation after import analysis. Suggestions
 /// never control media ownership; this surface only records face-identity decisions through the existing
 /// face decision operations.
 /// </summary>
@@ -16,18 +16,41 @@ public sealed class PeopleSurface : Surface
 {
     private readonly FaceReviewViewModel _vm;
     private readonly Grid _root = new();
-    private readonly StackPanel _list = UI.V(8);
+    private readonly ItemsRepeater _list;
+    private readonly PooledElementFactory _rowFactory;
     private readonly TextBlock _state = UI.Text(string.Empty, "body-muted");
     private readonly Border _profilingNotice = new() { Visibility = Visibility.Collapsed };
     private readonly Border _emptyState = new() { Visibility = Visibility.Collapsed };
-    private readonly Dictionary<Guid, ReviewRow> _rows = new();
+    private readonly Dictionary<FrameworkElement, ReviewRow> _rows = new();
+    private readonly Button _loadMore;
 
     public PeopleSurface(AppServices services, FaceReviewViewModel vm) : base(services)
     {
         _vm = vm;
         _root.Background = ThemeRuntime.Current.Brush("canvas");
         _state.Visibility = Visibility.Collapsed;
-        var bulkAssign = UI.Button(UI.T("Faces.AssignAll", "Assign all to this profile"), null, ButtonKind.Secondary, "icon.profile.assign", _vm.AssignAllToThisProfileCommand);
+        _rowFactory = new PooledElementFactory(
+            _ => "face-review",
+            (_, datum) =>
+            {
+                var row = new ReviewRow(Services, _vm);
+                _rows.Add(row.View, row);
+                return row.View;
+            },
+            (element, datum) => _rows[element].Bind((FaceReviewItemViewModel)datum!),
+            element => _rows[element].Unbind(),
+            element =>
+            {
+                if (_rows.Remove(element, out var row))
+                {
+                    row.Dispose();
+                }
+            });
+        var (reviewScroll, repeater) = Repeaters.Virtualized(
+            _rowFactory, Repeaters.Stack(horizontal: false, spacing: 8));
+        _list = repeater;
+        _list.ItemsSource = _vm.Reviews;
+        var bulkAssign = UI.Button(UI.T("Faces.AssignAll", "Assign all to this Profile"), null, ButtonKind.Secondary, "icon.profile.assign", _vm.AssignAllToThisProfileCommand);
         bulkAssign.HorizontalAlignment = HorizontalAlignment.Left;
         var scopeContext = UI.WrappedText(string.Empty, "caption", "textSecondary");
         void UpdateScopeContext()
@@ -57,21 +80,30 @@ public sealed class PeopleSurface : Surface
         _emptyState.CornerRadius = new CornerRadius(14);
         _emptyState.Padding = new Thickness(16);
 
-        var page = UI.V(12,
-            header,
-            _profilingNotice,
-            _state,
-            _emptyState,
-            _list);
+        _loadMore = UI.Button(
+            UI.T("Common.LoadMore", "Load more"),
+            () => Services.RunUserAction(
+                _vm.LoadMoreReviewsAsync(),
+                "PeopleSurface.LoadMoreReviewsAsync",
+                UI.T("Faces.LoadFailed", "Face reviews could not be loaded.")),
+            ButtonKind.Secondary);
+        _loadMore.HorizontalAlignment = HorizontalAlignment.Center;
+        _loadMore.Visibility = Visibility.Collapsed;
+        var page = UI.Grid("auto,*,auto", "*");
+        page.RowSpacing = 10;
+        page.Children.Add(UI.V(8, header, _profilingNotice, _state, _emptyState).At(0));
+        page.Children.Add(reviewScroll.At(1));
+        page.Children.Add(_loadMore.At(2));
         page.MaxWidth = 1100;
         page.HorizontalAlignment = HorizontalAlignment.Stretch;
-        _root.Children.Add(UI.Scroll(page.Margin(14, 12, 14, 24)));
+        _root.Children.Add(page.Margin(14, 12, 14, 24));
         Bag.Add(Observe.Collection(_vm.Reviews, SyncRows));
         Bag.Add(Observe.Props(_vm, UpdateScopeContext, nameof(FaceReviewViewModel.ScopedProfileDisplayName)));
         Bag.Add(Observe.Props(_vm, SyncRows,
             nameof(FaceReviewViewModel.StatusMessage),
             nameof(FaceReviewViewModel.Status),
-            nameof(FaceReviewViewModel.ErrorMessage)));
+            nameof(FaceReviewViewModel.ErrorMessage),
+            nameof(FaceReviewViewModel.HasMoreReviews)));
         Bag.Add(Observe.Props(Services.Status, UpdateProfilingNotice, nameof(ShellStatusViewModel.ProfilingState)));
         SyncRows();
         UpdateProfilingNotice();
@@ -98,7 +130,7 @@ public sealed class PeopleSurface : Surface
                     UI.T("Faces.ProfilingUnavailable.Title", "Face detection is not available right now"),
                     "body-strong"),
                 UI.Text(
-                    UI.T("Faces.ProfilingUnavailable.Message", "The face analysis engine could not start. People suggestions will not appear for imported media. You can still assign people manually from each Profile. This does not affect your media or Vault."),
+                    UI.T("Faces.ProfilingUnavailable.Message", "Face analysis is unavailable. People suggestions will not appear for imports. You can assign people manually from Profile. Your media and Vault are unaffected."),
                     "body-muted", maxLines: 4));
         }
         else
@@ -109,30 +141,7 @@ public sealed class PeopleSurface : Surface
 
     private void SyncRows()
     {
-        var desiredIds = _vm.Reviews.Select(static review => review.FaceId).ToHashSet();
-        foreach (var staleId in _rows.Keys.Where(id => !desiredIds.Contains(id)).ToList())
-        {
-            _rows[staleId].Dispose();
-            _rows.Remove(staleId);
-        }
-
-        foreach (var review in _vm.Reviews.Take(200))
-        {
-            if (!_rows.ContainsKey(review.FaceId))
-            {
-                _rows.Add(review.FaceId, new ReviewRow(Services, _vm, review));
-            }
-        }
-
-        _list.Children.Clear();
-        foreach (var review in _vm.Reviews.Take(200))
-        {
-            if (_rows.TryGetValue(review.FaceId, out var row))
-            {
-                _list.Children.Add(row.View);
-            }
-        }
-
+        _loadMore.Visibility = _vm.HasMoreReviews ? Visibility.Visible : Visibility.Collapsed;
         if (_vm.Reviews.Count > 0)
         {
             _emptyState.Visibility = Visibility.Collapsed;
@@ -188,7 +197,7 @@ public sealed class PeopleSurface : Surface
             UI.WrappedText(
                 UI.T(
                     "Faces.Empty.Detail",
-                    "Face review appears after imported photos or videos contain detectable faces. Face analysis is optional and never blocks your media or Profile."),
+                    "Faces awaiting confirmation appear here after photo or video import."),
                 "body-muted"),
             actions);
         emptyContent.HorizontalAlignment = HorizontalAlignment.Stretch;
@@ -197,10 +206,9 @@ public sealed class PeopleSurface : Surface
 
     public override void Dispose()
     {
+        _rowFactory.Clear();
         foreach (var row in _rows.Values)
-        {
             row.Dispose();
-        }
         _rows.Clear();
         base.Dispose();
     }
@@ -209,22 +217,39 @@ public sealed class PeopleSurface : Surface
     {
         private readonly AppServices _services;
         private readonly FaceReviewViewModel _owner;
-        private readonly FaceReviewItemViewModel _review;
+        private FaceReviewItemViewModel _review;
         private readonly Border _host = new();
         private readonly PropertyChangedEventHandler _propertyChanged;
 
-        public ReviewRow(AppServices services, FaceReviewViewModel owner, FaceReviewItemViewModel review)
+        public ReviewRow(AppServices services, FaceReviewViewModel owner)
         {
             _services = services;
             _owner = owner;
-            _review = review;
+            _review = null!;
             _host.CornerRadius = new CornerRadius(14);
             _propertyChanged = (_, _) => UiDispatch.Run(Render);
+        }
+
+        public FrameworkElement View => _host;
+
+        public void Bind(FaceReviewItemViewModel review)
+        {
+            if (_review is not null)
+            {
+                _review.PropertyChanged -= _propertyChanged;
+            }
+            _review = review;
             _review.PropertyChanged += _propertyChanged;
             Render();
         }
 
-        public FrameworkElement View => _host;
+        public void Unbind()
+        {
+            if (_review is not null)
+            {
+                _review.PropertyChanged -= _propertyChanged;
+            }
+        }
 
         private void Render()
         {
@@ -315,7 +340,7 @@ public sealed class PeopleSurface : Surface
                     _owner.AssignOtherWithPickerCommand,
                     parameter: _review));
                 actions.Children.Add(UI.Button(
-                    UI.F("Faces.NotPerson", "Not {0}", suggestedName!),
+                    UI.T("Faces.IgnoreNotPerson", "Ignore / Not a person"),
                     () => _services.RunUserAction(
                         _owner.RejectFaceAsync(_review),
                         "PeopleSurface.RejectFaceAsync",

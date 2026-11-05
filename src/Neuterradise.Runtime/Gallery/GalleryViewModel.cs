@@ -274,8 +274,15 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
         get => _minRating;
         set
         {
-            if (SetProperty(ref _minRating, value))
+            var minimum = NormalizeRating(value);
+            if (SetProperty(ref _minRating, minimum))
             {
+                if (minimum.HasValue && _maxRating < minimum)
+                {
+                    _maxRating = minimum;
+                    RaisePropertyChanged(nameof(MaxRating));
+                }
+
                 OnFilterChanged();
             }
         }
@@ -286,12 +293,21 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
         get => _maxRating;
         set
         {
-            if (SetProperty(ref _maxRating, value))
+            var maximum = NormalizeRating(value);
+            if (SetProperty(ref _maxRating, maximum))
             {
+                if (maximum.HasValue && _minRating > maximum)
+                {
+                    _minRating = maximum;
+                    RaisePropertyChanged(nameof(MinRating));
+                }
+
                 OnFilterChanged();
             }
         }
     }
+
+    private static int? NormalizeRating(int? rating) => rating is >= 1 and <= 5 ? rating : null;
 
     public bool HasImages
     {
@@ -346,7 +362,7 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
         ? SurfaceText.Format(
             "Gallery.NoRelatedResults",
             "No profiles related to {0} yet.",
-            _relatedToProfileName ?? SurfaceText.Get("Common.Profile", "this Profile"))
+            _relatedToProfileName ?? SurfaceText.Get("Common.Profile", "Profile"))
         : SurfaceText.Get("Gallery.NoResults", "No Profiles match these filters.");
 
     public bool HasSharedMedia
@@ -634,7 +650,7 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
             return;
         }
 
-        var targetIndex = Math.Max(1, requestedPageIndex);
+        var targetIndex = Math.Clamp(requestedPageIndex, 1, Math.Max(1, _totalPages));
         if (targetIndex == _pageIndex)
         {
             return;
@@ -861,10 +877,7 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
             if (current.TryGetValue(summary.ProfileId, out var existing)
                 && string.Equals(existing.ProfileCardVariantId, summary.ProfileCardVariantId, StringComparison.Ordinal))
             {
-                if (existing.RowVersion != summary.RowVersion)
-                {
-                    existing.UpdateFrom(summary, ReducedMotionAuthority.IsReduced);
-                }
+                existing.UpdateFrom(summary, ReducedMotionAuthority.IsReduced);
                 desired.Add(existing);
                 continue;
             }
@@ -995,8 +1008,12 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
         _selectedCategoryId = string.IsNullOrWhiteSpace(origin.CategoryId) ? null : origin.CategoryId;
         _selectedTagId = string.IsNullOrWhiteSpace(origin.TagId) ? null : origin.TagId;
         _favoritesOnly = origin.FavoritesOnly;
-        _minRating = origin.MinRating;
-        _maxRating = origin.MaxRating;
+        _minRating = NormalizeRating(origin.MinRating);
+        _maxRating = NormalizeRating(origin.MaxRating);
+        if (_minRating > _maxRating)
+        {
+            _maxRating = _minRating;
+        }
         _hasImages = origin.HasImages;
         _hasVideos = origin.HasVideos;
         _hasModels = origin.HasModels;
@@ -1370,6 +1387,7 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
         switch (invalidation.DomainKind)
         {
             case CatalogInvalidationDomain.Profile:
+            case CatalogInvalidationDomain.Media:
             case CatalogInvalidationDomain.Category:
             case CatalogInvalidationDomain.Tag:
             case CatalogInvalidationDomain.Appearance:
@@ -1477,6 +1495,7 @@ public sealed class GalleryCardViewModel : ObservableObject
     public string? CategoryName => _summary.CategoryName;
 
     public IReadOnlyList<string> Tags => _summary.Tags;
+    public IReadOnlyList<ProfileTagAssignment> AssignedTags => _summary.AssignedTags;
 
     public int? Rating => _summary.Rating;
 
@@ -1489,6 +1508,10 @@ public sealed class GalleryCardViewModel : ObservableObject
     public long MediaCount => _summary.ActiveOwnedMediaCount;
 
     public int RelatedProfileCount => _summary.RelatedProfileCount;
+
+    public string? Overview => _summary.Overview;
+
+    public DateTimeOffset CreatedAtUtc => _summary.CreatedAtUtc;
 
     public DateTimeOffset UpdatedAtUtc => _summary.UpdatedAtUtc;
 
@@ -1570,6 +1593,8 @@ public sealed class GalleryCardViewModel : ObservableObject
         RaisePropertyChanged(nameof(BannerMediaId));
         RaisePropertyChanged(nameof(MediaCount));
         RaisePropertyChanged(nameof(RelatedProfileCount));
+        RaisePropertyChanged(nameof(Overview));
+        RaisePropertyChanged(nameof(CreatedAtUtc));
         RaisePropertyChanged(nameof(UpdatedAtUtc));
         RaisePropertyChanged(nameof(RowVersion));
         RaisePropertyChanged(nameof(Appearance));

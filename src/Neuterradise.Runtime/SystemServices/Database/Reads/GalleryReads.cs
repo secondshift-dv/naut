@@ -108,7 +108,8 @@ public sealed class GalleryReads
                    banner_prepared.sha256 AS banner_fingerprint,
                    banner_source.media_type AS banner_media_type,
                    banner_prepared.relative_path AS banner_asset_relative_path,
-                   banner_prepared.media_asset_id AS banner_media_asset_id
+                   banner_prepared.media_asset_id AS banner_media_asset_id,
+                   p.overview
             FROM profiles p
             LEFT JOIN owned_counts oc ON oc.profile_id = p.profile_id
             LEFT JOIN related_counts rc ON rc.profile_id = p.profile_id
@@ -151,7 +152,7 @@ public sealed class GalleryReads
                 var item = items[i];
                 if (tagMap.TryGetValue(item.ProfileId, out var tags))
                 {
-                    items[i] = item with { Tags = tags };
+                    items[i] = item with { Tags = tags.Select(tag => tag.DisplayName).ToArray(), AssignedTags = tags };
                 }
             }
         }
@@ -186,7 +187,8 @@ public sealed class GalleryReads
                    banner_prepared.sha256 AS banner_fingerprint,
                    banner_source.media_type AS banner_media_type,
                    banner_prepared.relative_path AS banner_asset_relative_path,
-                   banner_prepared.media_asset_id AS banner_media_asset_id
+                   banner_prepared.media_asset_id AS banner_media_asset_id,
+                   p.overview
             FROM profiles p
             LEFT JOIN owned_counts oc ON oc.profile_id = p.profile_id
             LEFT JOIN related_counts rc ON rc.profile_id = p.profile_id
@@ -209,7 +211,7 @@ public sealed class GalleryReads
 
         var summary = ReadGalleryProfileSummary(reader);
         var tags = await LoadTagsForProfileAsync(connection, profileId, cancellationToken).ConfigureAwait(false);
-        return summary with { Tags = tags };
+        return summary with { Tags = tags.Select(tag => tag.DisplayName).ToArray(), AssignedTags = tags };
     }
 
     public async Task<IReadOnlyList<HomeSpotlightCandidateReadModel>> GetSpotlightCandidatesAsync(
@@ -284,7 +286,7 @@ public sealed class GalleryReads
                 {
                     list[i] = item with
                     {
-                        Summary = item.Summary with { Tags = tags }
+                        Summary = item.Summary with { Tags = tags.Select(tag => tag.DisplayName).ToArray(), AssignedTags = tags }
                     };
                 }
             }
@@ -468,7 +470,10 @@ public sealed class GalleryReads
             bannerFingerprint,
             bannerMediaType,
             bannerAssetRelativePath,
-            bannerMediaAssetId);
+            bannerMediaAssetId)
+        {
+            Overview = reader.FieldCount > 22 && !reader.IsDBNull(22) ? reader.GetString(22) : null,
+        };
     }
 
     // ── Where / Order ───────────────────────────────────────────────────────────
@@ -674,14 +679,14 @@ public sealed class GalleryReads
 
     // ── Tags ────────────────────────────────────────────────────────────────────
 
-    private static async Task<IReadOnlyList<string>> LoadTagsForProfileAsync(
+    private static async Task<IReadOnlyList<ProfileTagAssignment>> LoadTagsForProfileAsync(
         SqliteConnection connection,
         Guid profileId,
         CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT t.name
+            SELECT t.tag_id, t.name
             FROM profile_tags pt
             JOIN tags t ON pt.tag_id = t.tag_id
             WHERE pt.profile_id = $profileId
@@ -689,22 +694,22 @@ public sealed class GalleryReads
             """;
         command.Parameters.AddWithValue("$profileId", DbGuid.Format(profileId));
 
-        var tags = new List<string>();
+        var tags = new List<ProfileTagAssignment>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            tags.Add(reader.GetString(0));
+            tags.Add(new ProfileTagAssignment(reader.GetString(0), reader.GetString(1)));
         }
 
         return tags;
     }
 
-    private static async Task<Dictionary<Guid, List<string>>> LoadTagsForProfilesAsync(
+    private static async Task<Dictionary<Guid, List<ProfileTagAssignment>>> LoadTagsForProfilesAsync(
         SqliteConnection connection,
         IEnumerable<Guid> profileIds,
         CancellationToken cancellationToken)
     {
-        var map = new Dictionary<Guid, List<string>>();
+        var map = new Dictionary<Guid, List<ProfileTagAssignment>>();
         var ids = profileIds.Select(DbGuid.Format).Distinct().ToList();
         if (ids.Count == 0)
         {
@@ -714,7 +719,7 @@ public sealed class GalleryReads
         await using var command = connection.CreateCommand();
         var inClause = string.Join(",", ids.Select((_, idx) => $"$id{idx}"));
         command.CommandText = $"""
-            SELECT pt.profile_id, t.name
+            SELECT pt.profile_id, t.name, t.tag_id
             FROM profile_tags pt
             JOIN tags t ON pt.tag_id = t.tag_id
             WHERE pt.profile_id IN ({inClause})
@@ -735,7 +740,7 @@ public sealed class GalleryReads
                 list = [];
                 map[profileId] = list;
             }
-            list.Add(tagName);
+            list.Add(new ProfileTagAssignment(reader.GetString(2), tagName));
         }
 
         return map;

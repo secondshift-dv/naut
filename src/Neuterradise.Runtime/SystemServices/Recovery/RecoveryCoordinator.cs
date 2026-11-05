@@ -45,7 +45,7 @@ public sealed class RecoveryCoordinator
         _jobRecovery = new JobRecovery(catalog);
     }
 
-    public async Task<RecoveryResult> RecoverAsync(CancellationToken cancellationToken = default)
+    public async Task<RecoveryResult> RecoverAsync(CancellationToken cancellationToken = default, bool includeMediaAssets = true)
     {
         var findings = new List<RecoveryFinding>();
 
@@ -61,9 +61,17 @@ public sealed class RecoveryCoordinator
         await RunStageAsync("IMPORT", () => _importRecovery.RecoverAsync(cancellationToken), findings, cancellationToken).ConfigureAwait(false);
         await RunStageAsync("STORAGE", () => _storageRecovery.RecoverPathReconciliationAsync(cancellationToken), findings, cancellationToken).ConfigureAwait(false);
         await RunStageAsync("TRASH", () => _trashRecovery.RecoverAsync(cancellationToken), findings, cancellationToken).ConfigureAwait(false);
-        await RunStageAsync("MEDIA_ASSETS", () => _storageRecovery.RecoverMediaAssetsAsync(cancellationToken), findings, cancellationToken).ConfigureAwait(false);
+        if (includeMediaAssets)
+            await RunStageAsync("MEDIA_ASSETS", () => _storageRecovery.RecoverMediaAssetsAsync(cancellationToken), findings, cancellationToken).ConfigureAwait(false);
         await RunStageAsync("STAGING", () => _importRecovery.RecoverStagingOwnershipAsync(cancellationToken), findings, cancellationToken).ConfigureAwait(false);
         await RunStageAsync("JOBS", () => _jobRecovery.RecoverAsync(cancellationToken), findings, cancellationToken).ConfigureAwait(false);
+        return findings.Count == 0 ? RecoveryResult.NoAction : new RecoveryResult(findings.AsReadOnly());
+    }
+
+    public async Task<RecoveryResult> RecoverMediaAssetsAsync(CancellationToken ct = default)
+    {
+        var findings = new List<RecoveryFinding>();
+        await RunStageAsync("MEDIA_ASSETS", () => _storageRecovery.RecoverMediaAssetsAsync(ct), findings, ct).ConfigureAwait(false);
         return findings.Count == 0 ? RecoveryResult.NoAction : new RecoveryResult(findings.AsReadOnly());
     }
 
@@ -101,17 +109,28 @@ public sealed class RecoveryCoordinator
                          JOIN import_units u ON u.import_unit_id = i.import_unit_id
                          WHERE u.state = 'CANCELLED'
                      ))
-                 OR (owner_type = 'Media'
-                     AND owner_id IN (
-                         SELECT DISTINCT i.candidate_media_id
-                         FROM import_items i
-                         JOIN import_units u ON u.import_unit_id = i.import_unit_id
-                         WHERE u.state = 'CANCELLED'
-                           AND i.candidate_media_id IS NOT NULL
-                     ))
+
               );
             """;
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        var cancelledMedia = new List<(Guid UnitId, Guid MediaId)>();
+        await using (var read = connection.CreateCommand())
+        {
+            read.CommandText = """
+                SELECT DISTINCT i.import_unit_id, i.candidate_media_id
+                FROM import_items i JOIN import_units u ON u.import_unit_id = i.import_unit_id
+                WHERE u.state = 'CANCELLED' AND i.candidate_media_id IS NOT NULL;
+                """;
+            await using var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                cancelledMedia.Add((DbGuid.Parse(reader.GetString(0)), DbGuid.Parse(reader.GetString(1))));
+        }
+        // Release the writer lease before entering the canonical shared-consumer-aware job authority.
+        await lease.DisposeAsync().ConfigureAwait(false);
+        var writes = new JobWrites(_catalog);
+        foreach (var (unitId, mediaId) in cancelledMedia)
+            await writes.CancelIdleMediaForImportUnitAsync(unitId, mediaId, DateTimeOffset.UtcNow, cancellationToken)
+                .ConfigureAwait(false);
         return [];
     }
 

@@ -111,7 +111,7 @@ public sealed class HealthReads
                   JOIN profiles p ON p.profile_id = pa.profile_id
                   WHERE pa.media_id = fd.media_id
                     AND pa.publication_import_unit_id IS NULL
-                    AND (p.kind <> 'NORMAL' OR (p.visibility = 'PUBLISHED' AND p.trashed_at_ms IS NULL))
+                    AND (p.trashed_at_ms IS NULL AND (p.kind <> 'NORMAL' OR p.visibility = 'PUBLISHED'))
               );
             """;
         return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
@@ -803,7 +803,7 @@ public sealed class HealthReads
             FROM storage_operations o
             WHERE o.state NOT IN ('COMPLETED', 'FAILED', 'CANCELLED')
               AND NOT (o.kind = 'IMPORT_COMMIT' AND o.state = 'TERMINAL')
-              AND o.kind <> 'LIBRARY_REPAIR'
+              AND o.kind NOT IN ('LIBRARY_REPAIR','PROFILE_TEXT_SYNC','PROFILE_OVERVIEW_IMPORT','MODEL_RENDER_VALIDATED')
               AND NOT EXISTS (
                     SELECT 1 FROM profiles p WHERE p.reconciliation_operation_id = o.operation_id)
               AND NOT EXISTS (

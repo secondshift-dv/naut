@@ -432,7 +432,7 @@ public static class UI
             return control;
         }
         var primary = Sample(Button(T("Common.Open", "Open"), kind: ButtonKind.Primary), "button", ButtonKind.Primary);
-        var secondary = Sample(Button(T("Common.Cancel", "Cancel")), "button");
+        var secondary = Sample(Button(T("Overlay.Cancel", "Cancel")), "button");
         var chip = Sample(new Button { Content = "Aa" }, "chip");
         var tab = Sample(new Button { Content = "Aa" }, "tab", ButtonKind.Primary);
         var icon = Sample(IconButton("icon.action.add", T("Common.Add", "Add")), "icon-button", ButtonKind.Ghost);
@@ -442,10 +442,30 @@ public static class UI
         var scroll = Scroll(V(3, Text("Aa · 123"), Text("Aa · 123"), Text("Aa · 123")), maxHeight: 35);
         scroll.VerticalScrollBarVisibility = ScrollBarVisibility.Visible;
         var scrollbar = skin.For("scrollbar");
-        scroll.Resources["ScrollBarThumbFill"] = theme.Brush(scrollbar.Border);
-        scroll.Resources["ScrollBarThumbMinWidth"] = scrollbar.ScrollbarWidth;
-        scroll.Resources["ScrollBarThumbMinHeight"] = scrollbar.ScrollbarWidth;
-        var sheet = V(4, H(4, primary, secondary), H(4, chip, tab, icon), input, H(4, toggle, slider), scroll);
+        scroll.Resources["ScrollBarThumbFill"] = theme.ControlFill(scrollbar, "textSecondary");
+        scroll.Resources["ScrollBarThumbFillPointerOver"] = theme.ControlFill(scrollbar, "textPrimary");
+        scroll.Resources["ScrollBarThumbFillPressed"] = theme.ControlFill(scrollbar, "accent", pressed: true);
+        scroll.Resources["ScrollBarVerticalThumbMinWidth"] = Math.Max(9, scrollbar.ScrollbarWidth);
+        scroll.Resources["ScrollBarHorizontalThumbMinHeight"] = Math.Max(10, scrollbar.ScrollbarWidth);
+        var disabled = Sample(new Button { Content = "Aa", IsEnabled = false }, "button");
+        var hover = Sample(new Button { Content = "Aa" }, "button");
+        var pressed = Sample(new Button { Content = "Aa" }, "button");
+        var focused = Sample(new Button { Content = "Aa" }, "button");
+        hover.Background = theme.ControlFill(skin, skin.HoverFill);
+        pressed.Background = theme.ControlFill(skin, skin.PressedFill, pressed: true);
+        focused.BorderBrush = theme.Brush(skin.Focus);
+        focused.BorderThickness = new Thickness(2);
+        hover.Loaded += (_, _) => hover.Background = theme.ControlFill(skin, skin.HoverFill);
+        pressed.Loaded += (_, _) => pressed.Background = theme.ControlFill(skin, skin.PressedFill, pressed: true);
+        focused.Loaded += (_, _) =>
+        {
+            focused.BorderBrush = theme.Brush(skin.Focus);
+            focused.BorderThickness = new Thickness(2);
+        };
+        var sheet = V(4, Wrap(4, primary, secondary), Wrap(4, chip, tab, icon, disabled), input,
+            Wrap(4, toggle, slider), scroll,
+            Text(T("Customize.ControlStates", "Hover · Pressed · Focus"), "micro", "textMuted"),
+            Wrap(4, hover, pressed, focused));
         sheet.IsHitTestVisible = false;
         return sheet.Margin(6);
     }
@@ -696,13 +716,18 @@ public static class UI
                 surface.BorderThickness = projectedBorder;
             }
             if (radius is null) surface.CornerRadius = new CornerRadius(ThemeRuntime.Current.Tokens.Number("radiusCard", 12));
+            if (material is Material.Grounded or Material.Raised)
+            {
+                surface.Background = ThemeRuntime.Current.SurfaceBrush(material == Material.Raised);
+                surface.BorderBrush = ThemeRuntime.Current.Brush("borderSubtle");
+            }
         });
 
         switch (material)
         {
             case Material.Raised:
-                border.Background = theme.Brush("surface2");
-                border.BorderBrush = theme.Brush("transparent");
+                border.Background = theme.SurfaceBrush(raised: true);
+                border.BorderBrush = theme.Brush("borderSubtle");
                 break;
             case Material.Frost:
                 border.Background = theme.Brush("glassFill");
@@ -717,8 +742,8 @@ public static class UI
                 border.BorderBrush = theme.Brush("glassBorder");
                 break;
             default:
-                border.Background = theme.Brush("surface1");
-                border.BorderBrush = theme.Brush("transparent");
+                border.Background = theme.SurfaceBrush();
+                border.BorderBrush = theme.Brush("borderSubtle");
                 break;
         }
 
@@ -762,17 +787,13 @@ public static class UI
         {
             Content = content,
             Padding = horizontal ? new Thickness(0, 0, 0, gutter) : new Thickness(0, 0, gutter, 0),
-            HorizontalScrollMode = horizontal ? ScrollMode.Enabled : ScrollMode.Disabled,
-            HorizontalScrollBarVisibility = horizontal ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled,
-            VerticalScrollMode = horizontal ? ScrollMode.Disabled : ScrollMode.Enabled,
-            VerticalScrollBarVisibility = horizontal ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto,
         };
         if (maxHeight is { } height)
         {
             scroll.MaxHeight = height;
         }
 
-        ScrollInteraction.Attach(scroll);
+        ScrollInteraction.ConfigureAxis(scroll, horizontal);
         scroll.Loaded += (_, _) => ThemeRuntime.Current.TrackNativeControls(scroll);
         return scroll;
     }
@@ -787,6 +808,8 @@ public static class UI
         var theme = ThemeRuntime.Current;
         var content = Text(text, "control", selected ? "textOnAccent" : "textPrimary")
             .Align(HorizontalAlignment.Center, VerticalAlignment.Center);
+        content.TextWrapping = TextWrapping.WrapWholeWords;
+        content.TextTrimming = TextTrimming.None;
 
         if (onClick is null)
         {
@@ -808,11 +831,11 @@ public static class UI
                 var skin = ThemeRuntime.Current.ControlFamily("chip");
                 value.CornerRadius = new CornerRadius(skin.Radius);
                 value.Padding = new Thickness(skin.HorizontalPadding, skin.VerticalPadding, skin.HorizontalPadding, skin.VerticalPadding);
-                value.MinHeight = skin.Height;
-                value.BorderThickness = new Thickness(skin.BorderWidth);
+                value.MinHeight = ThemeRuntime.Current.Tokens.Number("chipHeight", 20);
+                value.BorderThickness = ThemeRuntime.ControlEdge(skin);
                 if (!selected)
                 {
-                    value.Background = ThemeRuntime.Current.Brush(skin.Fill);
+                    value.Background = ThemeRuntime.Current.ControlFill(skin, skin.Fill);
                     value.BorderBrush = ThemeRuntime.Current.Brush(skin.Border);
                 }
             }
@@ -852,11 +875,11 @@ public static class UI
         };
         return new Border
         {
-            Child = Text(text, "badge", foreground)
+            Child = WrappedText(text, "badge", foreground)
                 .Align(HorizontalAlignment.Center, VerticalAlignment.Center),
             Padding = new Thickness(6, 1, 6, 1),
             MinHeight = theme.Tokens.Number("badgeHeight", 18),
-            CornerRadius = new CornerRadius(4),
+            CornerRadius = new CornerRadius(9),
             Background = theme.Brush(background),
             VerticalAlignment = VerticalAlignment.Center,
         };

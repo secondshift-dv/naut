@@ -25,6 +25,10 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
     IGenerateVideoMediaAssetsJobOperation, IGenerateModelMediaAssetsJobOperation
 {
     private const int ContractVersion = 1;
+    // Keep the same pixel budget for either orientation; portrait banners must not be capped to 720px tall.
+    private const string HoverScale = "scale=w='if(gte(iw,ih),min(1280,iw),min(720,iw))':" +
+        "h='if(gte(iw,ih),min(720,ih),min(1280,ih))':force_original_aspect_ratio=decrease:" +
+        "force_divisible_by=2,format=yuv420p";
     private readonly MediaReads _media;
     private readonly CatalogDb _catalog;
     private readonly MediaAssetReads _mediaAssets;
@@ -158,8 +162,7 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
                     $"[0:v]setpts=PTS-STARTPTS,split=2[thumbsrc][hoversrc];" +
                     $"[thumbsrc]select='gte(t,{thumbnailOffsetSeconds})'," +
                     "scale='min(1024,iw)':'min(1024,ih)':force_original_aspect_ratio=decrease[thumb];" +
-                    "[hoversrc]scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease:" +
-                    "force_divisible_by=2,format=yuv420p[hover]";
+                    "[hoversrc]" + HoverScale + "[hover]";
                 args =
                 [
                     "-y", "-ss", TimestampSeconds(hoverStart), "-i", path,
@@ -187,8 +190,7 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
                 [
                     "-y", "-ss", TimestampSeconds(hoverStart), "-i", path, "-t", "5.8",
                     "-map", "0:v:0", "-an",
-                    "-vf", "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease:" +
-                           "force_divisible_by=2,format=yuv420p",
+                    "-vf", HoverScale,
                     "-c:v", "libopenh264", "-threads", "2",
                     "-movflags", "+faststart", hoverTemp
                 ];
@@ -384,9 +386,9 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
     private static string TimestampSeconds(long milliseconds) =>
         FormattableString.Invariant($"{milliseconds / 1000d:0.###}");
 
-    private static void EncodeWebp(string input, string output)
+    private void EncodeWebp(string input, string output)
     {
-        using var bitmap = TargetSizeDecoder.Decode(input, 1024, 1024)
+        using var bitmap = TargetSizeDecoder.Decode(input, 1024, 1024, _tools)
             ?? throw new InvalidDataException("The model or image adapter did not return a decodable still.");
         using var image = SKImage.FromBitmap(bitmap);
         using var encoded = image.Encode(SKEncodedImageFormat.Webp, 85)

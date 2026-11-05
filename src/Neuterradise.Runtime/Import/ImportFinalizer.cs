@@ -412,6 +412,26 @@ public sealed class ImportFinalizer : IAsyncDisposable
                 _attentionUntil.Remove(unitId);
             }
 
+            if (draft.PublishWhenReady)
+            {
+                var current = await _operations.LoadVerificationReadModelAsync(unitId, cancellationToken).ConfigureAwait(false);
+                if (current is null) return ImportFinalizeOutcome.Finished;
+                var intent = VerificationDraftV1.FromJson(current.VerificationDraftJson, _timeProvider.GetUtcNowUnixMilliseconds());
+                if (!intent.PublishWhenReady) return ImportFinalizeOutcome.Committed;
+                if (current.State is not (ImportUnitState.ReadyForVerification or ImportUnitState.Committing))
+                    return ImportFinalizeOutcome.Waiting;
+                var published = await new ImportPublicationCoordinator(_catalog, _timeProvider)
+                    .PublishDurableAsync(unitId, cancellationToken).ConfigureAwait(false);
+                if (published.IsPublished) return ImportFinalizeOutcome.Committed;
+                if (published.Status == ImportPublicationStatus.Blocked)
+                {
+                    var items = await _reads.GetUnitItemsUnboundedAsync(unitId, cancellationToken).ConfigureAwait(false);
+                    await RecordAttentionAsync(unitId, items.Select(item => item.ItemId).ToArray(), cancellationToken).ConfigureAwait(false);
+                    lock (_sync) _attentionUntil[unitId] = _timeProvider.GetUtcNow().Add(AttentionBackoff);
+                    return ImportFinalizeOutcome.NeedsAttention;
+                }
+                return ImportFinalizeOutcome.Waiting;
+            }
             return ImportFinalizeOutcome.Committed;
         }
 

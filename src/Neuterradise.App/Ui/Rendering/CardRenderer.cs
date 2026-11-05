@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using Neuterradise.App.Design.CoverFrames;
 using Neuterradise.App.Presentation;
+using Neuterradise.App.Profiles;
 
 namespace Neuterradise.App.Ui;
 
@@ -26,6 +27,7 @@ public sealed record CardData(
     MediaTransformState BannerTransform,
     FramePlan? Frame)
 {
+    public IReadOnlyList<ProfileTagAssignment> AssignedTags { get; init; } = [];
     public bool Has(string slot) => slot switch
     {
         SemanticSlots.ProfileCategory => !string.IsNullOrWhiteSpace(Category),
@@ -62,6 +64,9 @@ public sealed class CardVisual : Grid
     private readonly List<Action<CardData>> _binders = [];
     private readonly List<(FrameworkElement Element, string Slot)> _conditions = [];
     private readonly List<CoverFrameView> _frames = [];
+    private readonly List<FrameworkElement> _hoverReveal = [];
+    private readonly List<FrameworkElement> _hoverResting = [];
+    private FrameworkElement? _hoverBanner;
     private readonly ScaleTransform _scale = new() { ScaleX = 1, ScaleY = 1 };
     private readonly Grid _content = new();
     private bool _buildingArtBase;
@@ -113,27 +118,6 @@ public sealed class CardVisual : Grid
 
     public Panel? BannerMediaHost => _bannerMediaHost;
 
-    public void AddCustomizationAction(Action<CardData> customize)
-    {
-        var action = UI.IconButton(
-            "icon.navigation.customize",
-            UI.T("Card.Customize", "Customize Card"),
-            () =>
-            {
-                if (Data is { } data)
-                {
-                    customize(data);
-                }
-            },
-            size: 24);
-        action.HorizontalAlignment = HorizontalAlignment.Right;
-        action.VerticalAlignment = VerticalAlignment.Top;
-        action.Margin = new Thickness(4);
-        // This secondary action consumes only its own tap; the card body still opens the Profile.
-        action.Tapped += (_, args) => args.Handled = true;
-        Children.Add(action);
-    }
-
     public bool IsSelected
     {
         set
@@ -172,6 +156,19 @@ public sealed class CardVisual : Grid
         foreach (var frame in _frames)
         {
             frame.IsHovered = hovered;
+        }
+
+        if (Plan.Hover == "spotlight")
+        {
+            void SetOpacity(FrameworkElement element, double value)
+            {
+                if (ThemeRuntime.Current.ReducedMotion) element.Opacity = value;
+                else Animate(element, "Opacity", value);
+            }
+            if (_hoverBanner is not null) SetOpacity(_hoverBanner, hovered ? 1 : 0);
+            foreach (var frame in _frames) SetOpacity(frame, hovered ? 0 : 1);
+            foreach (var reveal in _hoverReveal) SetOpacity(reveal, hovered ? 1 : 0);
+            foreach (var resting in _hoverResting) SetOpacity(resting, hovered ? 0 : 1);
         }
 
         if (Plan.Hover is "lift" or "sheen" && !ThemeRuntime.Current.ReducedMotion)
@@ -258,6 +255,13 @@ public sealed class CardVisual : Grid
 
             case TextNode text:
             {
+                if (text.Slot == SemanticSlots.ProfileTags)
+                {
+                    var capsules = TagCapsules.Create([]);
+                    _binders.Add(data => TagCapsules.Update(capsules, data.AssignedTags, 4));
+                    element = capsules;
+                    break;
+                }
                 var block = UI.Text(null, text.TypeRole, TokenName(text.Color), text.MaxLines);
                 block.TextAlignment = text.TextAlignment switch
                 {
@@ -267,14 +271,54 @@ public sealed class CardVisual : Grid
                 };
                 if (text.Slot is { } slot)
                 {
-                    _binders.Add(data => block.Text = data.TextFor(slot));
+                    _binders.Add(data =>
+                    {
+                        block.Text = data.TextFor(slot);
+                        ToolTipService.SetToolTip(block, block.Text);
+                    });
                 }
                 else if (text.TextKey is { } key)
                 {
                     block.Text = UI.T(key, key);
                 }
 
-                element = block;
+                if (Plan.Hover == "sheen" && text.OnMedia
+                    && text.Slot is SemanticSlots.ProfileName or SemanticSlots.ProfileCategory)
+                {
+                    var outlined = new Grid();
+                    var strokes = new List<TextBlock>(4);
+                    foreach (var (x, y) in new[] { (-0.9, 0.0), (0.9, 0.0), (0.0, -0.9), (0.0, 0.9) })
+                    {
+                        var stroke = UI.Text(null, text.TypeRole, "warning", text.MaxLines);
+                        stroke.TextAlignment = block.TextAlignment;
+                        stroke.Opacity = 0.7;
+                        stroke.IsHitTestVisible = false;
+                        stroke.RenderTransform = new TranslateTransform { X = x, Y = y };
+                        outlined.Children.Add(stroke);
+                        strokes.Add(stroke);
+                    }
+                    if (text.Slot is { } outlinedSlot)
+                        _binders.Add(data =>
+                        {
+                            foreach (var stroke in strokes) stroke.Text = data.TextFor(outlinedSlot);
+                        });
+                    outlined.Children.Add(block);
+                    element = outlined;
+                }
+                else if (Plan.Hover == "sheen" && text.OnMedia
+                    && text.Slot == SemanticSlots.ProfileMediaCount)
+                {
+                    element = new Border
+                    {
+                        Child = block,
+                        Background = theme.Brush("mediaOverlay"),
+                        BorderBrush = theme.Brush("glassBorder"),
+                        BorderThickness = new Thickness(1),
+                        CornerRadius = new CornerRadius(4),
+                        Padding = new Thickness(4, 2, 4, 2),
+                    };
+                }
+                else element = block;
                 break;
             }
 
@@ -325,6 +369,8 @@ public sealed class CardVisual : Grid
                     _bannerMediaHost = new Grid();
                     _bannerMediaHost.Children.Add(view);
                     element = _bannerMediaHost;
+                    if (!_buildingArtBase && Plan.Hover == "spotlight" && image.Slot == SemanticSlots.ProfileBanner)
+                        _hoverBanner = element;
                 }
                 else
                 {
@@ -424,6 +470,14 @@ public sealed class CardVisual : Grid
             theme.TrackThemeElement(shapedBorder, value => value.CornerRadius = new CornerRadius(ThemeRuntime.Current.Tokens.ResolveRadius(radius)));
         }
         ApplyLayout(element, node.Layout);
+        if (!_buildingArtBase && Plan.Hover == "spotlight")
+        {
+            if (ReferenceEquals(element, _hoverBanner)) element.Opacity = 0;
+            if (node is StackNode && node.Layout.Opacity < 0.5) _hoverReveal.Add(element);
+            if (node is TextNode { Slot: SemanticSlots.ProfileName, TypeRole: "card-title" }
+                && node.Layout.VerticalAlignment == "bottom")
+                _hoverResting.Add(element);
+        }
         if (_buildingArtBase && node is TextNode or BadgeNode or IconNode
             || !_buildingArtBase && node is ScrimNode or ShapeNode)
             element.Opacity = 0;
@@ -434,7 +488,8 @@ public sealed class CardVisual : Grid
     {
         var theme = ThemeRuntime.Current;
         var onMedia = badge.Style == "glass";
-        var textColor = onMedia ? "onMediaPrimary" : badge.Style == "solid" ? "textOnAccent" : "textSecondary";
+        var textColor = onMedia || Plan.Hover == "sheen" && badge.Style == "text"
+            ? "onMediaPrimary" : badge.Style == "solid" ? "textOnAccent" : "textSecondary";
         var icon = badge.Slot switch
         {
             SemanticSlots.ProfileFavorite => "icon.profile.favorite",
@@ -445,8 +500,21 @@ public sealed class CardVisual : Grid
             _ => null,
         };
         var label = UI.Text(null, "badge", textColor);
-        var content = UI.H(4, icon is null ? null : new IconView(icon, 12, badge.Slot == SemanticSlots.ProfileFavorite ? "danger" : textColor), label);
-        _binders.Add(data => label.Text = badge.Slot == SemanticSlots.ProfileFavorite ? UI.T("Card.Favorite", "Favorite") : data.TextFor(badge.Slot));
+        var badgeIcon = icon is null ? null : new IconView(icon, 12, textColor);
+        var content = UI.H(4, badgeIcon, label);
+        _binders.Add(data =>
+        {
+            label.Text = badge.Slot == SemanticSlots.ProfileFavorite
+                ? UI.T("Card.Favorite", "Favorite") : data.TextFor(badge.Slot);
+            if (badgeIcon is not null)
+                badgeIcon.ColorToken = badge.Slot switch
+                {
+                    SemanticSlots.ProfileFavorite when data.IsFavorite => "danger",
+                    SemanticSlots.ProfileFavorite when Plan.Hover == "sheen" => "warning",
+                    SemanticSlots.ProfileRating when data.Rating is > 0 => "warning",
+                    _ => textColor,
+                };
+        });
         if (badge.Slot == SemanticSlots.ProfileFavorite)
         {
             label.Visibility = Visibility.Collapsed;
@@ -537,7 +605,7 @@ public static class CardDataFactory
             AppearanceFor(overrides, frame, ThemeRuntime.Current.ReducedMotion),
             media.Cover,
             media.Banner,
-            frame);
+            frame) { AssignedTags = card.AssignedTags };
     }
 
     /// <summary>Profile Cover appearance with the resolved frame definition (built-in or pack-defined).</summary>

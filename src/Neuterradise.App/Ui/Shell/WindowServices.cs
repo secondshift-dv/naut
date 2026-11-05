@@ -47,11 +47,14 @@ public sealed class UnoWindowPlacement : IDisposable
     private bool _restoreBoundsKnown;
     private bool _adjusting;
     private readonly WindowStateProjection _windowState;
+    private IntPtr _nativeHandle;
+    private readonly SubclassProcedure _subclass;
 
     public UnoWindowPlacement(AppConfigurationStore? store, WindowStateProjection? windowState = null)
     {
         _store = store;
         _windowState = windowState ?? new WindowStateProjection();
+        _subclass = OnNativeMessage;
     }
 
     private bool IsMaximized => _window is not null && WindowChrome.IsMaximized(_window);
@@ -87,6 +90,9 @@ public sealed class UnoWindowPlacement : IDisposable
         ArgumentNullException.ThrowIfNull(window);
         Detach();
         _window = window;
+        _nativeHandle = WindowChrome.GetNativeHandle(window);
+        if (_nativeHandle == IntPtr.Zero || !SetWindowSubclass(_nativeHandle, _subclass, 1, 0))
+            throw new InvalidOperationException("The main window resize constraint could not be installed.");
 
         WindowPlacementConfiguration? saved = null;
         if (_store is not null)
@@ -148,6 +154,8 @@ public sealed class UnoWindowPlacement : IDisposable
         }
 
         window.AppWindow.Changed -= OnChanged;
+        if (_nativeHandle != IntPtr.Zero) RemoveWindowSubclass(_nativeHandle, _subclass, 1);
+        _nativeHandle = IntPtr.Zero;
         _window = null;
     }
 
@@ -192,17 +200,67 @@ public sealed class UnoWindowPlacement : IDisposable
             }
         }
 
+        if (args.DidSizeChange || args.DidPositionChange)
+        {
+            ReconcileBounds(sender);
+        }
+    }
+
+    private IntPtr OnNativeMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam, nuint id, nuint data)
+    {
+        if (message == 0x02E0 && lParam != IntPtr.Zero) // WM_DPICHANGED supplies an outer rectangle in the new DPI.
+        {
+            var suggested = Marshal.PtrToStructure<NativeRect>(lParam);
+            var scale = ((long)wParam & 0xffff) / 96.0;
+            var monitor = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+            if (scale > 0 && GetMonitorInfo(MonitorFromRect(ref suggested, 2), ref monitor))
+            {
+                var width = Math.Min(monitor.Work.Right - monitor.Work.Left,
+                    Math.Max(suggested.Right - suggested.Left, (int)Math.Ceiling(WindowGeometry.MinimumWidth * scale)));
+                var height = Math.Min(monitor.Work.Bottom - monitor.Work.Top,
+                    Math.Max(suggested.Bottom - suggested.Top, (int)Math.Ceiling(WindowGeometry.MinimumHeight * scale)));
+                suggested.Left = Math.Clamp(suggested.Left, monitor.Work.Left, monitor.Work.Right - width);
+                suggested.Top = Math.Clamp(suggested.Top, monitor.Work.Top, monitor.Work.Bottom - height);
+                suggested.Right = suggested.Left + width;
+                suggested.Bottom = suggested.Top + height;
+                Marshal.StructureToPtr(suggested, lParam, false);
+            }
+        }
+        var result = DefSubclassProc(hwnd, message, wParam, lParam);
+        if (message == 0x0024 && lParam != IntPtr.Zero) // WM_GETMINMAXINFO constrains all native resize edges.
+        {
+            var limits = Marshal.PtrToStructure<MinMaxInfo>(lParam);
+            var monitor = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+            var dpi = GetDpiForWindow(hwnd);
+            var scale = (dpi == 0 ? 96 : dpi) / 96.0;
+            var width = (int)Math.Ceiling(WindowGeometry.MinimumWidth * scale);
+            var height = (int)Math.Ceiling(WindowGeometry.MinimumHeight * scale);
+            if (GetMonitorInfo(MonitorFromWindow(hwnd, 2), ref monitor))
+            {
+                width = Math.Min(width, monitor.Work.Right - monitor.Work.Left);
+                height = Math.Min(height, monitor.Work.Bottom - monitor.Work.Top);
+            }
+            limits.MinimumTrack.X = Math.Max(limits.MinimumTrack.X, width);
+            limits.MinimumTrack.Y = Math.Max(limits.MinimumTrack.Y, height);
+            Marshal.StructureToPtr(limits, lParam, false);
+        }
+        return result;
+    }
+
+    private void ReconcileBounds(AppWindow sender)
+    {
         if (_adjusting || sender.Presenter is OverlappedPresenter { State: not OverlappedPresenterState.Restored })
         {
             return;
         }
 
-        if (args.DidSizeChange || args.DidPositionChange)
         {
             var scale = WindowScale;
-            var bounds = new NeutralRect(sender.Position.X / scale, sender.Position.Y / scale, sender.Size.Width / scale, sender.Size.Height / scale);
+            if (!GetWindowRect(_nativeHandle, out var nativeBounds)) return;
+            var bounds = new NeutralRect(nativeBounds.Left / scale, nativeBounds.Top / scale,
+                (nativeBounds.Right - nativeBounds.Left) / scale, (nativeBounds.Bottom - nativeBounds.Top) / scale);
 
-            // 800 × 600 is the supported minimum; smaller drags snap back to it.
+            // Clamp in DIPs against the current monitor before converting to physical pixels.
             var minimum = WindowGeometry.MinimumFor(CurrentWorkArea());
             if (bounds.Width + 0.5 < minimum.Width || bounds.Height + 0.5 < minimum.Height)
             {
@@ -217,6 +275,37 @@ public sealed class UnoWindowPlacement : IDisposable
 
     [DllImport("user32.dll")]
     private static extern uint GetDpiForSystem();
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint { public int X; public int Y; }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect { public int Left; public int Top; public int Right; public int Bottom; }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MinMaxInfo
+    {
+        public NativePoint Reserved, MaximumSize, MaximumPosition, MinimumTrack, MaximumTrack;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MonitorInfo { public int Size; public NativeRect Monitor, Work; public uint Flags; }
+    private delegate IntPtr SubclassProcedure(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam, nuint id, nuint data);
+    [DllImport("comctl32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetWindowSubclass(IntPtr hwnd, SubclassProcedure callback, nuint id, nuint data);
+    [DllImport("comctl32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool RemoveWindowSubclass(IntPtr hwnd, SubclassProcedure callback, nuint id);
+    [DllImport("comctl32.dll")]
+    private static extern IntPtr DefSubclassProc(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(IntPtr hwnd, out NativeRect rect);
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromRect(ref NativeRect rect, uint flags);
+    [DllImport("user32.dll", EntryPoint = "GetMonitorInfoW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
 
     [DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(IntPtr window);

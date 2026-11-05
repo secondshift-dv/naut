@@ -1,0 +1,16 @@
+{
+  "id": "builtin.neuterradise.spotlight.cinematic-v2",
+  "kind": "spotlight-style",
+  "name": "Cinematic",
+  "description": "Wide artwork with minimal text.",
+  "spec": {
+    "composition": "cinema",
+    "motion": "ken-burns",
+    "transition": "fade",
+    "rotationSeconds": 12,
+    "showCover": false,
+    "showOverview": false,
+    "pagination": "counter-rail",
+    "scrimStrength": 0.64
+  }
+}

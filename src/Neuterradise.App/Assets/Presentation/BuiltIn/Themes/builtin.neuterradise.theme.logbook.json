@@ -1,0 +1,92 @@
+{
+  "id": "builtin.neuterradise.theme.logbook",
+  "kind": "theme",
+  "name": "Logbook",
+  "description": "Warm ivory, dark ink and muted olive.",
+  "spec": {
+    "theme": {
+      "schemaVersion": 1,
+      "id": "logbook",
+      "name": "Logbook",
+      "isDark": false,
+      "colors": {
+        "canvas": "#FFF5F0E5",
+        "surface1": "#FFFFFBF3",
+        "surface2": "#FFEAE3D4",
+        "surface3": "#FFDCD4C3",
+        "surfaceElevated": "#FFFFFDF8",
+        "surfaceOverlay": "#F2F5F0E5",
+        "surfaceHover": "#FFE7DDC9",
+        "surfacePressed": "#FFD8CBB4",
+        "surfaceSelected": "#FFE1DDC8",
+        "textPrimary": "#FF302D26",
+        "textSecondary": "#FF544F40",
+        "textMuted": "#FF77705C",
+        "textDisabled": "#FF96999D",
+        "textInverse": "#FFF9FAFC",
+        "textOnAccent": "#FFFFFFFF",
+        "textLink": "#FF5C6440",
+        "borderSubtle": "#14202C3A",
+        "borderDefault": "#24202C3A",
+        "borderStrong": "#40202C3A",
+        "borderInteractive": "#FF687044",
+        "borderSelected": "#FF687044",
+        "focus": "#FF687044",
+        "accent": "#FF687044",
+        "accentHover": "#FF515A34",
+        "accentPressed": "#FF41492B",
+        "accentSecondary": "#FF97866B",
+        "selection": "#33687044",
+        "selectionHover": "#4D687044",
+        "info": "#FF2E638D",
+        "success": "#FF287044",
+        "warning": "#FF8A5B12",
+        "danger": "#FFA93543",
+        "dangerHover": "#FF902B37"
+      },
+      "typography": {
+        "displayFamily": "Segoe UI Variable Display",
+        "headingFamily": "Segoe UI Variable Display",
+        "bodyFamily": "Segoe UI Variable Text",
+        "monoFamily": "Cascadia Mono"
+      },
+      "shape": {
+        "xs": 3,
+        "sm": 8,
+        "md": 10,
+        "lg": 14,
+        "xl": 18
+      },
+      "motion": {
+        "fastMs": 120,
+        "normalMs": 180,
+        "slowMs": 280,
+        "cinematicMs": 500
+      },
+      "background": {
+        "kind": "RadialGlow"
+      },
+      "morphology": {
+        "navigationTreatment": "AccentEdge",
+        "cardPersonality": "Flat",
+        "chromeTreatment": "Flush",
+        "focusTreatment": "Ring",
+        "borderWeight": 0.8,
+        "elevationStrength": 0.6,
+        "glowStrength": 0.04,
+        "panelOpacity": 1,
+        "motionIntensity": 0.6,
+        "navigationRadiusScale": 0.9
+      }
+    },
+    "material": {
+      "personality": "milky-paper",
+      "atmosphere": "editorial",
+      "grain": 0.025,
+      "glassOpacity": 1,
+      "specular": 0.04,
+      "rimLight": 0.1
+    },
+    "artwork": "theme-icon-logbook"
+  }
+}

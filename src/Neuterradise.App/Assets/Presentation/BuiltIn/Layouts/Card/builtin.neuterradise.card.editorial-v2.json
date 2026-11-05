@@ -2,9 +2,9 @@
   "id": "builtin.neuterradise.card.editorial-v2",
   "kind": "profile-card",
   "name": "Editorial",
-  "description": "Cover and a persistent reading column.",
+  "description": "A wide image beside Profile details.",
   "spec": {
-    "aspect": 1.55,
+    "aspect": 1.75,
     "art": "cover",
     "density": "detailed",
     "hover": "banner",
@@ -19,7 +19,7 @@
         },
         {
           "type": "stack",
-          "spacing": 5,
+          "spacing": 3,
           "children": [
             {
               "type": "text",
@@ -49,32 +49,38 @@
               "slot": "profile.overview",
               "role": "micro",
               "color": "token:textSecondary",
-              "maxLines": 2,
+              "maxLines": 1,
               "visibleWhen": "profile.overview"
             },
             {
-              "type": "badge",
-              "slot": "profile.identity.rating",
-              "style": "text",
-              "visibleWhen": "profile.identity.rating",
-              "hAlign": "left"
-            },
-            {
-              "type": "badge",
-              "slot": "profile.identity.favorite",
-              "style": "text",
-              "visibleWhen": "profile.identity.favorite",
-              "hAlign": "left"
+              "type": "stack",
+              "orientation": "horizontal",
+              "spacing": 8,
+              "children": [
+                {
+                  "type": "badge",
+                  "slot": "profile.identity.rating",
+                  "style": "text",
+                  "visibleWhen": "profile.identity.rating",
+                  "hAlign": "left"
+                },
+                {
+                  "type": "badge",
+                  "slot": "profile.identity.favorite",
+                  "style": "text",
+                  "hAlign": "left"
+                }
+              ]
             }
           ],
           "background": "token:surface1",
-          "padding": 12,
+          "padding": 8,
           "column": 1
         }
       ],
       "columns": [
-        "0.85*",
-        "1.15*"
+        "1.1*",
+        "0.9*"
       ]
     }
   }

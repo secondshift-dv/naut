@@ -37,7 +37,17 @@ public sealed partial class PresentationCompiler
 
     /// <summary>Compiles (or returns the cached plan for) one definition. Returns null when it fails closed.</summary>
     public CompiledDefinition? Compile(InstalledPack pack, PresentationDefinition definition) =>
-        _cache.GetOrAdd((pack.PackId, definition.Id, pack.ContentHash), cacheKey => CompileCore(pack.Manifest, pack.Origin, definition, _assets, _themes, out _));
+        _cache.GetOrAdd((pack.PackId, definition.Id, pack.ContentHash), cacheKey =>
+        {
+            var compiled = CompileCore(pack.Manifest, pack.Origin, definition, _assets, _themes, out _);
+            var identity = $"pack-art:{pack.PackId}:{cacheKey.Hash}:{definition.Id}";
+            return compiled?.Plan switch
+            {
+                ThemePlan theme => compiled with { Plan = theme with { ArtworkIdentity = identity } },
+                FramePlan frame => compiled with { Plan = frame with { OverlayAssetIdentity = identity } },
+                _ => compiled,
+            };
+        });
 
     /// <summary>Install-time validation: compiles every definition without an asset store.</summary>
     public static IReadOnlyList<PackDiagnostic> ValidateDefinitions(PresentationPackManifest manifest)
@@ -173,7 +183,18 @@ public sealed partial class PresentationCompiler
                 context.StringList(m, "frameAffinity"));
         }
 
-        return new ThemePlan(theme, material);
+        string? artwork = null;
+        if (!spec.TryGetProperty("artwork", out var art)
+            || art.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(art.GetString()))
+        {
+            context.Error("artwork", "Every Theme requires a declared Image asset for its representative thumbnail.");
+        }
+        else
+        {
+            artwork = context.Asset(art.GetString()!, PackAssetKind.Image, "artwork");
+        }
+        return new ThemePlan(theme, material, artwork);
     }
 
     // ---------------------------------------------------------------- backdrop / environment
@@ -283,8 +304,11 @@ public sealed partial class PresentationCompiler
             AssetPath: assetPath,
             Source: source,
             Blend: context.Enum(layer, "blend", ["normal", "screen", "multiply", "overlay", "soft-light", "plus"], "normal"),
-            Direction: context.Enum(layer, "direction", ["up", "down", "diagonal", "still", "radial"], "up"),
-            ParticleShape: context.Enum(layer, "particleShape", ["dot", "ring", "line", "petal", "leaf", "diamond"], "dot"));
+            Direction: context.Enum(layer, "direction", ["up", "down", "left", "right", "diagonal", "still", "radial"], "up"),
+            ParticleShape: context.Enum(layer, "particleShape", ["dot", "ring", "line", "petal", "leaf", "diamond", "pixel", "sparkle", "bokeh"], "dot"),
+            Drift: context.Number(layer, "drift", 0.015, 0, 0.2),
+            Twinkle: context.Number(layer, "twinkle", 0.45, 0, 0.5),
+            SpawnRegion: context.Enum(layer, "spawnRegion", ["all", "upper", "lower", "edges"], "all"));
     }
 
     // ---------------------------------------------------------------- structure
@@ -393,7 +417,7 @@ public sealed partial class PresentationCompiler
         var layoutId = context.Enum(
             spec,
             "layoutId",
-            [.. MediaLayoutCatalog.BuiltInIds],
+            [.. MediaLayoutCatalog.CompatibleLayoutIds],
             MediaLayoutCatalog.FallbackLayoutId);
         var placement = context.Enum(
             spec,
@@ -406,9 +430,12 @@ public sealed partial class PresentationCompiler
             ["none", "hairline", "gallery", "double", "luminous", "neon"],
             "hairline");
         var fields = context.StringList(spec, "metadataFields")
-            .Where(field => field is "name" or "type" or "duration" or "dimensions" or "favorite" or "added")
+            .Where(field => field is "name" or "type" or "format" or "duration" or "dimensions" or "favorite" or "added")
             .Distinct(StringComparer.Ordinal)
             .ToArray();
+
+        var browse = context.Enum(spec, "browse", ["wall", "workbench", "editorial", "reel"], "wall");
+        if (browse == "reel") browse = "wall";
 
         return new ProfileMediaLayoutPlan(new MediaLayoutDefinition(
             layoutId,
@@ -443,7 +470,7 @@ public sealed partial class PresentationCompiler
             context.Number(spec, "frameGlow", 0, 0, 1),
             context.Enum(spec, "hoverStyle", ["lift", "spotlight", "none"], "lift"),
             context.Bool(spec, "showTypeBadge", true)),
-            context.Enum(spec, "browse", ["wall", "workbench", "reel"], "wall"));
+            browse);
     }
 
     private static FramePlan? CompileFrame(JsonElement spec, SpecContext context)

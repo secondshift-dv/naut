@@ -102,7 +102,8 @@ public sealed class StorageRecovery
                 {
                     try
                     {
-                        var valid = await new MediaAssetFileValidator().ValidateAsync(path,MediaAssetRole.ModelRender,cancellationToken,candidate.SourceHash).ConfigureAwait(false);
+                        var valid = await new ModelRenderValidationReceipts(_catalog)
+                            .ValidateAsync(path, candidate.SourceHash, cancellationToken, backgroundIo: true).ConfigureAwait(false);
                         validFile = valid.Sha256 == candidate.AssetHash && valid.ByteLength == candidate.ByteLength;
                     }
                     catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException or ArgumentException)

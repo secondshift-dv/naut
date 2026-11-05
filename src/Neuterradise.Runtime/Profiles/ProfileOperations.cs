@@ -545,6 +545,8 @@ public sealed class ProfileOperations
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 
+        await lease.DisposeAsync().ConfigureAwait(false);
+        await new ProfileTextFiles(_catalog).InspectAsync(request.ProfileId, cancellationToken).ConfigureAwait(false);
         return OperationResult<ProfileMetadataOutcome>.Success(
             new ProfileMetadataOutcome(request.ProfileId, newRowVersion));
     }

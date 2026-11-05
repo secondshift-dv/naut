@@ -17,7 +17,7 @@ public sealed class VaultWelcomeView : Grid
         Children.Add(new BackdropView { Plan = BackdropPlan.Still(), IsSurfaceActive = false });
 
         var theme = ThemeRuntime.Current;
-        var location = UI.Input(UI.T("Startup.Vault.Location", "Choose a Vault folder"));
+        var location = UI.Input(UI.T("Startup.Vault.Location", "Choose a location"));
         location.IsReadOnly = true;
         location.Foreground = theme.Brush("textPrimary");
         location.Resources["TextControlForeground"] = theme.Brush("textPrimary");
@@ -105,8 +105,8 @@ public sealed class VaultWelcomeView : Grid
         locationRow.ColumnSpacing = 8;
 
         var content = UI.V(
-            18,
-            BrandAssets.Lockup(54, 30, animateMark: false),
+            12,
+            BrandAssets.Lockup(36, 12, animateMark: false),
             UI.V(
                 8,
                 UI.WrappedText(
@@ -116,7 +116,7 @@ public sealed class VaultWelcomeView : Grid
                 UI.WrappedText(
                     UI.T(
                         "Startup.Vault.WelcomeBody",
-                        "Keep your photos, videos and 3D models together in a Vault on your computer."),
+                        "Keep photos, videos and 3D models in a local Vault."),
                     "body",
                     "textSecondary")),
             UI.V(
@@ -143,9 +143,9 @@ public sealed class VaultWelcomeView : Grid
             content,
             Material.Deep,
             ThemeRuntime.Current.Tokens.Number("radiusHero", 20),
-            28);
-        panel.MaxWidth = 600;
-        panel.Margin = new Thickness(24);
+            18);
+        panel.MaxWidth = 460;
+        panel.Margin = new Thickness(12);
         panel.HorizontalAlignment = HorizontalAlignment.Center;
         panel.VerticalAlignment = VerticalAlignment.Center;
         Children.Add(UI.Scroll(panel));

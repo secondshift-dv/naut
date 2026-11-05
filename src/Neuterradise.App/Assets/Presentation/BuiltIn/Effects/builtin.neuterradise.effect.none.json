@@ -24,5 +24,6 @@
     "continuousAnimation": false,
     "offscreenPolicy": "pause",
     "maxAnimatedLayers": 0
-  }
+  },
+  "description": "No decorative effect."
 }

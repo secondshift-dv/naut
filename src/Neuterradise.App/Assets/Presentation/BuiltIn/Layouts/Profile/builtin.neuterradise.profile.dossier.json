@@ -1,0 +1,114 @@
+{
+  "id": "builtin.neuterradise.profile.dossier",
+  "kind": "profile-layout",
+  "name": "Dossier",
+  "spec": {
+    "layout": {
+      "schemaVersion": 1,
+      "id": "dossier",
+      "name": "Dossier",
+      "bannerMode": "None",
+      "height": "Low",
+      "coverPlacement": "InlineLeft",
+      "coverSize": "Medium",
+      "coverDetailLevel": "Full",
+      "identityAlignment": "Left",
+      "contentWidth": "Wide",
+      "overlay": "Medium",
+      "blur": "Off",
+      "fade": "Bottom",
+      "sectionDensity": "Compact",
+      "modules": [
+        {
+          "id": "overview",
+          "order": 0,
+          "visible": true,
+          "width": "Full"
+        },
+        {
+          "id": "related",
+          "order": 1,
+          "visible": true,
+          "width": "Full"
+        },
+        {
+          "id": "faces",
+          "order": 2,
+          "visible": true,
+          "width": "Full"
+        },
+        {
+          "id": "recentMedia",
+          "order": 3,
+          "visible": true,
+          "width": "Full"
+        },
+        {
+          "id": "media",
+          "order": 4,
+          "visible": true,
+          "width": "Full"
+        }
+      ]
+    },
+    "surface": {
+      "type": "columns",
+      "columns": [
+        "320",
+        "*"
+      ],
+      "spacing": 20,
+      "children": [
+        {
+          "type": "stack",
+          "spacing": 12,
+          "children": [
+            {
+              "type": "semantic",
+              "id": "identity"
+            },
+            {
+              "type": "semantic",
+              "id": "overview"
+            },
+            {
+              "type": "semantic",
+              "id": "related"
+            },
+            {
+              "type": "semantic",
+              "id": "actions"
+            },
+            {
+              "type": "semantic",
+              "id": "faces"
+            }
+          ]
+        },
+        {
+          "type": "stack",
+          "spacing": 14,
+          "children": [
+            {
+              "type": "semantic",
+              "id": "statistics"
+            },
+            {
+              "type": "semantic",
+              "id": "review"
+            },
+            {
+              "type": "semantic",
+              "id": "recent-media"
+            },
+            {
+              "type": "semantic",
+              "id": "media"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "description": "Compact identity, details on the left and media on the right."
+}

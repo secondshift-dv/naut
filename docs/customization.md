@@ -4,7 +4,9 @@ Naut separates collection data from presentation choices. You can change how Hom
 
 ## Appearance
 
-Settings provides the application Theme and one of the [eight interface languages](languages.md). Presentation resources are managed separately so a theme or language change does not silently replace Profile media or layout choices.
+**Settings → Appearance** is where users select the installed Theme, Typography and Control Style. Naut v0.0.7 provides three curated primary themes (Obsidian, Logbook, Foundry) and three distinct built-in Control Styles. The **Settings → Presentation** screen lists installed presentation resources and packs; it is a library view rather than the place where every layout is applied.
+
+Use the contextual **Customize** action on Home, Gallery, Cards or Profiles to apply layout, frame, backdrop and effect choices to the relevant surface. The built-in Home, Spotlight, Profile, Card, Media and Gallery categories each offer three curated alternatives. Saved legacy selections and compatible installed packs are mapped or retained as documented in the [v0.0.7 release notes](releases/v0.0.7.md).
 
 ## Home and Gallery
 

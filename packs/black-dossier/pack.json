@@ -95,9 +95,9 @@
           },
           "shape": {
             "xs": 0,
-            "sm": 2,
-            "md": 3,
-            "lg": 4,
+            "sm": 1,
+            "md": 2,
+            "lg": 3,
             "xl": 4
           },
           "motion": {
@@ -113,18 +113,18 @@
             "motionIntensity": 0.35,
             "focusTreatment": "Ring",
             "glowStrength": 0,
-            "borderWeight": 1,
+            "borderWeight": 1.25,
             "elevationStrength": 0.25,
             "cardPersonality": "Flat",
-            "chromeTreatment": "Elevated",
-            "panelOpacity": 0.9,
+            "chromeTreatment": "Accented",
+            "panelOpacity": 1,
             "navigationRadiusScale": 0.25,
-            "navigationTreatment": "SelectedSurface"
+            "navigationTreatment": "StrongBorder"
           }
         },
         "material": {
           "personality": "grounded",
-          "atmosphere": "none",
+          "atmosphere": "precision",
           "grain": 0.015,
           "glassOpacity": 0.9,
           "glassBlur": 10,
@@ -135,7 +135,8 @@
           "frameAffinity": [
             "naut.black-dossier.frame"
           ]
-        }
+        },
+        "artwork": "backdrop-atrium"
       }
     },
     {

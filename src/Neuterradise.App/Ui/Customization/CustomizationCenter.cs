@@ -30,14 +30,6 @@ namespace Neuterradise.App.Ui;
 public sealed partial class CustomizationCenter : IDisposable
 {
     private const int SubjectMediaLimit = 500;
-    private static readonly IReadOnlySet<string> CuratedBuiltInEffects = new HashSet<string>(StringComparer.Ordinal)
-    {
-        "builtin.neuterradise.effect.none",
-        "builtin.neuterradise.effect.silk",
-        "builtin.neuterradise.effect.rain",
-        "builtin.neuterradise.effect.snow",
-        "builtin.neuterradise.effect.bubbles",
-    };
 
     private readonly AppServices _services;
     private readonly PreviewSession _session;
@@ -405,12 +397,12 @@ public sealed partial class CustomizationCenter : IDisposable
         if (_cardOnly) return;
         if (_session.Context.ProfileId is not null && _subject is null)
         {
-            _inspector.Children.Add(UI.Text(UI.T("Customize.Loading.ProfileCard", "Loading this Profile's card..."), "body-muted"));
+            _inspector.Children.Add(UI.Text(UI.T("Customize.Loading.ProfileCard", "Loading this Profile's card…"), "body-muted"));
             return;
         }
 
         _inspector.Children.Add(UI.Guidance(
-            UI.T("Customize.PreviewNote.Title", "Preview mode"),
+            UI.T("Customize.PreviewNote.Title", "Preview note"),
             UI.T("Customize.Previewing", "Previewing changes. Nothing is saved until Save changes."),
             "warning"));
 
@@ -685,7 +677,7 @@ public sealed partial class CustomizationCenter : IDisposable
             {
                 var discard = await _services.ConfirmAsync(
                     UI.T("Customize.DiscardTitle", "Discard changes?"),
-                    UI.T("Customize.DiscardBody", "Your preview changes haven't been applied."),
+                    UI.T("Customize.DiscardBody", "Your preview changes have not been saved."),
                     UI.T("Customize.Discard", "Discard"),
                     destructive: true,
                     cancel: UI.T("Customize.KeepEditing", "Keep editing")).ConfigureAwait(true);

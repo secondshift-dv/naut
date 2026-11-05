@@ -106,9 +106,10 @@ internal sealed class LivingNavigationButton : Button
             {
                 Width = 28,
                 Height = 28,
-                CornerRadius = new CornerRadius(14),
-                Background = theme.Brush("navSelectedBackground"),
-                Child = _iconStage,
+                CornerRadius = new CornerRadius(theme.Tokens.Number("navCornerRadius", 6)),
+                Background = theme.Brush("transparent"),
+                Child = new IconView("icon.vault.identity", 20, "accent")
+                    .Align(HorizontalAlignment.Center, VerticalAlignment.Center),
                 VerticalAlignment = VerticalAlignment.Center,
             };
             Content = UI.H(8, _vaultBadge, UI.V(0, _label, _secondaryLabel))
@@ -201,6 +202,7 @@ internal sealed class LivingNavigationButton : Button
 
         _compact = compact;
         _label.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        if (_secondaryLabel is not null) _secondaryLabel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
         Padding = compact ? new Thickness(8, 0, 8, 0) : _role switch
         {
             LivingNavigationRole.Vault => new Thickness(8, 0, 10, 0),
@@ -283,6 +285,21 @@ internal sealed class LivingNavigationButton : Button
         {
             _secondaryLabel.Foreground = theme.Brush("textPrimary");
         }
+    }
+
+    public void SetVaultLogo(ImageRef? source)
+    {
+        if (_vaultBadge is null) return;
+        _vaultBadge.Child = source is null
+            ? new IconView("icon.vault.identity", 20, "accent")
+                .Align(HorizontalAlignment.Center, VerticalAlignment.Center)
+            : new SkImageView
+            {
+                Source = source,
+                Width = 26,
+                Height = 26,
+                CornerRadiusValue = 6,
+            };
     }
 
     private void ApplySemanticMotion(bool active)

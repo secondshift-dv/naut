@@ -32,6 +32,7 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
     private readonly Dictionary<Guid, CompiledDefinition> _cardByProfile = [];
     private readonly Dictionary<FrameworkElement, IDisposable> _cardObservers = [];
     private GalleryLayoutPlan _layout = null!;
+    private bool _measurePinboardByCardAspect;
     private int _presentationGeneration;
     private CompiledDefinition _defaultCard = null!;
     private bool _initialized;
@@ -109,6 +110,8 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
     {
         var layoutDefinition = ResolvePresentation(PresentationSlots.GalleryLayout, Context);
         _layout = layoutDefinition.PlanAs<GalleryLayoutPlan>();
+        _measurePinboardByCardAspect = layoutDefinition.Origin == PackOrigin.BuiltIn
+            && layoutDefinition.Ref.DefinitionId == "builtin.neuterradise.gallery.pinboard";
         _defaultCard = ResolvePresentation(PresentationSlots.ProfileCard, Context);
         _headerBag.Dispose();
         _headerBag = new Disposables();
@@ -131,6 +134,8 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         var preferredWidth = Math.Min(availableWidth, Math.Clamp(_layout.ItemMinWidth, 120, _layout.ItemMaxWidth));
         var columns = Math.Max(1, (int)Math.Floor((availableWidth + _layout.Spacing) / (preferredWidth + _layout.Spacing)));
         columns = Math.Min(columns, Math.Max(1, _layout.MaxColumns));
+        if (_layout.HeightPattern is null && _layout.Primitive is not (CollectionPrimitives.SingleColumn or CollectionPrimitives.List or CollectionPrimitives.Carousel))
+            columns = Math.Min(columns, Math.Max(1, _vm.Cards.Count));
         var width = Math.Min(_layout.ItemMaxWidth, (availableWidth - ((columns - 1) * _layout.Spacing)) / columns);
         if (_layout.Primitive == CollectionPrimitives.Carousel)
         {
@@ -139,7 +144,7 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         var requestedHeight = _layout.ItemAspect is { } containerAspect
             ? width / Math.Max(0.3, containerAspect)
             : _layout.RowHeight;
-        var rowHeight = Math.Min(Math.Max(120, requestedHeight), Math.Max(160, viewportHeight * 0.52));
+        var rowHeight = Math.Min(Math.Max(120, requestedHeight), Math.Max(160, viewportHeight * 0.52)) + CardActionHeight;
 
         Layout layout = _layout.Primitive switch
         {
@@ -162,8 +167,18 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
             gridLayout.ItemsStretch = UniformGridLayoutItemsStretch.None;
         }
         _repeater.Layout = layout;
+        _repeater.Width = double.NaN;
+        _repeater.HorizontalAlignment = HorizontalAlignment.Stretch;
         if (_layout.HeightPattern is { } pattern)
-            _repeater.Layout = new MasonryLayout(_layout.ItemMinWidth, _layout.ItemMaxWidth, _layout.MaxColumns, _layout.Spacing, pattern);
+            _repeater.Layout = new MasonryLayout(_layout.ItemMinWidth, _layout.ItemMaxWidth, _layout.MaxColumns, _layout.Spacing,
+                index => _measurePinboardByCardAspect && index < _vm.Cards.Count
+                    ? CardFor(_vm.Cards[index]).PlanAs<CardPlan>().Aspect
+                    : pattern[index % pattern.Count], CardActionHeight);
+        else if (_layout.Primitive is not (CollectionPrimitives.SingleColumn or CollectionPrimitives.List or CollectionPrimitives.Carousel))
+        {
+            _repeater.Width = Math.Min(availableWidth, columns * width + (columns - 1) * _layout.Spacing);
+            _repeater.HorizontalAlignment = HorizontalAlignment.Center;
+        }
         foreach (var host in _cardObservers.Keys.OfType<Grid>().ToArray())
         {
             if (host.Children.FirstOrDefault() is CardVisual visual)
@@ -172,9 +187,7 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
             }
         }
         var horizontal = _layout.Primitive == CollectionPrimitives.Carousel;
-        _scroll.HorizontalScrollMode = horizontal ? ScrollMode.Enabled : ScrollMode.Disabled;
-        _scroll.HorizontalScrollBarVisibility = horizontal ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled;
-        _scroll.VerticalScrollMode = horizontal ? ScrollMode.Disabled : ScrollMode.Enabled;
+        ScrollInteraction.ConfigureAxis(_scroll, horizontal);
         if (refreshItems)
         {
             _repeater.ItemsSource = null;
@@ -627,16 +640,21 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         ? $"{_presentationGeneration}:{CardFor(card).Ref}"
         : $"{_presentationGeneration}:empty";
 
+    private const double CardActionHeight = 34;
+
+    private bool IsCatalogue => _layout.Toolbar == "feed" && _layout.Primitive == CollectionPrimitives.AdaptiveWall;
+
     private FrameworkElement Create(string kind, object? data)
     {
         var definition = data is GalleryCardViewModel card ? CardFor(card) : _defaultCard;
-        var host = new Grid();
+        var catalogue = IsCatalogue || _layout.Primitive == CollectionPrimitives.SingleColumn;
+        var host = UI.Grid("*,34", catalogue ? "auto,*" : "*");
         var visual = new CardVisual(definition)
         {
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Top,
         };
-        visual.AddCustomizationAction(_ =>
+        var customize = UI.Button(UI.T("Card.Customize", "Customize Card"), () =>
         {
             if (host.DataContext is GalleryCardViewModel item)
             {
@@ -645,8 +663,30 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
                 Services.OpenCustomization(CustomizationCategories.Profile,
                     PresentationContext.ForProfile(state, "gallery"), PresentationSlots.ProfileCard);
             }
-        });
+        }, ButtonKind.Ghost, "icon.navigation.customize");
+        customize.Height = CardActionHeight;
+        customize.MinHeight = 0;
+        customize.HorizontalAlignment = HorizontalAlignment.Center;
+        customize.Tapped += (_, args) => args.Handled = true;
         host.Children.Add(visual);
+        if (catalogue)
+        {
+            var details = UI.Grid("*,*,*,*", "*");
+            details.RowSpacing = 6;
+            details.Margin = new Thickness(12, 0, 8, 0);
+            details.Children.Add(CatalogueInfo(UI.T("Profile.Overview", "Overview")).At(0));
+            details.Children.Add(CatalogueInfo(UI.T("Profile.Related", "Related")).At(1));
+            details.Children.Add(CatalogueInfo(UI.F("Gallery.Catalogue.Updated", "Updated {0}", string.Empty).Trim()).At(2));
+            details.Children.Add(CatalogueInfo(UI.F("Gallery.Catalogue.Created", "Created {0}", string.Empty).Trim()).At(3));
+            host.Children.Add(details.At(0, 1));
+            customize.HorizontalAlignment = HorizontalAlignment.Left;
+            customize.Margin = new Thickness(20, 0, 0, 0);
+            host.Children.Add(customize.At(1, 1));
+        }
+        else
+        {
+            host.Children.Add(customize.At(1));
+        }
         host.SizeChanged += (_, _) => FitCardVisual(host, visual);
         UpdateHostGeometry(host, visual);
 
@@ -678,6 +718,18 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         return host;
     }
 
+    private static Border CatalogueInfo(string title) => new()
+    {
+        Child = UI.V(2,
+            UI.Text(title, "micro", "textMuted", 1),
+            UI.Text(string.Empty, "caption", "textSecondary", 2)),
+        Background = ThemeRuntime.Current.Brush("surface2"),
+        BorderBrush = ThemeRuntime.Current.Brush("borderSubtle"),
+        BorderThickness = new Thickness(1),
+        CornerRadius = new CornerRadius(7),
+        Padding = new Thickness(9, 5, 9, 5),
+    };
+
     private void Bind(FrameworkElement element, object? data)
     {
         if (data is not GalleryCardViewModel card || element is not Grid host || host.Children[0] is not CardVisual visual)
@@ -692,7 +744,7 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         host.DataContext = card;
         UpdateHostGeometry(host, visual);
         Services.ProfileSnapshots.Warm(card.ProfileId);
-        void UpdateCard() => ApplyCardData(visual, card);
+        void UpdateCard() => ApplyCardData(host, visual, card);
         _cardObservers[host] = Observe.Props(
             card,
             UpdateCard,
@@ -704,6 +756,9 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
             nameof(GalleryCardViewModel.IsFavorite),
             nameof(GalleryCardViewModel.MediaCount),
             nameof(GalleryCardViewModel.RelatedProfileCount),
+            nameof(GalleryCardViewModel.Overview),
+            nameof(GalleryCardViewModel.CreatedAtUtc),
+            nameof(GalleryCardViewModel.UpdatedAtUtc),
             nameof(GalleryCardViewModel.Appearance),
             nameof(GalleryCardViewModel.CoverAppearance),
             nameof(GalleryCardViewModel.CoverSource),
@@ -712,13 +767,34 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         UpdateCard();
     }
 
-    private void ApplyCardData(CardVisual visual, GalleryCardViewModel card)
+    private void ApplyCardData(Grid host, CardVisual visual, GalleryCardViewModel card)
     {
         var plan = visual.Plan;
         var coverWidth = (int)Math.Clamp(_layout.ItemMinWidth * 1.5, 160, 720);
         var data = CardDataFactory.From(card, Services.Presentation, coverWidth, plan.UsesBanner ? coverWidth * 2 : coverWidth);
         visual.Bind(data);
         visual.IsSelected = card.IsSelected;
+        if ((IsCatalogue || _layout.Primitive == CollectionPrimitives.SingleColumn)
+            && host.Children.Count > 2 && host.Children[1] is Grid details)
+        {
+            static void SetInfo(Grid panel, int index, string value)
+            {
+                var border = (Border)panel.Children[index];
+                var text = (StackPanel)border.Child;
+                ((TextBlock)text.Children[1]).Text = value;
+            }
+
+            SetInfo(details, 0, string.IsNullOrWhiteSpace(card.Overview)
+                ? UI.T("Profile.Overview.EmptyTitle", "No Overview yet")
+                : card.Overview);
+            SetInfo(details, 1, data.RelatedCount > 0
+                ? data.TextFor(SemanticSlots.ProfileRelatedCount)
+                : UI.T("Gallery.Catalogue.NoConnections", "No related Profiles"));
+            SetInfo(details, 2, card.UpdatedAtUtc.ToLocalTime().ToString(
+                "d MMM yyyy", System.Globalization.CultureInfo.CurrentCulture));
+            SetInfo(details, 3, card.CreatedAtUtc.ToLocalTime().ToString(
+                "d MMM yyyy", System.Globalization.CultureInfo.CurrentCulture));
+        }
     }
 
     private void UpdateHostGeometry(Grid host, CardVisual visual)
@@ -727,28 +803,30 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         host.Height = double.NaN;
         host.HorizontalAlignment = HorizontalAlignment.Stretch;
 
-        var aspect = Math.Max(0.3, visual.Plan.Aspect);
-        if (_layout.Primitive == CollectionPrimitives.SingleColumn)
+        if (IsCatalogue)
         {
-            var viewportWidth = Math.Max(320, _field.ActualWidth > 0 ? _field.ActualWidth : _root.ActualWidth);
-            var viewportHeight = Math.Max(320, _field.ActualHeight > 0 ? _field.ActualHeight : 720);
+            host.Height = _layout.RowHeight + CardActionHeight;
+        }
+        else if (_layout.Primitive == CollectionPrimitives.SingleColumn)
+        {
+            var viewportWidth = Math.Max(180, _field.ActualWidth > 0 ? _field.ActualWidth : _root.ActualWidth);
+            var viewportHeight = Math.Max(160, _field.ActualHeight > 0 ? _field.ActualHeight : 720);
             var availableWidth = Math.Max(180, viewportWidth - (2 * UI.PagePadding(viewportWidth)) - 8);
-            var minWidth = Math.Min(_layout.ItemMinWidth, availableWidth);
-            var maxHeight = Math.Min(520, Math.Max(280, viewportHeight * 0.72));
-            host.Width = Math.Min(availableWidth, Math.Max(minWidth, Math.Min(_layout.ItemMaxWidth, maxHeight * aspect)));
-            host.Height = host.Width / aspect;
+            var visualHeight = Math.Min(320, Math.Max(160, viewportHeight * 0.46));
+            host.Width = availableWidth;
+            host.Height = visualHeight + CardActionHeight;
             host.HorizontalAlignment = HorizontalAlignment.Center;
         }
         else if (_layout.Primitive == CollectionPrimitives.List)
         {
-            host.Height = _layout.RowHeight;
+            host.Height = _layout.RowHeight + CardActionHeight;
         }
         else if (_layout.Primitive == CollectionPrimitives.Carousel)
         {
             var viewportWidth = Math.Max(180, _field.ActualWidth > 0 ? _field.ActualWidth : _root.ActualWidth);
             var viewportHeight = Math.Max(240, _field.ActualHeight > 0 ? _field.ActualHeight : 540);
             host.Width = Math.Min(_layout.ItemMaxWidth, Math.Max(120, viewportWidth * 0.6));
-            host.Height = Math.Min(Math.Max(120, _layout.RowHeight), Math.Max(160, viewportHeight * 0.52));
+            host.Height = Math.Min(Math.Max(120, _layout.RowHeight), Math.Max(160, viewportHeight * 0.52)) + CardActionHeight;
         }
 
         FitCardVisual(host, visual);
@@ -757,20 +835,21 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
     private void FitCardVisual(Grid host, CardVisual visual)
     {
         var width = host.ActualWidth;
-        var height = host.ActualHeight;
+        var height = Math.Max(0, host.ActualHeight - CardActionHeight);
         if (width <= 0 || height <= 0)
         {
             return;
         }
 
-        if (_layout.HeightPattern is not null)
+        if (host.Children.OfType<Button>().FirstOrDefault() is { } action) action.MaxWidth = width;
+        var aspect = Math.Max(0.3, visual.Plan.Aspect);
+        if (IsCatalogue || _layout.Primitive == CollectionPrimitives.SingleColumn)
         {
-            visual.Width = width;
-            visual.Height = height;
+            visual.Width = Math.Min(width * 0.38, height * aspect);
+            visual.Height = Math.Min(height, visual.Width / aspect);
+            visual.HorizontalAlignment = HorizontalAlignment.Left;
             return;
         }
-
-        var aspect = Math.Max(0.3, visual.Plan.Aspect);
         if (width / height > aspect)
         {
             visual.Height = height;
@@ -780,6 +859,14 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         {
             visual.Width = width;
             visual.Height = width / aspect;
+        }
+
+        if (host.Children.OfType<Button>().FirstOrDefault() is { } customize)
+        {
+            customize.RenderTransform = new Microsoft.UI.Xaml.Media.TranslateTransform
+            {
+                Y = Math.Min(0, visual.Height - height),
+            };
         }
     }
 

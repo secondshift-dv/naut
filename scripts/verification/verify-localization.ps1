@@ -74,6 +74,26 @@ if ($english.Count -eq 0) {
     throw 'English localization authority is empty.'
 }
 
+$literalKeyPattern = [regex]'\b(?:UI\.(?:T|F)|SurfaceText\.(?:Get|Format))\(\s*"([^"\r\n]+)"\s*,\s*"'
+$sourceKeys = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+foreach ($source in Get-ChildItem (Join-Path $RepositoryRoot 'src') -Recurse -File -Filter '*.cs' |
+    Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' }) {
+    foreach ($match in $literalKeyPattern.Matches([IO.File]::ReadAllText($source.FullName))) {
+        $key = $match.Groups[1].Value
+        [void]$sourceKeys.Add($key)
+        if (-not $english.ContainsKey($key)) { throw "Source references missing localization key '$key'." }
+    }
+}
+$builtInRoot = Join-Path $RepositoryRoot 'src/Neuterradise.App/Assets/Presentation/BuiltIn'
+$builtInCatalog = Get-Content (Join-Path $builtInRoot 'catalog.json') -Raw | ConvertFrom-Json
+foreach ($definitionFile in $builtInCatalog.definitionFiles) {
+    $definition = Get-Content (Join-Path $builtInRoot $definitionFile) -Raw | ConvertFrom-Json
+    foreach ($field in @('Name', 'Description')) {
+        $key = "Presentation.Definition.$($definition.id).$field"
+        if (-not $english.ContainsKey($key)) { throw "Built-in definition is missing localization key '$key'." }
+    }
+}
+
 $validatedFlags = 0
 foreach ($language in $languages) {
     $path = Join-Path $StringsRoot "$($language.Code).xml"
@@ -112,5 +132,7 @@ foreach ($language in $languages) {
 
 Write-Host "LOCALIZATION_LANGUAGES=$($languages.Count)"
 Write-Host "LOCALIZATION_KEYS=$($english.Count)"
+Write-Host "LOCALIZATION_SOURCE_KEYS=$($sourceKeys.Count)"
+Write-Host "LOCALIZATION_BUILTIN_DEFINITIONS=$($builtInCatalog.definitionFiles.Count)"
 Write-Host "LOCALIZATION_FLAGS=$validatedFlags"
 Write-Host 'LOCALIZATION_VERIFY=PASS'

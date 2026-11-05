@@ -56,8 +56,9 @@ public sealed class SettingsSurface : Surface
         _root.Children.Add(_content.At(0, 1, rowSpan: 2));
         _root.SizeChanged += (_, _) =>
         {
-            var narrow = _root.ActualWidth < 620;
-            _root.ColumnDefinitions[0].Width = narrow ? new GridLength(1, GridUnitType.Star) : new GridLength(_root.ActualWidth < 960 ? 144 : 168);
+            var narrow = _root.ActualWidth < 860;
+            _root.ColumnDefinitions[0].Width = narrow ? new GridLength(1, GridUnitType.Star) : new GridLength(_root.ActualWidth < 1150 ? 176 : 200);
+            railSurface.BorderThickness = narrow ? new Thickness(0, 0, 0, 1) : new Thickness(0, 0, 1, 0);
             _root.ColumnDefinitions[1].Width = narrow ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
             railSurface.At(0, 0, rowSpan: narrow ? 1 : 2, columnSpan: narrow ? 2 : 1);
             _content.At(narrow ? 1 : 0, narrow ? 0 : 1, rowSpan: narrow ? 1 : 2, columnSpan: narrow ? 2 : 1);
@@ -167,7 +168,7 @@ public sealed class SettingsSurface : Surface
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 HorizontalContentAlignment = HorizontalAlignment.Left,
                 Tag = item.Key,
-                MaxWidth = _root.ActualWidth < 620 ? 180 : double.PositiveInfinity,
+                MaxWidth = _root.ActualWidth < 760 ? 180 : double.PositiveInfinity,
             };
             entry.Tip(item.Description);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(entry, item.Title);
@@ -237,6 +238,7 @@ public sealed class SettingsSurface : Surface
         {
             ("theme", "Settings.Appearance.Theme", "Theme"),
             ("typography", "Settings.Presentation.Fonts", "Font"),
+            ("control-style", "Settings.Presentation.ControlStyles", "Control Styles"),
         })
         {
             var tab = id;
@@ -255,6 +257,7 @@ public sealed class SettingsSurface : Surface
         UIElement section = _appearanceTab switch
         {
             "typography" => AppearanceDefinitionSection(PresentationSlots.Typography),
+            "control-style" => AppearanceDefinitionSection(PresentationSlots.ControlSkin),
             _ => AppearanceDefinitionSection(PresentationSlots.Theme),
         };
 
@@ -267,18 +270,18 @@ public sealed class SettingsSurface : Surface
         var selected = Services.Presentation.Resolve(slot, PresentationContext.Global).Definition;
         var wrap = new VariableWrap(10);
         foreach (var definition in Services.Presentation.DefinitionsOf(descriptor.Kind!)
-            .Where(d => d.Ref == selected || BuiltInPresentationCatalog.IsPrimary(d.Ref))
+            .Where(d => d.Ref == selected || d.Origin == PackOrigin.User || BuiltInPresentationCatalog.IsPrimary(d.Ref))
             .Where(d => d.Plan is not EffectPlan effect || effect.Supports(slot)))
         {
             var reference = definition.Ref;
             var isSelected = selected == reference;
             var displayName = SurfaceText.PresentationName(definition);
             var displayDescription = SurfaceText.PresentationDescription(definition);
-            var descriptionText = displayDescription is { Length: > 0 } description
+            var descriptionText = slot != PresentationSlots.Theme && displayDescription is { Length: > 0 } description
                 ? UI.WrappedText(description, "caption")
                 : null;
             var labels = UI.V(2,
-                UI.H(4,
+                UI.Wrap(4,
                     UI.Text(displayName, "control", maxLines: 1).Tip(displayName),
                     isSelected ? UI.Badge(UI.T("Common.Selected", "Selected"), "accent") : null),
                 descriptionText,
@@ -295,13 +298,19 @@ public sealed class SettingsSurface : Surface
 
             var card = new Button
             {
-                Content = UI.Surface(
-                    UI.V(8, AppearanceDefinitionPreview(slot, definition), labels),
-                    Material.Raised,
-                    12,
-                    10),
-                Width = 176,
-                MinHeight = slot == PresentationSlots.ControlSkin ? 270 : 190,
+                Content = new Border
+                {
+                    Child = slot == PresentationSlots.Theme
+                        ? UI.Grid("auto", "auto,*", AppearanceDefinitionPreview(slot, definition).At(0, 0), labels.Margin(8, 0, 0, 0).At(0, 1))
+                        : UI.V(8, AppearanceDefinitionPreview(slot, definition), labels),
+                    Background = ThemeRuntime.Current.Brush("surface1"),
+                    CornerRadius = new CornerRadius(slot == PresentationSlots.Theme ? 8 : 12),
+                    Padding = new Thickness(10),
+                },
+                Width = slot == PresentationSlots.Theme ? 164
+                    : slot == PresentationSlots.ControlSkin ? 320 : 176,
+                MinHeight = slot == PresentationSlots.Theme ? 72
+                    : slot == PresentationSlots.ControlSkin ? 240 : 150,
                 Padding = new Thickness(0),
                 CornerRadius = new CornerRadius(12),
                 Background = ThemeRuntime.Current.Brush("transparent"),
@@ -311,6 +320,7 @@ public sealed class SettingsSurface : Surface
                 VerticalContentAlignment = VerticalAlignment.Stretch,
             };
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(card, displayName);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetItemStatus(card, isSelected ? UI.T("Common.Selected", "Selected") : string.Empty);
             ToolTipService.SetToolTip(
                 card,
                 string.IsNullOrWhiteSpace(displayDescription)
@@ -330,14 +340,27 @@ public sealed class SettingsSurface : Surface
             };
             wrap.Children.Add(card);
         }
+        wrap.SizeChanged += (_, _) =>
+        {
+            if (wrap.ActualWidth <= 0) return;
+            var preferred = slot == PresentationSlots.Theme ? 164d
+                : slot == PresentationSlots.ControlSkin ? 320d : 176d;
+            var columns = Math.Max(1, (int)((wrap.ActualWidth + 10) / (preferred + 10)));
+            var width = Math.Min(slot == PresentationSlots.Theme ? 200
+                    : slot == PresentationSlots.ControlSkin ? 360 : 280,
+                Math.Max(1, (wrap.ActualWidth - (columns - 1) * 10) / columns));
+            foreach (var card in wrap.Children.OfType<Button>()) card.Width = width;
+        };
 
         var title = descriptor.Id == PresentationSlots.Typography
-            ? UI.T("Settings.Presentation.Fonts", "Font")
-            : UI.T(descriptor.LabelKey, descriptor.LabelFallback);
+            ? UI.T("Settings.Presentation.Fonts", "Fonts")
+            : descriptor.Id == PresentationSlots.ControlSkin
+                ? UI.T("Settings.Presentation.ControlStyles", "Control Styles")
+                : UI.T(descriptor.LabelKey, descriptor.LabelFallback);
         var sectionDescription = descriptor.Id == PresentationSlots.Theme
             ? UI.T("Settings.Theme.Desc", "Colour, material and shape.")
             : descriptor.Id == PresentationSlots.Typography
-                ? UI.T("Settings.Presentation.Fonts.Desc", "Choose the font used by naut.")
+                ? UI.T("Settings.Presentation.Fonts.Desc", "Available fonts.")
                 : descriptor.DescriptionFallback;
         return UI.Section(title, sectionDescription, wrap);
     }
@@ -352,15 +375,15 @@ public sealed class SettingsSurface : Surface
                 Text = text, FontFamily = new Microsoft.UI.Xaml.Media.FontFamily(LocalPresentationFonts.Current.Register(face)),
                 FontSize = size, Foreground = theme.Brush("textPrimary"), TextWrapping = TextWrapping.Wrap,
             };
-            return UI.V(3, Sample("Aa · 123", typography.Heading, 20), Sample("日本語 · 한국어 · 中文", typography.Body, 14),
-                Sample("0x20  01:23", typography.Mono, 12)).Margin(8);
+            return UI.V(3, Sample("Aa · 123", typography.Heading, 12), Sample("日本語 · 한국어 · 中文", typography.Body, 10),
+                Sample("0x20  01:23", typography.Mono, 9)).Margin(8);
         }
         if (definition.Plan is ControlSkinPlan skin)
             return UI.ControlSheet(skin);
         if (definition.Plan is EffectPlan effect)
             return PresentationEffects.Preview(effect, 82);
         if (slot == PresentationSlots.Theme)
-            return ThemePreviewView.Create(definition.PlanAs<ThemePlan>(), 82);
+            return ThemePreviewView.Create(definition.PlanAs<ThemePlan>(), 52);
 
         var accent = definition.PreviewAccent is { } previewAccent
             && ThemeColorText.TryParse(previewAccent, out var parsed)
@@ -740,26 +763,12 @@ public sealed class SettingsSurface : Surface
                 var typeLabel = isProfile
                     ? UI.T("Settings.Trash.Profile", "Profile")
                     : UI.T("Settings.Trash.Media", "Media");
-                string retentionText;
-                if (isProfile)
-                {
-                    var permanentDeletionAt =
-                        ProfileTrashRetentionPolicy.ProfilePermanentDeletionAt(item.TrashedAtUtc);
-                    var remaining = permanentDeletionAt - DateTimeOffset.UtcNow;
-                    var remainingDays = Math.Max(1, (int)Math.Ceiling(remaining.TotalDays));
-                    retentionText = remaining <= TimeSpan.Zero
-                        ? UI.T("Trash.Retention.Due", "Scheduled for automatic permanent deletion.")
-                        : UI.F(
-                            "Trash.Retention.Remaining",
-                            "Deletes automatically in {0} day(s).",
-                            remainingDays);
-                }
-                else
-                {
-                    retentionText = UI.T(
-                        "Trash.Media.Retention",
-                        "Media stays in Trash until you restore or permanently delete it.");
-                }
+                var permanentDeletionAt = TrashRetentionPolicy.PermanentDeletionAt(item.TrashedAtUtc);
+                var remaining = permanentDeletionAt - DateTimeOffset.UtcNow;
+                var remainingDays = Math.Max(1, (int)Math.Ceiling(remaining.TotalDays));
+                var retentionText = remaining <= TimeSpan.Zero
+                    ? UI.T("Trash.Retention.Due", "Scheduled for automatic permanent deletion.")
+                    : UI.F("Trash.Retention.Remaining", "Deletes automatically in {0} day(s).", remainingDays);
 
                 var restoreInProgress = item.State is TrashEntryState.RestoreExecuting
                     or TrashEntryState.RestoreFinalizing;
@@ -830,7 +839,7 @@ public sealed class SettingsSurface : Surface
                 UI.F(
                     "Trash.Desc",
                     "Items here can be restored. Permanent deletion asks first.",
-                    ProfileTrashRetentionPolicy.ProfileRetentionDays),
+                    TrashRetentionPolicy.RetentionDays),
                 "body-muted"),
             feedback,
             confirm,
@@ -874,7 +883,20 @@ public sealed class SettingsSurface : Surface
             {
                 foreach (var finding in group.Findings)
                 {
-                    findings.Children.Add(UI.Grid("auto", "*,auto",
+                    var actions = UI.Wrap(4);
+                    foreach (var action in finding.ImportActions ?? [])
+                    {
+                        var label = action switch
+                        {
+                            HealthImportAction.CompleteCleanup => UI.T("Health.Import.Cleanup", "Complete cleanup"),
+                            HealthImportAction.CleanupTemporary => UI.T("Health.Import.CleanupTemporary", "Clean temporary files"),
+                            HealthImportAction.Resume => UI.T("Health.Import.Resume", "Resume"),
+                            HealthImportAction.Retry => UI.T("Health.Import.Retry", "Retry"),
+                            _ => UI.T("Health.Import.Cancel", "Cancel import"),
+                        };
+                        actions.Children.Add(UI.Button(label, () => health.ImportActionCommand.Execute((finding, action)), ButtonKind.Ghost));
+                    }
+                    findings.Children.Add(UI.Grid("auto,auto", "*,auto",
                         UI.V(3,
                             UI.Text(finding.Code, "micro", "textMuted"),
                             UI.WrappedText(finding.Summary, "body")).At(0, 0),
@@ -884,7 +906,8 @@ public sealed class SettingsSurface : Surface
                                 health.SelectFindingCommand.Execute(finding);
                                 health.PrepareRepairCommand.Execute(null);
                             }).At(0, 1)
-                            : null));
+                            : null,
+                        actions.At(1, 0)));
                 }
             }
 

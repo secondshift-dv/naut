@@ -206,7 +206,7 @@ public sealed class ExplorerLocationProvider
         using var process = Process.Start(new ProcessStartInfo(absolutePath)
         {
             UseShellExecute = true,
-        }) ?? throw new InvalidOperationException("Windows did not create a shell process.");
+        });
 
         return Task.CompletedTask;
     }

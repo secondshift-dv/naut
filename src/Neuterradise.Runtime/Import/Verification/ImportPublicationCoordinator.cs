@@ -65,7 +65,9 @@ public sealed class ImportPublicationCoordinator
             {
                 CurrentStep = 5,
                 ImportRequested = true,
-                AttentionItemIds = existing.AttentionItemIds ?? finalDraft.AttentionItemIds,
+                AttentionItemIds = (existing.AttentionItemIds ?? finalDraft.AttentionItemIds ?? [])
+                    .Except((finalDraft.ProfileCollisionDecisions ?? []).Select(decision => decision.ImportItemId))
+                    .Except((finalDraft.DuplicateDecisions ?? []).Select(decision => decision.ImportItemId)).ToArray(),
             };
 
             try
@@ -88,7 +90,7 @@ public sealed class ImportPublicationCoordinator
     }
 
     /// <summary>
-    /// Restart-safe publication. COMMITTING means Save was accepted and publication must converge;
+    /// Restart-safe publication. COMMITTING means publication was authorized and must converge;
     /// re-entry repeats only idempotent/durably-proven steps.
     /// </summary>
     public async Task<ImportPublicationResult> PublishDurableAsync(
@@ -124,6 +126,15 @@ public sealed class ImportPublicationCoordinator
         var draft = VerificationDraftV1.FromJson(
             model.VerificationDraftJson,
             _timeProvider.GetUtcNow().ToUnixTimeMilliseconds());
+        if (draft.PublishWhenReady)
+        {
+            var automaticBlockers = _validator.ValidateDraft(draft);
+            if (automaticBlockers.Count > 0)
+                return ImportPublicationResult.Blocked(automaticBlockers[0].Code, automaticBlockers[0].Message);
+            draft = await PrepareAutomaticDraftAsync(unitId, draft, model.RowVersion, cancellationToken).ConfigureAwait(false);
+            model = await _verification.LoadVerificationReadModelAsync(unitId, cancellationToken).ConfigureAwait(false)
+                ?? throw new CatalogInvariantException("Automatic import disappeared before publication.");
+        }
         var destination = await ReadDurableDestinationAsync(unitId, cancellationToken).ConfigureAwait(false);
         if (destination is null || destination.ProfileId == Guid.Empty)
         {
@@ -235,6 +246,16 @@ public sealed class ImportPublicationCoordinator
             : cleanup.Checkpoint >= ImportCommitCheckpoint.SourceCleanupComplete
                 ? ImportUnitState.Completed
                 : ImportUnitState.Committed;
+
+        var textFiles = new ProfileTextFiles(_catalog);
+        await textFiles.InspectAsync(destination.ProfileId, cancellationToken).ConfigureAwait(false);
+        if (model.SourceKind == "DIRECTORY" && model.SourcePathOrReference is { } sourceFolder)
+        {
+            try { await textFiles.QueueImportedOverviewAsync(destination.ProfileId, unitId, sourceFolder, cancellationToken).ConfigureAwait(false); }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+            { System.Diagnostics.Trace.TraceWarning("Import overview is unavailable: {0}", exception.GetType().Name); }
+        }
+
         await _catalog.ImportWrites.UpdateUnitStateAsync(unitId, finalState, cancellationToken).ConfigureAwait(false);
 
         return finalState == ImportUnitState.CommittedWithCleanupAttention
@@ -634,6 +655,56 @@ public sealed class ImportPublicationCoordinator
             ? DbGuid.Format(bannerArtifact) : DBNull.Value);
         selection.Parameters.AddWithValue("$profile", DbGuid.Format(profileId));
         await selection.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<VerificationDraftV1> PrepareAutomaticDraftAsync(
+        Guid unitId, VerificationDraftV1 draft, long rowVersion, CancellationToken cancellationToken)
+    {
+        var problems = await _verification.GetGateProblemsAsync(unitId, draft, cancellationToken).ConfigureAwait(false);
+        // The Profile picker is explicit KeepDestination intent, independent of who appears in a photo.
+        var collisions = (draft.ProfileCollisionDecisions ?? []).Concat(problems.ProfileCollisions.Select(problem =>
+            new StagedProfileCollisionDecision(problem.ImportItemId, ProfileCollisionAction.KeepDestination, null))).ToArray();
+        var faces = draft.FaceDecisions.ToList();
+        await using (var connection = await _catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false))
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText = """
+                SELECT fd.face_id, fd.row_version, fd.suggested_identity_id, fd.suggested_candidates_json,
+                       fd.embedding_space_key, identity.profile_id, ii.import_item_id, fd.media_id, fd.model_id, fd.model_version, fd.embedding
+                FROM import_items ii JOIN face_detections fd ON fd.media_id=COALESCE(ii.reused_media_id,ii.candidate_media_id)
+                JOIN identities identity ON identity.identity_id=fd.suggested_identity_id AND identity.is_active=1
+                JOIN profiles p ON p.profile_id=identity.profile_id AND p.kind='NORMAL' AND p.visibility='PUBLISHED' AND p.trashed_at_ms IS NULL
+                WHERE ii.import_unit_id=$unit AND ii.disposition='INCLUDED' AND fd.decision_state='SUGGESTED'
+                  AND EXISTS (SELECT 1 FROM identity_samples sample
+                    JOIN face_detections reference_face ON reference_face.face_id=sample.face_id
+                    JOIN media original ON original.media_id=reference_face.media_id
+                    WHERE sample.identity_id=identity.identity_id AND sample.embedding_space_key=fd.embedding_space_key
+                      AND reference_face.confirmed_identity_id=identity.identity_id AND reference_face.decision_state='CONFIRMED'
+                      AND original.state='ACTIVE' AND original.trashed_at_ms IS NULL);
+                """;
+            command.Parameters.AddWithValue("$unit", DbGuid.Format(unitId));
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                var evidence = FaceSuggestionEvidenceV1.TryParse(reader.IsDBNull(3) ? null : reader.GetString(3));
+                var top = AutomaticMediaAssignmentPolicy.GetStrongFaceSuggestion(evidence);
+                var faceId = DbGuid.Parse(reader.GetString(0));
+                if (top is null || top.IdentityId != DbGuid.Parse(reader.GetString(2))
+                    || reader.IsDBNull(4) || reader.IsDBNull(8) || reader.IsDBNull(9) || reader.IsDBNull(10)
+                    || evidence!.EmbeddingSpaceKey != reader.GetString(4)
+                    || !EmbeddingSpaceKey.TryParse(reader.GetString(4), out var space)
+                    || !FaceEmbedding.TryFromBlob(reader.GetFieldValue<byte[]>(10), space, out _, out _)
+                    || faces.Any(face => face.FaceId == faceId)) continue;
+                faces.Add(new StagedFaceDecision(faceId, reader.GetInt64(1), VerificationFaceDecision.Confirm,
+                    VerificationFaceTargetKind.ExistingProfile, DbGuid.Parse(reader.GetString(5)),
+                    DbGuid.Parse(reader.GetString(6)), DbGuid.Parse(reader.GetString(7)), reader.GetString(8), reader.GetString(9)));
+            }
+        }
+        if (collisions.Length == (draft.ProfileCollisionDecisions?.Count ?? 0) && faces.Count == draft.FaceDecisions.Count)
+            return draft;
+        var updated = draft with { ProfileCollisionDecisions = collisions, FaceDecisions = faces };
+        await _verification.UpdateDraftAsync(unitId, updated, rowVersion, cancellationToken).ConfigureAwait(false);
+        return updated;
     }
 
     private async Task<ImportPublicationResult> ApplyFaceDecisionsAsync(

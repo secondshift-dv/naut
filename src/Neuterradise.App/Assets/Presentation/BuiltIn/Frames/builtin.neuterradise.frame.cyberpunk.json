@@ -2,7 +2,7 @@
   "id": "builtin.neuterradise.frame.cyberpunk",
   "kind": "cover-frame",
   "name": "Cyberpunk",
-  "description": "Segmented gunmetal arcs with cyan and magenta neon.",
+  "description": "Layered titanium arcs with cyan and violet light.",
   "spec": {
     "frameId": "cyberpunk",
     "overlayAsset": "frame-cyberpunk",

@@ -1,0 +1,12 @@
+Naut curated Theme representative artwork
+
+Obsidian, Logbook and Foundry were created in the ChatGPT image generation tool
+on 2026-10-29 for Naut's theme selector. The original image subjects are:
+Obsidian - quiet charcoal layers, crimson horizon and navigation marks;
+Logbook - warm ivory paper, olive cartographic coast and compass;
+Foundry - graphite, copper/brass layers and precise compass linework.
+
+Artwork is the small visual identity swatch only; it is not a screenshot
+and never defines runtime colors, which are semantic Theme tokens.
+The images are part of the built-in application payload license in catalog.json.
+No Vault data, client media, credentials or local files were submitted.

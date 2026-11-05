@@ -1,0 +1,43 @@
+{
+  "id": "builtin.neuterradise.control-skin.luminous",
+  "kind": "control-skin",
+  "name": "Halo",
+  "description": "Rounded surfaces with a fine accent line.",
+  "spec": {
+    "radius": 14,
+    "borderWidth": 1.5,
+    "horizontalPadding": 8,
+    "verticalPadding": 3,
+    "height": 26,
+    "scrollbarWidth": 8,
+    "fill": "token:surface2",
+    "hoverFill": "token:surfaceHover",
+    "pressedFill": "token:surfacePressed",
+    "border": "token:borderDefault",
+    "focus": "token:focus",
+    "material": "flat",
+    "relief": 0,
+    "families": {
+      "input": {
+        "radius": 6
+      },
+      "chip": {
+        "radius": 12,
+        "height": 24,
+        "horizontalPadding": 7,
+        "verticalPadding": 2
+      },
+      "slider": {
+        "thumbWidth": 16,
+        "thumbHeight": 16
+      },
+      "tab": {
+        "edge": "bottom",
+        "radius": 4
+      },
+      "scrollbar": {
+        "scrollbarWidth": 8
+      }
+    }
+  }
+}

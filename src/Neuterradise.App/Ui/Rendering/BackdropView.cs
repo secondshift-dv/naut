@@ -169,7 +169,7 @@ public sealed class BackdropView : Grid
             UpdateClock();
             if (!value)
             {
-                StopVideos(releaseSources: true);
+                StopVideos();
             }
             else if (_videos.Any(video => video.SourcePath is null))
             {
@@ -339,25 +339,35 @@ public sealed class BackdropView : Grid
         else
         {
             UpdateClock();
+            if (ResourceGovernor.Shared.Tier == PresentationTier.Suspended) StopVideos();
+            else StartVideos();
         }
     }
 
     private void Rebuild()
     {
         StopClock();
-        StopVideos(releaseSources: true);
-        RetireCanvases();
-        Children.Clear();
+        var previousVideos = _videos.ToList();
+        var previousCanvases = _canvases.ToList();
+        var nextChildren = new List<UIElement>();
+        _canvases.Clear();
         _videos.Clear();
         foreach (var player in _players) player.Pause();
         _players.Clear();
         if (_plan is null)
         {
+            Children.Clear();
+            foreach (var video in previousVideos) video.Dispose();
+            foreach (var canvas in previousCanvases) canvas.Retire();
             return;
         }
 
         _tier = CurrentTier();
         var variant = _plan.For(_tier);
+        // Older installed video packs may omit static variants. Render one bounded frame through
+        // the existing decoder without rewriting their manifest or creating persistent derivatives.
+        if (variant.Layers.Count == 0 && _plan.For(VisualTier.Full).Layers.Any(layer => layer.Kind == "video"))
+            variant = _plan.For(VisualTier.Full) with { Static = true };
         var segment = new List<BackdropLayer>();
 
         void Flush()
@@ -367,9 +377,11 @@ public sealed class BackdropView : Grid
                 return;
             }
 
-            var canvas = new BackdropCanvas(this, [.. segment]);
+            var canvas = previousCanvases.FirstOrDefault(candidate => candidate.Matches(segment));
+            if (canvas is null) canvas = new BackdropCanvas(this, [.. segment]);
+            else previousCanvases.Remove(canvas);
             _canvases.Add(canvas);
-            Children.Add(canvas);
+            nextChildren.Add(canvas);
             segment.Clear();
         }
 
@@ -378,16 +390,16 @@ public sealed class BackdropView : Grid
             if (layer.Kind == "video")
             {
                 Flush();
-                if (_tier == VisualTier.Full && (layer.AssetPath ?? (layer.Source == "media-banner" ? AmbientVideoPath : null)) is { } videoPath)
+                if ((layer.AssetPath ?? (layer.Source == "media-banner" ? AmbientVideoPath : null)) is { } videoPath)
                 {
-                    var video = new SkVideoView
-                    {
-                        Opacity = layer.Opacity,
-                    };
-                    video.Play(videoPath, loop: true);
-                    video.SetActive(_active);
+                    var video = previousVideos.FirstOrDefault(candidate => string.Equals(candidate.SourcePath, videoPath, StringComparison.OrdinalIgnoreCase));
+                    if (video is null) video = new SkVideoView();
+                    else previousVideos.Remove(video);
+                    video.Opacity = layer.Opacity;
+                    video.Play(videoPath, loop: true, still: _tier != VisualTier.Full || variant.Static);
+                    video.SetActive(_active && ResourceGovernor.Shared.Tier != PresentationTier.Suspended);
                     _videos.Add(video);
-                    Children.Add(video);
+                    nextChildren.Add(video);
                 }
 
                 continue;
@@ -405,7 +417,7 @@ public sealed class BackdropView : Grid
                         Stretch = Stretch.UniformToFill,
                         Opacity = layer.Opacity,
                     };
-                    Children.Add(player);
+                    nextChildren.Add(player);
                     _players.Add(player);
                 }
 
@@ -416,8 +428,19 @@ public sealed class BackdropView : Grid
         }
 
         Flush();
+        foreach (var video in previousVideos) video.Dispose();
+        foreach (var canvas in previousCanvases) canvas.Retire();
         if (ReadabilityGuard && variant.Layers.Any(l => l.Kind is "image" or "video"))
-            Children.Add(new Border { Background = ThemeRuntime.Current.Brush("canvas"), Opacity = 0.78, IsHitTestVisible = false });
+            nextChildren.Add(new Border { Background = ThemeRuntime.Current.Brush("canvas"), Opacity = 0.78, IsHitTestVisible = false });
+        // Keep matching layers attached: transient Unloaded events can retire a valid video frame.
+        for (var index = 0; index < nextChildren.Count; index++)
+        {
+            var child = nextChildren[index];
+            if (index < Children.Count && ReferenceEquals(Children[index], child)) continue;
+            if (Children.Contains(child)) Children.Remove(child);
+            Children.Insert(index, child);
+        }
+        while (Children.Count > nextChildren.Count) Children.RemoveAt(Children.Count - 1);
         StartVideos();
         UpdateClock();
     }
@@ -434,7 +457,7 @@ public sealed class BackdropView : Grid
 
     private void StartVideos()
     {
-        if (!_active || _tier != VisualTier.Full)
+        if (!_active || ResourceGovernor.Shared.Tier == PresentationTier.Suspended)
         {
             return;
         }
@@ -462,7 +485,9 @@ public sealed class BackdropView : Grid
 
     private void UpdateClock()
     {
-        var animated = _plan?.For(_tier).IsAnimated == true;
+        var variant = _plan?.For(_tier);
+        var animated = variant is { Static: false } && variant.Layers.Any(layer =>
+            layer.Kind is "particles" or "fog" or "light-sweep" || layer.Amplitude > 0);
         var allowed = _active && IsLoaded && animated && _tier != VisualTier.Fallback
             && ResourceGovernor.Shared.Tier != PresentationTier.Suspended;
         if (allowed && !_clockRunning)
@@ -510,6 +535,7 @@ public sealed class BackdropView : Grid
 /// <summary>Draws one contiguous run of procedural backdrop layers.</summary>
 internal sealed class BackdropCanvas : SKCanvasElement
 {
+    internal bool Matches(IEnumerable<BackdropLayer> layers) => !_retired && _layers.SequenceEqual(layers);
     private static readonly Lazy<SKImage> NoiseTexture = new(() => CreateNoise(96, grain: true));
     private static readonly Lazy<SKImage> FogTexture = new(() => CreateNoise(128, grain: false));
 
@@ -518,6 +544,9 @@ internal sealed class BackdropCanvas : SKCanvasElement
     private readonly Dictionary<BackdropLayer, SKImage?> _images = [];
     private readonly Dictionary<BackdropLayer, SKImage?> _blurred = [];
     private readonly Dictionary<BackdropLayer, Particle[]> _particles = [];
+    private readonly Dictionary<BackdropLayer, SKShader> _bokehShaders = [];
+    private SKPath? _sparklePath;
+    private SKPath? _wavePath;
     private PreparedColors[] _colors = [];
     private int _generation;
     private bool _retired;
@@ -566,6 +595,22 @@ internal sealed class BackdropCanvas : SKCanvasElement
             layer.Color2 is null ? null : SkiaColor.From(tokens.Resolve(layer.Color2)),
             layer.Stops?.Select(stop => SkiaColor.From(tokens.Resolve(stop.Color))).ToArray(),
             layer.Stops?.Select(stop => (float)stop.Offset).ToArray()))];
+
+        foreach (var shader in _bokehShaders.Values) shader.Dispose();
+        _bokehShaders.Clear();
+        if (_layers.Any(l => l.Kind == "particles" && l.ParticleShape == "sparkle"))
+            _sparklePath ??= new SKPath();
+        if (_layers.Any(l => l.Kind == "wave-field"))
+            _wavePath ??= new SKPath();
+        for (var index = 0; index < _layers.Length; index++)
+        {
+            var layer = _layers[index];
+            if (layer.Kind != "particles" || layer.ParticleShape != "bokeh") continue;
+            var color = _colors[index].Color ?? SKColors.White;
+            // Keep tint and radial geometry immutable; per-particle opacity is supplied by the paint.
+            _bokehShaders[layer] = SKShader.CreateRadialGradient(new SKPoint(0, 0), 1,
+                [color.WithAlpha(255), color.WithAlpha(0)], null, SKShaderTileMode.Clamp);
+        }
 
         foreach (var particleLayer in _layers.Where(l => l.Kind == "particles" && !_particles.ContainsKey(l)))
         {
@@ -650,6 +695,12 @@ internal sealed class BackdropCanvas : SKCanvasElement
 
         _blurred.Clear();
         _images.Clear();
+        foreach (var shader in _bokehShaders.Values) shader.Dispose();
+        _bokehShaders.Clear();
+        _sparklePath?.Dispose();
+        _sparklePath = null;
+        _wavePath?.Dispose();
+        _wavePath = null;
     }
 
     protected override void RenderOverride(SKCanvas canvas, Windows.Foundation.Size area)
@@ -744,13 +795,13 @@ internal sealed class BackdropCanvas : SKCanvasElement
                     foreach (var particle in _particles[layer])
                     {
                         var travel = (float)(t * layer.Speed * 0.16 * particle.Speed);
-                        var y = (particle.Y + (layer.Direction is "down" or "diagonal" ? travel : layer.Direction == "still" ? 0 : -travel)) % 1f;
+                        var y = (particle.Y + (layer.Direction is "down" or "diagonal" ? travel : layer.Direction is "still" or "left" or "right" ? 0 : -travel)) % 1f;
                         if (y < 0)
                         {
                             y += 1;
                         }
 
-                        var x = particle.X + (float)(Math.Sin((t * 0.3 * particle.Speed) + particle.Phase) * 0.015);
+                        var x = particle.X + (float)(Math.Sin((t * 0.3 * particle.Speed) + particle.Phase) * layer.Drift);
                         if (layer.Direction == "diagonal") x = (x + travel * 0.4f) % 1;
                         if (layer.Direction == "radial")
                         {
@@ -758,11 +809,49 @@ internal sealed class BackdropCanvas : SKCanvasElement
                             x = 0.5f + (float)Math.Cos(particle.Phase) * radius * 0.5f;
                             y = 0.5f + (float)Math.Sin(particle.Phase) * radius * 0.5f;
                         }
-                        var twinkle = 0.55 + (0.45 * Math.Sin((t * 1.4 * particle.Speed) + particle.Phase));
+                        if (layer.Direction is "left" or "right")
+                            x = (x + (layer.Direction == "left" ? -travel : travel)) % 1;
+                        x = (x % 1 + 1) % 1;
+                        if (layer.SpawnRegion == "upper") y *= .35f;
+                        else if (layer.SpawnRegion == "lower") y = .65f + y * .35f;
+                        else if (layer.SpawnRegion == "edges") x = x < .5f ? x * .3f : .85f + (x - .5f) * .3f;
+                        var twinkle = 1 - layer.Twinkle + (layer.Twinkle * Math.Sin((t * 1.4 * particle.Speed) + particle.Phase));
                         paint.Color = color.WithAlpha((byte)Math.Clamp(color.Alpha * layer.Opacity * twinkle, 0, 255));
                         var particleX = (x * w) + (depthX * 1.5f);
                         var particleY = (y * h) + (depthY * 1.5f);
-                        if (layer.ParticleShape == "line") canvas.DrawLine(particleX, particleY, particleX - particle.Size * 2, particleY - particle.Size * 6, paint);
+                        if (layer.ParticleShape == "pixel")
+                            canvas.DrawRect(SKRect.Create(particleX, particleY, particle.Size * 2, particle.Size * 2), paint);
+                        else if (layer.ParticleShape == "sparkle")
+                        {
+                            var size = particle.Size * 2;
+                            var star = _sparklePath!;
+                            star.Rewind();
+                            star.MoveTo(particleX, particleY - size);
+                            star.LineTo(particleX + size * .22f, particleY - size * .22f);
+                            star.LineTo(particleX + size, particleY);
+                            star.LineTo(particleX + size * .22f, particleY + size * .22f);
+                            star.LineTo(particleX, particleY + size);
+                            star.LineTo(particleX - size * .22f, particleY + size * .22f);
+                            star.LineTo(particleX - size, particleY);
+                            star.LineTo(particleX - size * .22f, particleY - size * .22f);
+                            star.Close();
+                            canvas.DrawPath(star, paint);
+                        }
+                        else if (layer.ParticleShape == "bokeh")
+                        {
+                            // Reuse the prepared radial shader, transforming the canvas rather than
+                            // allocating an SKShader wrapper for each particle on every frame.
+                            var radius = particle.Size * 3;
+                            paint.Shader = _bokehShaders[layer];
+                            paint.Color = SKColors.White.WithAlpha(paint.Color.Alpha);
+                            canvas.Save();
+                            canvas.Translate(particleX, particleY);
+                            canvas.Scale(radius, radius);
+                            canvas.DrawCircle(0, 0, 1, paint);
+                            canvas.Restore();
+                            paint.Shader = null;
+                        }
+                        else if (layer.ParticleShape == "line") canvas.DrawLine(particleX, particleY, particleX - particle.Size * 2, particleY - particle.Size * 6, paint);
                         else if (layer.ParticleShape is "petal" or "leaf" or "diamond")
                         {
                             canvas.Save();
@@ -802,16 +891,32 @@ internal sealed class BackdropCanvas : SKCanvasElement
                 }
                 case "wave-field":
                 {
-                    paint.Color = (colors.Color ?? SKColors.White).WithAlpha((byte)(255 * layer.Opacity));
+                    var color = colors.Color ?? SKColors.White;
+                    var path = _wavePath!;
+                    var motion = (float)(t * Math.Max(0, layer.Speed));
+                    var scale = (float)Math.Clamp(layer.Scale, 0.25, 3);
+                    var amplitude = Math.Min(h * 0.12f, 54f) * scale;
                     paint.Style = SKPaintStyle.Stroke;
-                    paint.StrokeWidth = 1.2f;
-                    for (var band = 0; band < 12; band++)
+                    paint.StrokeCap = SKStrokeCap.Round;
+                    for (var band = 0; band < 9; band++)
                     {
-                        using var path = new SKPath();
-                        for (var step = 0; step <= 48; step++)
+                        var depth = band / 8f;
+                        var phase = band * 0.53f;
+                        var center = h * (0.12f + band * 0.098f);
+                        var drift = motion * (0.47f + depth * 0.38f);
+                        var strength = (float)(0.26 + layer.Amplitude * (0.70 - 0.22 * depth));
+                        paint.Color = color.WithAlpha((byte)Math.Clamp(
+                            color.Alpha * layer.Opacity * (0.26 + 0.62 * (1 - depth)), 0, 255));
+                        paint.StrokeWidth = 0.9f + (1 - depth) * 1.45f;
+                        path.Rewind();
+                        for (var step = 0; step <= 64; step++)
                         {
-                            var x = w * step / 48;
-                            var y = h * band / 12 + (float)(Math.Sin(step * 0.24 + band * 0.6 + t * Math.Max(0.6, layer.Speed)) * 18 * layer.Scale);
+                            var progress = step / 64f;
+                            var envelope = 0.25f + 0.75f * (float)Math.Sin(Math.PI * progress);
+                            var broad = (float)Math.Sin(progress * Math.PI * 2.65 + phase - drift);
+                            var ripple = (float)Math.Sin(progress * Math.PI * 5.4 - phase * 0.8f + drift * 0.55f);
+                            var y = center + amplitude * strength * envelope * (broad + ripple * 0.23f);
+                            var x = progress * w;
                             if (step == 0) path.MoveTo(x, y); else path.LineTo(x, y);
                         }
                         canvas.DrawPath(path, paint);
@@ -830,7 +935,9 @@ internal sealed class BackdropCanvas : SKCanvasElement
                 case "light-sweep":
                 {
                     var color = colors.Color ?? SKColors.White;
-                    var progress = (float)((t / Math.Max(2, layer.Period)) % 1.0);
+                    // Freezing at the cycle origin leaves the entire sweep outside the viewport.
+                    var frozen = _owner.Tier == VisualTier.Fallback || _owner.Plan?.For(_owner.Tier).Static == true;
+                    var progress = frozen ? 0.5f : (float)((t * Math.Max(0.1, layer.Speed) / Math.Max(2, layer.Period)) % 1.0);
                     var band = (float)layer.Width;
                     var position = (progress * (1 + (band * 2))) - band;
                     var angle = layer.Angle * Math.PI / 180;

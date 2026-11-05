@@ -353,6 +353,7 @@ public sealed class ImportActivityService : IAsyncDisposable
         var committed = unit.State.IsUnitCommitted();
         var failed = unit.State is ImportUnitState.FailedRetryable or ImportUnitState.FailedTerminal;
         var cancelled = unit.State == ImportUnitState.Cancelled;
+        var cleanupPending = cancelled && unit.RollbackSettled != true;
         // Required preparation failures are actionable only while the import is still unpublished.
         // Cancelled/committed units can retain historical capability/job rows (for diagnostics and
         // repair provenance), but those rows must never resurrect a terminal import as active work.
@@ -374,6 +375,8 @@ public sealed class ImportActivityService : IAsyncDisposable
         var setAside = (draft?.AttentionItemIds?.Count ?? 0) + (progress?.UnusableItemCount ?? 0);
         var attentionCount = setAside + unit.CleanupFailedCount;
         var profileChosen = draft?.Destination.Kind is not null || requested;
+        var publicationAttention = !committed && draft?.PublishWhenReady == true
+            && unit.State == ImportUnitState.ReadyForVerification && attentionCount > 0;
 
         var candidateReadyForReview = !requested && !unit.LibraryCommitState.HasReachedDomainCommit()
             && unit.State == ImportUnitState.Preparing && admitted > 0 && prepared >= admitted;
@@ -381,7 +384,7 @@ public sealed class ImportActivityService : IAsyncDisposable
         ImportActivityStage stage;
         if (cancelled)
         {
-            stage = ImportActivityStage.Cancelled;
+            stage = cleanupPending ? ImportActivityStage.NeedsAttention : ImportActivityStage.Cancelled;
         }
         else if (committed && attentionCount > 0)
         {
@@ -391,7 +394,7 @@ public sealed class ImportActivityService : IAsyncDisposable
         {
             stage = ImportActivityStage.Done;
         }
-        else if (failed || hasPreparationFailure)
+        else if (failed || hasPreparationFailure || publicationAttention)
         {
             stage = ImportActivityStage.NeedsAttention;
         }
@@ -403,6 +406,10 @@ public sealed class ImportActivityService : IAsyncDisposable
         {
             stage = ImportActivityStage.Saving;
         }
+        else if (!profileChosen)
+        {
+            stage = ImportActivityStage.WaitingForProfile;
+        }
         else if (unit.State == ImportUnitState.ReadyForVerification || candidateReadyForReview)
         {
             stage = ImportActivityStage.ReadyToVerify;
@@ -410,10 +417,6 @@ public sealed class ImportActivityService : IAsyncDisposable
         else if (unit.State == ImportUnitState.Intake)
         {
             stage = ImportActivityStage.Reading;
-        }
-        else if (!profileChosen)
-        {
-            stage = ImportActivityStage.WaitingForProfile;
         }
         else
         {
@@ -448,7 +451,7 @@ public sealed class ImportActivityService : IAsyncDisposable
         var isTerminal = committed
             || stage == ImportActivityStage.Cancelled
             || unit.State == ImportUnitState.FailedTerminal;
-        var needsAttention = failed || hasPreparationFailure || (committed && attentionCount > 0);
+        var needsAttention = cleanupPending || failed || hasPreparationFailure || publicationAttention || (committed && attentionCount > 0);
 
         // ReadyForVerification: preparation is complete; expose Continue/Review, not Pause/Prioritize.
         var isReadyToVerify = stage == ImportActivityStage.ReadyToVerify;
@@ -468,10 +471,14 @@ public sealed class ImportActivityService : IAsyncDisposable
                 : unit.SourceDisplayName,
         };
 
-        var stageText = duplicateOnlySettled
+        var stageText = cleanupPending
+            ? SurfaceText.Get("Import.Stage.CleanupPending", "Cleanup pending")
+            : duplicateOnlySettled
             ? SurfaceText.Get("Import.Stage.AlreadyInVault", "Already in your Vault")
             : DescribeStageWithImportPhase(unit, stage);
-        var detailText = duplicateOnly
+        var detailText = cleanupPending
+            ? SurfaceText.Get("Import.Detail.CleanupPending", "Import has stopped. Complete cleanup before clearing this entry.")
+            : duplicateOnly
             && stage is not (ImportActivityStage.Done or ImportActivityStage.NeedsAttention or ImportActivityStage.Cancelled)
             ? SurfaceText.Get(
                 "Import.Detail.DuplicateOnly",
@@ -490,12 +497,12 @@ public sealed class ImportActivityService : IAsyncDisposable
             IsTerminal: isTerminal,
             NeedsAttention: needsAttention,
             CanContinue: stage is ImportActivityStage.WaitingForProfile or ImportActivityStage.ReadyToVerify
-                || hasPreparationFailure,
+                || hasPreparationFailure || publicationAttention,
             CanRetry: unit.State == ImportUnitState.FailedRetryable,
             // FAILED_TERMINAL exposes one decisive action: Clear. Clear internally performs the
             // ordered cancellation/rollback before hiding history, so a second Cancel button would
             // be redundant and misleading.
-            CanCancel: unit.State.CanCancelUnpublished() && unit.State != ImportUnitState.FailedTerminal,
+            CanCancel: cleanupPending || unit.State.CanCancelUnpublished() && unit.State != ImportUnitState.FailedTerminal,
             CanClearHistory: unit.State == ImportUnitState.FailedTerminal
                 || (!needsAttention
                     && unit.State is (ImportUnitState.Committed
@@ -580,7 +587,7 @@ public sealed class ImportActivityService : IAsyncDisposable
         if (stage == ImportActivityStage.Checking)
         {
             _etaStates.Remove(unitId);
-            return SurfaceText.Get("Import.Eta.Preparing", "Preparing remaining media…");
+            return SurfaceText.Get("Import.Eta.Preparing", "Preparing remaining media...");
         }
         if (stage is not (ImportActivityStage.Checking or ImportActivityStage.Saving)
             || progress is null)
@@ -705,6 +712,7 @@ public sealed class ImportActivityService : IAsyncDisposable
     {
         if (unit.StageTwoStartedAtUtc is { } stageTwoStarted
             && stage is ImportActivityStage.Checking
+                or ImportActivityStage.WaitingForProfile
                 or ImportActivityStage.Paused
                 or ImportActivityStage.NeedsAttention
                 or ImportActivityStage.ReadyToVerify)

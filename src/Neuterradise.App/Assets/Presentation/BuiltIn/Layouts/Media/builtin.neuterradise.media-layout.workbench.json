@@ -3,27 +3,29 @@
   "kind": "profile-media-layout",
   "name": "Workbench",
   "spec": {
-    "layoutId": "editorial",
-    "cardWidth": 720,
-    "aspect": 2.2,
-    "mediaWidthFraction": 0.64,
+    "layoutId": "workbench",
+    "cardWidth": 320,
+    "aspect": 1.75,
+    "mediaWidthFraction": 0.43,
     "fit": "fit",
     "metadataPlacement": "side",
     "metadataFields": [
       "name",
+      "type",
       "dimensions",
       "duration",
       "favorite"
     ],
-    "metadataLines": 2,
-    "frameStyle": "gallery",
-    "frameRadius": 10,
-    "frameThickness": 2,
+    "metadataLines": 3,
+    "frameStyle": "hairline",
+    "frameRadius": 8,
+    "frameThickness": 1,
     "frameColor": "token:borderDefault",
     "selectedFrameColor": "token:accent",
     "frameGlow": 0,
-    "hoverStyle": "spotlight",
+    "hoverStyle": "none",
     "showTypeBadge": false,
     "browse": "workbench"
-  }
+  },
+  "description": "Three compact media columns on wide Profile surfaces."
 }

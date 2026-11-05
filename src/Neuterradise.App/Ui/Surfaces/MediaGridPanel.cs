@@ -8,41 +8,14 @@ using Neuterradise.App.Shell;
 
 namespace Neuterradise.App.Ui;
 
-public static class MediaGridViewportPolicy
-{
-    public static double Calculate(double cardHeight, double availableHeight, bool horizontal)
-    {
-        cardHeight = double.IsFinite(cardHeight) && cardHeight > 0 ? cardHeight : 160;
-        availableHeight = double.IsFinite(availableHeight) && availableHeight > 0 ? availableHeight : 600;
-        if (horizontal)
-        {
-            return Math.Clamp(cardHeight + 16, 180, Math.Min(420, Math.Max(180, availableHeight * 0.55)));
-        }
-
-        var rows = availableHeight switch
-        {
-            < 700 => 2,
-            < 900 => 3,
-            < 1200 => 4,
-            _ => 5,
-        };
-        const double spacing = 10;
-        var desired = cardHeight * rows + spacing * (rows - 1);
-        var twoRowBaseline = Math.Clamp(cardHeight * 2 + spacing, 240, 340);
-        var upper = Math.Clamp(availableHeight * 0.68, twoRowBaseline, 760);
-        return Math.Clamp(desired, Math.Min(twoRowBaseline, upper), Math.Max(twoRowBaseline, upper));
-    }
-}
-
 public sealed class MediaGridPanel : IDisposable
 {
     private readonly AppServices _services;
     private readonly MediaGridViewModel _vm;
     private readonly Func<PresentationContext> _context;
     private readonly Func<string, PresentationContext, CompiledDefinition> _resolve;
-    private readonly Grid _root = UI.Grid("auto,*,auto", "*");
+    private readonly Grid _root = UI.Grid("auto,auto,auto", "*");
     private readonly ItemsRepeater _repeater;
-    private readonly ScrollViewer _scroll;
     private readonly PooledElementFactory _factory;
     private readonly TextBlock _state = UI.WrappedText(string.Empty, "body-muted");
     private readonly Border _stateHost = new();
@@ -50,25 +23,21 @@ public sealed class MediaGridPanel : IDisposable
     private readonly HashSet<MediaCardView> _views = [];
     private MediaLayoutDefinition _layout;
     private string _browse = "wall";
+    private int _observedPage;
 
-    public MediaGridPanel(AppServices services, MediaGridViewModel vm, Func<PresentationContext> context, Func<string, PresentationContext, CompiledDefinition>? resolve = null)
+    public MediaGridPanel(AppServices services, MediaGridViewModel vm, Func<PresentationContext> context, Func<string, PresentationContext, CompiledDefinition>? resolve = null, Action? bringMediaIntoView = null)
     {
         _services = services;
         _vm = vm;
+        _observedPage = vm.CurrentPage;
         _context = context;
         _resolve = resolve ?? ((slot, current) => _services.Presentation.ResolveCompiled(slot, current));
         _layout = ResolveLayout();
         _factory = new PooledElementFactory(KindOf, Create, Bind, Recycle);
-        var (scroll, repeater) = Repeaters.Virtualized(
-            _factory,
-            Repeaters.Grid(_layout.CardWidth, _layout.CardHeight, 10));
-        _repeater = repeater;
-        _scroll = scroll;
+        _repeater = new ItemsRepeater { Name = "ProfileMedia", ItemTemplate = _factory };
         ApplyBrowse();
-        _scroll.Height = ViewportHeight();
-
         var stage = new Grid();
-        stage.Children.Add(scroll);
+        stage.Children.Add(_repeater);
         _stateHost.Child = UI.V(8,
             new IconView("icon.media.image", 28, "textMuted").Align(HorizontalAlignment.Center),
             _state.Align(HorizontalAlignment.Center));
@@ -102,11 +71,16 @@ public sealed class MediaGridPanel : IDisposable
             nameof(MediaGridViewModel.State),
             nameof(MediaGridViewModel.RangeText)));
         UpdateState();
-        _root.SizeChanged += (_, _) =>
+        _root.SizeChanged += (_, _) => RefreshLayout();
+        _repeater.SizeChanged += (_, _) => RefreshLayout();
+        _bag.Add(Observe.Props(_vm, () =>
         {
-            if (_browse == "workbench") RefreshLayout();
-            else RefreshViewport();
-        };
+            if (_observedPage == _vm.CurrentPage) return;
+            _observedPage = _vm.CurrentPage;
+            // The owning Profile page can bring Media into view immediately on pagination.
+            // Waiting for another State change can miss the scroll when the query stays Ready.
+            _root.DispatcherQueue.TryEnqueue(() => bringMediaIntoView?.Invoke());
+        }, nameof(MediaGridViewModel.CurrentPage)));
     }
 
     public FrameworkElement View => _root;
@@ -120,14 +94,12 @@ public sealed class MediaGridPanel : IDisposable
         var next = ResolveLayout();
         if (next == _layout && previousBrowse == _browse)
         {
-            RefreshViewport();
             return;
         }
 
         HoverVideoCoordinator.Shared.StopAll();
         _layout = next;
         ApplyBrowse();
-        RefreshViewport();
         foreach (var view in _views)
         {
             view.ApplyLayout(_layout);
@@ -138,34 +110,32 @@ public sealed class MediaGridPanel : IDisposable
     {
         var plan = _resolve(PresentationSlots.ProfileMediaLayout, _context() with { Surface = "media" }).PlanAs<ProfileMediaLayoutPlan>();
         _browse = plan.Browse;
-        return _browse == "workbench" && _root.ActualWidth > 0
-            ? plan.Layout with { CardWidth = Math.Max(140, Math.Min(plan.Layout.CardWidth, _root.ActualWidth - 24)) }
-            : plan.Layout;
+        var width = _repeater is { ActualWidth: > 0 } ? _repeater.ActualWidth
+            : _root.ActualWidth > 0 ? _root.ActualWidth : plan.Layout.CardWidth;
+        var maxWidth = _browse == "workbench" ? 320 : _browse == "editorial" ? 260 : 220;
+        var target = _browse == "workbench" && width >= 620
+            ? Math.Min(maxWidth, (width - 44) / 3)
+            : plan.Layout.CardWidth;
+        return plan.Layout with { CardWidth = Math.Min(Math.Max(1, width), Math.Clamp(target, 120, maxWidth)) };
     }
 
     private void ApplyBrowse()
     {
         _repeater.Layout = _browse switch
         {
-            "workbench" => Repeaters.Stack(false, 8),
-            "reel" => Repeaters.Stack(true, 10),
-            _ => Repeaters.Grid(_layout.CardWidth, _layout.CardHeight, 10),
+            "editorial" => new EditorialGridLayout(_layout.CardWidth, _layout.CardHeight, 14),
+            "workbench" => CompactGrid(8),
+            _ => CompactGrid(10),
         };
-        _scroll.HorizontalScrollMode = _browse == "reel" ? ScrollMode.Enabled : ScrollMode.Disabled;
-        _scroll.HorizontalScrollBarVisibility = _browse == "reel" ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled;
-        _scroll.VerticalScrollMode = _browse == "reel" ? ScrollMode.Disabled : ScrollMode.Enabled;
     }
 
-    private void RefreshViewport() => _scroll.Height = ViewportHeight();
-
-    private double ViewportHeight()
+    private UniformGridLayout CompactGrid(double spacing) => new()
     {
-        var availableHeight = _root.XamlRoot?.Size.Height ?? 0;
-        return MediaGridViewportPolicy.Calculate(
-            _layout.CardHeight,
-            availableHeight,
-            _browse == "reel");
-    }
+        MinItemWidth = _layout.CardWidth, MinItemHeight = _layout.CardHeight,
+        MinColumnSpacing = spacing, MinRowSpacing = spacing,
+        ItemsStretch = UniformGridLayoutItemsStretch.None,
+        MaximumRowsOrColumns = _browse == "workbench" ? 3 : int.MaxValue,
+    };
 
     private FrameworkElement Toolbar()
     {

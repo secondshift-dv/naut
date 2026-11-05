@@ -7,7 +7,7 @@
 <p align="center">Local-first media collections for Windows — offline face intelligence, interactive 3D Figures, and your own portable Vault.</p>
 
 <p align="center">
-  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.6"><strong>Download Naut v0.0.6</strong></a>
+  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.7"><strong>Download Naut v0.0.7</strong></a>
   ·
   <a href="https://secondshift-dv.github.io/naut/"><strong>View Live Demo</strong></a>
   ·
@@ -84,6 +84,15 @@ The portable app package and the Vault are separate boundaries. Imports copy fil
 - **3D is additive, not mandatory.** Normal Naut use does not require a discrete GPU or a Figure.
 - **Portable application, durable collection.** Updating the app package does not replace the Vault.
 
+## What changed in v0.0.7
+
+- **Refined presentation:** refreshed Obsidian, Logbook and Foundry themes; three curated layouts per major surface; readable Gallery cards, Home Spotlight, Profile sections and Media views.
+- **Vault identity:** rename a Vault and assign its own PNG, JPEG or WebP icon in Settings → Vault; the identity travels with that Vault.
+- **Simpler media intake:** Add media directly from a Profile, see durable Import Activity, and safely cancel or resume interrupted transfers.
+- **Recoverable organization:** 30-day grouped Profile Trash, explicit review of externally edited Overview and Private Note files, and more compatible video/image inputs.
+
+See the [complete v0.0.7 release notes](docs/releases/v0.0.7.md) for compatibility details, limitations and verification coverage.
+
 ## See it in action
 
 <table>
@@ -99,7 +108,7 @@ The portable app package and the Vault are separate boundaries. Imports copy fil
 
 ## Quick Start
 
-1. Open the official [Naut v0.0.6 download](https://github.com/secondshift-dv/naut/releases/tag/v0.0.6) and choose **`naut-v0.0.6-win-x64.zip`** under Assets.
+1. Open the official [Naut v0.0.7 download](https://github.com/secondshift-dv/naut/releases/tag/v0.0.7) and choose **`naut-v0.0.7-win-x64.zip`** under Assets.
 2. Extract the complete ZIP to a normal folder.
 3. Run `naut.exe`.
 4. Choose **where to keep** your Vault.
@@ -120,7 +129,7 @@ Naut's normal collection experience is intentionally lighter than its optional F
 | **Display** | 1280 × 720 | 1920 × 1080 or higher |
 | **Free app/update space** | 3 GB | 3 GB+ on SSD |
 
-Vault storage is separate and depends on the size of your collection. See the full [Naut v0.0.6 System Requirements](docs/system-requirements.md).
+Vault storage is separate and depends on the size of your collection. See the full [Naut v0.0.7 System Requirements](docs/system-requirements.md).
 
 ## Optional pack collection
 

@@ -1,7 +1,7 @@
 {
   "id": "builtin.neuterradise.effect.sweep",
   "kind": "effect",
-  "name": "Sweep",
+  "name": "Light Sweep",
   "spec": {
     "targets": [
       "all"
@@ -13,10 +13,12 @@
         "layers": [
           {
             "kind": "light-sweep",
-            "opacity": 0.1,
+            "opacity": 0.3,
             "color": "token:accent",
-            "width": 0.15,
-            "speed": 0.25
+            "width": 0.22,
+            "speed": 1.0,
+            "period": 8,
+            "angle": 14
           }
         ]
       },
@@ -33,5 +35,6 @@
     "continuousAnimation": true,
     "offscreenPolicy": "pause",
     "maxAnimatedLayers": 1
-  }
+  },
+  "description": "A moving sweep of light."
 }

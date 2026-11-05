@@ -13,8 +13,11 @@
         "layers": [
           {
             "kind": "wave-field",
-            "opacity": 0.1,
-            "color": "token:accentSecondary"
+            "opacity": 0.32,
+            "color": "token:accentSecondary",
+            "scale": 1.15,
+            "amplitude": 0.48,
+            "speed": 0.78
           }
         ]
       },
@@ -22,9 +25,11 @@
         "layers": [
           {
             "kind": "wave-field",
-            "opacity": 0.1,
+            "opacity": 0.32,
             "color": "token:accentSecondary",
-            "amplitude": 0
+            "amplitude": 0.0,
+            "scale": 1.15,
+            "speed": 0.0
           }
         ]
       },
@@ -32,18 +37,21 @@
         "layers": [
           {
             "kind": "wave-field",
-            "opacity": 0.1,
+            "opacity": 0.32,
             "color": "token:accentSecondary",
-            "amplitude": 0
+            "amplitude": 0.0,
+            "scale": 1.15,
+            "speed": 0.0
           }
         ]
       }
     }
   },
   "performance": {
-    "tier": "static",
-    "continuousAnimation": false,
+    "tier": "light",
+    "continuousAnimation": true,
     "offscreenPolicy": "pause",
-    "maxAnimatedLayers": 0
-  }
+    "maxAnimatedLayers": 1
+  },
+  "description": "Flowing nautilus contours."
 }

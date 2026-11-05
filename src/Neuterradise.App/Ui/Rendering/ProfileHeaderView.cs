@@ -25,7 +25,9 @@ public sealed record ProfileHeaderViewState(
     bool ReducedMotion,
     PresentationContext? Context = null,
     FrameworkElement? FigureView = null,
-    double FigureSize = 300);
+    double FigureSize = 300,
+    IReadOnlyList<ProfileTagAssignment>? Tags = null,
+    Func<FrameworkElement>? DetailsFactory = null);
 
 public static class ProfileIdentityView
 {
@@ -33,9 +35,10 @@ public static class ProfileIdentityView
         string name, string? category, IReadOnlyList<string> tags, int? rating, bool isFavorite,
         ProfileLayoutIdentityAlignment alignment, Action<int>? onRating = null, ICommand? favoriteCommand = null,
         string? favoriteTooltip = null,
-        FrameworkElement? actions = null, FrameworkElement? status = null)
+        FrameworkElement? actions = null, FrameworkElement? status = null,
+        IReadOnlyList<ProfileTagAssignment>? assignedTags = null, bool showTags = true)
     {
-        var nameView = UI.Text(name, "hero", maxLines: 2);
+        var nameView = UI.Text(name, "hero", maxLines: 2).Tip(name);
         var taxonomy = new VariableWrap(6);
         if (!string.IsNullOrWhiteSpace(category))
         {
@@ -51,10 +54,7 @@ public static class ProfileIdentityView
             });
         }
 
-        foreach (var tag in tags.Where(static value => !string.IsNullOrWhiteSpace(value)).Take(5))
-        {
-            taxonomy.Children.Add(UI.Badge(tag));
-        }
+        if (showTags && assignedTags is { Count: > 0 }) taxonomy.Children.Add(TagCapsules.Create(assignedTags));
         var stars = UI.H(3);
         for (var i = 1; i <= 5; i++)
         {
@@ -87,8 +87,17 @@ public static class ProfileIdentityView
         stars.VerticalAlignment = VerticalAlignment.Center;
         favorite.VerticalAlignment = VerticalAlignment.Center;
         var preferences = UI.H(10, stars, favorite);
+        stars.Visibility = onRating is null && rating is not > 0 ? Visibility.Collapsed : Visibility.Visible;
+        favorite.Visibility = favoriteCommand is null && !isFavorite ? Visibility.Collapsed : Visibility.Visible;
+        preferences.Visibility = stars.Visibility == Visibility.Collapsed && favorite.Visibility == Visibility.Collapsed
+            ? Visibility.Collapsed : Visibility.Visible;
         taxonomy.Visibility = taxonomy.Children.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
-        var content = UI.V(6, nameView, taxonomy, preferences, actions, status);
+        var content = UI.V(8, taxonomy, nameView, preferences, actions, status);
+        content.SizeChanged += (_, args) =>
+        {
+            var size = TokenAuthority.Foundations.TypeStyles["hero"].Size;
+            nameView.FontSize = args.NewSize.Width < 420 ? Math.Min(28, size) : size;
+        };
         if (alignment == ProfileLayoutIdentityAlignment.Center)
         {
             nameView.TextAlignment = TextAlignment.Center;
@@ -105,7 +114,14 @@ public static class ProfileIdentityView
             if (actions is not null) actions.HorizontalAlignment = HorizontalAlignment.Right;
             content.HorizontalAlignment = HorizontalAlignment.Right;
         }
-        return UI.Surface(content, Material.Deep, ThemeRuntime.Current.Tokens.Number("radiusSurface", 16), 12);
+        return new Border
+        {
+            Child = content, Padding = new Thickness(12),
+            VerticalAlignment = VerticalAlignment.Center,
+            Background = ThemeRuntime.Current.Brush("canvas"),
+            BorderBrush = ThemeRuntime.Current.Brush("borderSubtle"),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+        };
     }
 }
 
@@ -120,6 +136,12 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         IsHitTestVisible = false,
     };
     private readonly ContentControl _identityHost = new();
+    private readonly ContentControl _tagOverlay = new()
+    {
+        HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top,
+        IsHitTestVisible = false,
+    };
+    private readonly ContentControl _detailsHost = new();
     private readonly ContentControl _figureRegion = new()
     {
         HorizontalContentAlignment = HorizontalAlignment.Stretch,
@@ -139,6 +161,12 @@ public sealed class ProfileHeaderView : Grid, IDisposable
     public event Action<FrameworkElement?>? CoverFramingSurfaceChanged;
     public FrameworkElement? CoverFramingSurface => _coverView;
     public FrameworkElement BannerFramingSurface => _bannerFramingSurface;
+
+    public void RefreshDetails()
+    {
+        if (_state?.Layout.Id == "chronicle" && _state.DetailsFactory is { } details)
+            _detailsHost.Content = details();
+    }
 
     public (double X, double Y) GetBannerPanDelta(double deltaX, double deltaY) =>
         _bannerVideo.FocalDeltaForDrag(deltaX, deltaY);
@@ -161,6 +189,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         _bannerRegion.Children.Add(_bannerVideo);
         _bannerRegion.Children.Add(_bannerScrim);
         _bannerRegion.Children.Add(_bannerFramingSurface);
+        _bannerRegion.Children.Add(_tagOverlay);
         _bannerRegion.Background = ThemeRuntime.Current.Brush("transparent");
 
         _bannerFrame.Child = _bannerRegion;
@@ -262,7 +291,12 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         }
         height = Math.Min(height, width < 960 ? 180.0 : width < 1200 ? 220.0 : 280.0);
 
-        var showBanner = layout.BannerMode != ProfileLayoutBannerMode.None;
+        var showBanner = layout.BannerMode != ProfileLayoutBannerMode.None
+            && !string.IsNullOrWhiteSpace(state.BannerVideoPath);
+        _tagOverlay.Visibility = showBanner && layout.Id == "portrait" ? Visibility.Visible : Visibility.Collapsed;
+        _tagOverlay.Margin = new Thickness(pagePadding, 16, pagePadding, 16);
+        _tagOverlay.MaxWidth = Math.Max(0, width - pagePadding * 2);
+        _tagOverlay.Content = TagCapsules.Create(state.Tags ?? [], width < 600 ? 2 : 4);
         var wideSplit = showBanner && layout.BannerMode == ProfileLayoutBannerMode.Split && width >= 960;
         var splitBannerOnLeft = layout.Id != "split-right";
 
@@ -359,8 +393,13 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         }
 
         var layout = state.Layout;
-        // Reflow the same viewport rather than multiplying native hosts during resize.
+        if (_detailsHost.Parent is Panel oldDetailsParent) oldDetailsParent.Children.Remove(_detailsHost);
+        if (layout.Id != "chronicle") _detailsHost.Content = null;
+        // Reflow the same native Figure host instead of multiplying viewports.
         if (_figureRegion.Parent is Panel oldParent) oldParent.Children.Remove(_figureRegion);
+        Grid.SetRowSpan(_figureRegion, 1);
+        Grid.SetColumnSpan(_figureRegion, 1);
+        RowDefinitions[1].MinHeight = 0;
         _figureRegion.Content = state.FigureView;
         if (state.FigureView is ProfileFigureView figure) figure.SetActive(_active);
         _figureRegion.Visibility = _active && state.FigureView is not null
@@ -402,7 +441,9 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         FrameworkElement? cover = coverVisual;
         var identity = state.IdentityFactory()
             ?? throw new InvalidOperationException("Profile identity factory returned no visual.");
-        var overlap = layout.CoverPlacement is
+        var hasBanner = layout.BannerMode != ProfileLayoutBannerMode.None
+            && !string.IsNullOrWhiteSpace(state.BannerVideoPath);
+        var overlap = hasBanner && layout.CoverPlacement is
             ProfileLayoutCoverPlacement.BottomLeftOverlap or ProfileLayoutCoverPlacement.BottomCenterOverlap;
         var center = layout.CoverPlacement is
                 ProfileLayoutCoverPlacement.BottomCenterOverlap or ProfileLayoutCoverPlacement.InlineCenter
@@ -429,36 +470,70 @@ public sealed class ProfileHeaderView : Grid, IDisposable
             band = grid;
         }
 
-        var wideSplit = layout.BannerMode == ProfileLayoutBannerMode.Split && width >= 960;
+        var wideSplit = hasBanner && layout.BannerMode == ProfileLayoutBannerMode.Split && width >= 960;
         var identityWidth = wideSplit ? width * 0.5 : width;
         if (state.FigureView is not null)
         {
             var figureWidth = Math.Min(Math.Max(1, identityWidth - 2 * UI.PagePadding(identityWidth)),
                 Math.Clamp(identityWidth * 0.3, 240, Math.Clamp(state.FigureSize, 240, 300)));
-            _figureRegion.Height = figureWidth + 72;
+            _figureRegion.Height = figureWidth + (identityWidth < 760 ? 24 : 48);
             // A native child has no intrinsic XAML size. Auto width lets its retained scene or
             // Thumbnail become the next measure input, feeding header reflow back into itself.
             _figureRegion.Width = figureWidth;
             _figureRegion.MaxWidth = 360;
             _figureRegion.HorizontalAlignment = HorizontalAlignment.Center;
-            // Overlap layouts intentionally lift the Cover/identity band into the Banner.
-            // When Figure shares that desktop row, compensate only its viewport so the native
-            // child starts below the Banner instead of inheriting the band's negative top margin.
-            _figureRegion.Margin = overlap && !wideSplit && identityWidth >= 760
-                ? new Thickness(0, coverSize * 0.45 + 10, 0, 0)
-                : new Thickness(0);
-            if (identityWidth >= 760)
+            _figureRegion.Margin = new Thickness(0);
+            var portraitOverlay = layout.Id == "portrait" && overlap && !wideSplit && identityWidth >= 760;
+            if (portraitOverlay)
+            {
+                // A native Figure clipped by the identity row cannot overlap the Banner.
+                // The shared two-row header owns its viewport and paints it after the Banner.
+                var top = Math.Max(0, _bannerFrame.Height - _figureRegion.Height * 0.62);
+                RowDefinitions[1].MinHeight = Math.Max(0,
+                    top + _figureRegion.Height - _bannerFrame.Height) + 16;
+                Grid.SetRow(_figureRegion, 0);
+                Grid.SetRowSpan(_figureRegion, 2);
+                Grid.SetColumn(_figureRegion, 1);
+                _figureRegion.HorizontalAlignment = HorizontalAlignment.Right;
+                _figureRegion.VerticalAlignment = VerticalAlignment.Top;
+                _figureRegion.Margin = new Thickness(0, top, UI.PagePadding(identityWidth), 0);
+                Children.Add(_figureRegion);
+            }
+            else if (identityWidth >= 760)
             {
                 var composition = UI.Grid("auto", "*,auto");
                 composition.ColumnSpacing = 16;
-                composition.Children.Add(band.At(0, 0));
-                composition.Children.Add(_figureRegion.At(0, 1));
+                if (layout.Id == "chronicle" && state.DetailsFactory is not null)
+                {
+                    _detailsHost.Content = state.DetailsFactory();
+                    AlignChronicleDetails(identityWidth - 2 * UI.PagePadding(identityWidth) - figureWidth - 16);
+                    band = UI.V(12, band, _detailsHost);
+                }
+                composition.Children.Add(band.Align(vertical: layout.Id == "chronicle"
+                    ? VerticalAlignment.Bottom : VerticalAlignment.Stretch).At(0, 0));
+                composition.Children.Add(_figureRegion.Align(vertical: layout.Id == "chronicle"
+                    ? VerticalAlignment.Bottom : VerticalAlignment.Center).At(0, 1));
                 band = composition;
             }
             else
             {
-                band = UI.V(8, band, _figureRegion);
+                if (layout.Id == "chronicle" && state.DetailsFactory is not null)
+                {
+                    _detailsHost.Content = state.DetailsFactory();
+                    AlignChronicleDetails(identityWidth - 2 * UI.PagePadding(identityWidth));
+                    band = UI.V(12, band, _detailsHost, _figureRegion);
+                }
+                else
+                {
+                    band = UI.V(8, band, _figureRegion);
+                }
             }
+        }
+        if (state.FigureView is null && layout.Id == "chronicle" && state.DetailsFactory is not null)
+        {
+            _detailsHost.Content = state.DetailsFactory();
+            AlignChronicleDetails(identityWidth - 2 * UI.PagePadding(identityWidth));
+            band = UI.V(12, band, _detailsHost);
         }
         var padding = UI.PagePadding(identityWidth);
         if (wideSplit)
@@ -478,6 +553,14 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         }
         _identityHost.Content = band;
         _identityLayoutBucket = IdentityLayoutBucket(width);
+    }
+
+    private void AlignChronicleDetails(double identityRegionWidth)
+    {
+        // The paired panels share the axis of the Cover/name column, not the full Profile.
+        _detailsHost.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+        _detailsHost.HorizontalAlignment = HorizontalAlignment.Center;
+        _detailsHost.Width = Math.Min(600, Math.Max(1, identityRegionWidth));
     }
 
     private static int IdentityLayoutBucket(double width) =>
@@ -547,6 +630,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         _state = null;
         _figureRegion.Content = null;
         _identityHost.Content = null;
+        _detailsHost.Content = null;
         _bannerVideo.Dispose();
     }
 }

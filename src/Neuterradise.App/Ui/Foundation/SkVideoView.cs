@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml;
 using Neuterradise.App.Presentation;
 using Neuterradise.App.Shell;
@@ -38,6 +39,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
     private string? _sourcePath;
     private MediaTransformState _presentation = MediaTransformState.Default;
     private bool _loop;
+    private bool _still;
     private bool _active = true;
     private bool _disposed;
     private int _generation;
@@ -196,7 +198,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
             overflowY > 0.5 ? -deltaY / overflowY : 0);
     }
 
-    public void Play(string? path, bool loop)
+    public void Play(string? path, bool loop, bool still = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (Volatile.Read(ref _shutdown) != 0)
@@ -210,14 +212,17 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
             return;
         }
 
-        var changed = !string.Equals(_sourcePath, path, StringComparison.OrdinalIgnoreCase) || _loop != loop;
+        var changed = !string.Equals(_sourcePath, path, StringComparison.OrdinalIgnoreCase);
+        var modeChanged = _loop != loop || _still != still;
         _sourcePath = path;
         _loop = loop;
+        _still = still;
         _active = true;
         if (changed)
         {
             StopDecoder(clearFrame: true);
         }
+        else if (modeChanged) StopDecoder(clearFrame: false);
 
         EnsurePlayback();
     }
@@ -254,7 +259,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
 
     private void EnsurePlayback()
     {
-        if (_disposed || Volatile.Read(ref _shutdown) != 0 || !_active || !IsLoaded || string.IsNullOrWhiteSpace(_sourcePath))
+        if (_disposed || Volatile.Read(ref _shutdown) != 0 || !_active || !IsLoaded || string.IsNullOrWhiteSpace(_sourcePath) || (_still && _frame is not null))
         {
             return;
         }
@@ -276,10 +281,11 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
 
         var generation = ++_generation;
         var cancellation = new CancellationTokenSource();
+        if (_still) cancellation.CancelAfter(TimeSpan.FromSeconds(15));
         _decodeCancellation?.Dispose();
         _decodeCancellation = cancellation;
         TaskObserver.Observe(
-            DecodeAsync(ffmpeg, _sourcePath, _loop, generation, cancellation.Token),
+            DecodeAsync(ffmpeg, _sourcePath, _loop, _still, generation, cancellation.Token),
             "SkVideoView.DecodeAsync",
             _ => UiDispatch.Run(() =>
             {
@@ -294,14 +300,16 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
         string ffmpegPath,
         string sourcePath,
         bool loop,
+        bool still,
         int generation,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (Volatile.Read(ref _shutdown) != 0) return;
+        using var foregroundDisk = Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.EnterForegroundDiskWork();
         using var process = new Process
         {
-            StartInfo = CreateStartInfo(ffmpegPath, sourcePath, loop),
+            StartInfo = CreateStartInfo(ffmpegPath, sourcePath, loop, still),
             EnableRaisingEvents = false,
         };
 
@@ -322,7 +330,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
         }
 
         var errorDrain = process.StandardError.ReadToEndAsync();
-        var playbackClock = Stopwatch.StartNew();
+        var playbackClock = new Stopwatch();
         long frameIndex = 0;
         try
         {
@@ -335,41 +343,53 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
                     break;
                 }
 
-                if (frameIndex > 0)
-                {
-                    var due = TimeSpan.FromSeconds(frameIndex / (double)FramesPerSecond);
-                    var delay = due - playbackClock.Elapsed;
-                    if (delay > TimeSpan.Zero)
-                    {
-                        await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-                    }
-                }
-                frameIndex++;
-
                 var accepted = false;
-                await UiDispatch.InvokeAsync(() =>
+                try
                 {
-                    if (!_disposed
-                        && generation == _generation
-                        && _active
-                        && IsLoaded
-                        && string.Equals(_sourcePath, sourcePath, StringComparison.OrdinalIgnoreCase))
+                    if (frameIndex == 0) playbackClock.Start();
+                    if (frameIndex > 0)
                     {
-                        var previous = _frame;
-                        _frame = bitmap;
-                        accepted = true;
-                        Invalidate();
-                        previous?.Dispose();
-                        if (previous is null)
+                        var due = TimeSpan.FromSeconds(frameIndex / (double)FramesPerSecond);
+                        var delay = due - playbackClock.Elapsed;
+                        if (delay > TimeSpan.Zero)
                         {
-                            FrameReady?.Invoke();
+                            await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+                        }
+                        else if (delay < TimeSpan.FromMilliseconds(-250))
+                        {
+                            // Do not flood the dispatcher to catch up after a blocked UI turn.
+                            playbackClock.Restart();
+                            frameIndex = 0;
                         }
                     }
-                }).ConfigureAwait(false);
+                    frameIndex++;
 
-                if (!accepted)
+                    await UiDispatch.InvokeAsync(() =>
+                    {
+                        if (!_disposed
+                            && generation == _generation
+                            && _active
+                            && IsLoaded
+                            && string.Equals(_sourcePath, sourcePath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            var previous = _frame;
+                            _frame = bitmap;
+                            accepted = true;
+                            Invalidate();
+                            previous?.Dispose();
+                            if (previous is null)
+                            {
+                                FrameReady?.Invoke();
+                            }
+                        }
+                    }).ConfigureAwait(false);
+                }
+                finally
                 {
-                    bitmap.Dispose();
+                    if (!accepted)
+                    {
+                        bitmap.Dispose();
+                    }
                 }
             }
 
@@ -381,7 +401,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
                     throw new InvalidOperationException($"FFmpeg video decoder exited with code {process.ExitCode}.");
                 }
 
-                if (loop)
+                if (loop && !still)
                 {
                     throw new InvalidOperationException("Looping FFmpeg video decoder ended unexpectedly.");
                 }
@@ -405,10 +425,9 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
                 }
             }
 
-            if (!process.HasExited)
-            {
-                TryKill(process);
-            }
+            // StopDecoder may have killed/disposed the process concurrently with async teardown.
+            // Probe and terminate through the same guarded path as foreground shutdown.
+            TryKill(process);
 
             try
             {
@@ -421,7 +440,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
         }
     }
 
-    private static ProcessStartInfo CreateStartInfo(string ffmpegPath, string sourcePath, bool loop)
+    private static ProcessStartInfo CreateStartInfo(string ffmpegPath, string sourcePath, bool loop, bool still)
     {
         var startInfo = new ProcessStartInfo(ffmpegPath)
         {
@@ -436,7 +455,9 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
         startInfo.ArgumentList.Add("-loglevel");
         startInfo.ArgumentList.Add("error");
         startInfo.ArgumentList.Add("-nostdin");
-        if (loop)
+        foreach (var argument in new[] { "-max_alloc", "67108864", "-threads", "1", "-protocol_whitelist", "file", "-format_whitelist", "mov,matroska,webm" })
+            startInfo.ArgumentList.Add(argument);
+        if (loop && !still)
         {
             startInfo.ArgumentList.Add("-stream_loop");
             startInfo.ArgumentList.Add("-1");
@@ -444,9 +465,16 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
 
         startInfo.ArgumentList.Add("-i");
         startInfo.ArgumentList.Add(sourcePath);
+        foreach (var argument in new[] { "-map", "0:v:0", "-sn", "-dn", "-threads", "1", "-filter_threads", "1" })
+            startInfo.ArgumentList.Add(argument);
         startInfo.ArgumentList.Add("-an");
         startInfo.ArgumentList.Add("-vf");
-        startInfo.ArgumentList.Add($"fps={FramesPerSecond}");
+        startInfo.ArgumentList.Add($"fps={FramesPerSecond},scale='min(1280,iw)':'min(1280,ih)':force_original_aspect_ratio=decrease");
+        if (still)
+        {
+            startInfo.ArgumentList.Add("-frames:v");
+            startInfo.ArgumentList.Add("1");
+        }
         startInfo.ArgumentList.Add("-f");
         startInfo.ArgumentList.Add("image2pipe");
         startInfo.ArgumentList.Add("-vcodec");
@@ -583,6 +611,10 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
         }
         catch (System.ComponentModel.Win32Exception)
         {
+        }
+        catch (COMException exception) when (exception.HResult == unchecked((int)0x80070006))
+        {
+            // E_HANDLE: async FFmpeg exit/disposal raced the bounded join after Kill.
         }
     }
 

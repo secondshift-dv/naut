@@ -59,6 +59,7 @@ public partial class App : Application
     private int _shutdownStarted;
     private int _vaultTransitionStarted;
     private bool _allowClose;
+    private AcceptanceRoots? _acceptanceRoots;
     private readonly WindowStateProjection _windowState = new();
     private Windows.UI.ViewManagement.UISettings? _uiSettings;
 
@@ -85,15 +86,46 @@ public partial class App : Application
             RefreshSystemReducedMotion();
         };
         _window.Activate();
+
+        try
+        {
+            _acceptanceRoots = ResolveAcceptanceRoots(args.Arguments ?? string.Empty);
+        }
+        catch (Exception exception)
+        {
+            ShowFailure("ACCEPTANCE_ROOT_INVALID", exception);
+            return;
+        }
+
+        if (_acceptanceRoots is not null)
+        {
+            _window.Title = ProductIdentity.DisplayName + " — isolated acceptance";
+        }
         ObserveStartup(StartAsync(), "App.StartAsync");
     }
 
     private async Task StartAsync()
     {
         _install = InstallPaths.CreateProduction();
-        _appState = AppStatePaths.CreateProduction();
+        _appState = _acceptanceRoots is { } acceptance
+            ? acceptance.AppState
+            : AppStatePaths.CreateProduction();
         _configuration = new AppConfigurationStore(_appState);
         _vaultTransitions = new VaultTransitionAuthority(_appState, _install);
+
+        if (_acceptanceRoots is { } isolated)
+        {
+            Directory.CreateDirectory(isolated.Vault.Root);
+            var isolatedConfiguration = await _configuration.UpdateAsync(
+                current => current with { VaultRoot = isolated.Vault.Root },
+                CancellationToken.None).ConfigureAwait(true);
+            if (!isolatedConfiguration.IsSaved)
+            {
+                ShowFailure("ACCEPTANCE_CONFIGURATION_FAILED", new InvalidOperationException(
+                    isolatedConfiguration.SafeErrorDetail ?? "The isolated acceptance configuration could not be initialized."));
+                return;
+            }
+        }
 
         try
         {
@@ -131,6 +163,69 @@ public partial class App : Application
 
         await BootstrapLoopAsync().ConfigureAwait(true);
     }
+
+    private static AcceptanceRoots? ResolveAcceptanceRoots(string arguments)
+    {
+        const string argumentPrefix = "--naut-acceptance-root=";
+        var tokens = (arguments ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var supplied = tokens.Where(token => token.StartsWith(argumentPrefix, StringComparison.Ordinal)).ToArray();
+        if (supplied.Length == 0)
+        {
+            tokens = Environment.GetCommandLineArgs().Skip(1).ToArray();
+            supplied = tokens.Where(token => token.StartsWith(argumentPrefix, StringComparison.Ordinal)).ToArray();
+            if (supplied.Length == 0) return null;
+        }
+        if (supplied.Length != 1 || tokens.Length != 1
+            || !string.Equals(Environment.GetEnvironmentVariable("NAUT_ENABLE_ACCEPTANCE_MODE"), "1", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Isolated acceptance startup requires one root argument and explicit process opt-in.");
+        }
+
+        var root = RootPathRules.NormalizeRoot(supplied[0][argumentPrefix.Length..], "acceptanceRoot");
+        var outputRoot = RootPathRules.NormalizeRoot(
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "out"),
+            "acceptanceOutputRoot");
+        var outputInfo = new DirectoryInfo(outputRoot);
+        if (!outputInfo.Exists || (outputInfo.Attributes & System.IO.FileAttributes.ReparsePoint) != 0
+            || !RootPathRules.IsStrictDescendant(outputRoot, root)
+            || !RootPathRules.AreSameRoot(Path.GetDirectoryName(root)!, outputRoot)
+            || !Path.GetFileName(root).StartsWith("naut-acceptance-", StringComparison.OrdinalIgnoreCase)
+            || File.Exists(root))
+        {
+            throw new InvalidOperationException("Acceptance state must be a direct child of this checkout's out directory.");
+        }
+
+        var appState = new AppStatePaths(Path.Combine(root, "app-state"));
+        var vault = new VaultPaths(Path.Combine(root, "vault"));
+        var installRoot = InstallPaths.CreateProduction().Root;
+        RootPathRules.EnsureRuntimeRootsDisjoint(installRoot, appState.Root, vault.Root);
+
+        var marker = Path.Combine(root, ".naut-acceptance-root");
+        if (Directory.Exists(root))
+        {
+            if (!string.Equals(Environment.GetEnvironmentVariable("NAUT_ACCEPTANCE_RESUME"), "1", StringComparison.Ordinal)
+                || (File.GetAttributes(root) & System.IO.FileAttributes.ReparsePoint) != 0
+                || !File.Exists(marker)
+                || (File.GetAttributes(marker) & System.IO.FileAttributes.ReparsePoint) != 0
+                || !string.Equals(File.ReadAllText(marker), root, StringComparison.OrdinalIgnoreCase)
+                || !Directory.Exists(appState.Root)
+                || !Directory.Exists(vault.Root)
+                || (File.GetAttributes(appState.Root) & System.IO.FileAttributes.ReparsePoint) != 0
+                || (File.GetAttributes(vault.Root) & System.IO.FileAttributes.ReparsePoint) != 0)
+            {
+                throw new InvalidOperationException("Acceptance resume requires a previously initialized isolated root and explicit opt-in.");
+            }
+        }
+        else
+        {
+            Directory.CreateDirectory(root);
+            File.WriteAllText(marker, root);
+        }
+
+        return new AcceptanceRoots(appState, vault);
+    }
+
+    private sealed record AcceptanceRoots(AppStatePaths AppState, VaultPaths Vault);
 
     private async Task BootstrapLoopAsync()
     {
@@ -538,7 +633,7 @@ public partial class App : Application
         _resourceGovernor = new ResourceGovernor();
         ResourceGovernor.InstallShared(_resourceGovernor);
         ApplyWindowState(_windowState.Current);
-        try { _figures = new FigureRuntime(); }
+        try { _figures = new FigureRuntime(catalog: context.Catalog); }
         catch (Exception exception) { Trace.TraceWarning("Figure hardware unavailable: {0}", exception.Message); }
         _derivedImages = new DerivedImageLoader(maxEntries: 640, maxBytes: 128L * 1024 * 1024, maxConcurrentDecodes: 2);
         DerivedImageLoader.InstallShared(_derivedImages);
@@ -706,26 +801,34 @@ public partial class App : Application
 
         _updateCoordinator?.Dispose();
         _updateHttpClient?.Dispose();
-        var updateHttpClient = new HttpClient();
-        _updateHttpClient = updateHttpClient;
+        if (_acceptanceRoots is null)
+        {
+            var updateHttpClient = new HttpClient();
+            _updateHttpClient = updateHttpClient;
 
-        var updateTrust = new UpdateTrustPolicy();
-        var updateValidator = new UpdatePackageValidator(_install!);
-        var updateStager = new UpdatePackageStager(_appState!, updateValidator);
-        var updateHandoff = new UpdateHandoffService(_appState!, _install!);
-        _updateCoordinator = new UpdateCoordinator(
-            context.Catalog.MutationAdmission,
-            _configuration!,
-            _appState!,
-            _install!,
-            context.Paths.Root,
-            new UpdateCheckService(updateHttpClient, updateTrust),
-            new UpdateDownloadService(updateHttpClient, _appState!),
-            new LocalUpdatePackageReader(),
-            updateTrust,
-            updateStager,
-            updateHandoff,
-            RequestUpdateShutdown);
+            var updateTrust = new UpdateTrustPolicy();
+            var updateValidator = new UpdatePackageValidator(_install!);
+            var updateStager = new UpdatePackageStager(_appState!, updateValidator);
+            var updateHandoff = new UpdateHandoffService(_appState!, _install!);
+            _updateCoordinator = new UpdateCoordinator(
+                context.Catalog.MutationAdmission,
+                _configuration!,
+                _appState!,
+                _install!,
+                context.Paths.Root,
+                new UpdateCheckService(updateHttpClient, updateTrust),
+                new UpdateDownloadService(updateHttpClient, _appState!),
+                new LocalUpdatePackageReader(),
+                updateTrust,
+                updateStager,
+                updateHandoff,
+                RequestUpdateShutdown);
+        }
+        else
+        {
+            _updateCoordinator = null;
+            _updateHttpClient = null;
+        }
 
         var profileSnapshots = new ProfileRuntimeSnapshotCache(context.Catalog);
         _profileSnapshots = profileSnapshots;
@@ -775,7 +878,10 @@ public partial class App : Application
         status.ApplyProfiling(runtime.ProfilingState, runtime.ProfilingStateReason);
         _context = context;
         _services = services;
-        _window!.Content = new ProductRoot(services);
+        var productRoot = new ProductRoot(services);
+        _window!.Content = productRoot;
+        if (_acceptanceRoots is not null)
+            AcceptanceMeasurements.Observe(productRoot, _window, _acceptanceRoots.AppState.Root);
         StartFigurePrewarm(context);
     }
 

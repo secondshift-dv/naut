@@ -1,4 +1,5 @@
 using System.IO;
+using Neuterradise.App.SystemServices.Storage;
 using Neuterradise.App.Import;
 using Neuterradise.App.Import.Preparation;
 using Neuterradise.App.Import.Verification;
@@ -121,7 +122,7 @@ public sealed class ImportRecovery
                 SELECT import_unit_id
                 FROM import_units
                 WHERE state = 'CANCELLED'
-                  AND rollback_settled = 0
+                  AND (rollback_settled = 0 OR rollback_settled IS NULL)
                 ORDER BY import_unit_id;
                 """;
 
@@ -254,7 +255,7 @@ public sealed class ImportRecovery
 
             if (terminalOwners.Contains(unitId))
             {
-                findings.Add(ReleaseStaging(entry, unitId));
+                findings.Add(ReleaseStaging(_catalog.Paths, entry, unitId));
                 continue;
             }
 
@@ -269,10 +270,41 @@ public sealed class ImportRecovery
         return findings;
     }
 
-    private static RecoveryFinding ReleaseStaging(string entry, Guid unitId)
+    public static async Task<bool> ReleaseTerminalStagingAsync(CatalogDb catalog, Guid unitId, CancellationToken cancellationToken = default)
+    {
+        using var admission = catalog.MutationAdmission.Enter(nameof(ReleaseTerminalStagingAsync));
+        await using var mutation = await catalog.ImportUnitMutations.EnterAsync(unitId, cancellationToken).ConfigureAwait(false);
+        var unit = await catalog.ImportReads.GetUnitSummaryAsync(unitId, cancellationToken).ConfigureAwait(false);
+        if (unit is null || !(unit.State.IsUnitCommitted() || unit.State == ImportUnitState.Cancelled && unit.RollbackSettled == true))
+            return false;
+        if ((await new Neuterradise.App.SystemServices.Database.Reads.SchedulerReads(catalog)
+                .GetCancellableRunningJobIdsForImportUnitAsync(unitId, cancellationToken).ConfigureAwait(false)).Count != 0)
+            return false;
+        return ReleaseCancelledStaging(catalog, unitId);
+    }
+
+    internal static bool ReleaseCancelledStaging(CatalogDb catalog, Guid unitId)
+    {
+        var entry = Path.Combine(catalog.Paths.StagingImportsPath, unitId.ToString("D"));
+        if (!Path.Exists(entry)) return true;
+        return ReleaseStaging(catalog.Paths, entry, unitId).Outcome == RecoveryOutcome.Completed;
+    }
+
+    private static RecoveryFinding ReleaseStaging(VaultPaths paths, string entry, Guid unitId)
     {
         try
         {
+            var expected = Path.Combine(paths.StagingImportsPath, unitId.ToString("D"));
+            if (!string.Equals(Path.GetFullPath(entry), Path.GetFullPath(expected), StringComparison.OrdinalIgnoreCase))
+                throw new IOException("Staging owner path mismatch.");
+            var pending = new Stack<string>();
+            pending.Push(entry);
+            while (pending.TryPop(out var current))
+            {
+                RootPathRules.RejectExistingReparsePoints(paths.Root, current);
+                if (Directory.Exists(current))
+                    foreach (var child in Directory.EnumerateFileSystemEntries(current)) pending.Push(child);
+            }
             if (Directory.Exists(entry))
             {
                 Directory.Delete(entry, recursive: true);

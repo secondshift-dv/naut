@@ -1,0 +1,106 @@
+{
+  "id": "builtin.neuterradise.card.poster-v2",
+  "kind": "profile-card",
+  "name": "Poster",
+  "description": "Framed still Cover over a blurred Banner; motion and metadata appear on hover.",
+  "spec": {
+    "legacyVariant": "poster",
+    "aspect": 0.63,
+    "art": "cover-over-banner",
+    "density": "detailed",
+    "hover": "spotlight",
+    "frame": "full",
+    "composition": {
+      "type": "overlay",
+      "children": [
+        {
+          "type": "image",
+          "slot": "profile.identity.banner",
+          "ambient": true,
+          "stretch": "uniform-to-fill"
+        },
+        {
+          "type": "image",
+          "slot": "profile.identity.banner",
+          "stretch": "uniform-to-fill"
+        },
+        {
+          "type": "scrim",
+          "direction": "to-top",
+          "from": "#D70C131B",
+          "to": "#1A0C131B"
+        },
+        {
+          "type": "frame",
+          "size": 142,
+          "hAlign": "center",
+          "vAlign": "center"
+        },
+        {
+          "type": "text",
+          "slot": "profile.identity.name",
+          "role": "card-title",
+          "maxLines": 2,
+          "color": "token:onMediaPrimary",
+          "onMedia": true,
+          "textAlignment": "center",
+          "hAlign": "center",
+          "vAlign": "bottom",
+          "margin": 14
+        },
+        {
+          "type": "stack",
+          "spacing": 7,
+          "margin": 14,
+          "vAlign": "bottom",
+          "opacity": 0,
+          "children": [
+            {
+              "type": "text",
+              "slot": "profile.identity.category",
+              "role": "micro",
+              "maxLines": 1,
+              "color": "token:onMediaPrimary",
+              "onMedia": true,
+              "visibleWhen": "profile.identity.category"
+            },
+            {
+              "type": "text",
+              "slot": "profile.identity.name",
+              "role": "section-title",
+              "maxLines": 2,
+              "color": "token:onMediaPrimary",
+              "onMedia": true
+            },
+            {
+              "type": "text",
+              "slot": "profile.identity.tags",
+              "role": "micro",
+              "maxLines": 1,
+              "color": "token:onMediaPrimary",
+              "onMedia": true,
+              "visibleWhen": "profile.identity.tags"
+            },
+            {
+              "type": "stack",
+              "orientation": "horizontal",
+              "spacing": 8,
+              "children": [
+                {
+                  "type": "badge",
+                  "slot": "profile.identity.rating",
+                  "style": "glass"
+                },
+                {
+                  "type": "badge",
+                  "slot": "profile.identity.favorite",
+                  "style": "glass"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
