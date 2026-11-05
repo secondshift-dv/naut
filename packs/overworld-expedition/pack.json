@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "packId": "naut.overworld-expedition",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "name": "Overworld Expedition",
   "author": "Anas / Second Shift",
   "description": "A calm voxel expedition: collection shelves, cozy landscapes and cute portrait companions.",
@@ -61,6 +61,12 @@
       "bytes": 32220,
       "path": "assets/silkscreen.ttf",
       "id": "font-display"
+    },
+    {
+      "id": "theme-field-notes",
+      "kind": "Image",
+      "path": "assets/theme-field-notes.webp",
+      "bytes": 16478
     }
   ],
   "definitions": [
@@ -146,7 +152,7 @@
             "navigationTreatment": "StrongBorder"
           }
         },
-        "artwork": "backdrop-meadow",
+        "artwork": "theme-field-notes",
         "material": {
           "personality": "milky-paper",
           "atmosphere": "editorial"
@@ -202,7 +208,7 @@
       "id": "naut.overworld-expedition.home-base-camp",
       "kind": "home-layout",
       "name": "Base Camp",
-      "description": "A still split hero, favorites and recent finds with compact activity and statistics.",
+      "description": "Still split hero, full-width recent finds, compact camp statistics and activity.",
       "previewAccent": "#FF476338",
       "spec": {
         "hero": {
@@ -216,11 +222,6 @@
             "id": "statistics",
             "style": "strip",
             "maxItems": 4
-          },
-          {
-            "id": "favorites",
-            "style": "poster",
-            "maxItems": 8
           },
           {
             "id": "recent",
@@ -248,23 +249,19 @@
             },
             {
               "type": "semantic",
-              "id": "statistics"
-            },
-            {
-              "type": "semantic",
-              "id": "favorites"
+              "id": "recent"
             },
             {
               "type": "columns",
               "columns": [
-                "2*",
+                "*",
                 "*"
               ],
-              "spacing": 16,
+              "spacing": 12,
               "children": [
                 {
                   "type": "semantic",
-                  "id": "recent"
+                  "id": "statistics"
                 },
                 {
                   "type": "stack",
@@ -403,7 +400,7 @@
       "id": "naut.overworld-expedition.profile-collection-lodge",
       "kind": "profile-layout",
       "name": "Collection Lodge",
-      "description": "Compact identity followed by the full-width media wall; Delete stays in the final actions section.",
+      "description": "Identity, optional Recent Media and the full-width collection wall before context; Delete remains last.",
       "previewAccent": "#FF476338",
       "spec": {
         "preset": "compact-hero",
@@ -413,6 +410,10 @@
             {
               "id": "identity",
               "type": "semantic"
+            },
+            {
+              "type": "semantic",
+              "id": "recent-media"
             },
             {
               "id": "media",

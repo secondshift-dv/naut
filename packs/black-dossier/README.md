@@ -1,8 +1,8 @@
-# BLACK DOSSIER 1.0.0
+# Black Dossier 1.1.0
 
 Neutral black. Cinematic identity. Restrained crimson.
 
-**Requires Naut 0.0.6 or later** for selected Banner-video thumbnails and the card's explicit no-Cover-fallback image policy.
+**Optimized for Naut 0.0.7** for selected Banner-video thumbnails and the card's explicit no-Cover-fallback image policy.
 
 ![Asset composition preview](preview.png)
 
@@ -35,3 +35,11 @@ Subject Dossier keeps the full Banner. The native Figure remains beside identity
 Signal Trace uses 24 silver traces and a crimson sweep in Full; Reduced uses 12 traces and a slower sweep. Static fallback retains the grid and crimson glow. Reduced Motion uses the static fallback. Offscreen/minimized effects pause. No effect can be seen until it is selected and saved for the desired surface.
 
 Original artwork and definitions: CC BY 4.0, Anas / Second Shift. Fonts retain OFL. See [provenance](PROVENANCE.txt) and [license](LICENSE.txt).
+
+## Changes in 1.1.0
+
+- The pack and Theme display names use Black Dossier (title case); stable technical ids are unchanged.
+- Obsidian Protocol has a small 320 x 180 artwork thumbnail in Settings > Appearance.
+- Operations Desk removes the redundant Favorites rail and balances statistics, recent Profiles and activity.
+- Subject Dossier places optional Recent Media below its media wall, above context and Delete.
+- Existing component selections can be updated by installing the new pack with Replace.

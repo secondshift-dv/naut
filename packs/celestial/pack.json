@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "packId": "neuterradise.celestial",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "name": "Neu Terradise · Celestial Collection",
   "author": "Anas",
   "description": "Curated celestial atmosphere, collectible portraits and a compact archive composition.",
@@ -55,6 +55,18 @@
       "kind": "Font",
       "path": "assets/notosansmono.ttf",
       "bytes": 405760
+    },
+    {
+      "id": "theme-violet",
+      "kind": "Image",
+      "path": "assets/theme-violet.webp",
+      "bytes": 15518
+    },
+    {
+      "id": "theme-azure",
+      "kind": "Image",
+      "path": "assets/theme-azure.webp",
+      "bytes": 6264
     }
   ],
   "definitions": [
@@ -151,7 +163,7 @@
           "ambientPrimary": "#FFA78BFA",
           "ambientSecondary": "#FF60A5FA"
         },
-        "artwork": "palace"
+        "artwork": "theme-violet"
       }
     },
     {
@@ -247,14 +259,14 @@
           "ambientPrimary": "#FF7DD3FC",
           "ambientSecondary": "#FFA5B4FC"
         },
-        "artwork": "citadel"
+        "artwork": "theme-azure"
       }
     },
     {
       "id": "neuterradise.celestial.home-observatory",
       "kind": "home-layout",
       "name": "Observatory",
-      "description": "Compact cinematic hero, collection rails and a quiet activity column.",
+      "description": "Compact observatory hero, collection statistics, recent finds and quiet activity panels.",
       "previewAccent": "#FFA78BFA",
       "spec": {
         "hero": {
@@ -268,11 +280,6 @@
             "id": "statistics",
             "style": "strip",
             "maxItems": 4
-          },
-          {
-            "id": "favorites",
-            "style": "poster",
-            "maxItems": 8
           },
           {
             "id": "recent",
@@ -301,10 +308,6 @@
             {
               "type": "semantic",
               "id": "statistics"
-            },
-            {
-              "type": "semantic",
-              "id": "favorites"
             },
             {
               "type": "columns",
@@ -443,7 +446,7 @@
       "id": "neuterradise.celestial.profile-sanctuary",
       "kind": "profile-layout",
       "name": "Sanctuary",
-      "description": "Identity and actions first, balanced context columns, then the media collection.",
+      "description": "Identity, balanced context columns, optional Recent Media and the full collection wall.",
       "previewAccent": "#FFA78BFA",
       "spec": {
         "preset": "cinematic",
@@ -490,6 +493,10 @@
                   ]
                 }
               ]
+            },
+            {
+              "type": "semantic",
+              "id": "recent-media"
             },
             {
               "type": "semantic",

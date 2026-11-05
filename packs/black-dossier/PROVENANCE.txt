@@ -1,4 +1,4 @@
-BLACK DOSSIER 1.0.0
+Black Dossier 1.1.0
 Author: Anas / Second Shift.
 Original architectural artwork: AI-assisted image created specifically for this pack on 2026-10-09. No third-party game assets, logos or reference imagery are included. Prompt describes a neutral black concrete atrium, quiet left area, white slit lights on the right and a thin crimson architectural accent.
 Gunmetal Seal: original mathematically symmetric raster frame constructed for this pack; transparent 80% central portrait opening. Preview is a composed asset board, not an application screenshot.
@@ -7,3 +7,7 @@ Inter: assets/inter.ttf; licenses/inter-OFL.txt.
 Naut Instrument Condensed: renamed modified IBM Plex face inherited from Celestial; assets/instrument-condensed.ttf; licenses/ibmplexsanscondensed-OFL.txt.
 Noto Sans Mono: assets/notosansmono.ttf; licenses/notosansmono-OFL.txt.
 Fonts retain SIL OFL 1.1 and notices. No game branding, personal media, executable code or plugins are distributed.
+
+Theme artwork thumbnails: resized, downsampled 320 x 180 WebP derivatives
+of the included original artwork for Settings > Appearance. No new sources
+or third-party assets were introduced.

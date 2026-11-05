@@ -1,4 +1,4 @@
-# Overworld Expedition — 1.0.1
+# Overworld Expedition — 1.1.0
 
 A calm voxel expedition for your collection, by **Anas / Second Shift**.
 17 independently selectable components. Install as an optional custom pack;
@@ -10,7 +10,7 @@ The preview combines pack assets; it is not a screenshot of Naut.
 
 ## Install and explore
 
-Download [Overworld Expedition 1.0.1](https://secondshift-dv.github.io/naut/packs/overworld-expedition-1.0.1.ntpack).
+Download [Overworld Expedition 1.1.0](https://secondshift-dv.github.io/naut/packs/overworld-expedition-1.1.0.ntpack).
 Open **Settings → Presentation → Packs / Advanced → Install from file**.
 Choose the archive, select components in Appearance or the corresponding
 Customize screen, and **Save changes**. Use **Replace** when updating this pack.
@@ -64,6 +64,13 @@ Voxel-world inspiration is expressed through original artwork. No Minecraft
 assets, logos or source files are included; this is an independent Naut pack.
 
 [Collection](../README.md) · [Checksums](https://secondshift-dv.github.io/naut/packs/checksums.json)
+
+## Changes in 1.1.0
+
+- Field Notes has a dedicated 320 x 180 artwork thumbnail for Settings > Appearance rather than relying on the full Meadow background.
+- Base Camp removes the redundant Favorites rail, giving Recent Profiles more room.
+- Collection Lodge shows optional Recent Media after identity when enabled; Delete remains last.
+- All original component ids remain unchanged; existing installations update through Replace.
 
 ## Changes in 1.0.1
 

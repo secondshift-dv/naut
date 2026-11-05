@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "packId": "naut.black-dossier",
-  "version": "1.0.0",
-  "name": "BLACK DOSSIER",
+  "version": "1.1.0",
+  "name": "Black Dossier",
   "author": "Anas / Second Shift",
   "description": "A black architectural collection: cinematic banners, framed Cover identities, condensed dossiers and restrained crimson motion. Requires Naut 0.0.6 or later.",
   "license": "CC-BY-4.0 (original definitions/artwork); SIL-OFL-1.1 (fonts)",
@@ -37,6 +37,12 @@
       "kind": "Font",
       "path": "assets/notosansmono.ttf",
       "bytes": 405760
+    },
+    {
+      "id": "theme-obsidian",
+      "kind": "Image",
+      "path": "assets/theme-obsidian.webp",
+      "bytes": 4420
     }
   ],
   "definitions": [
@@ -50,7 +56,7 @@
         "theme": {
           "schemaVersion": 1,
           "id": "black-dossier",
-          "name": "BLACK DOSSIER",
+          "name": "Black Dossier",
           "isDark": true,
           "colors": {
             "canvas": "#FF08090B",
@@ -136,7 +142,7 @@
             "naut.black-dossier.frame"
           ]
         },
-        "artwork": "backdrop-atrium"
+        "artwork": "theme-obsidian"
       }
     },
     {
@@ -168,7 +174,7 @@
       "id": "naut.black-dossier.home",
       "kind": "home-layout",
       "name": "Operations Desk",
-      "description": "Large inset feature, compact statistics and a responsive collection/activity split.",
+      "description": "Large inset brief and a responsive operations board pairing statistics, recent finds and activity.",
       "previewAccent": "#FFB72739",
       "spec": {
         "hero": {
@@ -182,11 +188,6 @@
             "id": "statistics",
             "style": "strip",
             "maxItems": 4
-          },
-          {
-            "id": "favorites",
-            "style": "poster",
-            "maxItems": 8
           },
           {
             "id": "recent",
@@ -213,10 +214,6 @@
               "id": "featured"
             },
             {
-              "type": "semantic",
-              "id": "statistics"
-            },
-            {
               "type": "columns",
               "columns": [
                 "2*",
@@ -230,7 +227,7 @@
                   "children": [
                     {
                       "type": "semantic",
-                      "id": "favorites"
+                      "id": "statistics"
                     },
                     {
                       "type": "semantic",
@@ -423,7 +420,7 @@
       "id": "naut.black-dossier.profile",
       "kind": "profile-layout",
       "name": "Subject Dossier",
-      "description": "Full Banner and native Figure beside the identity on wide screens; media first, context after, Delete last.",
+      "description": "Banner-led identity, media and optional Recent Media, then context, review and Delete.",
       "previewAccent": "#FFB72739",
       "spec": {
         "preset": "cinematic",
@@ -438,6 +435,10 @@
             {
               "type": "semantic",
               "id": "media"
+            },
+            {
+              "type": "semantic",
+              "id": "recent-media"
             },
             {
               "type": "semantic",
@@ -460,10 +461,6 @@
                   "id": "faces"
                 }
               ]
-            },
-            {
-              "type": "semantic",
-              "id": "recent-media"
             },
             {
               "type": "semantic",

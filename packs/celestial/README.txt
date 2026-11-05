@@ -2,7 +2,7 @@ Neu Terradise · Celestial Collection
 
 INSTALL
 Settings > Presentation > Packs / Advanced > Install from archive
-Choose Neu-Terradise-Celestial-1.2.0.ntpack (or the matching .zip).
+Choose celestial-1.3.0.ntpack (or the matching .zip).
 If using Install from folder, select the folder containing pack.json.
 
 All components are independent. Installing does not change active selections.
@@ -26,3 +26,9 @@ Use Astral Glass for a quieter background without illustrated scenery.
 This pack contains 19 independently selectable definitions, not presets
 that automatically change multiple bindings. Source art provenance and
 font licenses are included. No application code or media import is needed.
+
+CHANGES IN 1.3.0
+Both Themes now use independent 320 x 180 artwork thumbnails in Appearance.
+Observatory removes the redundant Favorites rail.
+Sanctuary places optional Recent Media ahead of the media collection.
+Component ids remain stable, allowing an existing pack to be replaced.
