@@ -31,6 +31,24 @@ public static class WindowChrome
     public static bool IsMaximized(Window window) =>
         window.AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Maximized };
 
+    /// <summary>Compact, monitor-aware welcome window. Normal saved placement is restored when the shell opens.</summary>
+    public static void SizeFirstRun(Window window)
+    {
+        var monitors = MonitorWorkAreas.Capture();
+        var workArea = monitors.PrimaryWorkArea;
+        var size = new Neuterradise.App.SystemServices.Size(
+            Math.Min(700, workArea.Width),
+            Math.Min(540, workArea.Height));
+        var bounds = WindowGeometry.CenterIn(size, workArea);
+        var scale = monitors.ScaleFor(workArea);
+        window.AppWindow.MoveAndResize(new RectInt32
+        {
+            X = (int)Math.Round(bounds.Left * scale),
+            Y = (int)Math.Round(bounds.Top * scale),
+            Width = (int)Math.Round(bounds.Width * scale),
+            Height = (int)Math.Round(bounds.Height * scale),
+        });
+    }
 }
 
 /// <summary>

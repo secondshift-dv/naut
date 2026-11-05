@@ -47,6 +47,20 @@ public sealed class VaultRootSelectionPolicy
                     "Choose an existing folder. Create a new folder in the Windows picker first if you want a new Vault.");
             }
 
+            if (RootPathRules.Overlaps(_install.Root, paths.Root))
+            {
+                return VaultSelectionInspection.Reject(
+                    "VAULT_SELECTION_INSTALL_OVERLAP",
+                    "The Vault must be outside the application installation folder and its parent folders.");
+            }
+
+            if (RootPathRules.Overlaps(_appState.Root, paths.Root))
+            {
+                return VaultSelectionInspection.Reject(
+                    "VAULT_SELECTION_APPSTATE_OVERLAP",
+                    "The Vault must be outside the application data folder and its parent folders.");
+            }
+
             paths.EnsureDisjointFrom(_install, _appState);
             RootPathRules.RejectExistingReparsePoints(paths.Root, paths.Root);
 

@@ -44,7 +44,7 @@ Naut v0.0.7 includes English, Bahasa Indonesia, 日本語, 한국어, 简体中�
 
 ## Where should I put the Vault?
 
-Choose a normal folder you control with enough space for the collection. Keep the Vault separate from the extracted Naut application directory.
+Choose a normal folder you control with enough space for the collection. Keep the Vault outside the extracted Naut application and AppData folders, including their parent folders. If first-run setup reports an installation/AppData overlap, create a separate sibling folder instead (for example, `D:\Apps\NautVault` next to `D:\Apps\Naut`). Never delete an existing Vault to resolve this message.
 
 ## Can I move to a different PC?
 

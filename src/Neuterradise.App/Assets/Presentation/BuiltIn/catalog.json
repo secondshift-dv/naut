@@ -139,11 +139,11 @@
     "Layouts/Card/builtin.neuterradise.card.poster-v2.json"
   ],
   "defaults": {
-    "appearance.theme": "builtin.neuterradise.theme.obsidian",
-    "home.layout": "builtin.neuterradise.home.showcase",
+    "appearance.theme": "builtin.neuterradise.theme.logbook",
+    "home.layout": "builtin.neuterradise.home.dashboard",
     "home.backdrop": "builtin.neuterradise.backdrop.night-chamber",
     "home.spotlight": "builtin.neuterradise.spotlight.cinematic-v2",
-    "gallery.layout": "builtin.neuterradise.gallery.wall",
+    "gallery.layout": "builtin.neuterradise.gallery.pinboard",
     "profile.card": "builtin.neuterradise.card.editorial-v2",
     "profile.layout": "builtin.neuterradise.profile.portrait",
     "profile.media.presentation": "builtin.neuterradise.media-layout.mosaic",

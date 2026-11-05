@@ -2,7 +2,7 @@
 
 ## 1. Download Naut
 
-Download **Naut v0.0.9** from the official [GitHub Releases](https://github.com/secondshift-dv/naut/releases/tag/v0.0.9) page.
+Download **Naut v0.0.10** from the official [GitHub Releases](https://github.com/secondshift-dv/naut/releases/tag/v0.0.10) page.
 
 The Windows package is portable. Extract the complete ZIP to a normal folder; do not run only the EXE from inside the archive.
 
@@ -16,7 +16,7 @@ Keep `runtime/` and `release-manifest.json` beside `naut.exe`. They are part of 
 
 On first launch Naut asks **where to keep** the Vault. Pick a folder you control. The selected folder becomes the Vault location and its folder name is used as the Vault name.
 
-A Vault is separate from the Naut application folder. Your collection should not depend on where the application itself is extracted.
+A Vault must be outside the Naut application and AppData folders (including their parent folders). For example, if Naut is installed in `D:\Apps\Naut`, use `D:\Apps\NautVault` as a separate sibling folder. Your collection should not depend on where the application itself is extracted.
 
 ## 4. Import media
 
@@ -33,4 +33,4 @@ Images, videos, and supported 3D model media receive the preparation appropriate
 
 You can rename the current Vault and give it an independent icon through **Settings → Vault**. Those preferences belong to the Vault, not the extracted application folder.
 
-For a browser-based preview without touching local files, open the [Naut Interactive Showcase](https://secondshift-dv.github.io/naut/). Read the [v0.0.9 release notes](releases/v0.0.9.md) before upgrading a Vault from a previous catalog version.
+For a browser-based preview without touching local files, open the [Naut Interactive Showcase](https://secondshift-dv.github.io/naut/). Read the [v0.0.10 release notes](releases/v0.0.10.md) before upgrading a Vault from a previous catalog version.

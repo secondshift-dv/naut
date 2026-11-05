@@ -2012,6 +2012,11 @@
     <sys:String x:Key="Settings.Health.ClearResults">Clear results</sys:String>
     <sys:String x:Key="Settings.Health.NoResults">Run a check to see current findings.</sys:String>
     <sys:String x:Key="Startup.Vault.ActionFailed">The Vault could not be opened. Check the location and try again.</sys:String>
+    <sys:String x:Key="Startup.Vault.SeparateLocation">Important: Keep the Vault outside Naut's application and AppData folders. A separate folder beside the app is fine.</sys:String>
+    <sys:String x:Key="Startup.Vault.InstallOverlap">This folder overlaps the Naut application folder. Choose a separate folder beside it, not inside it or above it.</sys:String>
+    <sys:String x:Key="Startup.Vault.AppStateOverlap">This folder overlaps Naut's AppData. Choose a separate folder outside AppData.</sys:String>
+    <sys:String x:Key="Startup.Vault.FolderMissing">Create the folder in Windows first, then select it.</sys:String>
+    <sys:String x:Key="Startup.Vault.ConfigAccess">Naut cannot save its settings in AppData. Check folder permissions.</sys:String>
     <sys:String x:Key="Startup.Vault.Browse">Browse</sys:String>
 <sys:String x:Key="Startup.Vault.LocalNote">Your originals stay where they are. Imported media is copied into this Vault.</sys:String>
     <sys:String x:Key="Startup.Vault.Location">Choose a location</sys:String>

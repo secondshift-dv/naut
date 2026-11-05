@@ -2012,6 +2012,11 @@
     <sys:String x:Key="Settings.Health.ClearResults">清除结果</sys:String>
     <sys:String x:Key="Settings.Health.NoResults">运行检查以查看当前问题。</sys:String>
     <sys:String x:Key="Startup.Vault.ActionFailed">无法打开Vault。请检查位置后重试。</sys:String>
+    <sys:String x:Key="Startup.Vault.SeparateLocation">重要：请将 Vault 保存在 Naut 应用程序文件夹和 AppData 之外。可以使用与应用程序文件夹并列的独立文件夹。</sys:String>
+    <sys:String x:Key="Startup.Vault.InstallOverlap">此文件夹与 Naut 应用程序文件夹重叠。请选择并列的独立文件夹，不要选择其内部或上级文件夹。</sys:String>
+    <sys:String x:Key="Startup.Vault.AppStateOverlap">此文件夹与 Naut 的 AppData 重叠。请选择 AppData 之外的独立文件夹。</sys:String>
+    <sys:String x:Key="Startup.Vault.FolderMissing">请先在 Windows 中创建文件夹，再选择该文件夹。</sys:String>
+    <sys:String x:Key="Startup.Vault.ConfigAccess">Naut 无法在 AppData 中保存设置。请检查文件夹权限。</sys:String>
     <sys:String x:Key="Startup.Vault.Browse">浏览</sys:String>
 <sys:String x:Key="Startup.Vault.LocalNote">原始文件留在原来的位置。导入的媒体将复制到此Vault中。</sys:String>
     <sys:String x:Key="Startup.Vault.Location">选择位置</sys:String>

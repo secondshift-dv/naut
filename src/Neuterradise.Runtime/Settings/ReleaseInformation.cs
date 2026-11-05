@@ -28,17 +28,25 @@ public static class GitHubReleaseInformation
             if (response.StatusCode == HttpStatusCode.NotFound) continue;
             response.EnsureSuccessStatusCode();
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            using var buffer = new MemoryStream();
-            var bytes = new byte[8192];
-            int count;
-            while ((count = await stream.ReadAsync(bytes, cancellationToken).ConfigureAwait(false)) != 0)
-            {
-                if (buffer.Length + count > 256 * 1024) return null;
-                await buffer.WriteAsync(bytes.AsMemory(0, count), cancellationToken).ConfigureAwait(false);
-            }
-            return Parse(buffer.ToArray(), installedVersion);
+            return await ParseAsync(stream, installedVersion, cancellationToken).ConfigureAwait(false);
         }
         return null;
+    }
+
+    /// <summary>Reads the bounded GitHub release response, including releases with large asset inventories.</summary>
+    public static async Task<ReleaseInformation?> ParseAsync(
+        Stream stream, string installedVersion, CancellationToken cancellationToken)
+    {
+        const int maximumResponseBytes = 8 * 1024 * 1024;
+        using var buffer = new MemoryStream();
+        var bytes = new byte[8192];
+        int count;
+        while ((count = await stream.ReadAsync(bytes, cancellationToken).ConfigureAwait(false)) != 0)
+        {
+            if (buffer.Length + count > maximumResponseBytes) return null;
+            await buffer.WriteAsync(bytes.AsMemory(0, count), cancellationToken).ConfigureAwait(false);
+        }
+        return Parse(buffer.GetBuffer().AsMemory(0, (int)buffer.Length), installedVersion);
     }
 
     public static ReleaseInformation? Parse(ReadOnlyMemory<byte> json, string installedVersion)

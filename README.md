@@ -7,7 +7,7 @@
 <p align="center">Local-first media collections for Windows — offline face intelligence, interactive 3D Figures, and your own portable Vault.</p>
 
 <p align="center">
-  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.9"><strong>Download Naut v0.0.9</strong></a>
+  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.10"><strong>Download Naut v0.0.10</strong></a>
   ·
   <a href="https://secondshift-dv.github.io/naut/"><strong>View Live Demo</strong></a>
   ·
@@ -84,13 +84,14 @@ The portable app package and the Vault are separate boundaries. Imports copy fil
 - **3D is additive, not mandatory.** Normal Naut use does not require a discrete GPU or a Figure.
 - **Portable application, durable collection.** Updating the app package does not replace the Vault.
 
-## What changed in v0.0.9
+## What changed in v0.0.10
 
-- **More efficient durable Import transfer:** when a file finishes on an existing 64 MiB checkpoint boundary, Naut reuses the safe offset rather than repeating a disk flush and catalog write.
-- **Less checkpoint bookkeeping:** transfer reuses its validated Import item identity rather than parsing it again for each checkpoint.
-- **Unchanged safety guarantees:** original files remain untouched; SHA-256, duplicate reuse, safe Cancel, Resume, metadata and media preparation continue through the established pipeline.
+- **Clear Vault location guidance:** first-run setup warns against placing a Vault inside or above the app or AppData folders, and gives specific errors for conflicting selections.
+- **Compact first-run window:** the Vault selector starts at up to 700 x 540 DIP; normal window placement returns when the collection opens.
+- **Refined first-run presentation:** Logbook, Dashboard, Cinematic, Pinboard, Portrait and Mosaic are the built-in defaults. Saved customization remains authoritative.
+- **Accurate About release dates:** GitHub release metadata with larger asset lists no longer fails the earlier 256 KiB limit.
 
-The improvement targets redundant checkpoint operations, not a guaranteed percentage reduction in total Import time. See the [complete v0.0.9 release notes](docs/releases/v0.0.9.md) for limitations and compatibility details.
+See the [v0.0.10 release notes](docs/releases/v0.0.10.md) for details and verification limits.
 
 ## See it in action
 
@@ -107,7 +108,7 @@ The improvement targets redundant checkpoint operations, not a guaranteed percen
 
 ## Quick Start
 
-1. Open the official [Naut v0.0.9 download](https://github.com/secondshift-dv/naut/releases/tag/v0.0.9) and choose **`naut-v0.0.9-win-x64.zip`** under Assets.
+1. Open the official [Naut v0.0.10 download](https://github.com/secondshift-dv/naut/releases/tag/v0.0.10) and choose **`naut-v0.0.10-win-x64.zip`** under Assets.
 2. Extract the complete ZIP to a normal folder.
 3. Run `naut.exe`.
 4. Choose **where to keep** your Vault.
@@ -128,7 +129,7 @@ Naut's normal collection experience is intentionally lighter than its optional F
 | **Display** | 1280 × 720 | 1920 × 1080 or higher |
 | **Free app/update space** | 3 GB | 3 GB+ on SSD |
 
-Vault storage is separate and depends on the size of your collection. See the full [Naut v0.0.9 System Requirements](docs/system-requirements.md).
+Vault storage is separate and depends on the size of your collection. See the full [Naut v0.0.10 System Requirements](docs/system-requirements.md).
 
 ## Optional pack collection
 

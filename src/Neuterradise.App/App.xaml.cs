@@ -545,6 +545,7 @@ public partial class App : Application
             () => Pickers.PickFolderAsync(_window),
             AcceptAsync,
             () => { completion.TrySetResult(new(null, null)); Exit(); });
+        WindowChrome.SizeFirstRun(_window);
         return await completion.Task.ConfigureAwait(true);
     }
 
@@ -552,6 +553,10 @@ public partial class App : Application
     {
         "VAULT_SELECTION_NOT_VAULT_OR_EMPTY" => UI.T("Startup.Vault.NotEmpty", "Choose an existing naut Vault or an empty folder."),
         "VAULT_SELECTION_NESTED" => UI.T("Startup.Vault.Nested", "Choose a location outside an existing Vault."),
+        "VAULT_SELECTION_INSTALL_OVERLAP" => UI.T("Startup.Vault.InstallOverlap", "This folder overlaps the Naut application folder. Choose a separate folder beside it, not inside it or above it."),
+        "VAULT_SELECTION_APPSTATE_OVERLAP" => UI.T("Startup.Vault.AppStateOverlap", "This folder overlaps Naut's AppData. Choose a separate folder outside AppData."),
+        "VAULT_SELECTION_FOLDER_MISSING" => UI.T("Startup.Vault.FolderMissing", "Create the folder in Windows first, then select it."),
+        "CONFIGURATION_ACCESS_DENIED" => UI.T("Startup.Vault.ConfigAccess", "Naut cannot save its settings in AppData. Check folder permissions."),
         _ => UI.T("Startup.Vault.ActionFailed", "The Vault could not be opened. Check the location and try again."),
     };
     /// <summary>
@@ -1275,6 +1280,8 @@ public partial class App : Application
             "VAULT_LOCKED" or "VAULT_LOCK_UNAVAILABLE" => (UI.T("Startup.Locked.Title", "naut is already open"), UI.T("Startup.Locked.Message", "Another window is using this Vault."), UI.T("Startup.Locked.Next", "Close the other window, then try again."), true),
             "VAULT_ROOT_MISSING" => (UI.T("Startup.Vault.MissingTitle", "The Vault folder can't be found"), UI.T("Startup.Vault.MissingMessage", "The saved Vault folder is missing or currently unavailable. naut did not recreate it."), UI.T("Startup.Vault.MissingNext", "Locate the existing Vault or choose a new Vault folder."), true),
             "VAULT_ROOT_INVALID" => (UI.T("Startup.Vault.Title", "The Vault folder can't be used"), UI.T("Startup.Vault.Message", "The configured Vault folder is not a safe, writable location."), UI.T("Startup.Vault.Next", "Choose a different Vault folder, then try again."), true),
+            "VAULT_SELECTION_INSTALL_OVERLAP" => (UI.T("Startup.Vault.Title", "The Vault folder can't be used"), UI.T("Startup.Vault.InstallOverlap", "This folder overlaps the Naut application folder. Choose a separate folder beside it, not inside it or above it."), UI.T("Startup.Vault.Next", "Choose a different Vault folder, then try again."), true),
+            "VAULT_SELECTION_APPSTATE_OVERLAP" => (UI.T("Startup.Vault.Title", "The Vault folder can't be used"), UI.T("Startup.Vault.AppStateOverlap", "This folder overlaps Naut's AppData. Choose a separate folder outside AppData."), UI.T("Startup.Vault.Next", "Choose a different Vault folder, then try again."), true),
             "VAULT_SELECTION_FOLDER_MISSING" or "VAULT_SELECTION_NOT_VAULT_OR_EMPTY" or "VAULT_SELECTION_INVALID" => (UI.T("Startup.Vault.Title", "The Vault folder can't be used"), UI.T("Startup.Vault.SelectionMessage", "Choose an existing naut Vault or an empty folder that you created in the Windows folder picker."), UI.T("Startup.Vault.SelectionNext", "The app does not create the selected folder. Create a new folder in Windows first if you want a new Vault."), true),
             "VAULT_CHANGE_RETURN_RESTART_FAILED" => (UI.T("Vault.RestartFailed.Title", "Restart required"), UI.T("Vault.Change.ReturnRestartMessage", "The previous Vault was restored, but naut could not restart itself."), UI.T("Vault.Change.ReturnRestartNext", "Close naut and open it again to return to the previous Vault."), false),
             "VAULT_CHANGE_RECOVERY_FAILED" or "VAULT_CHANGE_PREVIOUS_ROOT_MISSING" or "VAULT_CHANGE_PREVIOUS_ROOT_INVALID" => (UI.T("Vault.Recovery.Title", "Vault recovery needs attention"), UI.T("Vault.Change.RecoveryMessage", "The selected Vault could not open and the previous Vault could not be restored automatically."), UI.T("Vault.Recovery.Next", "Do not delete or rename either Vault folder. Open diagnostics and verify the folders before trying again."), false),

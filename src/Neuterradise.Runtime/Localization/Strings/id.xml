@@ -2012,6 +2012,11 @@
     <sys:String x:Key="Settings.Health.ClearResults">Bersihkan hasil</sys:String>
     <sys:String x:Key="Settings.Health.NoResults">Jalankan pemeriksaan untuk melihat temuan terkini.</sys:String>
     <sys:String x:Key="Startup.Vault.ActionFailed">Vault tidak dapat dibuka. Periksa lokasi dan coba lagi.</sys:String>
+    <sys:String x:Key="Startup.Vault.SeparateLocation">Penting: Simpan Vault di luar folder aplikasi Naut dan AppData. Folder terpisah di samping folder aplikasi boleh digunakan.</sys:String>
+    <sys:String x:Key="Startup.Vault.InstallOverlap">Folder ini bertumpang tindih dengan folder aplikasi Naut. Pilih folder terpisah di sampingnya, bukan di dalam atau di atasnya.</sys:String>
+    <sys:String x:Key="Startup.Vault.AppStateOverlap">Folder ini bertumpang tindih dengan AppData Naut. Pilih folder terpisah di luar AppData.</sys:String>
+    <sys:String x:Key="Startup.Vault.FolderMissing">Buat folder di Windows terlebih dahulu, lalu pilih folder tersebut.</sys:String>
+    <sys:String x:Key="Startup.Vault.ConfigAccess">Naut tidak dapat menyimpan pengaturan di AppData. Periksa izin folder.</sys:String>
     <sys:String x:Key="Startup.Vault.Browse">Telusuri</sys:String>
 <sys:String x:Key="Startup.Vault.LocalNote">File asli tetap di tempatnya. Media yang diimpor disalin ke Vault ini.</sys:String>
     <sys:String x:Key="Startup.Vault.Location">Pilih lokasi</sys:String>

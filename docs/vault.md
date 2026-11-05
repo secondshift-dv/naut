@@ -10,7 +10,7 @@ Prepared derivatives and caches support presentation and performance, but they d
 
 ## Choosing a Vault
 
-On first launch, choose the folder where the Vault should live. Naut does not require a separate name field: the chosen folder is the location and its folder name is the Vault name.
+On first launch, choose a folder outside the application installation and AppData folders. A separate sibling folder is supported, but selecting the installation folder, AppData folder, or their ancestors/descendants is not allowed. Choose an existing empty folder for a new Vault or an existing Naut Vault to reopen it. Naut does not require a separate name field: the chosen folder is the location and its folder name is the Vault name.
 
 You can later pick an existing compatible Vault or move the active Vault through the supported Vault controls.
 

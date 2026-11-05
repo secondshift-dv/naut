@@ -131,6 +131,12 @@ public sealed class VaultWelcomeView : Grid
                     "textSecondary")),
             UI.WrappedText(
                 UI.T(
+                    "Startup.Vault.SeparateLocation",
+                    "Important: Keep the Vault outside Naut's application and AppData folders. A separate folder beside the app is fine."),
+                "caption",
+                "warning"),
+            UI.WrappedText(
+                UI.T(
                     "Startup.Vault.LocalNote",
                     "Your originals stay where they are. Imported media is copied into this Vault."),
                 "caption",
