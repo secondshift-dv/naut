@@ -86,7 +86,7 @@ public sealed record VerificationBannerCandidate(
     int Rank,
     bool IsRecommended,
     string? Reason,
-    string? PreviewImagePath = null)
+    string? PreviewImagePath = null, bool IsReady = true)
 {
     public bool HasPreviewImage => !string.IsNullOrWhiteSpace(PreviewImagePath);
 

@@ -2,7 +2,7 @@
 
 ## 1. Download Naut
 
-Download **Naut v0.0.8** from the official [GitHub Releases](https://github.com/secondshift-dv/naut/releases/tag/v0.0.8) page.
+Download **Naut v0.0.9** from the official [GitHub Releases](https://github.com/secondshift-dv/naut/releases/tag/v0.0.9) page.
 
 The Windows package is portable. Extract the complete ZIP to a normal folder; do not run only the EXE from inside the archive.
 
@@ -33,4 +33,4 @@ Images, videos, and supported 3D model media receive the preparation appropriate
 
 You can rename the current Vault and give it an independent icon through **Settings → Vault**. Those preferences belong to the Vault, not the extracted application folder.
 
-For a browser-based preview without touching local files, open the [Naut Interactive Showcase](https://secondshift-dv.github.io/naut/). Read the [v0.0.8 release notes](releases/v0.0.8.md) before upgrading a Vault from a previous catalog version.
+For a browser-based preview without touching local files, open the [Naut Interactive Showcase](https://secondshift-dv.github.io/naut/). Read the [v0.0.9 release notes](releases/v0.0.9.md) before upgrading a Vault from a previous catalog version.

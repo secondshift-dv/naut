@@ -1,0 +1,43 @@
+{
+  "id": "builtin.neuterradise.effect.glitter",
+  "kind": "effect",
+  "name": "Glitter",
+  "spec": {
+    "targets": [
+      "effect.profile.banner"
+    ],
+    "channel": "particles",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "particles",
+            "opacity": 0.5,
+            "color": "#FFF9E8",
+            "count": 14,
+            "sizeMin": 0.5,
+            "sizeMax": 1.5,
+            "speed": 0.04,
+            "particleShape": "sparkle",
+            "drift": 0.01,
+            "twinkle": 0.5,
+            "spawnRegion": "all"
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  },
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  }
+}

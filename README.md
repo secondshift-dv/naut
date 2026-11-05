@@ -7,7 +7,7 @@
 <p align="center">Local-first media collections for Windows — offline face intelligence, interactive 3D Figures, and your own portable Vault.</p>
 
 <p align="center">
-  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.8"><strong>Download Naut v0.0.8</strong></a>
+  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.9"><strong>Download Naut v0.0.9</strong></a>
   ·
   <a href="https://secondshift-dv.github.io/naut/"><strong>View Live Demo</strong></a>
   ·
@@ -54,7 +54,7 @@ Compatible models can become interactive Figures with rotate, pan, zoom, Naut-ma
 <td width="50%" valign="top">
 <a href="docs/import-media.md"><img src="docs/assets/readme/feature-smart-import.svg" alt="Smart media import" width="100%"></a><br>
 <strong>Smart media import</strong><br>
-The same import path prepares only what each media type needs: metadata, thumbnails, bounded video presentation media, face analysis when applicable, and Figure derivatives for supported models.
+The same import path prepares only what each media type needs: metadata, thumbnails, bounded video HOVER and Banner renditions, face analysis when applicable, and Figure derivatives for supported models.
 </td>
 <td width="50%" valign="top">
 <a href="docs/customization.md"><img src="docs/assets/readme/feature-customization.svg" alt="Presentation without destructive edits" width="100%"></a><br>
@@ -80,17 +80,17 @@ The portable app package and the Vault are separate boundaries. Imports copy fil
 
 - **Profiles, not folders first.** A Profile can represent a person, character, project, object, subject, or any collection identity.
 - **Local control by design.** The authoritative collection lives in the Vault you choose.
-- **Prepared for browsing.** Naut generates bounded presentation derivatives instead of modifying original media.
+- **Prepared for browsing.** Naut generates bounded presentation derivatives instead of modifying original media. Profiles keep multiple Banner alternatives while preserving the original files.
 - **3D is additive, not mandatory.** Normal Naut use does not require a discrete GPU or a Figure.
 - **Portable application, durable collection.** Updating the app package does not replace the Vault.
 
-## What changed in v0.0.8
+## What changed in v0.0.9
 
 - **More efficient durable Import transfer:** when a file finishes on an existing 64 MiB checkpoint boundary, Naut reuses the safe offset rather than repeating a disk flush and catalog write.
 - **Less checkpoint bookkeeping:** transfer reuses its validated Import item identity rather than parsing it again for each checkpoint.
 - **Unchanged safety guarantees:** original files remain untouched; SHA-256, duplicate reuse, safe Cancel, Resume, metadata and media preparation continue through the established pipeline.
 
-The improvement targets redundant checkpoint operations, not a guaranteed percentage reduction in total Import time. See the [complete v0.0.8 release notes](docs/releases/v0.0.8.md) for limitations and compatibility details.
+The improvement targets redundant checkpoint operations, not a guaranteed percentage reduction in total Import time. See the [complete v0.0.9 release notes](docs/releases/v0.0.9.md) for limitations and compatibility details.
 
 ## See it in action
 
@@ -107,7 +107,7 @@ The improvement targets redundant checkpoint operations, not a guaranteed percen
 
 ## Quick Start
 
-1. Open the official [Naut v0.0.8 download](https://github.com/secondshift-dv/naut/releases/tag/v0.0.8) and choose **`naut-v0.0.8-win-x64.zip`** under Assets.
+1. Open the official [Naut v0.0.9 download](https://github.com/secondshift-dv/naut/releases/tag/v0.0.9) and choose **`naut-v0.0.9-win-x64.zip`** under Assets.
 2. Extract the complete ZIP to a normal folder.
 3. Run `naut.exe`.
 4. Choose **where to keep** your Vault.
@@ -128,7 +128,7 @@ Naut's normal collection experience is intentionally lighter than its optional F
 | **Display** | 1280 × 720 | 1920 × 1080 or higher |
 | **Free app/update space** | 3 GB | 3 GB+ on SSD |
 
-Vault storage is separate and depends on the size of your collection. See the full [Naut v0.0.8 System Requirements](docs/system-requirements.md).
+Vault storage is separate and depends on the size of your collection. See the full [Naut v0.0.9 System Requirements](docs/system-requirements.md).
 
 ## Optional pack collection
 

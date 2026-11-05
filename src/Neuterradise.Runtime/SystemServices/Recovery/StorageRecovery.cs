@@ -56,6 +56,7 @@ public sealed class StorageRecovery
                   AND aa.state IN ('READY','NEEDS_REPAIR')
                   AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.owner_type = 'Media'
                       AND j.owner_id = aa.media_id AND j.kind = CASE
+                          WHEN aa.role = 'BANNER' THEN 'GenerateBanner'
                           WHEN a.media_type = 'VIDEO' THEN 'GenerateVideoMediaAssets'
                           WHEN a.media_type = 'MODEL' THEN 'GenerateModelMediaAssets'
                           ELSE 'GenerateThumbnail' END
@@ -84,7 +85,7 @@ public sealed class StorageRecovery
                     "The durable MediaAsset path is invalid and was left unchanged."));
                 continue;
             }
-            var validFile = candidate.State == "READY" && candidate.ContractVersion == 1 && File.Exists(path)
+            var validFile = candidate.State == "READY" && MediaAssetContracts.IsSupported(DbEnum.ParseMediaAssetRole(candidate.Role), candidate.ContractVersion) && File.Exists(path)
                 && new FileInfo(path).Length == candidate.ByteLength;
             if (candidate.Role == "MODEL_RENDER")
             {
@@ -111,7 +112,7 @@ public sealed class StorageRecovery
                 }
             }
             if (validFile) continue;
-            var kind = candidate.MediaType == "VIDEO" ? "GenerateVideoMediaAssets"
+            var kind = candidate.Role == "BANNER" ? "GenerateBanner" : candidate.MediaType == "VIDEO" ? "GenerateVideoMediaAssets"
                 : candidate.MediaType == "MODEL" ? "GenerateModelMediaAssets" : "GenerateThumbnail";
             var lane = kind == "GenerateThumbnail" && candidate.MediaType == "IMAGE"
                 ? JobLane.Cpu : JobLane.Media;

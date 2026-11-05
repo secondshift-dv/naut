@@ -363,9 +363,9 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
                 .ConfigureAwait(false);
             var cover = await ResolveHomeCoverAsync(item.Summary.ProfileId, cancellationToken)
                 .ConfigureAwait(false);
-            var bannerVideo = selectedBanner?.Role == MediaAssetRole.Hover
-                ? ResolveMediaAssetPath(selectedBanner)
-                : null;
+            var rendition = selectedBanner is not null && _mediaResources is not null
+                ? await _mediaResources.ResolveProfileBannerAsync(item.Summary.ProfileId, selectedBanner.MediaAssetId, cancellationToken).ConfigureAwait(false) : null;
+            var bannerVideo = rendition?.State == MediaAssetResourceState.Ready ? rendition.PhysicalPath : null;
             string? bannerPath = null;
             if (selectedBanner?.Role == MediaAssetRole.Hover && _mediaResources is not null)
             {

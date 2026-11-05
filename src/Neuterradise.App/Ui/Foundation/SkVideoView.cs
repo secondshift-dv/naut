@@ -165,6 +165,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
     public event Action? Failed;
 
     public string? SourcePath => _sourcePath;
+    public bool HasFrame => _frame is not null;
 
     public void SetPresentation(MediaTransformState presentation)
     {
@@ -306,7 +307,6 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (Volatile.Read(ref _shutdown) != 0) return;
-        using var foregroundDisk = Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.EnterForegroundDiskWork();
         using var process = new Process
         {
             StartInfo = CreateStartInfo(ffmpegPath, sourcePath, loop, still),
@@ -469,7 +469,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
             startInfo.ArgumentList.Add(argument);
         startInfo.ArgumentList.Add("-an");
         startInfo.ArgumentList.Add("-vf");
-        startInfo.ArgumentList.Add($"fps={FramesPerSecond},scale='min(1280,iw)':'min(1280,ih)':force_original_aspect_ratio=decrease");
+        startInfo.ArgumentList.Add($"fps={FramesPerSecond},scale=w='if(gte(iw,ih),min(1600,iw),min(900,iw))':h='if(gte(iw,ih),min(900,ih),min(1600,ih))':force_original_aspect_ratio=decrease");
         if (still)
         {
             startInfo.ArgumentList.Add("-frames:v");
@@ -485,7 +485,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
 
     private static async Task<SKBitmap?> ReadBmpFrameAsync(Stream stream, CancellationToken cancellationToken)
     {
-        var header = new byte[14];
+        var header = new byte[54];
         if (!await ReadExactlyOrEofAsync(stream, header, cancellationToken).ConfigureAwait(false))
         {
             return null;
@@ -501,6 +501,17 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
         {
             throw new InvalidDataException($"FFmpeg returned an invalid BMP frame length: {frameLength}.");
         }
+
+        var width = BinaryPrimitives.ReadInt32LittleEndian(header.AsSpan(18, 4));
+        var rawHeight = BinaryPrimitives.ReadInt32LittleEndian(header.AsSpan(22, 4));
+        var bits = BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(28, 2));
+        var pixelOffset = BinaryPrimitives.ReadInt32LittleEndian(header.AsSpan(10, 4));
+        var height = Math.Abs((long)rawHeight);
+        var stride = ((long)width * bits + 31) / 32 * 4;
+        if (width <= 0 || height <= 0 || Math.Max(width, height) > 1600 || Math.Min(width, height) > 900
+            || bits is not (24 or 32) || pixelOffset < 54 || pixelOffset > 138
+            || frameLength != pixelOffset + stride * height)
+            throw new InvalidDataException("FFmpeg returned an invalid or oversized BMP geometry.");
 
         var buffer = ArrayPool<byte>.Shared.Rent(frameLength);
         try

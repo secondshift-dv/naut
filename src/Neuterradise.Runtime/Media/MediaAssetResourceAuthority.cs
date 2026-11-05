@@ -48,6 +48,15 @@ public sealed class MediaAssetResourceAuthority
             : Missing(bannerMediaAssetId);
     }
 
+    public async Task<MediaAssetResource> ResolveProfileBannerAsync(Guid profileId, Guid hoverAssetId, CancellationToken ct = default)
+    {
+        var hover = await _reads.GetPublicSelectedMediaAsync(profileId, hoverAssetId, ct).ConfigureAwait(false);
+        if (hover?.Role != MediaAssetRole.Hover) return Missing(hoverAssetId);
+        var rendition = await new Neuterradise.App.Profiles.ProfileBannerOperations(_catalog)
+            .ResolveRenditionAsync(profileId, hover.MediaId, ct: ct).ConfigureAwait(false);
+        return await ResolveMediaAssetAsync(rendition, ct).ConfigureAwait(false);
+    }
+
     private async Task<MediaAssetResource> ResolveSelectedMediaAssetAsync(Guid profileId, Guid mediaAssetId,
         CancellationToken ct)
     {

@@ -50,7 +50,7 @@ public sealed record DurableMediaAssetTrashPlan(
     {
         if (!Enum.IsDefined(Role) || ByteLength <= 0 || Sha256 is not {Length:64}
             || Sha256.Any(c => c is not (>= '0' and <= '9' or >= 'a' and <= 'f'))
-            || Role == MediaAssetRole.Hover && mediaType != MediaType.Video
+            || Role is (MediaAssetRole.Hover or MediaAssetRole.Banner) && mediaType != MediaType.Video
             || Role == MediaAssetRole.ModelRender && mediaType != MediaType.Model) return false;
         try
         {

@@ -82,9 +82,9 @@ public sealed class ProfileManifestWriter
     {
         ArgumentNullException.ThrowIfNull(manifest);
 
-        if (manifest.SchemaVersion != 1)
+        if (manifest.SchemaVersion is not (1 or 2))
         {
-            throw new JsonException($"Unsupported manifest schema version {manifest.SchemaVersion}. Expected 1.");
+            throw new JsonException($"Unsupported manifest schema version {manifest.SchemaVersion}. Expected 1 or 2.");
         }
 
         if (manifest.ProfileId == Guid.Empty)
@@ -108,6 +108,13 @@ public sealed class ProfileManifestWriter
             throw new JsonException("UNKNOWN manifest must have a positive UnknownSequence.");
         }
 
+        if (manifest.BannerEntries.Any(entry => entry.MediaId == Guid.Empty || entry.SortOrder < 0
+            || entry.Origin is not ("INITIAL" or "ADDED"))
+            || manifest.BannerEntries.Select(entry => entry.MediaId).Distinct().Count() != manifest.BannerEntries.Count)
+            throw new JsonException("Invalid Banner collection projection.");
+        if (manifest.Kind == ProfileKind.Unknown && manifest.BannerEntries.Count != 0)
+            throw new JsonException("UNKNOWN manifest cannot contain Banners.");
+
         if (manifest.FigureMediaId == Guid.Empty) throw new JsonException("Manifest FigureMediaId cannot be empty.");
 
         if (manifest.Kind == ProfileKind.Unknown &&
@@ -128,7 +135,7 @@ public sealed class ProfileManifestWriter
         }
 
         return new ProfileManifestV1(
-            schemaVersion: 1,
+            schemaVersion: 2,
             profileId: profile.ProfileId,
             kind: profile.Kind,
             displayName: profile.DisplayName,
@@ -139,7 +146,7 @@ public sealed class ProfileManifestWriter
             layoutPresetId: profile.LayoutPresetId,
             appearanceOverridesJson: profile.AppearanceOverridesJson,
             updatedAtUtc: profile.UpdatedAtUtc.ToUniversalTime(),
-            unknownSequence: (int?)profile.UnknownSequence, figureMediaId: profile.FigureMediaId);
+            unknownSequence: (int?)profile.UnknownSequence, figureMediaId: profile.FigureMediaId, bannerEntries: profile.BannerEntries);
     }
 
     public static ProfileManifestV1 CreateManifest(
@@ -152,7 +159,7 @@ public sealed class ProfileManifestWriter
         int? unknownSequence = null)
     {
         return new ProfileManifestV1(
-            schemaVersion: 1,
+            schemaVersion: 2,
             profileId: profileId,
             kind: kind,
             displayName: displayName,

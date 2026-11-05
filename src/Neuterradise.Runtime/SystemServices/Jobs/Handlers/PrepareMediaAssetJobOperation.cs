@@ -25,10 +25,11 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
     IGenerateVideoMediaAssetsJobOperation, IGenerateModelMediaAssetsJobOperation
 {
     private const int ContractVersion = 1;
-    // Keep the same pixel budget for either orientation; portrait banners must not be capped to 720px tall.
-    private const string HoverScale = "scale=w='if(gte(iw,ih),min(1280,iw),min(720,iw))':" +
-        "h='if(gte(iw,ih),min(720,ih),min(1280,ih))':force_original_aspect_ratio=decrease:" +
+    // Orientation-aware ceilings preserve portrait detail without upscaling the original.
+    private const string HoverScale = "scale=w='if(gte(iw,ih),min(854,iw),min(480,iw))':" +
+        "h='if(gte(iw,ih),min(480,ih),min(854,ih))':force_original_aspect_ratio=decrease:" +
         "force_divisible_by=2,format=yuv420p";
+    private static readonly string BannerScale = HoverScale.Replace("854", "1600", StringComparison.Ordinal).Replace("480", "900", StringComparison.Ordinal);
     private readonly MediaReads _media;
     private readonly CatalogDb _catalog;
     private readonly MediaAssetReads _mediaAssets;
@@ -53,12 +54,25 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
         _models = models;
     }
 
-    public Task<JobExecutionResult> ExecuteAsync(JobExecutionContext context, CancellationToken ct) =>
-        context.Kind == "GenerateVideoMediaAssets"
-            ? ExecuteVideoAssetsAsync(context, ct)
+    public async Task<JobExecutionResult> ExecuteAsync(JobExecutionContext context, CancellationToken ct)
+    {
+        var result = context.Kind is "GenerateVideoMediaAssets" or "GenerateBanner"
+            ? await ExecuteVideoAssetsAsync(context, ct).ConfigureAwait(false)
             : context.Kind == "GenerateModelMediaAssets"
-            ? ExecuteModelAssetsAsync(context, ct)
-            : ExecuteRoleAsync(context, MediaAssetRole.Thumbnail, ct);
+            ? await ExecuteModelAssetsAsync(context, ct).ConfigureAwait(false)
+            : await ExecuteRoleAsync(context, MediaAssetRole.Thumbnail, ct).ConfigureAwait(false);
+        if (context.Kind == "GenerateBanner" && !result.IsSucceeded && !ct.IsCancellationRequested)
+        {
+            await using var connection = await _catalog.OpenConnectionAsync(ct).ConfigureAwait(false);
+            await using var read = connection.CreateCommand();
+            read.CommandText = "SELECT EXISTS(SELECT 1 FROM profile_banner_requests WHERE job_id=$job AND origin='INITIAL') AND NOT EXISTS(SELECT 1 FROM profile_banner_requests WHERE job_id=$job AND origin='ADDED');";
+            read.Parameters.AddWithValue("$job", DbGuid.Format(context.JobId));
+            var initialOnly = Convert.ToInt32(await read.ExecuteScalarAsync(ct).ConfigureAwait(false)) == 1;
+            if (initialOnly)
+                return await ExecuteVideoAssetsAsync(context, ct, suppressBanner: true).ConfigureAwait(false);
+        }
+        return result;
+    }
 
     private async Task<JobExecutionResult> ExecuteModelAssetsAsync(JobExecutionContext context, CancellationToken ct)
     {
@@ -112,10 +126,10 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
 
     private async Task<JobExecutionResult> ExecuteVideoAssetsAsync(
         JobExecutionContext context,
-        CancellationToken ct)
+        CancellationToken ct, bool suppressBanner = false)
     {
         var source = await _media.GetMediaSourceAsync(context.OwnerId, ct).ConfigureAwait(false);
-        if (source is null || source.IsRetired)
+        if (source is null || !source.IsActive)
             return JobExecutionResult.Cancelled("The Media is no longer available for preparation.");
         if (source.MediaType != MediaType.Video)
             return Invalid("MEDIA_ASSET_MEDIA_TYPE_INVALID", "Video MediaAsset preparation requires video Media.");
@@ -128,14 +142,39 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
             .ConfigureAwait(false);
         var needHover = await NeedsGenerationAsync(source.MediaId, MediaAssetRole.Hover, ct)
             .ConfigureAwait(false);
-        if (!needThumbnail && !needHover)
+        var banners = new Neuterradise.App.Profiles.ProfileBannerOperations(_catalog);
+        var bannerRequested = context.Kind == "GenerateBanner" && !suppressBanner;
+        var small = await banners.IsSmallSourceAsync(source.MediaId, ct).ConfigureAwait(false);
+        if (bannerRequested && small && !needHover)
+        {
+            var existingHover = await _mediaAssets.GetOwnedMediaAssetAsync(source.MediaId, MediaAssetRole.Hover, ct).ConfigureAwait(false);
+            if (existingHover?.ContractVersion != 2 && !await _writes.TryAcceptHoverContractAsync(source.MediaId, ct).ConfigureAwait(false))
+            {
+                await _writes.MarkMediaNeedsRepairAsync(source.MediaId, MediaAssetRole.Hover, ct).ConfigureAwait(false);
+                needHover = true;
+            }
+        }
+        var needBanner = bannerRequested && !small
+            && await NeedsGenerationAsync(source.MediaId, MediaAssetRole.Banner, ct).ConfigureAwait(false);
+        if (!needThumbnail && !needHover && !needBanner)
+        {
+            if (bannerRequested && !await banners.CompleteRequestsAsync(source.MediaId, ct).ConfigureAwait(false))
+                return Invalid("BANNER_MEMBERSHIP_NOT_COMMITTED", "The Banner request no longer has an eligible Profile relation.");
             return JobExecutionResult.Succeeded;
+        }
 
         var representativeTimestamp = await ReadRepresentativeTimestampAsync(
             source.MediaId, source.DurationMilliseconds, ct).ConfigureAwait(false);
         var hoverStart = Math.Max(0, Math.Min(
             representativeTimestamp - 500,
             Math.Max(0, (source.DurationMilliseconds ?? 0) - 5800)));
+        if (bannerRequested && (await _mediaAssets.GetOwnedMediaAssetAsync(source.MediaId, MediaAssetRole.Hover, ct).ConfigureAwait(false)) is not null)
+        {
+            var hover = await _mediaAssets.GetOwnedMediaAssetAsync(source.MediaId, MediaAssetRole.Hover, ct).ConfigureAwait(false);
+            if (hover?.SourceTimestampMs is not { } timestamp)
+                return Invalid("BANNER_TIMESTAMP_UNAVAILABLE", "The prepared Hover has no authoritative source timestamp.");
+            hoverStart = timestamp;
+        }
         var thumbnailOffset = Math.Max(0, representativeTimestamp - hoverStart);
 
         var tempDirectory = _paths.ResolveContainedPath(
@@ -144,6 +183,7 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
         var thumbnailTemp = Path.Combine(tempDirectory, "thumbnail.webp");
         var frameTemp = Path.Combine(tempDirectory, "thumbnail.jpg");
         var hoverTemp = Path.Combine(tempDirectory, "hover.mp4");
+        var bannerTemp = Path.Combine(tempDirectory, "banner.mp4");
 
         try
         {
@@ -154,50 +194,35 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
                     "MEDIA_ASSET_TOOL_UNAVAILABLE",
                     "The approved video encoder is unavailable.");
 
-            IReadOnlyList<string> args;
-            if (needThumbnail && needHover)
+            var outputs = new List<(string Label, string Filter)>();
+            if (needThumbnail) outputs.Add(("thumb", $"select='gte(t,{TimestampSeconds(thumbnailOffset)})',scale='min(1024,iw)':'min(1024,ih)':force_original_aspect_ratio=decrease"));
+            if (needHover) outputs.Add(("hover", HoverScale + ",fps=24"));
+            if (needBanner) outputs.Add(("banner", BannerScale + ",fps=24"));
+            var filter = "[0:v]setpts=PTS-STARTPTS";
+            if (outputs.Count > 1) filter += ",split=" + outputs.Count + string.Concat(outputs.Select(output => "[" + output.Label + "src]"));
+            else filter += "[" + outputs[0].Label + "src]";
+            filter += ";" + string.Join(";", outputs.Select(output => "[" + output.Label + "src]" + output.Filter + "[" + output.Label + "]"));
+            var args = new List<string> { "-y", "-ss", TimestampSeconds(hoverStart), "-i", path,
+                "-filter_complex", filter, "-progress", "pipe:1", "-nostats" };
+            foreach (var output in outputs)
             {
-                var thumbnailOffsetSeconds = TimestampSeconds(thumbnailOffset);
-                var filter =
-                    $"[0:v]setpts=PTS-STARTPTS,split=2[thumbsrc][hoversrc];" +
-                    $"[thumbsrc]select='gte(t,{thumbnailOffsetSeconds})'," +
-                    "scale='min(1024,iw)':'min(1024,ih)':force_original_aspect_ratio=decrease[thumb];" +
-                    "[hoversrc]" + HoverScale + "[hover]";
-                args =
-                [
-                    "-y", "-ss", TimestampSeconds(hoverStart), "-i", path,
-                    "-filter_complex", filter,
-                    "-map", "[thumb]", "-frames:v", "1", "-an",
-                    "-c:v", "mjpeg", "-threads", "2", frameTemp,
-                    "-map", "[hover]", "-t", "5.8", "-an",
-                    "-c:v", "libopenh264", "-threads", "2",
-                    "-movflags", "+faststart", hoverTemp
-                ];
+                args.AddRange(["-map", "[" + output.Label + "]", "-an"]);
+                if (output.Label == "thumb") args.AddRange(["-frames:v", "1", "-c:v", "mjpeg", "-threads", "2", frameTemp]);
+                else args.AddRange(["-t", "5.8", "-r", "24", "-c:v", "libopenh264", "-threads", "2",
+                    "-b:v", output.Label == "banner" ? "6000k" : "1000k", "-rc_mode", "bitrate",
+                    "-movflags", "+faststart", output.Label == "banner" ? bannerTemp : hoverTemp]);
             }
-            else if (needThumbnail)
+            var duration = Math.Max(1, Math.Min(5800, (source.DurationMilliseconds ?? 5800) - hoverStart));
+            await context.Progress.ReportProgressAsync(0, duration + 1, "Preparing", ct).ConfigureAwait(false);
+            async Task OnProgress(string line)
             {
-                args =
-                [
-                    "-y", "-ss", TimestampSeconds(representativeTimestamp), "-i", path,
-                    "-frames:v", "1",
-                    "-vf", "scale='min(1024,iw)':'min(1024,ih)':force_original_aspect_ratio=decrease",
-                    "-an", "-c:v", "mjpeg", "-threads", "2", frameTemp
-                ];
-            }
-            else
-            {
-                args =
-                [
-                    "-y", "-ss", TimestampSeconds(hoverStart), "-i", path, "-t", "5.8",
-                    "-map", "0:v:0", "-an",
-                    "-vf", HoverScale,
-                    "-c:v", "libopenh264", "-threads", "2",
-                    "-movflags", "+faststart", hoverTemp
-                ];
+                if (line.StartsWith("out_time_us=", StringComparison.Ordinal)
+                    && long.TryParse(line.AsSpan(12), out var microseconds))
+                    await context.Progress.ReportProgressAsync(Math.Clamp(microseconds / 1000, 0, duration), duration + 1, "Encoding", ct).ConfigureAwait(false);
             }
 
             var result = await _launcher.RunAsync(
-                new ProcessRunRequest(ffmpeg, args, Timeout: TimeSpan.FromMinutes(3)), ct)
+                new ProcessRunRequest(ffmpeg, args, Timeout: TimeSpan.FromMinutes(3), OutputLineReceived: OnProgress), ct)
                 .ConfigureAwait(false);
             if (result.TimedOut || result.ExitCode != 0)
                 return Invalid("MEDIA_ASSET_RENDER_FAILED",
@@ -220,10 +245,21 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
                 await _writes.PublishMediaAssetAsync(
                     source.MediaId,
                     MediaAssetRole.Hover,
-                    ContractVersion,
+                    2,
                     hoverTemp,
                     hoverStart,
                     ct: ct).ConfigureAwait(false);
+            }
+
+            if (needBanner)
+                await _writes.PublishMediaAssetAsync(source.MediaId, MediaAssetRole.Banner, 2,
+                    bannerTemp, hoverStart, ct: ct).ConfigureAwait(false);
+            if (bannerRequested)
+            {
+                await context.Progress.ReportProgressAsync(duration, duration + 1, "Finalizing", ct).ConfigureAwait(false);
+                if (!await banners.CompleteRequestsAsync(source.MediaId, ct).ConfigureAwait(false))
+                    return Invalid("BANNER_MEMBERSHIP_NOT_COMMITTED", "The Banner request no longer has an eligible Profile relation.");
+                await context.Progress.ReportProgressAsync(duration + 1, duration + 1, "Ready", ct).ConfigureAwait(false);
             }
 
             return JobExecutionResult.Succeeded;
@@ -268,10 +304,10 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
             var current = await _validator.ValidateAsync(
                 _paths.ResolveVaultRelativePath(VaultPathArea.MediaAssets, existing.RelativePath),
                 role,
-                ct, sourceHash).ConfigureAwait(false);
+                ct, sourceHash, existing.ContractVersion).ConfigureAwait(false);
             if (current.ByteLength == existing.ByteLength
                 && current.Sha256 == existing.Sha256
-                && existing.ContractVersion == ContractVersion)
+                && MediaAssetContracts.IsSupported(role, existing.ContractVersion))
                 return false;
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
@@ -286,7 +322,7 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
         MediaAssetRole role, CancellationToken ct, string? preparedModelPath = null)
     {
         var source = await _media.GetMediaSourceAsync(context.OwnerId, ct).ConfigureAwait(false);
-        if (source is null || source.IsRetired)
+        if (source is null || !source.IsActive)
             return JobExecutionResult.Cancelled("The Media is no longer available for preparation.");
 
         var expectedType = context.Kind switch

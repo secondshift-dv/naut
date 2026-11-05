@@ -1,0 +1,39 @@
+{
+  "id": "builtin.neuterradise.effect.shimmer",
+  "kind": "effect",
+  "name": "Shimmer",
+  "spec": {
+    "targets": [
+      "effect.profile.banner"
+    ],
+    "channel": "lighting",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "light-sweep",
+            "opacity": 0.35,
+            "color": "#FFF9E8",
+            "width": 0.3,
+            "speed": 0.2,
+            "period": 18,
+            "angle": 14
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  },
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  }
+}

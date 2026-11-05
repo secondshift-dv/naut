@@ -40,7 +40,8 @@ public sealed partial class CustomizationCenter
         string DisplayTitle,
         string? PreviewPath,
         string? PlaybackPath,
-        bool IsRecommended);
+        bool IsRecommended,
+        bool IsMember = false);
 
     private sealed record CustomizationFigureCandidate(
         Guid MediaId,
@@ -188,23 +189,30 @@ public sealed partial class CustomizationCenter
             }
 
             var bannerCandidates = new List<CustomizationBannerCandidate>();
+            var bannerOperations = new ProfileBannerOperations(_services.Catalog);
+            var bannerEntries = await bannerOperations.ReadEntriesAsync(profileId, cancellationToken).ConfigureAwait(true);
             foreach (var candidate in ranked.BannerHovers)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var preview = await _services.Runtime.MediaResources.ResolveMediaThumbnailAsync(
                     candidate.MediaId,
                     cancellationToken).ConfigureAwait(true);
+                var rendition = await bannerOperations.ResolveRenditionAsync(profileId, candidate.MediaId, ct: cancellationToken).ConfigureAwait(true);
                 bannerCandidates.Add(new CustomizationBannerCandidate(
                     candidate.MediaId,
                     0.5,
                     0.5,
                     candidate.DisplayName,
                     preview.State == MediaAssetResourceState.Ready ? preview.PhysicalPath : null,
-                    _services.Paths.ResolveVaultRelativePath(
+                    rendition is null ? null : _services.Paths.ResolveVaultRelativePath(
                         Neuterradise.App.SystemServices.Storage.VaultPathArea.MediaAssets,
-                        candidate.RelativePath),
-                    candidate.Rank <= ProfileMediaCandidateReads.MaximumBannerCandidates));
+                        rendition.RelativePath),
+                    false,
+                    rendition is not null && bannerEntries.Any(entry => entry.MediaId == candidate.MediaId)));
             }
+
+            bannerCandidates = bannerCandidates.OrderBy(candidate => candidate.IsMember ? 0 : 1)
+                .ThenBy(candidate => bannerEntries.FirstOrDefault(entry => entry.MediaId == candidate.MediaId)?.SortOrder ?? int.MaxValue).ToList();
 
             string? ResolveFigureAssetPath(string? relativePath)
             {
@@ -255,9 +263,8 @@ public sealed partial class CustomizationCenter
                     bannerPath = bannerThumbnail.State == MediaAssetResourceState.Ready
                         ? bannerThumbnail.PhysicalPath
                         : null;
-                    bannerVideoPath = _services.Paths.ResolveVaultRelativePath(
-                        Neuterradise.App.SystemServices.Storage.VaultPathArea.MediaAssets,
-                        selectedBanner.RelativePath);
+                    var resolved = await _services.Runtime.MediaResources.ResolveProfileBannerAsync(profileId, selectedBanner.MediaAssetId, cancellationToken).ConfigureAwait(true);
+                    bannerVideoPath = resolved.State == MediaAssetResourceState.Ready ? resolved.PhysicalPath : null;
                 }
             }
 

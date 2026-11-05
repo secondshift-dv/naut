@@ -175,6 +175,7 @@ public sealed class ProductionRuntimeRegistry : IAsyncDisposable
                 new GenerateThumbnailJobHandler(assetArtifacts));
             registry.Register("GenerateVideoMediaAssets",
                 new GenerateVideoMediaAssetsJobHandler(assetArtifacts));
+            registry.Register("GenerateBanner", new GenerateBannerJobHandler(assetArtifacts));
             registry.Register("GenerateModelMediaAssets", new GenerateModelMediaAssetsJobHandler(assetArtifacts));
             registry.Register(
                 "FaceAnalysis",

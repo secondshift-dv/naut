@@ -140,6 +140,7 @@ public sealed class ManagedPathPlanner
         {
             MediaAssetRole.Thumbnail => "thumbnail.webp",
             MediaAssetRole.Hover => "hover.mp4",
+            MediaAssetRole.Banner => "banner.mp4",
             MediaAssetRole.ModelRender => "model-render.nfig",
             _ => throw new ArgumentOutOfRangeException(nameof(role), role, null),
         };

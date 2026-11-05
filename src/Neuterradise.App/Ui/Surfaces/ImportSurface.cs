@@ -1676,7 +1676,9 @@ public sealed class ImportSurface : Surface
 
         var description = isCover
             ? UI.T("Import.Cover.Description", "Used as the Profile portrait and card image.")
-            : UI.T("Import.Banner.Description", "Used as the moving Profile header when a prepared video is available.");
+            : wizard.IsNewChoice
+                ? UI.T("Banner.VerifyAdvice", "Showing the 3 best Banner recommendations. You can add more videos as Banners later in Customize Profile.")
+                : UI.T("Import.Banner.Description", "Used as the moving Profile header when a prepared video is available.");
 
         var header = UI.Grid(
             "auto",
@@ -1834,6 +1836,8 @@ public sealed class ImportSurface : Surface
                     {
                         labels.Children.Add(UI.Badge(UI.T("Import.Recommended", "Recommended"), "accent"));
                     }
+                    if (option.Banner is { IsReady: false })
+                        labels.Children.Add(UI.Badge(UI.T("Banner.Progress.Preparing", "Preparing"), "accent"));
                     if (option.IsSelected)
                     {
                         labels.Children.Add(UI.Badge(UI.T("Import.Selected", "Selected"), "success"));

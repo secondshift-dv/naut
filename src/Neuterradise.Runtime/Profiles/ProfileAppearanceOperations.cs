@@ -1,3 +1,4 @@
+using Neuterradise.App.Localization;
 using Neuterradise.App.Media.Model;
 using System.IO;
 using System.Text;
@@ -245,6 +246,9 @@ public sealed class ProfileAppearanceOperations
             return OperationResult<ProfileAppearanceOutcome>.Validation(OperationErrorCode.ProfileCardInvalid, $"The Profile card variant '{variant}' is not recognized.");
         if (overrides.MediaLayoutId is { } mediaLayoutId && !MediaLayoutCatalog.IsBuiltInId(mediaLayoutId))
             return OperationResult<ProfileAppearanceOutcome>.Validation(OperationErrorCode.ProfileAppearanceInvalid, "That Media Layout is not recognized.");
+        if (overrides.BannerEffect is not ("none" or "film" or "glitter" or "shimmer")
+            || !double.IsFinite(overrides.BannerEffectIntensity) || overrides.BannerEffectIntensity is < 0 or > 1)
+            return OperationResult<ProfileAppearanceOutcome>.Validation(OperationErrorCode.ProfileAppearanceInvalid, "Invalid Banner effect.");
         var cover = CoverFrameCatalog.Resolve(overrides.ToCoverAppearanceRequest(), reduceMotion: false);
         if (overrides.CoverFrameId is not null && cover.Diagnostics.Count > 0)
             return OperationResult<ProfileAppearanceOutcome>.Validation(OperationErrorCode.ProfileAppearanceInvalid, cover.Diagnostics[0].Detail);
@@ -346,6 +350,11 @@ public sealed class ProfileAppearanceOperations
             Guid? preparedBannerId = null;
             if (sources.BannerMediaId is { } bannerMediaId)
             {
+                var entries = await new ProfileBannerOperations(_catalog).ReadEntriesAsync(profileId, cancellationToken).ConfigureAwait(false);
+                if (!entries.Any(entry => entry.MediaId == bannerMediaId)
+                    || await new ProfileBannerOperations(_catalog).ResolveRenditionAsync(profileId, bannerMediaId, ct: cancellationToken).ConfigureAwait(false) is null)
+                    return (OperationResult<ProfileAppearanceOutcome>.Validation(OperationErrorCode.ProfileAppearanceInvalid,
+                        SurfaceText.Get("Banner.NotReady", "The selected Banner is not ready. Add or repair it, then try again.")), overrides);
                 var rejection = await ValidateAppearanceMediaAsync(
                     transaction,
                     profileId,
@@ -702,7 +711,8 @@ public sealed record ProfileAppearanceOverrides(
     double CoverOffsetY = 0,
     double CoverRotation = 0,
     string? MediaLayoutId = null,
-    bool ShowRecentMedia = true)
+    bool ShowRecentMedia = true,
+    string BannerEffect = "none", double BannerEffectIntensity = .2)
 {
     // First canonical Profile appearance contract. The fresh v1 catalog has no appearance migrations.
     public const int SchemaVersion = 1;
@@ -781,6 +791,8 @@ public sealed record ProfileAppearanceOverrides(
             writer.WriteNumber("coverRotation", CoverRotation);
             WriteOptionalString(writer, "mediaLayoutId", MediaLayoutId);
             writer.WriteBoolean("showRecentMedia", ShowRecentMedia);
+            writer.WriteString("bannerEffect", BannerEffect);
+            writer.WriteNumber("bannerEffectIntensity", BannerEffectIntensity);
             writer.WriteEndObject();
         }
 
@@ -831,7 +843,8 @@ public sealed record ProfileAppearanceOverrides(
                 ReadNumber(root, "coverOffsetY", 0),
                 ReadNumber(root, "coverRotation", 0),
                 MediaLayoutCatalog.Normalize(ReadString(root, "mediaLayoutId")),
-                ReadBoolean(root, "showRecentMedia", Default.ShowRecentMedia));
+                ReadBoolean(root, "showRecentMedia", Default.ShowRecentMedia),
+                ReadString(root, "bannerEffect") ?? "none", ReadNumber(root, "bannerEffectIntensity", .2));
         }
         catch (JsonException)
         {

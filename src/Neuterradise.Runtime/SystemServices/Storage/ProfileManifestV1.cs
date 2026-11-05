@@ -50,6 +50,9 @@ public sealed record ProfileManifestV1
     [JsonConverter(typeof(IsoDateTimeOffsetUtcConverter))]
     public DateTimeOffset UpdatedAtUtc { get; init; }
 
+    [JsonPropertyOrder(14)]
+    public IReadOnlyList<ProfileBannerEntry> BannerEntries { get; init; } = [];
+
     [JsonConstructor]
     public ProfileManifestV1(
         int schemaVersion,
@@ -63,7 +66,8 @@ public sealed record ProfileManifestV1
         string? layoutPresetId,
         string? appearanceOverridesJson,
         DateTimeOffset updatedAtUtc,
-        int? unknownSequence = null, Guid? figureMediaId = null)
+        int? unknownSequence = null, Guid? figureMediaId = null,
+        IReadOnlyList<ProfileBannerEntry>? bannerEntries = null)
     {
         SchemaVersion = schemaVersion;
         ProfileId = profileId;
@@ -78,6 +82,7 @@ public sealed record ProfileManifestV1
         UpdatedAtUtc = updatedAtUtc;
         UnknownSequence = unknownSequence;
         FigureMediaId = figureMediaId;
+        BannerEntries = bannerEntries ?? [];
     }
 }
 

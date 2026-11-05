@@ -10,3 +10,9 @@ public sealed class GenerateVideoMediaAssetsJobHandler : AuthorizedJobHandler
     {
     }
 }
+
+public sealed class GenerateBannerJobHandler : AuthorizedJobHandler
+{
+    public GenerateBannerJobHandler(IGenerateVideoMediaAssetsJobOperation operation)
+        : base("GenerateBanner", [JobLane.Media], "Media", operation, runOffCallingThread: true) { }
+}

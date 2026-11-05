@@ -12,6 +12,8 @@ public sealed class MediaAssetReads
         CancellationToken cancellationToken = default) =>
         ReadMediaAsync(assetId, role, null, cancellationToken);
 
+    // Selection identity survives derivative repair so callers can resolve the source thumbnail.
+    // Playback readiness remains the rendition resolver's responsibility.
     public async Task<MediaAssetRecord?> GetPublicSelectedMediaAsync(Guid profileId, Guid mediaMediaId,
         CancellationToken ct = default)
     {
@@ -26,7 +28,7 @@ public sealed class MediaAssetReads
             JOIN profile_media pm ON pm.media_id = m.media_id
             JOIN profiles p ON p.profile_id = pm.profile_id
             JOIN profile_appearance appearance ON appearance.profile_id = p.profile_id
-            WHERE ma.media_asset_id = $asset AND ma.state = 'READY' AND m.state = 'ACTIVE'
+            WHERE ma.media_asset_id = $asset AND m.state = 'ACTIVE'
               AND pm.profile_id = $profile AND pm.publication_import_unit_id IS NULL
               AND p.visibility = 'PUBLISHED' AND p.trashed_at_ms IS NULL
               AND (appearance.cover_media_asset_id = ma.media_asset_id

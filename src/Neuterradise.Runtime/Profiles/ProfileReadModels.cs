@@ -68,7 +68,8 @@ public sealed record ProfileDetailReadModel(
     string? BannerAssetRelativePath = null,
     Guid? FigureMediaId = null, string? FigureThumbnailRelativePath = null,
     string? FigureModelRenderRelativePath = null, MediaAssetState? FigureModelRenderState = null,
-    string? FigureSourceSha256 = null)
+    string? FigureSourceSha256 = null,
+    IReadOnlyList<ProfileBannerEntry>? BannerEntries = null)
 {
     public IReadOnlyList<ProfileTagAssignment> AssignedTags => TagAssignments ?? [];
 }

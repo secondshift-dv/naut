@@ -76,14 +76,14 @@ public sealed class FigureRuntime : IDisposable
         var request = CancellationTokenSource.CreateLinkedTokenSource(ct, _lifetime.Token);
         var task = Task.Run(async () =>
         {
-            using var foregroundDisk = _governor.EnterForegroundDiskWork();
             request.Token.ThrowIfCancellationRequested();
+            using var permit = await _governor.AcquireAsync(ResourceClass.CpuHeavy, request.Token);
+            using var foregroundDisk = _governor.EnterForegroundDiskWork();
             var validated = _validationReceipts is null ? null
                 : await _validationReceipts.ValidateAsync(path, sourceSha256, request.Token).ConfigureAwait(false);
             var key = CreateSceneCacheKey(path, sourceSha256, lod, textureDimension);
             if (TryGetCachedScene(key, out var cached)) return cached;
 
-            using var permit = await _governor.AcquireAsync(ResourceClass.CpuHeavy, request.Token);
             FigureSceneData scene;
             try
             {

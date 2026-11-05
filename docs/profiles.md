@@ -21,6 +21,8 @@ Cover and Banner are presentation choices, not replacements for the original med
 
 Video Banners can loop on the Profile surface when ready. Video hover presentation is intentionally brief and bounded.
 
+Since v0.0.9, each Profile can retain an ordered collection of Banner alternatives. Use **Add as Banner** in Customize to prepare an additional eligible video without replacing the active choice. Choosing an active Banner, framing and effects is a preview until **Save**; **Cancel** discards those preview changes. When a selected Banner rendition is unavailable or requires repair, Naut falls back to a still image without discarding the saved selection.
+
 ## Face-aware Profile suggestions
 
 For applicable media, Naut can use [Face Intelligence](face-intelligence.md) to detect faces and compare compatible embeddings with locally confirmed identity samples.

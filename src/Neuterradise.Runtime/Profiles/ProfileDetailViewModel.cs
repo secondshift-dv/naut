@@ -460,6 +460,7 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
     {
         RowVersion = appearance.ProfileRowVersion;
         _coverMediaId = appearance.CoverMediaId;
+        var bannerSourceChanged = _bannerMediaId != appearance.BannerMediaId;
         _bannerMediaId = appearance.BannerMediaId;
         _figureMediaId = appearance.FigureMediaId;
         FigureThumbnailRelativePath = appearance.FigureThumbnailRelativePath;
@@ -483,7 +484,8 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
         ApplyCoverImage(
             CoverImagePath,
             appearance.CoverMediaAssetId is { } coverAssetId ? $"artifact:{coverAssetId:N}" : null);
-        BannerVideoPath = ResolvePreparedMediaAssetPath(appearance.BannerAssetRelativePath);
+        if (bannerSourceChanged) BannerVideoPath = null;
+        if (IsRouteActive) StartRouteTask(RefreshBannerVideoAsync, "Profile Banner could not be resolved.");
 
         RaisePropertyChanged(nameof(CoverMediaId));
         RaisePropertyChanged(nameof(BannerMediaId));
@@ -1971,6 +1973,8 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
         }
     }
 
+    public string? BannerPosterPath { get; private set; }
+
     public bool HasBannerVideo => !string.IsNullOrWhiteSpace(BannerVideoPath);
 
     private async Task ResolveCoverResourceAsync(CancellationToken cancellationToken)
@@ -2002,6 +2006,7 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
     private async Task RefreshBannerVideoAsync(CancellationToken cancellationToken)
     {
         string? path = null;
+        string? poster = null;
         if (_catalog is not null)
         {
             var selection = await _catalog.MediaAssetReads.GetPublicSelectionAsync(ProfileId, cancellationToken)
@@ -2010,9 +2015,16 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
                 ? await _catalog.MediaAssetReads.GetPublicSelectedMediaAsync(ProfileId, assetId, cancellationToken)
                     .ConfigureAwait(false)
                 : null;
+            if (_mediaResources is not null && (asset?.MediaId ?? BannerMediaId) is { } sourceId)
+            {
+                var still = await _mediaResources.ResolveMediaThumbnailAsync(sourceId, cancellationToken).ConfigureAwait(false);
+                poster = still.State == MediaAssetResourceState.Ready ? still.PhysicalPath : null;
+            }
             if (asset?.Role == MediaAssetRole.Hover)
             {
-                path = ResolveMediaAssetPath(asset);
+                var rendition = _mediaResources is null ? null
+                    : await _mediaResources.ResolveProfileBannerAsync(ProfileId, asset.MediaAssetId, cancellationToken).ConfigureAwait(false);
+                path = rendition?.State == MediaAssetResourceState.Ready ? rendition.PhysicalPath : null;
             }
         }
 
@@ -2020,6 +2032,8 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
         {
             if (!_isDisposed && IsRouteActive)
             {
+                BannerPosterPath = poster;
+                RaisePropertyChanged(nameof(BannerPosterPath));
                 BannerVideoPath = path;
             }
         }).ConfigureAwait(false);

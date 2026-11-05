@@ -15,7 +15,8 @@ public sealed record ProcessRunRequest(
     IReadOnlyList<string> Arguments,
     string? WorkingDirectory = null,
     TimeSpan? Timeout = null,
-    int MaxCapturedCharacters = BoundedProcessLauncher.DefaultMaxCapturedCharacters);
+    int MaxCapturedCharacters = BoundedProcessLauncher.DefaultMaxCapturedCharacters,
+    Func<string, Task>? OutputLineReceived = null);
 
 public sealed record ProcessRunResult(
     int ExitCode,
@@ -78,7 +79,7 @@ public sealed class BoundedProcessLauncher : IProcessLauncher
 
         var outputTask = ReadBoundedAsync(
             process.StandardOutput,
-            request.MaxCapturedCharacters);
+            request.MaxCapturedCharacters, request.OutputLineReceived);
         var errorTask = ReadBoundedAsync(
             process.StandardError,
             request.MaxCapturedCharacters);
@@ -153,8 +154,30 @@ public sealed class BoundedProcessLauncher : IProcessLauncher
 
     private static async Task<string> ReadBoundedAsync(
         StreamReader reader,
-        int maxCapturedCharacters)
+        int maxCapturedCharacters, Func<string, Task>? lineReceived = null)
     {
+        if (lineReceived is not null)
+        {
+            var text = new StringBuilder();
+            var line = new StringBuilder();
+            var chars = new char[4096];
+            int count;
+            while ((count = await reader.ReadAsync(chars.AsMemory()).ConfigureAwait(false)) > 0)
+            {
+                for (var index = 0; index < count; index++)
+                {
+                    var value = chars[index];
+                    if (text.Length < maxCapturedCharacters) text.Append(value);
+                    if (value == '\n')
+                    {
+                        await lineReceived(line.ToString().TrimEnd('\r')).ConfigureAwait(false);
+                        line.Clear();
+                    }
+                    else if (line.Length < 4096) line.Append(value);
+                }
+            }
+            return text.ToString();
+        }
         var buffer = new char[4096];
         var captured = new StringBuilder(Math.Min(maxCapturedCharacters, buffer.Length));
         int read;

@@ -639,7 +639,7 @@ public sealed class JobScheduler : IAsyncDisposable
             }
 
             using var importPressure = record.Kind is "TransferOriginal" or "HashMedia"
-                or "ExtractMetadata" or "GenerateThumbnail" or "GenerateVideoMediaAssets" or "FaceAnalysis"
+                or "ExtractMetadata" or "GenerateThumbnail" or "GenerateVideoMediaAssets" or "GenerateBanner" or "FaceAnalysis"
                 ? ResourceGovernor.Shared.EnterImportPressure()
                 : null;
             using var permit = await AcquirePermitAsync(record.Lane, cancellationToken).ConfigureAwait(false);

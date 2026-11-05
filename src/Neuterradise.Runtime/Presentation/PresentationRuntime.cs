@@ -330,8 +330,17 @@ public sealed class PresentationRuntime
                     ?? throw new InvalidOperationException($"No usable definition exists for slot '{slot}'.");
     }
 
-    public T ResolvePlan<T>(string slot, PresentationContext context, BindingSet? bindings = null) where T : class =>
-        ResolveCompiled(slot, context, bindings).PlanAs<T>();
+    public T ResolvePlan<T>(string slot, PresentationContext context, BindingSet? bindings = null) where T : class
+    {
+        if (slot == PresentationSlots.BannerEffect && typeof(T) == typeof(EffectPlan) && context.Profile is { } profile
+            && ResolveCompiled(slot, context, bindings).Plan is EffectPlan banner)
+        {
+            var intensity = Math.Clamp(profile.Overrides.BannerEffectIntensity, 0, 1);
+            return (T)(object)(banner with { Environment = new BackdropPlan(banner.Environment.Variants.ToDictionary(
+                pair => pair.Key, pair => pair.Value with { Layers = intensity <= 0 ? [] : pair.Value.Layers.Select(layer => layer with { Opacity = layer.Opacity * intensity }).ToArray() })) });
+        }
+        return ResolveCompiled(slot, context, bindings).PlanAs<T>();
+    }
 
     public ProfileMediaPresentation ResolveMedia(ProfilePresentationState profile) => profile.Media;
 
@@ -399,6 +408,7 @@ public sealed class PresentationRuntime
 
         return slot switch
         {
+            PresentationSlots.BannerEffect => DefinitionRef.BuiltIn("builtin.neuterradise.effect." + profile.Overrides.BannerEffect),
             PresentationSlots.ProfileLayout when profile.LayoutPresetId is { } preset => DefinitionRef.BuiltIn($"builtin.neuterradise.profile.{preset}"),
             PresentationSlots.ProfileCard when profile.Overrides.ProfileCardVariantId is { } variant => CardRefForVariant(variant),
             PresentationSlots.ProfileMediaLayout => DefinitionRef.BuiltIn($"builtin.neuterradise.media-layout.{MediaLayoutCatalog.Normalize(profile.Overrides.MediaLayoutId)}"),
@@ -426,6 +436,8 @@ public sealed class PresentationRuntime
         }
 
         var id = definition.DefinitionId;
+        if (slot == PresentationSlots.BannerEffect && id is "builtin.neuterradise.effect.none" or "builtin.neuterradise.effect.film" or "builtin.neuterradise.effect.glitter" or "builtin.neuterradise.effect.shimmer")
+            return id[(id.LastIndexOf('.') + 1)..];
         // New data-authored definitions are represented by generic bindings. Legacy fields can
         // only encode the compatibility catalogs and must never normalize a new selection away.
         if (BuiltInPresentationCatalog.IsPrimary(definition))
@@ -452,7 +464,7 @@ public sealed class PresentationRuntime
     }
 
     public static bool IsBridgedProfileSlot(string slot) =>
-        slot is PresentationSlots.ProfileLayout or PresentationSlots.ProfileCard or PresentationSlots.ProfileMediaLayout or PresentationSlots.ProfileFrame;
+        slot is PresentationSlots.ProfileLayout or PresentationSlots.ProfileCard or PresentationSlots.ProfileMediaLayout or PresentationSlots.ProfileFrame or PresentationSlots.BannerEffect;
 
     // ---------------------------------------------------------------- preview / apply
 
@@ -747,6 +759,7 @@ public sealed class PreviewSession
             ProfileWorking = slot switch
             {
                 PresentationSlots.ProfileLayout => profile with { LayoutPresetId = legacy },
+                PresentationSlots.BannerEffect => profile with { Overrides = profile.Overrides with { BannerEffect = legacy } },
                 PresentationSlots.ProfileCard => profile with { Overrides = profile.Overrides with { ProfileCardVariantId = legacy } },
                 PresentationSlots.ProfileMediaLayout => profile with { Overrides = profile.Overrides with { MediaLayoutId = MediaLayoutCatalog.Normalize(legacy) } },
                 _ => profile with { Overrides = FrameAppearance(profile.Overrides, CoverFrameCatalog.TryGetFrame(legacy, out var legacyFrame) ? legacyFrame : CoverFrameCatalog.None) },
@@ -919,6 +932,8 @@ public sealed class PreviewSession
                 BannerFocusX = o.BannerFocusX,
                 BannerFocusY = o.BannerFocusY,
                 BannerZoom = o.BannerZoom,
+                BannerEffect = o.BannerEffect,
+                BannerEffectIntensity = o.BannerEffectIntensity,
             },
         };
     }

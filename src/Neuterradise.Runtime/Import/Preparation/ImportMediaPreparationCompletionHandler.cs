@@ -48,6 +48,8 @@ public sealed class ImportMediaPreparationCompletionHandler
         }
 
         var (assetId, jobKind, mediaType) = jobInfo.Value;
+        if (jobKind == "GenerateBanner" && result.IsSucceeded)
+            await new Neuterradise.App.Profiles.ProfileBannerOperations(_catalog).CompleteRequestsAsync(assetId, CancellationToken.None).ConfigureAwait(false);
         var capabilities = await ResolveCapabilitiesAsync(jobId, jobKind, mediaType).ConfigureAwait(false);
         if (capabilities.Count == 0)
         {
@@ -103,6 +105,17 @@ public sealed class ImportMediaPreparationCompletionHandler
         string jobKind,
         MediaType mediaType)
     {
+        if (jobKind == "GenerateBanner")
+        {
+            await using var connection = await _catalog.OpenConnectionAsync().ConfigureAwait(false);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT capability FROM media_capability_readiness WHERE job_id=$job;";
+            command.Parameters.AddWithValue("$job", DbGuid.Format(jobId));
+            var bound = new List<MediaCapability>();
+            await using var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+            while (await reader.ReadAsync().ConfigureAwait(false)) bound.Add(DbEnum.ParseMediaCapability(reader.GetString(0)));
+            return bound;
+        }
         var capabilities = ImportMediaPreparationCoordinator.MapJobKindToCapabilities(jobKind, mediaType);
         if (capabilities.Count > 0)
         {

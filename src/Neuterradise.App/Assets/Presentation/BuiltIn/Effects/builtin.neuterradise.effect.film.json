@@ -1,0 +1,36 @@
+{
+  "id": "builtin.neuterradise.effect.film",
+  "kind": "effect",
+  "name": "Film",
+  "spec": {
+    "targets": [
+      "effect.profile.banner"
+    ],
+    "channel": "particles",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "noise",
+            "opacity": 0.24,
+            "speed": 0.3,
+            "amplitude": 0.01
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  },
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  }
+}

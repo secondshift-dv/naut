@@ -244,6 +244,7 @@ public sealed class RepairPlanner
                    aa.contract_version, aa.row_version, aa.state,
                    EXISTS (SELECT 1 FROM jobs j WHERE j.owner_type = 'Media'
                        AND j.owner_id = aa.media_id AND j.kind = CASE
+                           WHEN aa.role = 'BANNER' THEN 'GenerateBanner'
                            WHEN a.media_type = 'VIDEO' THEN 'GenerateVideoMediaAssets'
                            WHEN a.media_type = 'MODEL' THEN 'GenerateModelMediaAssets'
                            ELSE 'GenerateThumbnail' END
@@ -292,7 +293,7 @@ public sealed class RepairPlanner
             }
             var invalid = finding.Code switch
             {
-                HealthFindingCode.ArtifactContractObsolete => version != 1,
+                HealthFindingCode.ArtifactContractObsolete => !MediaAssetContracts.IsSupported(DbEnum.ParseMediaAssetRole(role), version),
                 HealthFindingCode.MediaAssetMissing => !File.Exists(path),
                 HealthFindingCode.MediaAssetNeedsRepair => reader.GetString(6) == "NEEDS_REPAIR",
                 _ => role == "MODEL_RENDER" ? structuralInvalid : File.Exists(path) &&

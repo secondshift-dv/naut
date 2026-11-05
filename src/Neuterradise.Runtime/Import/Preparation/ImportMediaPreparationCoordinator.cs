@@ -84,6 +84,8 @@ public sealed class ImportMediaPreparationCoordinator
         int assetsScheduled = 0;
         int jobsScheduled = 0;
         var processedMediaIds = new HashSet<Guid>();
+        if (!candidatePhase)
+            await new ProfileBannerOperations(_catalog).EnsureInitialAsync(unitId, cancellationToken).ConfigureAwait(false);
 
         foreach (var item in items)
         {
@@ -194,6 +196,7 @@ public sealed class ImportMediaPreparationCoordinator
         Guid unitId,
         CancellationToken cancellationToken = default)
     {
+        var pendingBanners = await new ProfileBannerOperations(_catalog).EnsureInitialAsync(unitId, cancellationToken).ConfigureAwait(false);
         await ReconcilePersistedArtifactsAsync(unitId, cancellationToken).ConfigureAwait(false);
         var summary = await _capabilityReads.GetUnitCapabilitySummaryAsync(unitId, cancellationToken)
             .ConfigureAwait(false);
@@ -201,7 +204,7 @@ public sealed class ImportMediaPreparationCoordinator
             .ConfigureAwait(false);
 
         return new MediaPreparationReadiness(
-            summary.AllRequiredTerminal,
+            summary.AllRequiredTerminal && pendingBanners.Count == 0,
             summary.MediasAllCapabilitiesTerminal,
             summary.TotalMedias,
             failedMediaIds,
@@ -233,7 +236,7 @@ public sealed class ImportMediaPreparationCoordinator
             return false;
         }
 
-        if (!allRequiredSettled)
+        if (!allRequiredSettled || (await new ProfileBannerOperations(_catalog).EnsureInitialAsync(unitId, cancellationToken).ConfigureAwait(false)).Count != 0)
         {
             return false;
         }
@@ -558,7 +561,20 @@ public sealed class ImportMediaPreparationCoordinator
             MediaType.Model => "GenerateModelMediaAssets",
             _ => "GenerateThumbnail",
         };
-        var previewJobId = DeriveJobId(assetId, previewKind);
+        Guid? bannerJobId = null;
+        if (!candidatePhase && mediaType == MediaType.Video)
+        {
+            await using var bannerConnection = await _catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+            await using var bannerRead = bannerConnection.CreateCommand();
+            bannerRead.CommandText = "SELECT r.job_id FROM profile_banner_requests r JOIN jobs j ON j.job_id=r.job_id WHERE r.media_id=$media AND (j.state IN ('PENDING','RUNNABLE','RUNNING','PAUSED','FAILED_RETRYABLE','WAITING_DEPENDENCY','WAITING_USER_INPUT') OR (r.origin='INITIAL' AND j.state='SUCCEEDED')) LIMIT 1;";
+            bannerRead.Parameters.AddWithValue("$media", DbGuid.Format(assetId));
+            if (await bannerRead.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is string id)
+            {
+                bannerJobId = DbGuid.Parse(id);
+                previewKind = "GenerateBanner";
+            }
+        }
+        var previewJobId = bannerJobId ?? DeriveJobId(assetId, previewKind);
         var previewCheckpoint = JsonSerializer.Serialize(new
         {
             schemaVersion = 2,
@@ -603,7 +619,8 @@ public sealed class ImportMediaPreparationCoordinator
 
         foreach (var job in allJobs)
         {
-            await _jobWrites.CreateJobAsync(job, cancellationToken).ConfigureAwait(false);
+            if (job.Kind != "GenerateBanner")
+                await _jobWrites.CreateJobAsync(job, cancellationToken).ConfigureAwait(false);
             jobsCreated++;
 
             // Candidate preparation can read only the completed staged transfer. Reused ACTIVE
@@ -634,6 +651,10 @@ public sealed class ImportMediaPreparationCoordinator
                     job.JobId, fingerprint, cancellationToken).ConfigureAwait(false);
             }
         }
+
+        if (bannerJobId is not null)
+            await ReconcileRecoveryJobAfterBindingAsync(new RecoveryJob(previewJob, null, assetId, fingerprint,
+                MapJobKindToCapabilities("GenerateBanner", mediaType)), cancellationToken).ConfigureAwait(false);
 
         // FaceEmbedding: conditional applicability. Initially NOT_APPLICABLE; after FaceDetection
         // completes, the completion handler checks persisted face_detections. If faces found,
@@ -783,7 +804,7 @@ public sealed class ImportMediaPreparationCoordinator
     {
         "ExtractMetadata" => [MediaCapability.Metadata],
         "GenerateThumbnail" => [MediaCapability.Thumbnail],
-        "GenerateVideoMediaAssets" => [MediaCapability.Thumbnail, MediaCapability.Hover],
+        "GenerateVideoMediaAssets" or "GenerateBanner" => [MediaCapability.Thumbnail, MediaCapability.Hover],
         "GenerateModelMediaAssets" => [MediaCapability.Thumbnail, MediaCapability.ModelRender],
         "FaceAnalysis" => [MediaCapability.FaceDetection],
         _ => [],

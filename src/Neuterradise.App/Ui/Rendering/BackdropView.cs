@@ -873,7 +873,9 @@ internal sealed class BackdropCanvas : SKCanvasElement
 
                 case "noise":
                 {
-                    paint.Shader = SKShader.CreateImage(NoiseTexture.Value, SKShaderTileMode.Repeat, SKShaderTileMode.Repeat);
+                    var phase = layer.Amplitude > 0 ? Math.Floor(t * layer.Speed * 8) : 0;
+                    paint.Shader = SKShader.CreateImage(NoiseTexture.Value, SKShaderTileMode.Repeat, SKShaderTileMode.Repeat,
+                        SKMatrix.CreateTranslation((float)(phase * 17 % 96), (float)(phase * 31 % 96)));
                     paint.Color = SKColors.White.WithAlpha((byte)(255 * layer.Opacity));
                     paint.BlendMode = SKBlendMode.Overlay;
                     canvas.DrawRect(rect, paint);

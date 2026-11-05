@@ -91,6 +91,7 @@ public sealed record BackdropLayer(
 public sealed record BackdropVariant(IReadOnlyList<BackdropLayer> Layers, bool Static = false)
 {
     public bool IsAnimated => !Static && Layers.Any(layer => layer.Kind is "particles" or "fog" or "light-sweep" or "video" or "lottie"
+        || (layer.Kind == "noise" && layer.Amplitude > 0)
         || (layer.Amplitude > 0 && layer.Kind is "gradient" or "radial-glow" or "image" or "grid-field" or "wave-field"));
 }
 

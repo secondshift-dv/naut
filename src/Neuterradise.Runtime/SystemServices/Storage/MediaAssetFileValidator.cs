@@ -25,14 +25,14 @@ public sealed class MediaAssetFileValidator
     }
 
     public async Task<ValidatedArtifactFile> ValidateAsync(string path, MediaAssetRole role,
-        CancellationToken ct = default, string? sourceSha256 = null)
+        CancellationToken ct = default, string? sourceSha256 = null, int contractVersion = 1)
     {
         if (role == MediaAssetRole.ModelRender)
         {
             var file = await ModelRenderContainer.ValidateAsync(path, sourceSha256, ct).ConfigureAwait(false);
             return new(file.ByteLength, file.Sha256, null, null, null);
         }
-        if (role is not (MediaAssetRole.Thumbnail or MediaAssetRole.Hover))
+        if (role is not (MediaAssetRole.Thumbnail or MediaAssetRole.Hover or MediaAssetRole.Banner))
             throw new ArgumentOutOfRangeException(nameof(role));
         var valid = await ValidateAsync(path, role == MediaAssetRole.Thumbnail, 6000, ct)
             .ConfigureAwait(false);
@@ -43,6 +43,19 @@ public sealed class MediaAssetFileValidator
             && !((valid.PixelWidth <= 1280 && valid.PixelHeight <= 720)
                 || (valid.PixelWidth <= 720 && valid.PixelHeight <= 1280)))
             throw new InvalidDataException("Canonical hover exceeds its orientation-aware 1280-by-720 pixel contract.");
+        if (role is MediaAssetRole.Hover or MediaAssetRole.Banner && contractVersion >= 2)
+        {
+            var metadata = await _video.ProbeAsync(path, ct).ConfigureAwait(false);
+            if (metadata.FrameRate is not { } fps || Math.Abs(fps - 24) > .01
+                || valid.PixelWidth % 2 != 0 || valid.PixelHeight % 2 != 0)
+                throw new InvalidDataException("Video rendition must have even dimensions at 24 FPS.");
+            if (role == MediaAssetRole.Hover && !Neuterradise.App.Profiles.ProfileBannerOperations.FitsHover(valid.PixelWidth, valid.PixelHeight))
+                throw new InvalidDataException("Hover contract 2 exceeds the 480p ceiling.");
+        }
+        if (role == MediaAssetRole.Banner
+            && !((valid.PixelWidth <= 1600 && valid.PixelHeight <= 900)
+                || (valid.PixelWidth <= 900 && valid.PixelHeight <= 1600)))
+            throw new InvalidDataException("Canonical banner exceeds its orientation-aware 1600-by-900 pixel contract.");
         return valid;
     }
 

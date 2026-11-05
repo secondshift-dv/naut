@@ -1,3 +1,4 @@
+using Neuterradise.App.Localization;
 using Neuterradise.App.Design.ProfileLayouts;
 using Neuterradise.App.Faces;
 using Neuterradise.App.Media;
@@ -145,6 +146,16 @@ public sealed class ImportPublicationCoordinator
         if (destinationBlocker is not null)
         {
             return destinationBlocker;
+        }
+
+        if (draft.Appearance.BannerIntent == VerificationAppearanceIntent.Set && draft.Appearance.BannerMediaId is { } requestedBanner)
+        {
+            var bannerOperations = new ProfileBannerOperations(_catalog);
+            var members = await bannerOperations.ReadEntriesAsync(destination.ProfileId, cancellationToken).ConfigureAwait(false);
+            var hover = await _catalog.MediaAssetReads.GetOwnedMediaAssetAsync(requestedBanner, MediaAssetRole.Hover, cancellationToken).ConfigureAwait(false);
+            if (!members.Any(entry => entry.MediaId == requestedBanner) || hover?.MediaAssetId != draft.Appearance.BannerMediaAssetId
+                || await bannerOperations.ResolveRenditionAsync(destination.ProfileId, requestedBanner, unitId, cancellationToken).ConfigureAwait(false) is null)
+                return ImportPublicationResult.Blocked("BANNER_NOT_READY", SurfaceText.Get("Banner.NotReady", "The selected Banner is not ready. Add or repair it, then try again."));
         }
 
         if (model.State == ImportUnitState.ReadyForVerification)
@@ -432,22 +443,25 @@ public sealed class ImportPublicationCoordinator
         }
 
         await ApplyAppearanceInTransactionAsync(transaction, profileId, draft.Appearance, now, cancellationToken).ConfigureAwait(false);
+        await using (var settleInitial = transaction.CreateCommand("DELETE FROM profile_banner_requests WHERE profile_id=$profile AND origin='INITIAL';"))
+        {
+            settleInitial.Parameters.AddWithValue("$profile", DbGuid.Format(profileId));
+            await settleInitial.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
 
-        if (destination.Kind == DestinationKind.NewNormal && initialCandidates is not null
-            && draft.Appearance.CoverIntent == VerificationAppearanceIntent.Unchanged)
+        if (destination.Kind == DestinationKind.NewNormal && initialCandidates is not null)
         {
             var cover = initialCandidates.Covers[0];
-            var banner = initialCandidates.BannerHovers
-                .OrderByDescending(static candidate => candidate.Score)
-                .ThenBy(static candidate => candidate.MediaAssetId)
-                .FirstOrDefault();
+            var banner = initialCandidates.BannerHovers.FirstOrDefault();
             await using var select = transaction.CreateCommand("""
-                UPDATE profile_appearance SET cover_media_asset_id = $cover,
-                    banner_media_asset_id = $banner
-                WHERE profile_id = $profile AND cover_media_asset_id IS NULL;
+                UPDATE profile_appearance SET cover_media_asset_id = CASE WHEN $coverIntent=0 AND cover_media_asset_id IS NULL THEN $cover ELSE cover_media_asset_id END,
+                    banner_media_asset_id = CASE WHEN $bannerIntent=0 THEN $banner ELSE banner_media_asset_id END
+                WHERE profile_id = $profile;
                 """);
             select.Parameters.AddWithValue("$profile", DbGuid.Format(profileId));
             select.Parameters.AddWithValue("$cover", DbGuid.Format(cover.MediaAssetId));
+            select.Parameters.AddWithValue("$coverIntent", (int)draft.Appearance.CoverIntent);
+            select.Parameters.AddWithValue("$bannerIntent", (int)draft.Appearance.BannerIntent);
             select.Parameters.AddWithValue("$banner", banner is null
                 ? DBNull.Value : DbGuid.Format(banner.MediaAssetId));
             await select.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);

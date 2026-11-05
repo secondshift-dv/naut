@@ -23,7 +23,7 @@ Profile customization can control:
 - Profile effects;
 - optional 3D Figure selection.
 
-Cover/Banner framing uses the live preview. Changes remain preview state until they are saved.
+Cover/Banner framing uses the live preview. Changes remain preview state until they are saved. In v0.0.9, the Profile Banner Collection keeps additional alternatives; **Add as Banner** prepares another eligible video while **Save/Cancel** applies or discards presentation selection. Built-in Film, Glitter and Shimmer effects are composited at display time with per-Profile intensity, without changing the original video.
 
 ## Presentation resources
 

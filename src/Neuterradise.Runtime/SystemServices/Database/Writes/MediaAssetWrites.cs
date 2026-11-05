@@ -22,6 +22,10 @@ public sealed class MediaAssetWrites
         CancellationToken ct = default)
     {
         if (contractVersion <= 0) throw new ArgumentOutOfRangeException(nameof(contractVersion));
+        if (role is MediaAssetRole.Hover or MediaAssetRole.Banner && sourceTimestampMs is null or < 0)
+            throw new CatalogInvariantException("Video renditions require an authoritative source timestamp.");
+        if (role == MediaAssetRole.Banner && contractVersion != 2)
+            throw new CatalogInvariantException("Banner requires rendition contract 2.");
         var temp = RequireTemp(preparedTempPath, VaultPathArea.TempMediaAssets);
         await using var lease = await _catalog.WriteCoordinator.EnterAsync(ct).ConfigureAwait(false);
         await using var connection = await _catalog.OpenConnectionAsync(ct).ConfigureAwait(false);
@@ -33,7 +37,7 @@ public sealed class MediaAssetWrites
         if (!await reader.ReadAsync(ct).ConfigureAwait(false)) throw new CatalogInvariantException("Artifact Media is not live.");
         var token = new MediaStorageToken(reader.GetString(0));
         var mediaType = reader.GetString(1);
-        if (role == MediaAssetRole.Hover && mediaType != "VIDEO")
+        if (role is (MediaAssetRole.Hover or MediaAssetRole.Banner) && mediaType != "VIDEO")
             throw new CatalogInvariantException("Only VIDEO can own Hover.");
         string? modelSourceHash = null;
         if (role == MediaAssetRole.ModelRender)
@@ -57,7 +61,7 @@ public sealed class MediaAssetWrites
         if (existingState == "READY")
             throw new CatalogInvariantException("READY artifact must be marked for repair before replacement.");
         var validated = await PublishAndValidateAsync(temp, target,
-            path => _validator.ValidateAsync(path, role, ct, modelSourceHash),
+            path => _validator.ValidateAsync(path, role, ct, modelSourceHash, contractVersion),
             existingState == "NEEDS_REPAIR", ct).ConfigureAwait(false);
         var now = DbTime.Format(_time.GetUtcNow());
         var artifactId = Guid.NewGuid();
@@ -95,6 +99,33 @@ public sealed class MediaAssetWrites
         return new MediaAssetRecord(persistedId, assetId, role, contractVersion,
             MediaAssetState.Ready, relative, validated.ByteLength, validated.Sha256,
             validated.PixelWidth, validated.PixelHeight, validated.DurationMs, sourceTimestampMs);
+    }
+
+    public async Task<bool> TryAcceptHoverContractAsync(Guid mediaId, CancellationToken ct = default)
+    {
+        var asset = await _catalog.MediaAssetReads.GetOwnedMediaAssetAsync(mediaId, MediaAssetRole.Hover, ct).ConfigureAwait(false);
+        if (asset?.State != MediaAssetState.Ready || asset.ContractVersion != 1 || asset.SourceTimestampMs is null) return false;
+        try
+        {
+            var path = _catalog.Paths.ResolveVaultRelativePath(VaultPathArea.MediaAssets, asset.RelativePath);
+            var validated = await _validator.ValidateAsync(path, MediaAssetRole.Hover, ct, contractVersion: 2).ConfigureAwait(false);
+            if (validated.Sha256 != asset.Sha256 || validated.ByteLength != asset.ByteLength) return false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException) { return false; }
+        await using var lease = await _catalog.WriteCoordinator.EnterAsync(ct).ConfigureAwait(false);
+        await using var connection = await _catalog.OpenConnectionAsync(ct).ConfigureAwait(false);
+        await using var update = connection.CreateCommand();
+        update.CommandText = """
+            UPDATE media_assets SET contract_version=2,row_version=row_version+1,updated_at_ms=$now
+            WHERE media_asset_id=$asset AND role='HOVER' AND state='READY' AND contract_version=1
+              AND sha256=$sha AND byte_length=$bytes AND relative_path=$path;
+            """;
+        update.Parameters.AddWithValue("$asset", DbGuid.Format(asset.MediaAssetId));
+        update.Parameters.AddWithValue("$sha", asset.Sha256);
+        update.Parameters.AddWithValue("$bytes", asset.ByteLength);
+        update.Parameters.AddWithValue("$path", asset.RelativePath);
+        update.Parameters.AddWithValue("$now", DbTime.Format(_time.GetUtcNow()));
+        return await update.ExecuteNonQueryAsync(ct).ConfigureAwait(false) == 1;
     }
 
     public async Task MarkMediaNeedsRepairAsync(Guid assetId, MediaAssetRole role,

@@ -57,9 +57,21 @@ public sealed class ProductRoot : Grid
     private IconView? _activityIcon;
     private bool _activityWasRunning;
     private bool _languageRefreshQueued;
+    private readonly Timer _dispatcherPulse;
+    private int _dispatcherPulsePending;
 
     public ProductRoot(AppServices services)
     {
+        _dispatcherPulse = new Timer(_ =>
+        {
+            if (Interlocked.Exchange(ref _dispatcherPulsePending, 1) != 0) return;
+            var posted = Stopwatch.GetTimestamp();
+            UiDispatch.Run(() =>
+            {
+                ResourceGovernor.Shared.ReportDispatcherLatency(Stopwatch.GetElapsedTime(posted));
+                Volatile.Write(ref _dispatcherPulsePending, 0);
+            });
+        }, null, Timeout.Infinite, Timeout.Infinite);
         _services = services;
         PresentationEffects.Runtime = services.Presentation;
         services.Root = this;
@@ -71,6 +83,7 @@ public sealed class ProductRoot : Grid
         ThemeRuntime.Current.Changed += OnThemeChanged;
         Loaded += (_, _) =>
         {
+            _dispatcherPulse.Change(250, 250);
             ThemeRuntime.Current.TrackNativeControls(this);
             ThemeRuntime.Current.Changed -= OnThemeChanged;
             ThemeRuntime.Current.Changed += OnThemeChanged;
@@ -79,6 +92,7 @@ public sealed class ProductRoot : Grid
         };
         Unloaded += (_, _) =>
         {
+            _dispatcherPulse.Change(Timeout.Infinite, Timeout.Infinite);
             ThemeRuntime.Current.Changed -= OnThemeChanged;
             if (_breadcrumbProfile is not null) _breadcrumbProfile.PropertyChanged -= OnBreadcrumbProfileChanged;
             _breadcrumbProfile = null;
@@ -701,9 +715,9 @@ public sealed class ProductRoot : Grid
         _breadcrumbHost.IsHitTestVisible = !locked;
     }
 
-    private void UpdatePreviewMedia(ImageRef? cover, string? bannerPath)
+    private void UpdatePreviewMedia(ImageRef? cover, string? bannerPath, ImageRef? bannerPoster)
     {
-        if (_current is ProfileSurface profile) profile.SetPreviewMedia(cover, bannerPath);
+        if (_current is ProfileSurface profile) profile.SetPreviewMedia(cover, bannerPath, bannerPoster);
     }
 
     private void RefreshFigureOcclusion()

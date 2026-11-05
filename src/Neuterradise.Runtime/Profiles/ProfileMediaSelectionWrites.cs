@@ -18,10 +18,8 @@ public sealed class ProfileMediaSelectionWrites
     {
         var ranked = await _candidates.ReadAsync(profileId, ct).ConfigureAwait(false);
         var cover = ranked.Covers.FirstOrDefault();
-        var banner = ranked.BannerHovers
-            .OrderByDescending(static candidate => candidate.Score)
-            .ThenBy(static candidate => candidate.MediaAssetId)
-            .FirstOrDefault();
+        var entries = await new ProfileBannerOperations(_catalog).ReadEntriesAsync(profileId, ct).ConfigureAwait(false);
+        var banner = entries.Select(entry => ranked.BannerHovers.FirstOrDefault(candidate => candidate.MediaId == entry.MediaId)).FirstOrDefault(candidate => candidate is not null);
         if (cover is null) return false;
 
         await using var lease = await _catalog.WriteCoordinator.EnterAsync(ct).ConfigureAwait(false);

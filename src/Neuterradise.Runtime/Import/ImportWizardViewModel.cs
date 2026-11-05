@@ -1152,7 +1152,8 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         var ordered = new List<ImportVisualOption>();
         foreach (var option in incoming)
         {
-            if (existing.TryGetValue(option.CandidateId, out var kept) && string.Equals(kept.PreviewPath, option.PreviewPath, StringComparison.Ordinal))
+            if (existing.TryGetValue(option.CandidateId, out var kept) && ((kept.Banner is not null && option.Banner is not null) || string.Equals(kept.PreviewPath, option.PreviewPath, StringComparison.Ordinal))
+                && kept.Banner?.IsReady == option.Banner?.IsReady)
             {
                 ordered.Add(kept);
             }
@@ -1189,6 +1190,11 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
 
     private void LoadPreview(ImportVisualOption option)
     {
+        if (option.Banner is not null && _mediaAssets is not null)
+        {
+            TaskObserver.Observe(LoadCandidatePreviewAsync(option), "ImportWizardViewModel.LoadBannerPreviewAsync");
+            return;
+        }
         if (!string.IsNullOrWhiteSpace(option.PreviewPath))
         {
             option.Preview = ImageRef.FromPath(option.PreviewPath, PreviewDecodeWidth, $"import-visual:{option.CandidateId}");

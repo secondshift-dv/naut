@@ -28,7 +28,7 @@ public sealed class ProfileMediaCandidateReads
     public ProfileMediaCandidateReads(CatalogDb catalog) => _catalog = catalog;
 
     public const int MaximumCoverCandidates = 6;
-    public const int MaximumBannerCandidates = 12;
+    public const int MaximumBannerCandidates = 3;
 
     public Task<ProfileMediaCandidates> ReadAllEligibleAsync(
         Guid profileId,
@@ -41,14 +41,15 @@ public sealed class ProfileMediaCandidateReads
         CancellationToken ct = default,
         Guid? importUnitId = null,
         int coverLimit = MaximumCoverCandidates,
-        int bannerLimit = MaximumBannerCandidates)
+        int bannerLimit = MaximumBannerCandidates,
+        bool includePendingBanner = false)
     {
         await using var connection = await _catalog.OpenConnectionAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT ma.media_asset_id, ma.media_id, ma.role, m.media_type,
                    ma.relative_path, COALESCE(m.current_managed_file_name, m.original_file_name, m.media_id),
-                   ma.source_timestamp_ms, ma.duration_ms, ma.pixel_width, ma.pixel_height,
+                   ma.source_timestamp_ms, ma.duration_ms, metadata.width, metadata.height,
                    COALESCE((SELECT MAX(CASE WHEN identity.profile_id = $profile THEN 2.0 ELSE 1.0 END
                                      + COALESCE(face.confidence, 0))
                              FROM face_detections face
@@ -57,6 +58,7 @@ public sealed class ProfileMediaCandidateReads
                    m.created_at_ms
             FROM media m
             JOIN media_assets ma ON ma.media_id = m.media_id
+            LEFT JOIN media_metadata metadata ON metadata.media_id=m.media_id
             WHERE m.state = 'ACTIVE'
               AND m.trashed_at_ms IS NULL AND ma.state = 'READY'
               AND EXISTS (SELECT 1 FROM profile_media pm
@@ -83,9 +85,8 @@ public sealed class ProfileMediaCandidateReads
             if (!ArtifactExists(relativePath)) continue;
             var width = reader.IsDBNull(8) ? 0 : reader.GetInt32(8);
             var height = reader.IsDBNull(9) ? 0 : reader.GetInt32(9);
-            var resolution = Math.Min(width, height);
-            var score = Convert.ToDouble(reader.GetValue(10), System.Globalization.CultureInfo.InvariantCulture)
-                * 100 + Math.Min(resolution, 1600) / 40d;
+            var score = ProfileAppearanceRules.SourceCandidateScore(
+                Convert.ToDouble(reader.GetValue(10), System.Globalization.CultureInfo.InvariantCulture), width, height);
             var candidate = new ProfileMediaCandidate(
                 DbGuid.Parse(reader.GetString(1)), DbGuid.Parse(reader.GetString(0)), role,
                 mediaType, relativePath, reader.GetString(5),
@@ -101,7 +102,7 @@ public sealed class ProfileMediaCandidateReads
             var selected = source
                 .OrderByDescending(static item => item.Candidate.Score)
                 .ThenBy(static item => item.CreatedAt)
-                .ThenBy(static item => item.Candidate.MediaAssetId)
+                .ThenBy(static item => item.Candidate.MediaId)
                 .Take(Math.Max(0, limit));
             return selected
                 .Select((item, index) => item.Candidate with { Rank = index + 1 })
@@ -127,6 +128,30 @@ public sealed class ProfileMediaCandidateReads
         var hovers = Rank(
             all.Where(static item => item.Candidate.Role == MediaAssetRole.Hover),
             bannerLimit);
+        if (importUnitId is not null)
+        {
+            var entries = (await new ProfileBannerOperations(_catalog).ReadEntriesAsync(profileId, ct).ConfigureAwait(false)).ToList();
+            if (includePendingBanner)
+            {
+                await using var pending = connection.CreateCommand();
+                pending.CommandText = "SELECT r.media_id,r.sort_order FROM profile_banner_requests r JOIN jobs j ON j.job_id=r.job_id WHERE r.profile_id=$profile AND r.origin='INITIAL' AND j.state IN ('PENDING','RUNNABLE','RUNNING','PAUSED','FAILED_RETRYABLE');";
+                pending.Parameters.AddWithValue("$profile", DbGuid.Format(profileId));
+                await using var pendingReader = await pending.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                while (await pendingReader.ReadAsync(ct).ConfigureAwait(false))
+                {
+                    var media = DbGuid.Parse(pendingReader.GetString(0));
+                    if (!entries.Any(entry => entry.MediaId == media)) entries.Add(new(media,pendingReader.GetInt32(1),"INITIAL",0,0));
+                }
+            }
+            var selected = new List<ProfileMediaCandidate>();
+            foreach (var entry in entries.OrderBy(entry => entry.SortOrder).ThenBy(entry => entry.MediaId))
+            {
+                var candidate = all.FirstOrDefault(item => item.Candidate.Role == MediaAssetRole.Hover && item.Candidate.MediaId == entry.MediaId).Candidate;
+                if (candidate is not null && (includePendingBanner || await new ProfileBannerOperations(_catalog).ResolveRenditionAsync(profileId, entry.MediaId, importUnitId, ct).ConfigureAwait(false) is not null))
+                    selected.Add(candidate with { Rank = selected.Count + 1 });
+            }
+            hovers = selected.Take(bannerLimit).ToList();
+        }
         return new ProfileMediaCandidates(thumbs, hovers);
     }
 }

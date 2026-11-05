@@ -75,7 +75,7 @@ public sealed partial class CustomizationCenter
         var working = _session.ProfileWorking;
         var sources = working?.Sources;
         var items = (banner
-            ? _subject!.BannerCandidates.Select(c => new CustomizationMediaChoice(
+            ? _subject!.BannerCandidates.Where(candidate => candidate.IsMember).Select(c => new CustomizationMediaChoice(
                 c.MediaId,
                 c.PreviewPath,
                 c.DisplayTitle,
@@ -117,7 +117,9 @@ public sealed partial class CustomizationCenter
                         4,
                         thumb,
                         UI.Text(candidate.Name, "micro", maxLines: 1),
-                        candidate.Recommended
+                        banner && candidate.Current
+                            ? UI.Badge(UI.T("Import.Selected", "Selected"), "accent")
+                            : candidate.Recommended
                             ? UI.Badge(UI.T("Customize.Recommended", "Suggested"), "accent")
                             : null),
                     Material.Raised,
@@ -170,7 +172,7 @@ public sealed partial class CustomizationCenter
         }
 
         var root = UI.V(12);
-        var suggested = items.Where(static candidate => candidate.Recommended).ToList();
+        var suggested = items.Where(candidate => !banner && candidate.Recommended).ToList();
         if (suggested.Count > 0)
         {
             root.Children.Add(UI.Section(
@@ -190,7 +192,8 @@ public sealed partial class CustomizationCenter
             if (items.Count == 0)
             {
                 browseHost.Children.Add(UI.Text(
-                    UI.T("Customize.NoEligibleMedia", "No Profile media is available for this choice."),
+                    banner ? UI.T("Banner.CollectionEmpty", "Your Banner Collection is empty. Choose Add as Banner to prepare a video.")
+                        : UI.T("Customize.NoEligibleMedia", "No Profile media is available for this choice."),
                     "body-muted"));
                 return;
             }
@@ -240,13 +243,132 @@ public sealed partial class CustomizationCenter
 
         RenderBrowsePage();
         root.Children.Add(UI.Section(
-            banner ? UI.T("Customize.BannerBrowseAll", "Browse all")
+            banner ? UI.T("Banner.Collection", "Banner Collection")
                 : UI.T("Customize.CoverBrowseAll", "Browse all"),
             UI.T(
                 "Customize.SourceNote",
                 "Choosing new media only changes the preview; the source and its framing are saved together when you choose Save changes."),
             browseHost));
+        if (banner)
+        {
+            root.Children.Add(BannerEffectsEditor());
+            root.Children.Add(UI.Button(UI.T("Banner.Add", "Add as Banner"), ShowBannerPicker, ButtonKind.Primary));
+        }
         return root;
+    }
+
+    private FrameworkElement BannerEffectsEditor()
+    {
+        var row = UI.Wrap(6);
+        foreach (var effect in new[] { "none", "film", "glitter", "shimmer" })
+        {
+            var value = effect;
+            row.Children.Add(UI.Button(UI.T("Banner.Effect." + effect, effect), () =>
+                _session.Select(PresentationSlots.BannerEffect, ScopeKind.Profile, DefinitionRef.BuiltIn("builtin.neuterradise.effect." + value))));
+        }
+        var intensity = new Slider { Minimum = 0, Maximum = 100, StepFrequency = 1,
+            Value = (_session.ProfileWorking?.Overrides.BannerEffectIntensity ?? .2) * 100 };
+        intensity.ValueChanged += (_, args) =>
+        {
+            _framingEdit = true;
+            try { _session.EditBanner(appearance => appearance with { BannerEffectIntensity = args.NewValue / 100 }); }
+            finally { _framingEdit = false; }
+        };
+        return UI.V(6, UI.Text(UI.T("Banner.Effects", "Banner Effects"), "caption"), row,
+            UI.Text(UI.T("Banner.Intensity", "Effect Intensity"), "caption"), intensity);
+    }
+
+    private void ShowBannerPicker()
+    {
+        if (_subject is null || _session.Context.ProfileId is not { } profileId) return;
+        var choices = _subject.BannerCandidates.ToArray();
+        var body = UI.V(10);
+        FrameworkElement? dialog = null;
+        var page = 0;
+        void Close() { if (dialog is not null) _services.Root!.Dialogs.Close(dialog); }
+        void Render()
+        {
+            body.Children.Clear();
+            body.Children.Add(UI.Text(UI.T("Banner.Add", "Add as Banner"), "section-title"));
+            if (choices.Length == 0) body.Children.Add(UI.WrappedText(UI.T("Banner.PickerEmpty", "No prepared videos are available for this Profile.")));
+            var tiles = new VariableWrap(8);
+            foreach (var choice in choices.Skip(page * 24).Take(24))
+            {
+                var candidate = choice;
+                var tile = UI.Button(candidate.DisplayTitle, null);
+                tile.Width = 160;
+                tile.Content = UI.V(4, new SkImageView { Source = ImageRef.FromPath(candidate.PreviewPath, 240), Height = 90 },
+                    UI.Text(candidate.DisplayTitle, "caption", maxLines: 2),
+                    candidate.IsMember ? UI.Text(UI.T("Banner.Member", "Already in collection"), "micro") : null);
+                tile.Click += async (_, _) =>
+                {
+                    Close();
+                    if (candidate.IsMember)
+                    {
+                        SelectSource(true, candidate.MediaId, false, null, candidate.PreviewPath, .5, .5);
+                        return;
+                    }
+                    await AddBannerAsync(profileId, candidate);
+                };
+                tiles.Children.Add(tile);
+            }
+            body.Children.Add(tiles);
+            var pages = Math.Max(1, (choices.Length + 23) / 24);
+            var previous = UI.Button(UI.T("Common.Previous", "Previous"), () => { page--; Render(); });
+            previous.IsEnabled = page > 0;
+            var next = UI.Button(UI.T("Common.Next", "Next"), () => { page++; Render(); });
+            next.IsEnabled = page + 1 < pages;
+            body.Children.Add(UI.Wrap(6, previous, next, UI.Button(UI.T("Import.Close", "Close"), Close)));
+        }
+        Render();
+        dialog = _services.Root!.Dialogs.Show(body, 720, Close);
+    }
+
+    private async Task AddBannerAsync(Guid profileId, CustomizationBannerCandidate candidate)
+    {
+        var status = UI.WrappedText(UI.T("Banner.Progress.Preparing", "Preparing"));
+        var progress = new ProgressBar { IsIndeterminate = true, Minimum = 0, Maximum = 100 };
+        var body = UI.V(10, UI.Text(candidate.DisplayTitle, "section-title"), status, progress);
+        var closed = false;
+        FrameworkElement? dialog = null;
+        void Close() { closed = true; if (dialog is not null) _services.Root!.Dialogs.Close(dialog); }
+        body.Children.Add(UI.Button(UI.T("Import.Close", "Close"), Close));
+        dialog = _services.Root!.Dialogs.Show(body, 440, Close);
+        try
+        {
+            var jobId = await new ProfileBannerOperations(_services.Catalog).AddAsync(profileId, candidate.MediaId);
+            while (jobId is { } id && !_closed)
+            {
+                var job = await new SchedulerReads(_services.Catalog).GetJobAsync(id);
+                if (job is null) throw new InvalidDataException("BANNER_JOB_UNAVAILABLE");
+                if (job.State is Neuterradise.App.SystemServices.Jobs.JobState.FailedTerminal or Neuterradise.App.SystemServices.Jobs.JobState.Cancelled)
+                    throw new InvalidDataException(job.ErrorCode ?? "BANNER_PREPARATION_FAILED");
+                if (job.State == Neuterradise.App.SystemServices.Jobs.JobState.Succeeded) break;
+                status.Text = UI.T("Banner.Progress." + (job.Stage is "Encoding" or "Finalizing" ? job.Stage : "Preparing"), "Preparing");
+                progress.IsIndeterminate = job.ProgressTotal <= 0;
+                if (job.ProgressTotal > 0) progress.Value = Math.Min(99, job.ProgressCompleted * 100d / job.ProgressTotal);
+                await Task.Delay(250);
+            }
+            if (_closed) return;
+            var ready = await new ProfileBannerOperations(_services.Catalog).ResolveRenditionAsync(profileId, candidate.MediaId);
+            if (ready is null) throw new InvalidDataException("BANNER_NOT_READY");
+            progress.IsIndeterminate = false;
+            progress.Value = 100;
+            status.Text = UI.T("Banner.Progress.Ready", "Ready");
+            var snapshot = await LoadSubjectSnapshotAsync(profileId, _subjectGeneration);
+            if (snapshot is not null && !_closed)
+            {
+                _subject = snapshot;
+                RenderAll();
+            }
+        }
+        catch (Exception exception) when (exception is IOException or InvalidOperationException or ArgumentException)
+        {
+            if (closed) return;
+            progress.IsIndeterminate = false;
+            status.Text = UI.T("Banner.AddFailed", "Banner could not be prepared. Check the original and try again.");
+            body.Children.Add(UI.Button(UI.T("Banner.Retry", "Retry"), async () => { Close(); await AddBannerAsync(profileId, candidate); }));
+        }
     }
     /// <summary>
     /// Previews one Cover or Banner source without mutating the other role.

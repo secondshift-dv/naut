@@ -101,6 +101,16 @@ public sealed class ResourceGovernor : IDisposable
     private bool _memoryPressure;
     private int _importPressure;
     private int _foregroundDiskWork;
+    public const long TransferThrottleQuantumBytes = 4L * 1024 * 1024;
+    private const int ObservationMilliseconds = 1000;
+    private const int RecoveryMilliseconds = 2000;
+    private const int ContendedOperationMilliseconds = 8;
+    private const int DispatcherLatencyThresholdMilliseconds = 50;
+    private readonly Queue<(long At, double Latency)> _dispatcherLatencies = new();
+    private long _contentionSince;
+    private long _lastContention;
+    private long _lastForegroundCompletion;
+    private int _diskDelay;
     private long _workingSet;
     private InteractionMode _mode = InteractionMode.ForegroundIdle;
     private PresentationTier _tier = PresentationTier.Full;
@@ -261,13 +271,69 @@ public sealed class ResourceGovernor : IDisposable
     public IDisposable EnterForegroundDiskWork()
     {
         Interlocked.Increment(ref _foregroundDiskWork);
-        return new Scope(() => Interlocked.Decrement(ref _foregroundDiskWork));
+        var started = _clock();
+        return new Scope(() =>
+        {
+            Interlocked.Decrement(ref _foregroundDiskWork);
+            lock (_sync)
+            {
+                if (_clock() - started >= ContendedOperationMilliseconds)
+                    _lastForegroundCompletion = _clock();
+            }
+        });
+    }
+
+    public void ReportDispatcherLatency(TimeSpan latency)
+    {
+        if (latency < TimeSpan.Zero || !double.IsFinite(latency.TotalMilliseconds)) return;
+        lock (_sync)
+        {
+            var now = _clock();
+            _dispatcherLatencies.Enqueue((now, latency.TotalMilliseconds));
+            while (_dispatcherLatencies.Count > 32
+                || (_dispatcherLatencies.Count > 0 && now - _dispatcherLatencies.Peek().At > RecoveryMilliseconds))
+                _dispatcherLatencies.Dequeue();
+        }
+    }
+
+    public void ReportTransferIoLatency(TimeSpan latency)
+    {
+        lock (_sync)
+        {
+            var now = _clock();
+            if (latency.TotalMilliseconds < ContendedOperationMilliseconds
+                || (Volatile.Read(ref _foregroundDiskWork) == 0
+                    && (_lastForegroundCompletion == 0 || now - _lastForegroundCompletion > ObservationMilliseconds))) return;
+            if (_lastContention == 0 || now - _lastContention > ObservationMilliseconds)
+                _contentionSince = now;
+            _lastContention = now;
+        }
+    }
+
+    public int BackgroundDiskDelayMilliseconds
+    {
+        get
+        {
+            lock (_sync)
+            {
+                var now = _clock();
+                if (_lastContention == 0 || now - _lastContention >= RecoveryMilliseconds)
+                    return _diskDelay = 0;
+                if (now - _lastContention > ObservationMilliseconds
+                    || _lastContention - _contentionSince < ObservationMilliseconds) return _diskDelay;
+                var samples = _dispatcherLatencies.Where(sample => now - sample.At <= RecoveryMilliseconds)
+                    .Select(sample => sample.Latency).Order().ToArray();
+                var degraded = samples.Length >= 8
+                    && samples[(int)Math.Ceiling(samples.Length * .95) - 1] >= DispatcherLatencyThresholdMilliseconds;
+                return _diskDelay = degraded ? 4 : 2;
+            }
+        }
     }
 
     public async ValueTask YieldBackgroundDiskAsync(CancellationToken ct = default)
     {
-        var delay = Volatile.Read(ref _foregroundDiskWork) > 0 ? 16
-            : Mode == InteractionMode.ForegroundInteractive ? 4 : 0;
+        ct.ThrowIfCancellationRequested();
+        var delay = BackgroundDiskDelayMilliseconds;
         if (delay != 0) await Task.Delay(delay, ct).ConfigureAwait(false);
     }
 

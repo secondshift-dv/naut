@@ -109,6 +109,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             _vm,
             UpdateProfileHeader,
             nameof(ProfileDetailViewModel.BannerVideoPath),
+            nameof(ProfileDetailViewModel.BannerPosterPath),
             nameof(ProfileDetailViewModel.AppearanceOverrides)));
         Bag.Add(Observe.Props(
             _vm,
@@ -162,12 +163,13 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
     private PresentationContext Context => PreviewContext(PresentationContext.ForProfile(State));
 
     private ImageRef? _previewCover;
+    private ImageRef? _previewBannerImage;
     private string? _previewBannerVideo;
     private bool _hasPreviewMedia;
 
     public Task RefreshCommittedAppearanceAsync() => _vm.RefreshAppearanceAsync();
 
-    public void SetPreviewMedia(ImageRef? cover, string? bannerVideoPath)
+    public void SetPreviewMedia(ImageRef? cover, string? bannerVideoPath, ImageRef? bannerPoster)
     {
         var currentCover = _hasPreviewMedia ? _previewCover : _vm.CoverSource;
         var currentBanner = _hasPreviewMedia ? _previewBannerVideo : _vm.BannerVideoPath;
@@ -177,10 +179,11 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
                 && StringComparer.OrdinalIgnoreCase.Equals(left.Path, right.Path)
                 && StringComparer.Ordinal.Equals(left.ResourceKey, right.ResourceKey);
         var coverChanged = !SameImageSource(currentCover, cover);
-        var bannerChanged = currentBanner != bannerVideoPath;
+        var bannerChanged = currentBanner != bannerVideoPath || !SameImageSource(_previewBannerImage, bannerPoster);
 
         _previewCover = cover;
         _previewBannerVideo = bannerVideoPath;
+        _previewBannerImage = bannerPoster;
         _hasPreviewMedia = true;
 
         // Opening Customize publishes the committed sources once. Do not tear down/reparent the
@@ -343,7 +346,8 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             () => Identity(identityAlignment),
             ReducedMotionAuthority.IsReduced, Context,
             FigureView: figureSource is null ? null : _figureView, Tags: _vm.AssignedTags,
-            DetailsFactory: _layout.Id == "chronicle" ? ChronicleDetails : null),
+            DetailsFactory: _layout.Id == "chronicle" ? ChronicleDetails : null,
+            BannerPoster: Preview is not null && _hasPreviewMedia ? _previewBannerImage : ImageRef.FromPath(_vm.BannerPosterPath, 1600)),
             rebuildIdentity: forceIdentity || previousLayout != _layout);
         _profileHeader.SetActive(IsActive);
     }
@@ -405,7 +409,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             _vm.DisplayName, _vm.CategoryName, _vm.Tags, _vm.Rating, _vm.IsFavorite, alignment,
             actions: actions,
             status: status, assignedTags: _vm.AssignedTags,
-            showTags: _layout.Id != "portrait" || string.IsNullOrWhiteSpace(_vm.BannerVideoPath));
+            showTags: _layout.Id != "portrait" || (string.IsNullOrWhiteSpace(_vm.BannerVideoPath) && string.IsNullOrWhiteSpace(_vm.BannerPosterPath)));
     }
     private void QueueModulesRefresh() => QueueModulesRefresh(force: true);
 

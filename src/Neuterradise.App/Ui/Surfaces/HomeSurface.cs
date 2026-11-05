@@ -299,6 +299,9 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         };
         art.Children.Add(_heroImage);
         art.Children.Add(_heroVideo);
+        art.Children.Add(PresentationEffects.View(PresentationSlots.BannerEffect, () =>
+            _vm.CurrentSpotlight is { } current ? PresentationContext.ForProfile(new ProfilePresentationState(current.ProfileId, 0, null,
+                _appearance.GetValueOrDefault(current.ProfileId) ?? ProfileAppearanceOverrides.Default), "home") : Context));
 
         var imageLayer = new Grid();
         imageLayer.Children.Add(art);
@@ -700,6 +703,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         // The actual Banner video always uses Banner framing, independent of that fallback.
         _heroImage.Transform = spotlight.BannerImagePath is not null ? media.Banner : media.Cover;
         _heroVideo.SetPresentation(media.Banner);
+        PresentationEffects.RefreshTree(_heroFrame, PresentationSlots.BannerEffect);
         PlayHeroVideo(spotlight, media.Playback);
     }
 

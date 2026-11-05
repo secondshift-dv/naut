@@ -277,192 +277,24 @@ public sealed class VerificationOperations
         }
 
         var draft = VerificationDraftV1.FromJson(model.VerificationDraftJson, _timeProvider.GetUtcNowUnixMilliseconds());
-        var destinationProfileId = draft.Destination.Kind == DestinationKind.ExistingNormal
-            ? draft.Destination.ProfileId
-            : null;
-
-        var evaluationInputs = new List<AppearanceCandidateEvaluationInput>();
         var itemMetaMap = new Dictionary<Guid, (Guid? ImportItemId, bool IsFromUnit)>();
-        var seenMediaIds = new HashSet<Guid>();
-
-        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-
-        await using (var unitCmd = connection.CreateCommand())
+        await using (var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false))
+        await using (var command = connection.CreateCommand())
         {
-            unitCmd.CommandText = """
-                SELECT COALESCE(ii.reused_media_id, ii.candidate_media_id) AS media_id,
-                       ii.import_item_id,
-                       ii.source_file_name,
-                       a.media_type,
-                       am.width AS pixel_width,
-                       am.height AS pixel_height,
-                       am.duration_ms AS duration_ms,
-                       ii.created_at_ms,
-                       EXISTS (
-                           SELECT 1 FROM face_detections fd
-                           WHERE fd.media_id = COALESCE(ii.reused_media_id, ii.candidate_media_id)
-                       ) AS has_face_detection,
-                       CASE
-                           WHEN $profileId IS NOT NULL THEN EXISTS (
-                               SELECT 1 FROM face_detections fd
-                               WHERE fd.media_id = COALESCE(ii.reused_media_id, ii.candidate_media_id)
-                                 AND fd.decision_state = 'CONFIRMED'
-                                 AND fd.confirmed_identity_id IN (SELECT identity_id FROM identities WHERE profile_id = $profileId)
-                           )
-                           ELSE 0
-                       END AS has_confirmed_face
-                FROM import_items ii
-                JOIN media a ON a.media_id = COALESCE(ii.reused_media_id, ii.candidate_media_id)
-                LEFT JOIN media_metadata am ON am.media_id = a.media_id
-                WHERE ii.import_unit_id = $unitId
-                  AND ii.disposition IN ('INCLUDED','REUSED')
-                ORDER BY ii.created_at_ms ASC, ii.import_item_id ASC;
-                """;
-            unitCmd.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
-            unitCmd.Parameters.AddWithValue("$profileId", destinationProfileId.HasValue ? DbGuid.Format(destinationProfileId.Value) : DBNull.Value);
-
-            await using var reader = await unitCmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            command.CommandText = "SELECT COALESCE(reused_media_id,candidate_media_id),import_item_id FROM import_items WHERE import_unit_id=$unit AND disposition IN ('INCLUDED','REUSED') ORDER BY created_at_ms,import_item_id;";
+            command.Parameters.AddWithValue("$unit", DbGuid.Format(unitId));
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            {
-                var assetId = DbGuid.Parse(reader.GetString(0));
-                var itemId = DbGuid.Parse(reader.GetString(1));
-                var name = reader.GetString(2);
-                var mediaType = DbEnum.ParseMediaType(reader.GetString(3));
-                var width = reader.IsDBNull(4) ? (int?)null : Convert.ToInt32(reader.GetInt64(4));
-                var height = reader.IsDBNull(5) ? (int?)null : Convert.ToInt32(reader.GetInt64(5));
-                var duration = reader.IsDBNull(6) ? (int?)null : Convert.ToInt32(reader.GetInt64(6));
-                var createdAt = reader.GetInt64(7);
-                var hasFace = !reader.IsDBNull(8) && reader.GetInt32(8) == 1;
-                var hasConfirmed = !reader.IsDBNull(9) && reader.GetInt32(9) == 1;
-
-                if (seenMediaIds.Add(assetId))
-                {
-                    itemMetaMap[assetId] = (itemId, true);
-                    var hasPreview = (await _catalog.MediaAssetReads.GetOwnedMediaAssetAsync(
-                        assetId, MediaAssetRole.Thumbnail, cancellationToken).ConfigureAwait(false))?.State
-                        == MediaAssetState.Ready;
-
-                    evaluationInputs.Add(new AppearanceCandidateEvaluationInput(
-                        MediaId: assetId,
-                        MediaType: mediaType,
-                        DisplayName: name,
-                        PixelWidth: width,
-                        PixelHeight: height,
-                        DurationMs: duration,
-                        HasDerivedPreview: hasPreview,
-                        HasConfirmedFaceForProfile: hasConfirmed,
-                        HasFaceDetection: hasFace,
-                        CreatedAtMs: createdAt));
-                }
-            }
+                if (!reader.IsDBNull(0)) itemMetaMap.TryAdd(DbGuid.Parse(reader.GetString(0)), (DbGuid.Parse(reader.GetString(1)), true));
         }
-
-        if (draft.Destination.Kind == DestinationKind.ExistingNormal && draft.Destination.ProfileId.HasValue)
-        {
-            var profId = draft.Destination.ProfileId.Value;
-            await using var profileCmd = connection.CreateCommand();
-            profileCmd.CommandText = """
-                SELECT pa.media_id,
-                       COALESCE(a.current_managed_file_name, a.sha256) AS display_name,
-                       a.media_type,
-                       am.width AS pixel_width,
-                       am.height AS pixel_height,
-                       am.duration_ms,
-                       pa.created_at_ms,
-                       EXISTS (
-                           SELECT 1 FROM face_detections fd
-                           WHERE fd.media_id = pa.media_id
-                       ) AS has_face_detection,
-                       EXISTS (
-                           SELECT 1 FROM face_detections fd
-                           WHERE fd.media_id = pa.media_id
-                             AND fd.decision_state = 'CONFIRMED'
-                             AND fd.confirmed_identity_id IN (SELECT identity_id FROM identities WHERE profile_id = $profileId)
-                       ) AS has_confirmed_face,
-                       (CASE WHEN p.cover_media_id = pa.media_id THEN 1 ELSE 0 END) AS is_existing_cover,
-                       (CASE WHEN EXISTS (
-                           SELECT 1
-                           FROM profile_appearance appearance
-                           JOIN media_assets banner_asset
-                             ON banner_asset.media_asset_id = appearance.banner_media_asset_id
-                           WHERE appearance.profile_id = p.profile_id
-                             AND banner_asset.media_id = pa.media_id
-                       ) THEN 1 ELSE 0 END) AS is_existing_banner
-                FROM profile_media pa
-                JOIN media a ON pa.media_id = a.media_id
-                LEFT JOIN media_metadata am ON pa.media_id = am.media_id
-                LEFT JOIN profiles p ON pa.profile_id = p.profile_id
-                WHERE pa.profile_id = $profileId
-                  AND pa.publication_import_unit_id IS NULL
-                  AND a.state = 'ACTIVE' AND a.trashed_at_ms IS NULL
-                ORDER BY pa.created_at_ms ASC, pa.media_id ASC;
-                """;
-            profileCmd.Parameters.AddWithValue("$profileId", DbGuid.Format(profId));
-
-            await using var reader = await profileCmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            {
-                var assetId = DbGuid.Parse(reader.GetString(0));
-                var name = reader.GetString(1);
-                var mediaType = DbEnum.ParseMediaType(reader.GetString(2));
-                var width = reader.IsDBNull(3) ? (int?)null : Convert.ToInt32(reader.GetInt64(3));
-                var height = reader.IsDBNull(4) ? (int?)null : Convert.ToInt32(reader.GetInt64(4));
-                var duration = reader.IsDBNull(5) ? (int?)null : Convert.ToInt32(reader.GetInt64(5));
-                var createdAt = reader.GetInt64(6);
-                var hasFace = !reader.IsDBNull(7) && reader.GetInt32(7) == 1;
-                var hasConfirmed = !reader.IsDBNull(8) && reader.GetInt32(8) == 1;
-                var isCover = !reader.IsDBNull(9) && reader.GetInt32(9) == 1;
-                var isBanner = !reader.IsDBNull(10) && reader.GetInt32(10) == 1;
-
-                if (seenMediaIds.Add(assetId))
-                {
-                    itemMetaMap[assetId] = (null, false);
-                    var hasPreview = (await _catalog.MediaAssetReads.GetOwnedMediaAssetAsync(
-                        assetId, MediaAssetRole.Thumbnail, cancellationToken).ConfigureAwait(false))?.State
-                        == MediaAssetState.Ready;
-
-                    evaluationInputs.Add(new AppearanceCandidateEvaluationInput(
-                        MediaId: assetId,
-                        MediaType: mediaType,
-                        DisplayName: name,
-                        PixelWidth: width,
-                        PixelHeight: height,
-                        DurationMs: duration,
-                        HasDerivedPreview: hasPreview,
-                        HasConfirmedFaceForProfile: hasConfirmed,
-                        HasFaceDetection: hasFace,
-                        CreatedAtMs: createdAt,
-                        IsExistingCover: isCover,
-                        IsExistingBanner: isBanner));
-                }
-            }
-        }
-
-        var faceEvidence = await _catalog.FaceReads
-            .GetAppearanceFaceEvidenceAsync(
-                [.. evaluationInputs.Select(static input => input.MediaId)],
-                destinationProfileId,
-                cancellationToken)
-            .ConfigureAwait(false);
-        if (faceEvidence.Count > 0)
-        {
-            for (var index = 0; index < evaluationInputs.Count; index++)
-            {
-                if (faceEvidence.TryGetValue(evaluationInputs[index].MediaId, out var faces))
-                {
-                    evaluationInputs[index] = evaluationInputs[index] with { FaceEvidence = faces };
-                }
-            }
-        }
-
         var ranked = model.DestinationProfileId is { } profileId
-            ? await new ProfileMediaCandidateReads(_catalog).ReadAsync(profileId, cancellationToken, unitId).ConfigureAwait(false)
+            ? await new ProfileMediaCandidateReads(_catalog).ReadAsync(profileId, cancellationToken, unitId, includePendingBanner: true).ConfigureAwait(false)
             : new ProfileMediaCandidates([], []);
         string? Preview(ProfileMediaCandidate candidate)
         {
             try
             {
-                var path = _catalog.Paths.ResolveVaultRelativePath(candidate.RelativePath);
+                var path = _catalog.Paths.ResolveVaultRelativePath(VaultPathArea.MediaAssets, candidate.RelativePath);
                 return File.Exists(path) ? path : null;
             }
             catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
@@ -480,14 +312,16 @@ public sealed class VerificationOperations
             candidate.Rank, candidate.Rank == 1,
             "Ranked Media Thumbnail", Preview(candidate))).ToArray();
 
-        var banners = ranked.BannerHovers
-            .Select(candidate => new VerificationBannerCandidate(
-                candidate.MediaAssetId.ToString("N"), candidate.MediaId,
-                itemMetaMap.GetValueOrDefault(candidate.MediaId).ImportItemId,
-                candidate.DisplayName, candidate.MediaType,
-                itemMetaMap.GetValueOrDefault(candidate.MediaId).IsFromUnit,
-                candidate.Rank, candidate.Rank == 1,
-                "Video banner", Preview(candidate))).ToArray();
+        var banners = new List<VerificationBannerCandidate>();
+        foreach (var candidate in ranked.BannerHovers)
+        {
+            var ready = model.DestinationProfileId is { } target && await new ProfileBannerOperations(_catalog)
+                .ResolveRenditionAsync(target, candidate.MediaId, unitId, cancellationToken).ConfigureAwait(false) is not null;
+            banners.Add(new VerificationBannerCandidate(candidate.MediaAssetId.ToString("N"), candidate.MediaId,
+                itemMetaMap.GetValueOrDefault(candidate.MediaId).ImportItemId, candidate.DisplayName, candidate.MediaType,
+                itemMetaMap.GetValueOrDefault(candidate.MediaId).IsFromUnit, candidate.Rank, candidate.Rank == 1,
+                null, null, ready));
+        }
 
         return new VerificationAppearanceCandidates(covers, banners);
     }

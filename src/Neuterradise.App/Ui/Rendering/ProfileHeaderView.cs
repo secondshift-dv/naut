@@ -27,7 +27,7 @@ public sealed record ProfileHeaderViewState(
     FrameworkElement? FigureView = null,
     double FigureSize = 300,
     IReadOnlyList<ProfileTagAssignment>? Tags = null,
-    Func<FrameworkElement>? DetailsFactory = null);
+    Func<FrameworkElement>? DetailsFactory = null, ImageRef? BannerPoster = null);
 
 public static class ProfileIdentityView
 {
@@ -129,6 +129,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
 {
     private readonly Border _bannerFrame = new();
     private readonly Grid _bannerRegion = new();
+    private readonly SkImageView _bannerPoster = new() { PlaceholderToken = "surface1" };
     private readonly Border _bannerScrim = new() { IsHitTestVisible = false };
     private readonly Border _bannerFramingSurface = new()
     {
@@ -177,6 +178,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         _state = _state with { Appearance = appearance };
         if (_coverView is not null) _coverView.Transform = MediaTransformState.FromCover(appearance);
         ApplyBannerTransform();
+        PresentationEffects.RefreshTree(_bannerRegion);
     }
 
     public ProfileHeaderView()
@@ -186,12 +188,25 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
+        _bannerRegion.Children.Add(_bannerPoster);
+        _bannerVideo.FrameReady += () => _bannerVideo.Visibility = Visibility.Visible;
+        _bannerVideo.Failed += () => _bannerVideo.Visibility = Visibility.Collapsed;
         _bannerRegion.Children.Add(_bannerVideo);
+        _bannerRegion.Children.Add(PresentationEffects.View(PresentationSlots.BannerEffect,
+            () => _state?.Context is { } context && context.Profile is { } profile
+                ? context with { Profile = profile with { Overrides = _state.Appearance } } : PresentationContext.Global));
+        PresentationEffects.SetActivityScope(_bannerRegion, () => _active);
         _bannerRegion.Children.Add(_bannerScrim);
         _bannerRegion.Children.Add(_bannerFramingSurface);
         _bannerRegion.Children.Add(_tagOverlay);
         _bannerRegion.Background = ThemeRuntime.Current.Brush("transparent");
 
+        Loaded += (_, _) => Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.Changed += OnGovernorChanged;
+        Unloaded += (_, _) =>
+        {
+            Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.Changed -= OnGovernorChanged;
+            ClearBanner();
+        };
         _bannerFrame.Child = _bannerRegion;
         Grid.SetColumnSpan(_bannerFrame, 2);
         Children.Add(_bannerFrame);
@@ -220,6 +235,8 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         }
 
         _state = state;
+        _bannerPoster.Source = state.BannerPoster;
+        PresentationEffects.RefreshTree(_bannerRegion);
         if (layoutChanged || figureChanged)
         {
             _identityLayoutBucket = -1;
@@ -292,7 +309,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         height = Math.Min(height, width < 960 ? 180.0 : width < 1200 ? 220.0 : 280.0);
 
         var showBanner = layout.BannerMode != ProfileLayoutBannerMode.None
-            && !string.IsNullOrWhiteSpace(state.BannerVideoPath);
+            && (!string.IsNullOrWhiteSpace(state.BannerVideoPath) || state.BannerPoster is not null);
         _tagOverlay.Visibility = showBanner && layout.Id == "portrait" ? Visibility.Visible : Visibility.Collapsed;
         _tagOverlay.Margin = new Thickness(pagePadding, 16, pagePadding, 16);
         _tagOverlay.MaxWidth = Math.Max(0, width - pagePadding * 2);
@@ -442,7 +459,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         var identity = state.IdentityFactory()
             ?? throw new InvalidOperationException("Profile identity factory returned no visual.");
         var hasBanner = layout.BannerMode != ProfileLayoutBannerMode.None
-            && !string.IsNullOrWhiteSpace(state.BannerVideoPath);
+            && (!string.IsNullOrWhiteSpace(state.BannerVideoPath) || state.BannerPoster is not null);
         var overlap = hasBanner && layout.CoverPlacement is
             ProfileLayoutCoverPlacement.BottomLeftOverlap or ProfileLayoutCoverPlacement.BottomCenterOverlap;
         var center = layout.CoverPlacement is
@@ -581,7 +598,8 @@ public sealed class ProfileHeaderView : Grid, IDisposable
             return;
         }
 
-        if (!_active || state.Layout.BannerMode == ProfileLayoutBannerMode.None)
+        if (!_active || state.ReducedMotion || state.Layout.BannerMode == ProfileLayoutBannerMode.None
+            || Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.Tier != Neuterradise.App.SystemServices.Resources.PresentationTier.Full)
         {
             PauseBanner();
             return;
@@ -590,10 +608,18 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         PlayBanner(state.BannerVideoPath);
     }
 
+    private void OnGovernorChanged(object? sender, EventArgs args) => UiDispatch.Run(() =>
+    {
+        if (!_disposed) UpdateBannerState();
+    });
+
     private void PlayBanner(string path)
     {
-        _bannerVideo.Visibility = Visibility.Visible;
+        if (!string.Equals(_bannerVideo.SourcePath, path, StringComparison.OrdinalIgnoreCase))
+            _bannerVideo.Visibility = Visibility.Collapsed;
+        _bannerVideo.SetActive(true);
         _bannerVideo.Play(path, loop: true);
+        _bannerVideo.Visibility = _bannerVideo.HasFrame ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void PauseBanner()
@@ -616,6 +642,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         }
 
         _bannerVideo.SetPresentation(MediaTransformState.FromBanner(state.Appearance));
+        _bannerPoster.Transform = MediaTransformState.FromBanner(state.Appearance);
     }
     public new void Dispose()
     {
@@ -625,6 +652,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         }
 
         _disposed = true;
+        Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.Changed -= OnGovernorChanged;
         _active = false;
         if (_state?.FigureView is ProfileFigureView figure) figure.SetActive(false);
         _state = null;
@@ -632,5 +660,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         _identityHost.Content = null;
         _detailsHost.Content = null;
         _bannerVideo.Dispose();
+        _bannerPoster.Source = null;
+        _bannerRegion.Children.Clear();
     }
 }

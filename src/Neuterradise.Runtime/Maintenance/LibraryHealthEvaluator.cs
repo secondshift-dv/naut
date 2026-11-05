@@ -924,7 +924,7 @@ public sealed class LibraryHealthEvaluator
                 if (options.FocusedMediaId is { } focus && focus != assetId) continue;
                 if (options.FocusedProfileId.HasValue) continue;
                 if (reader.GetString(5) == "TRASHED" || !reader.IsDBNull(6)) continue;
-                if (reader.GetInt32(4) != 1)
+                if (!MediaAssetContracts.IsSupported(DbEnum.ParseMediaAssetRole(reader.GetString(8)), reader.GetInt32(4)))
                     findings.Add(new HealthFinding(HealthFindingCode.ArtifactContractObsolete,
                         HealthSeverity.Error, null, assetId, null, null,
                         $"MediaAsset '{relativePath}' uses an obsolete contract.", true));

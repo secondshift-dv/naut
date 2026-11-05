@@ -16,6 +16,7 @@ public static class DbEnum
     {
         MediaAssetRole.Thumbnail => "THUMBNAIL",
         MediaAssetRole.Hover => "HOVER",
+        MediaAssetRole.Banner => "BANNER",
         MediaAssetRole.ModelRender => "MODEL_RENDER",
         _ => throw new ArgumentOutOfRangeException(nameof(value), value, null),
     };
@@ -24,6 +25,7 @@ public static class DbEnum
     {
         "THUMBNAIL" => MediaAssetRole.Thumbnail,
         "HOVER" => MediaAssetRole.Hover,
+        "BANNER" => MediaAssetRole.Banner,
         "MODEL_RENDER" => MediaAssetRole.ModelRender,
         _ => throw new FormatException($"'{value}' is not a valid MediaAssetRole database value."),
     };

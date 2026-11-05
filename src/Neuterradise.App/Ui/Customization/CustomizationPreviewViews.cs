@@ -208,7 +208,7 @@ public sealed partial class CustomizationCenter
             IdentityPreview,
             ReducedMotionAuthority.IsReduced, _session.LiveContext,
             FigureView: figurePreview,
-            FigureSize: _figureEditorOpen ? 240 : 300, Tags: _subject?.Detail.AssignedTags));
+            FigureSize: _figureEditorOpen ? 240 : 300, Tags: _subject?.Detail.AssignedTags, BannerPoster: _bannerSource));
         _profilePreviewHeader.SetActive(true);
         AttachFraming(_profilePreviewHeader.CoverFramingSurface, false);
         AttachFraming(_profilePreviewHeader.BannerFramingSurface, true);

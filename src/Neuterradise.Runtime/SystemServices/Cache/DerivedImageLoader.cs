@@ -412,8 +412,11 @@ public sealed class DerivedImageLoader : IDisposable
             await _decodeSlots.WaitAsync(_lifetime.Token).ConfigureAwait(false);
             try
             {
-                using var foregroundDisk = Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.EnterForegroundDiskWork();
-                var image = await Task.Run(() => Decode(key), _lifetime.Token).ConfigureAwait(false);
+                var image = await Task.Run(() =>
+                {
+                    using var foregroundDisk = Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.EnterForegroundDiskWork();
+                    return Decode(key);
+                }, _lifetime.Token).ConfigureAwait(false);
                 if (image is null)
                 {
                     Interlocked.Increment(ref _failures);

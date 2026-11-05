@@ -259,7 +259,7 @@ public sealed class RepairExecutor
                 || !ModelRenderEligibility.IsEligible(reader.GetString(9),reader.GetString(10))
                 || plan.SourcePathOrRelative != expectedModelPath)
                 return RepairReadiness.Stale;
-            if (version != 1 || reader.GetString(6) == "NEEDS_REPAIR" || !File.Exists(path)) return RepairReadiness.Ready;
+            if (!MediaAssetContracts.IsSupported(DbEnum.ParseMediaAssetRole(plan.ExpectedAuthorityState), version) || reader.GetString(6) == "NEEDS_REPAIR" || !File.Exists(path)) return RepairReadiness.Ready;
             try
             {
                 var valid = await new MediaAssetFileValidator().ValidateAsync(path,MediaAssetRole.ModelRender,cancellationToken,reader.GetString(7)).ConfigureAwait(false);
@@ -269,7 +269,7 @@ public sealed class RepairExecutor
             catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException or ArgumentException)
             { return RepairReadiness.Ready; }
         }
-        if (version != 1 || reader.GetString(6) == "NEEDS_REPAIR"
+        if (!MediaAssetContracts.IsSupported(DbEnum.ParseMediaAssetRole(plan.ExpectedAuthorityState), version) || reader.GetString(6) == "NEEDS_REPAIR"
             || !File.Exists(path) || new FileInfo(path).Length != plan.ExpectedPhysicalByteLength)
             return RepairReadiness.Ready;
         await using var stream = File.OpenRead(path);
@@ -286,7 +286,7 @@ public sealed class RepairExecutor
         command.Parameters.AddWithValue("$id", DbGuid.Format(assetId));
         var mediaType = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string;
         if (mediaType is null) return new StorageOperationResult(StorageOperationStatus.NeedsAttention);
-        var kind = mediaType == "VIDEO" ? "GenerateVideoMediaAssets"
+        var kind = plan.ExpectedAuthorityState == "BANNER" ? "GenerateBanner" : mediaType == "VIDEO" ? "GenerateVideoMediaAssets"
             : mediaType == "MODEL" ? "GenerateModelMediaAssets" : "GenerateThumbnail";
         var lane = kind == "GenerateThumbnail" && mediaType == "IMAGE" ? JobLane.Cpu : JobLane.Media;
         await using var lease = await _catalog.WriteCoordinator.EnterAsync(cancellationToken).ConfigureAwait(false);

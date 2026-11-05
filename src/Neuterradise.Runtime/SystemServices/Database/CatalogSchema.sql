@@ -316,7 +316,7 @@ CREATE TABLE profiles (
 CREATE TABLE media_assets (
     media_asset_id TEXT PRIMARY KEY,
     media_id TEXT NOT NULL REFERENCES media(media_id) ON DELETE CASCADE,
-    role TEXT NOT NULL CHECK (role IN ('THUMBNAIL','HOVER','MODEL_RENDER')),
+    role TEXT NOT NULL CHECK (role IN ('THUMBNAIL','HOVER','MODEL_RENDER','BANNER')),
     contract_version INTEGER NOT NULL CHECK (contract_version > 0),
     state TEXT NOT NULL CHECK (state IN ('READY','NEEDS_REPAIR')),
     relative_path TEXT NOT NULL UNIQUE CHECK (relative_path LIKE 'media-assets/%' AND instr(relative_path, '..') = 0),
@@ -330,7 +330,7 @@ CREATE TABLE media_assets (
     updated_at_ms INTEGER NOT NULL,
     row_version INTEGER NOT NULL DEFAULT 0 CHECK (row_version >= 0),
     CHECK (role <> 'THUMBNAIL' OR (pixel_width IS NOT NULL AND pixel_height IS NOT NULL)),
-    CHECK (role <> 'HOVER' OR (duration_ms IS NOT NULL AND duration_ms BETWEEN 1 AND 6000)),
+    CHECK (role NOT IN ('HOVER','BANNER') OR (duration_ms IS NOT NULL AND duration_ms BETWEEN 1 AND 6000)),
     CHECK (role <> 'MODEL_RENDER' OR (contract_version = 1 AND pixel_width IS NULL
         AND pixel_height IS NULL AND duration_ms IS NULL AND source_timestamp_ms IS NULL)),
     UNIQUE (media_id, role)
@@ -529,10 +529,10 @@ END;
 
 CREATE TABLE catalog_contract (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-    schema_version INTEGER NOT NULL CHECK (schema_version = 2)
+    schema_version INTEGER NOT NULL CHECK (schema_version = 3)
 );
-INSERT INTO catalog_contract(singleton, schema_version) VALUES(1, 2);
-PRAGMA user_version = 2;
+INSERT INTO catalog_contract(singleton, schema_version) VALUES(1, 3);
+PRAGMA user_version = 3;
 
 CREATE TRIGGER trg_media_storage_token_immutable
 BEFORE UPDATE OF media_storage_token ON media
@@ -1177,8 +1177,8 @@ WHEN NOT EXISTS (
     SELECT 1 FROM media a
     WHERE a.media_id = NEW.media_id
       AND NEW.relative_path = 'media-assets/' || a.media_storage_token || '/'
-          || CASE NEW.role WHEN 'THUMBNAIL' THEN 'thumbnail.webp' WHEN 'HOVER' THEN 'hover.mp4' WHEN 'MODEL_RENDER' THEN 'model-render.nfig' END
-      AND (NEW.role <> 'HOVER' OR a.media_type = 'VIDEO')
+          || CASE NEW.role WHEN 'THUMBNAIL' THEN 'thumbnail.webp' WHEN 'HOVER' THEN 'hover.mp4' WHEN 'BANNER' THEN 'banner.mp4' WHEN 'MODEL_RENDER' THEN 'model-render.nfig' END
+      AND (NEW.role NOT IN ('HOVER','BANNER') OR a.media_type = 'VIDEO')
       AND (NEW.role <> 'MODEL_RENDER' OR (a.media_type = 'MODEL'
           /* model-figure-format-start */
           AND (
@@ -1202,8 +1202,8 @@ WHEN NOT EXISTS (
     SELECT 1 FROM media a
     WHERE a.media_id = NEW.media_id
       AND NEW.relative_path = 'media-assets/' || a.media_storage_token || '/'
-          || CASE NEW.role WHEN 'THUMBNAIL' THEN 'thumbnail.webp' WHEN 'HOVER' THEN 'hover.mp4' WHEN 'MODEL_RENDER' THEN 'model-render.nfig' END
-      AND (NEW.role <> 'HOVER' OR a.media_type = 'VIDEO')
+          || CASE NEW.role WHEN 'THUMBNAIL' THEN 'thumbnail.webp' WHEN 'HOVER' THEN 'hover.mp4' WHEN 'BANNER' THEN 'banner.mp4' WHEN 'MODEL_RENDER' THEN 'model-render.nfig' END
+      AND (NEW.role NOT IN ('HOVER','BANNER') OR a.media_type = 'VIDEO')
       AND (NEW.role <> 'MODEL_RENDER' OR (a.media_type = 'MODEL'
           /* model-figure-format-start */
           AND (
@@ -1375,3 +1375,40 @@ WHEN ((NEW.cover_media_asset_id IS NOT NULL AND NEW.cover_media_asset_id IS NOT 
 BEGIN
     SELECT RAISE(ABORT,'Profile group Trash has reserved this mutation');
 END;
+
+CREATE TABLE profile_banner_entries (
+    profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
+    media_id TEXT NOT NULL REFERENCES media(media_id) ON DELETE CASCADE,
+    sort_order INTEGER NOT NULL CHECK (sort_order >= 0),
+    origin TEXT NOT NULL CHECK (origin IN ('INITIAL','ADDED')),
+    created_at_ms INTEGER NOT NULL,
+    updated_at_ms INTEGER NOT NULL,
+    PRIMARY KEY (profile_id, media_id)
+);
+
+CREATE TRIGGER trg_profile_banner_entry_insert
+BEFORE INSERT ON profile_banner_entries
+WHEN NOT EXISTS (
+    SELECT 1 FROM profile_media pm JOIN profiles p ON p.profile_id=pm.profile_id
+    JOIN media m ON m.media_id=pm.media_id
+    JOIN media_metadata metadata ON metadata.media_id=m.media_id
+    JOIN media_assets h ON h.media_id=m.media_id AND h.role='HOVER' AND h.state='READY'
+    WHERE pm.profile_id=NEW.profile_id AND pm.media_id=NEW.media_id
+      AND p.kind='NORMAL' AND p.trashed_at_ms IS NULL AND m.state='ACTIVE' AND m.trashed_at_ms IS NULL
+      AND (EXISTS (SELECT 1 FROM media_assets b WHERE b.media_id=m.media_id AND b.role='BANNER' AND b.state='READY'
+                   AND b.source_timestamp_ms=h.source_timestamp_ms)
+           OR (metadata.width IS NOT NULL AND metadata.height IS NOT NULL
+               AND max(metadata.width,metadata.height)<=854 AND min(metadata.width,metadata.height)<=480
+               AND h.contract_version>=2 AND max(h.pixel_width,h.pixel_height)<=854 AND min(h.pixel_width,h.pixel_height)<=480)))
+BEGIN
+    SELECT RAISE(ABORT, 'Banner collection requires related ready renditions');
+END;
+
+CREATE TABLE profile_banner_requests (
+    profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
+    media_id TEXT NOT NULL REFERENCES media(media_id) ON DELETE CASCADE,
+    job_id TEXT NOT NULL REFERENCES jobs(job_id) ON DELETE CASCADE,
+    origin TEXT NOT NULL CHECK (origin IN ('INITIAL','ADDED')),
+    sort_order INTEGER NOT NULL CHECK (sort_order >= 0),
+    PRIMARY KEY (profile_id, media_id)
+);

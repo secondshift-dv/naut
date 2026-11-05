@@ -295,7 +295,20 @@ public sealed class ProfileReads
             BannerAssetRelativePath: bannerAssetRelativePath,
             FigureMediaId: ReadFigureId(reader), FigureThumbnailRelativePath: ReadFigureString(reader,"figure_thumbnail_path"),
             FigureModelRenderRelativePath: ReadFigureString(reader,"figure_render_path"), FigureModelRenderState: ReadFigureState(reader),
-            FigureSourceSha256: ReadFigureString(reader,"figure_source_sha256"));
+            FigureSourceSha256: ReadFigureString(reader,"figure_source_sha256"),
+            BannerEntries: await ReadBannerEntriesAsync(connection, profileId, cancellationToken).ConfigureAwait(false));
+    }
+
+    private static async Task<IReadOnlyList<ProfileBannerEntry>> ReadBannerEntriesAsync(SqliteConnection connection, Guid profileId, CancellationToken ct)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT media_id,sort_order,origin,created_at_ms,updated_at_ms FROM profile_banner_entries WHERE profile_id=$profile ORDER BY sort_order,created_at_ms,media_id;";
+        command.Parameters.AddWithValue("$profile", DbGuid.Format(profileId));
+        var entries = new List<ProfileBannerEntry>();
+        await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        while (await reader.ReadAsync(ct).ConfigureAwait(false))
+            entries.Add(new(DbGuid.Parse(reader.GetString(0)), reader.GetInt32(1), reader.GetString(2), reader.GetInt64(3), reader.GetInt64(4)));
+        return entries;
     }
 
     public async Task<ProfileAppearanceReadModel?> GetAppearanceAsync(

@@ -28,6 +28,8 @@ Use **Settings → Vault** to rename the active Vault or choose a custom icon (P
 
 Naut v0.0.7 upgrades recognized Catalog Schema v1 Vaults atomically to v2 without resetting existing rows. Older v1 binaries cannot open an upgraded catalog; back up the Vault before upgrading if you may need to downgrade.
 
+Naut v0.0.9 atomically advances recognized Catalog v1/v2 Vaults to schema v3, preserving existing media identities, Profile selections and Banner membership. Profile manifests use schema 2 while compatible readers still accept schema 1. Older Naut versions cannot safely write an upgraded v3 Catalog. For a downgrade, restore a complete pre-upgrade Vault backup; do not delete or reset the upgraded Catalog.
+
 Managed NORMAL Profiles can mirror Overview and Private Note into UTF-8 text files inside the Vault. These files are **plaintext**; anyone with filesystem access can read them. If edited outside Naut, the application asks how to resolve the conflict before adopting or replacing the content. Keep the entire Vault together when backing it up or moving it.
 
 ## Backups

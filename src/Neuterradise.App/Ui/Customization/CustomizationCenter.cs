@@ -114,7 +114,7 @@ public sealed partial class CustomizationCenter : IDisposable
     public FrameworkElement View => _root;
     public PreviewSession Session => _session;
     public event Action<bool>? EditorChanged;
-    public event Action<ImageRef?, string?>? PreviewMediaChanged;
+    public event Action<ImageRef?, string?, ImageRef?>? PreviewMediaChanged;
     public bool IsEditor => _dedicatedEditor;
     public void SetFigureOccluded(bool occluded) => _profilePreviewFigure.SetOccluded(occluded);
     public bool IsCardOnly => _cardOnly;
@@ -122,7 +122,7 @@ public sealed partial class CustomizationCenter : IDisposable
     public void SetInspectorWidth(double width) => _workspace.SetInspectorWidth(width);
     public void PublishPreviewMedia()
     {
-        if (_subject is not null) PreviewMediaChanged?.Invoke(_coverSource, _bannerVideoPath);
+        if (_subject is not null) PreviewMediaChanged?.Invoke(_coverSource, _bannerVideoPath, _bannerSource);
     }
 
     private static bool IsDedicatedSlot(string? slot) => slot is PresentationSlots.ProfileCover

@@ -117,16 +117,27 @@ internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
                 var written = safeOffset;
                 var lastCheckpoint = safeOffset;
                 var checkpointSavedThisRun = false;
+                var nextThrottleBoundary = (safeOffset / Neuterradise.App.SystemServices.Resources.ResourceGovernor.TransferThrottleQuantumBytes + 1)
+                    * Neuterradise.App.SystemServices.Resources.ResourceGovernor.TransferThrottleQuantumBytes;
                 while (written < length && !cancellationToken.IsCancellationRequested)
                 {
-                    await Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared
-                        .YieldBackgroundDiskAsync(cancellationToken).ConfigureAwait(false);
+                    var ioStarted = System.Diagnostics.Stopwatch.GetTimestamp();
                     var read = await source.ReadAsync(buffer.AsMemory(0, (int)Math.Min(_bufferSize, length - written)),
                         cancellationToken).ConfigureAwait(false);
                     if (read == 0) return Failed("SOURCE_CHANGED", "The source ended before its expected length.");
                     await partial.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+                    Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.ReportTransferIoLatency(
+                        System.Diagnostics.Stopwatch.GetElapsedTime(ioStarted));
                     hash.AppendData(buffer, 0, read);
                     written += read;
+                    if (written >= nextThrottleBoundary)
+                    {
+                        nextThrottleBoundary = (written / Neuterradise.App.SystemServices.Resources.ResourceGovernor.TransferThrottleQuantumBytes + 1)
+                            * Neuterradise.App.SystemServices.Resources.ResourceGovernor.TransferThrottleQuantumBytes;
+                        if (written < length)
+                            await Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared
+                                .YieldBackgroundDiskAsync(cancellationToken).ConfigureAwait(false);
+                    }
                     await context.Progress.ReportProgressAsync(written, length, "Transferring", cancellationToken)
                         .ConfigureAwait(false);
                     if (written - lastCheckpoint >= _checkpointInterval)
