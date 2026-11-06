@@ -201,7 +201,12 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         _bannerRegion.Children.Add(_tagOverlay);
         _bannerRegion.Background = ThemeRuntime.Current.Brush("transparent");
 
-        Loaded += (_, _) => Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.Changed += OnGovernorChanged;
+        Loaded += (_, _) =>
+        {
+            if (_disposed) return;
+            Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.Changed += OnGovernorChanged;
+            UpdateBannerState();
+        };
         Unloaded += (_, _) =>
         {
             Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.Changed -= OnGovernorChanged;
@@ -599,7 +604,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         }
 
         if (!_active || state.ReducedMotion || state.Layout.BannerMode == ProfileLayoutBannerMode.None
-            || Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.Tier != Neuterradise.App.SystemServices.Resources.PresentationTier.Full)
+            || !Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.IsPrimaryVideoAllowed)
         {
             PauseBanner();
             return;

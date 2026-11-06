@@ -147,6 +147,8 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         Bag.Add(Observe.Collection(_vm.Discovery, QueueRebuildRails));
         Bag.Add(Observe.Collection(_vm.ActiveImports, QueueRebuildRails));
         Bag.Add(Observe.Props(_vm, QueueRebuildRails, nameof(HomeViewModel.VaultPulse)));
+        ResourceGovernor.Shared.Changed += OnGovernorChanged;
+        Bag.Add(() => ResourceGovernor.Shared.Changed -= OnGovernorChanged);
         UpdateNotice();
     }
 
@@ -218,6 +220,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         _backdrop.IsSurfaceActive = true;
         _rotation.Start();
         StartSpotlightMotion();
+        SyncHeroPlayback();
         Services.RunUserAction(
             _vm.RefreshAsync(),
             "HomeSurface.ActivateAsync",
@@ -707,10 +710,28 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         PlayHeroVideo(spotlight, media.Playback);
     }
 
+    private void OnGovernorChanged(object? sender, EventArgs args) =>
+        UiDispatch.Run(SyncHeroPlayback);
+
+    private void SyncHeroPlayback()
+    {
+        if (_retired || !IsActive) return;
+        if (_vm.CurrentSpotlight is not { } spotlight)
+        {
+            StopHeroVideo();
+            return;
+        }
+
+        var overrides = _appearance.GetValueOrDefault(spotlight.ProfileId)
+            ?? ProfileAppearanceOverrides.Default;
+        var state = new ProfilePresentationState(spotlight.ProfileId, 0, null, overrides);
+        PlayHeroVideo(spotlight, Services.Presentation.ResolveMedia(state).Playback);
+    }
+
     private void PlayHeroVideo(HomeSpotlightViewModel spotlight, PlaybackPresentationState playback)
     {
         if (_spotlight.Composition == "snapshot" || !IsActive
-            || !spotlight.HasBannerVideo || ResourceGovernor.Shared.Tier != PresentationTier.Full
+            || !spotlight.HasBannerVideo || !ResourceGovernor.Shared.IsPrimaryVideoAllowed
             || ReducedMotionAuthority.IsReduced)
         {
             StopHeroVideo();

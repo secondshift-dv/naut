@@ -68,7 +68,8 @@ public sealed class FigureRuntime : IDisposable
 
     private sealed record FigureSceneCacheEntry(FigureSceneCacheKey Key, FigureSceneData Scene);
 
-    public Task<FigureSceneData> LoadSceneAsync(string path, string sourceSha256, int lod, int textureDimension, CancellationToken ct)
+    public Task<FigureSceneData> LoadSceneAsync(string path, string sourceSha256, int lod, int textureDimension,
+        CancellationToken ct, bool foreground = true)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -77,7 +78,7 @@ public sealed class FigureRuntime : IDisposable
         var task = Task.Run(async () =>
         {
             request.Token.ThrowIfCancellationRequested();
-            using var permit = await _governor.AcquireAsync(ResourceClass.CpuHeavy, request.Token);
+            using var permit = await _governor.AcquireAsync(ResourceClass.CpuHeavy, request.Token, foreground);
             using var foregroundDisk = _governor.EnterForegroundDiskWork();
             var validated = _validationReceipts is null ? null
                 : await _validationReceipts.ValidateAsync(path, sourceSha256, request.Token).ConfigureAwait(false);
@@ -113,13 +114,36 @@ public sealed class FigureRuntime : IDisposable
     public async Task PrewarmSceneAsync(string path, string sourceSha256, CancellationToken ct = default)
     {
         if (_disposed || !IsLiveAllowed) return;
+        // Prefetch admission waits for foreground idle; an interaction or Import that starts
+        // during validation cancels optional work so a visible Figure is not queued behind it.
+        using var prefetch = await _governor.AcquireAsync(ResourceClass.Prefetch, ct).ConfigureAwait(false);
+        if (_disposed || !IsLiveAllowed || !_governor.IsPrefetchAllowed) return;
+        using var interruption = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        void OnGovernorChanged(object? sender, EventArgs args)
+        {
+            if (!_governor.IsPrefetchAllowed) interruption.Cancel();
+        }
 
-        // Geometry fidelity is stable across camera distance. The prepared reduced meshes are not
-        // trusted as presentation authority because structurally valid clustering can still create
-        // visible surface loss on real human scans. Resource scaling therefore changes texture
-        // residency only; the live Figure always uses source-detail LOD0 geometry.
-        var textureDimension = Tier == PresentationTier.Reduced ? 1024 : 2048;
-        _ = await LoadSceneAsync(path, sourceSha256, 0, textureDimension, ct).ConfigureAwait(false);
+        _governor.Changed += OnGovernorChanged;
+        try
+        {
+            if (!_governor.IsPrefetchAllowed) return;
+            // The live Figure always uses source-detail LOD0; only texture residency is reduced.
+            var textureDimension = Tier == PresentationTier.Reduced ? 1024 : 2048;
+            try
+            {
+                _ = await LoadSceneAsync(path, sourceSha256, 0, textureDimension,
+                    interruption.Token, foreground: false).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                // A canceled prewarm has no persisted state; foreground loading owns the scene.
+            }
+        }
+        finally
+        {
+            _governor.Changed -= OnGovernorChanged;
+        }
     }
 
     public bool TryGetCachedScene(

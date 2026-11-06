@@ -159,7 +159,7 @@ public sealed class ResourceGovernor : IDisposable
 
     public ResourceLimits BackgroundLimits { get; }
 
-    /// <summary>Raised (on a pool thread) when the mode or presentation tier changes.</summary>
+    /// <summary>Raised (on a pool thread) when the mode, presentation tier, or primary-video eligibility changes.</summary>
     public event EventHandler? Changed;
 
     /// <summary>Raised when memory pressure asks bounded caches to shed.</summary>
@@ -177,7 +177,17 @@ public sealed class ResourceGovernor : IDisposable
 
     public bool IsHoverVideoAllowed => Mode != InteractionMode.Background && !IsScrolling;
 
-    public bool IsPrefetchAllowed => Mode == InteractionMode.ForegroundIdle && !_memoryPressure;
+    public bool IsPrefetchAllowed
+    {
+        get { lock (_sync) return _mode == InteractionMode.ForegroundIdle && !_memoryPressure && Volatile.Read(ref _importPressure) == 0; }
+    }
+
+    // Import lowers decorative detail, but only memory pressure or an inactive/reduced-motion
+    // window suspends the selected Home/Profile video. Hover stays on its separate budget.
+    public bool IsPrimaryVideoAllowed
+    {
+        get { lock (_sync) return (_tier is PresentationTier.Full or PresentationTier.Reduced) && !_memoryPressure; }
+    }
 
     public bool IsScrolling { get; private set; }
 
@@ -246,9 +256,10 @@ public sealed class ResourceGovernor : IDisposable
         lock (_sync)
         {
             var previousLimits = CaptureLimitsLocked();
+            var eligibilityChanged = _memoryPressure != memoryPressure && _tier == PresentationTier.Reduced;
             _workingSet = Math.Max(0, workingSetBytes);
             _memoryPressure = memoryPressure;
-            changed = Recompute(previousLimits);
+            changed = Recompute(previousLimits) || eligibilityChanged;
         }
 
         if (changed)
@@ -337,7 +348,8 @@ public sealed class ResourceGovernor : IDisposable
         if (delay != 0) await Task.Delay(delay, ct).ConfigureAwait(false);
     }
 
-    public ValueTask<ResourcePermit> AcquireAsync(ResourceClass resourceClass, CancellationToken cancellationToken = default)
+    public ValueTask<ResourcePermit> AcquireAsync(ResourceClass resourceClass, CancellationToken cancellationToken = default,
+        bool foreground = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         cancellationToken.ThrowIfCancellationRequested();
@@ -354,7 +366,8 @@ public sealed class ResourceGovernor : IDisposable
             }
 
             waiter = new TaskCompletionSource<ResourcePermit>(TaskCreationOptions.RunContinuationsAsynchronously);
-            state.Waiting.AddLast(waiter);
+            if (foreground && resourceClass == ResourceClass.CpuHeavy) state.Waiting.AddFirst(waiter);
+            else state.Waiting.AddLast(waiter);
         }
 
         if (cancellationToken.CanBeCanceled)

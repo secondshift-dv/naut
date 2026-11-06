@@ -38,6 +38,8 @@ No. Integrated graphics are sufficient for normal Naut use. Interactive 3D Figur
 
 Yes. Figure is optional and independent from the rest of the Profile experience.
 
+Naut v0.0.11 prevents a temporary Profile layout reflow from canceling an initial 3D scene load. If the prepared model, compatible graphics device or renderer is unavailable, the static thumbnail remains the fallback.
+
 ## Which interface languages are included?
 
 Naut v0.0.7 includes English, Bahasa Indonesia, 日本語, 한국어, 简体中文, Deutsch, Français, and Español. See [Languages](languages.md).

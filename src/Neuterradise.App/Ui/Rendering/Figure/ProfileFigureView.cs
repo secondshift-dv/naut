@@ -139,12 +139,12 @@ public sealed class ProfileFigureView : Grid, IDisposable
 
     private void OnUnloaded(object sender, RoutedEventArgs args)
     {
-        // Header reflow/reparenting can transiently unload this XAML host while the Profile is still
-        // active. Hide the native child but retain the expensive live lease; route suspension and
-        // Dispose remain the authorities that actually release it.
-        if (_active && _lease is { IsDisposed: false } lease)
+        // Header reflow can unload this host before the first scene finishes validating.
+        // Retain both the active lease and any pending load across transient reparenting;
+        // route suspension and Dispose remain the authorities that cancel and release.
+        if (_active)
         {
-            lease.SetActive(false);
+            if (_lease is { IsDisposed: false } lease) lease.SetActive(false);
             return;
         }
         Release();
