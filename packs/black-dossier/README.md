@@ -1,4 +1,4 @@
-# Black Dossier ? source 2.0.0
+# Black Dossier - source 2.0.0
 
 Black architectural evidence archive: condensed white headings, angular surfaces, thin gunmetal framing and controlled crimson signals. Nine independent definitions:
 
@@ -18,7 +18,7 @@ Black architectural evidence archive: condensed white headings, angular surfaces
 
 Obsidian Protocol has much harder corners, stronger chrome and flatter surfaces than Naut's built-in Obsidian. Dual Identity keeps a separate Banner still and plays the prepared Banner on permitted hover without substituting Cover. Subject Dossier presents media before context; Delete stays in the app-owned footer. Signal Trace uses a grid, silver lines and a crimson sweep with bounded reduced and static fallbacks.
 
-Install from Settings ? Presentation ? Packs / Advanced, then choose Theme and Typography in Appearance, Home in Home Customize, and Profile/Frame/Backdrop/Effect in Profile Customize. Card is selected in Customize Card. Save independently.
+Install from Settings > Presentation > Packs / Advanced, then choose Theme and Typography in Appearance, Home in Home Customize, and Profile/Frame/Backdrop/Effect in Profile Customize. Card is selected in Customize Card. Save independently.
 
 [Download 2.0.0](https://secondshift-dv.github.io/naut/packs/black-dossier-2.0.0.ntpack). [Earlier 1.1.0 archive](https://secondshift-dv.github.io/naut/packs/black-dossier-1.1.0.ntpack).
 

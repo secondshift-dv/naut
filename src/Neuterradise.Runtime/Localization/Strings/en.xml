@@ -1920,7 +1920,9 @@
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.pollen.Name">Pollen</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.pollen.Description">Pollen visual effect.</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.bubbles.Name">Bubbles</sys:String>
+    <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.bubble-rise.Name">Bubbles</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.bubbles.Description">Bubbles visual effect.</sys:String>
+    <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.bubble-rise.Description">Bubbles visual effect.</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.meteors.Name">Meteors</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.meteors.Description">Meteors visual effect.</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.sparkles.Name">Sparkles</sys:String>
@@ -1937,8 +1939,6 @@
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.steam.Description">Steam visual effect.</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.cloud-veil.Name">Cloud Veil</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.cloud-veil.Description">Cloud Veil visual effect.</sys:String>
-    <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.aurora.Name">Aurora</sys:String>
-    <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.aurora.Description">Slow ribbons of light.</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.neon-pulse.Name">Neon Pulse</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.neon-pulse.Description">Neon Pulse visual effect.</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.silk.Name">Silk</sys:String>

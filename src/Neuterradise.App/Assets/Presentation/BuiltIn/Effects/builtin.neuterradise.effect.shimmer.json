@@ -13,20 +13,42 @@
         "layers": [
           {
             "kind": "light-sweep",
-            "opacity": 0.35,
+            "opacity": 0.59,
             "color": "#FFF9E8",
-            "width": 0.3,
-            "speed": 0.2,
-            "period": 18,
+            "width": 0.34,
+            "speed": 1.0,
+            "period": 7,
             "angle": 14
           }
         ]
       },
       "reduced": {
-        "layers": []
+        "layers": [
+          {
+            "kind": "radial-glow",
+            "opacity": 0.3,
+            "color": "#FFF9E8",
+            "centerX": 0.52,
+            "centerY": 0.4,
+            "radius": 0.35,
+            "amplitude": 0,
+            "speed": 0
+          }
+        ]
       },
       "fallback": {
-        "layers": []
+        "layers": [
+          {
+            "kind": "radial-glow",
+            "opacity": 0.3,
+            "color": "#FFF9E8",
+            "centerX": 0.52,
+            "centerY": 0.4,
+            "radius": 0.35,
+            "amplitude": 0,
+            "speed": 0
+          }
+        ]
       }
     }
   },
@@ -35,5 +57,6 @@
     "continuousAnimation": true,
     "offscreenPolicy": "pause",
     "maxAnimatedLayers": 1
-  }
+  },
+  "description": "A visible moving highlight across the banner."
 }

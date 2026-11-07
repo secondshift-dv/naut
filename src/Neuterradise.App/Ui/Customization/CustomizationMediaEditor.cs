@@ -260,10 +260,13 @@ public sealed partial class CustomizationCenter
     private FrameworkElement BannerEffectsEditor()
     {
         var row = UI.Wrap(6);
+        var selectedEffect = _session.Resolve(PresentationSlots.BannerEffect).Definition?.DefinitionId;
         foreach (var effect in new[] { "none", "film", "glitter", "shimmer" })
         {
             var value = effect;
-            row.Children.Add(UI.Button(UI.T("Banner.Effect." + effect, effect), () =>
+            var selected = selectedEffect == "builtin.neuterradise.effect." + value;
+            var label = UI.T("Banner.Effect." + effect, effect);
+            row.Children.Add(UI.Tab((selected ? "\u2713 " : string.Empty) + label, selected, () =>
                 _session.Select(PresentationSlots.BannerEffect, ScopeKind.Profile, DefinitionRef.BuiltIn("builtin.neuterradise.effect." + value))));
         }
         var intensity = new Slider { Minimum = 0, Maximum = 100, StepFrequency = 1,

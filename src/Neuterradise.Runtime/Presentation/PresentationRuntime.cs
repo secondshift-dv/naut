@@ -335,7 +335,7 @@ public sealed class PresentationRuntime
         if (slot == PresentationSlots.BannerEffect && typeof(T) == typeof(EffectPlan) && context.Profile is { } profile
             && ResolveCompiled(slot, context, bindings).Plan is EffectPlan banner)
         {
-            var intensity = Math.Clamp(profile.Overrides.BannerEffectIntensity, 0, 1);
+            var intensity = Math.Sqrt(Math.Clamp(profile.Overrides.BannerEffectIntensity, 0, 1));
             return (T)(object)(banner with { Environment = new BackdropPlan(banner.Environment.Variants.ToDictionary(
                 pair => pair.Key, pair => pair.Value with { Layers = intensity <= 0 ? [] : pair.Value.Layers.Select(layer => layer with { Opacity = layer.Opacity * intensity }).ToArray() })) });
         }

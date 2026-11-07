@@ -268,14 +268,14 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
     {
         var search = new AutoSuggestBox
         {
-            PlaceholderText = UI.T("Gallery.Search", "Search Profiles, categories or tags"),
+            PlaceholderText = UI.T("Import.SearchProfiles", "Search Profiles"),
             Text = _vm.SearchText,
             ItemsSource = _vm.Suggestions,
             TextMemberPath = nameof(GallerySearchSuggestion.Text),
         };
-        search.MinWidth = 180;
-        search.Width = 220;
-        search.MaxWidth = 280;
+        search.MinWidth = 0;
+        search.HorizontalAlignment = HorizontalAlignment.Stretch;
+        search.Tip(UI.T("Gallery.Search", "Search Profiles, categories or tags"));
         search.TextChanged += (sender, args) =>
         {
             if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput)
@@ -567,7 +567,7 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         }
         else
         {
-            if (_layout.Toolbar == "drawer") searchRow.Width = 180;
+            if (_layout.Toolbar == "drawer") searchRow.Width = 220;
             toolbar = UI.Wrap(8, titleRow, searchRow, sort, favorites, moreFilters, clear);
         }
         UpdateActiveFilters();

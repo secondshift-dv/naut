@@ -1,0 +1,46 @@
+{
+  "id": "builtin.neuterradise.effect.bubble-rise",
+  "kind": "effect",
+  "name": "Bubbles",
+  "performance": {
+    "tier": "light",
+    "continuousAnimation": true,
+    "offscreenPolicy": "pause",
+    "maxAnimatedLayers": 1
+  },
+  "spec": {
+    "targets": [
+      "effect.home",
+      "effect.profile"
+    ],
+    "channel": "particles",
+    "interactionOnly": false,
+    "variants": {
+      "full": {
+        "layers": [
+          {
+            "kind": "particles",
+            "opacity": 0.58,
+            "color": "token:accentSecondary",
+            "count": 24,
+            "sizeMin": 3,
+            "sizeMax": 8,
+            "speed": 0.45,
+            "direction": "up",
+            "particleShape": "ring",
+            "drift": 0.025,
+            "twinkle": 0.04,
+            "spawnRegion": "all"
+          }
+        ]
+      },
+      "reduced": {
+        "layers": []
+      },
+      "fallback": {
+        "layers": []
+      }
+    }
+  },
+  "description": "Light floating outline bubbles."
+}

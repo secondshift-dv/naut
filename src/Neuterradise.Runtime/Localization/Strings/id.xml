@@ -1920,7 +1920,9 @@
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.pollen.Name">Serbuk Sari</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.pollen.Description">Efek visual Serbuk Sari.</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.bubbles.Name">Gelembung</sys:String>
+    <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.bubble-rise.Name">Gelembung</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.bubbles.Description">Efek visual Gelembung.</sys:String>
+    <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.bubble-rise.Description">Efek visual Gelembung.</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.meteors.Name">Meteors</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.meteors.Description">Efek visual Meteors.</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.sparkles.Name">Kilau</sys:String>
@@ -1937,8 +1939,6 @@
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.steam.Description">Efek visual Uap.</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.cloud-veil.Name">Selubung Awan</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.cloud-veil.Description">Efek visual Selubung Awan.</sys:String>
-    <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.aurora.Name">Aurora</sys:String>
-    <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.aurora.Description">Pita cahaya yang bergerak perlahan.</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.neon-pulse.Name">Denyut Neon</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.neon-pulse.Description">Efek visual Denyut Neon.</sys:String>
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.silk.Name">Sutra</sys:String>

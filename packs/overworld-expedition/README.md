@@ -1,4 +1,4 @@
-# Voxel Playground ? source 2.0.0
+# Voxel Playground - source 2.0.0
 
 An original voxel sandbox inspired by Minecraft/Roblox-style creative worlds and builders, but not using their artwork, trademarks, source files or characters. The collection emphasizes grassy/sky surfaces, square blocks, tactile stud-like controls, pixel headings and one friendly animal ornament.
 
@@ -27,6 +27,6 @@ The destructive Delete action remains app-owned and below all sections.
 
 **Removed from 1.1.0:** Trophy Shelves, Forest Hideaway, Golden Dust, Moss Bunny and Bee Meadow. These relied on duplicate virtualized grids, static-image shells, particle recipes or square frame mechanisms. Deleted selection IDs use Naut's built-in fallback. Other technical IDs remain stable.
 
-Install via Settings ? Presentation ? Packs / Advanced. Theme, Typography and Controls are selected in Settings ? Appearance. Choose Home and Profile components in their Customize panels, and the Card through Customize Card. Save each choice independently.
+Install via Settings > Presentation > Packs / Advanced. Theme, Typography and Controls are selected in Settings > Appearance. Choose Home and Profile components in their Customize panels, and the Card through Customize Card. Save each choice independently.
 
 [Download 2.0.0](https://secondshift-dv.github.io/naut/packs/overworld-expedition-2.0.0.ntpack). [Earlier 1.1.0 archive](https://secondshift-dv.github.io/naut/packs/overworld-expedition-1.1.0.ntpack). Content is CC BY 4.0; bundled fonts remain SIL OFL. See [PROVENANCE.txt](PROVENANCE.txt).

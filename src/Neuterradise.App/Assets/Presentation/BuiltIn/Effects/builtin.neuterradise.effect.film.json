@@ -13,17 +13,43 @@
         "layers": [
           {
             "kind": "noise",
-            "opacity": 0.24,
-            "speed": 0.3,
-            "amplitude": 0.01
+            "opacity": 0.38,
+            "speed": 0.6,
+            "amplitude": 0.12
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.18
           }
         ]
       },
       "reduced": {
-        "layers": []
+        "layers": [
+          {
+            "kind": "noise",
+            "opacity": 0.32,
+            "speed": 0,
+            "amplitude": 0
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.12
+          }
+        ]
       },
       "fallback": {
-        "layers": []
+        "layers": [
+          {
+            "kind": "noise",
+            "opacity": 0.32,
+            "speed": 0,
+            "amplitude": 0
+          },
+          {
+            "kind": "vignette",
+            "opacity": 0.12
+          }
+        ]
       }
     }
   },
@@ -31,6 +57,7 @@
     "tier": "light",
     "continuousAnimation": true,
     "offscreenPolicy": "pause",
-    "maxAnimatedLayers": 1
-  }
+    "maxAnimatedLayers": 2
+  },
+  "description": "Visible film grain and soft edge shade over the banner."
 }
