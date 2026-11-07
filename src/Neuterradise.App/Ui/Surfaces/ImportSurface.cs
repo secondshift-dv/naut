@@ -418,6 +418,7 @@ public sealed class ImportSurface : Surface
 
         private readonly ProgressBar _bar;
         private readonly Grid _activityClip;
+        private readonly RectangleGeometry _activityGeometry = new();
         private readonly Border _sweep;
         private readonly CompositeTransform _sweepTransform = new() { SkewX = -24 };
         private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(75) };
@@ -461,6 +462,7 @@ public sealed class ImportSurface : Surface
                 VerticalAlignment = VerticalAlignment.Center,
                 IsHitTestVisible = false,
             };
+            _activityClip.Clip = _activityGeometry;
             _activityClip.Children.Add(_sweep);
 
             Children.Add(_bar);
@@ -476,6 +478,7 @@ public sealed class ImportSurface : Surface
 
         public void SetSurfaceActive(bool active)
         {
+            if (_surfaceActive == active) return;
             _surfaceActive = active;
             UpdateAnimation();
         }
@@ -500,11 +503,9 @@ public sealed class ImportSurface : Surface
         private void UpdateClip()
         {
             var width = Math.Max(0, ActualWidth * _value);
+            if (_activityClip.Width == width) return;
             _activityClip.Width = width;
-            _activityClip.Clip = new RectangleGeometry
-            {
-                Rect = new Windows.Foundation.Rect(0, 0, width, BarHeight),
-            };
+            _activityGeometry.Rect = new Windows.Foundation.Rect(0, 0, width, BarHeight);
             _activityClip.Visibility = width > 1 ? Visibility.Visible : Visibility.Collapsed;
             if (_phase > width + SweepWidth)
             {

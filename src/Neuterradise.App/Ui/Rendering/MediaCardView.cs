@@ -264,7 +264,13 @@ public sealed class MediaCardView : Grid, IDisposable
         Unbind();
         _card = card;
         DataContext = card;
-        _observer = (_, _) => UiDispatch.Run(UpdateVisual);
+        _observer = (_, args) =>
+        {
+            // The favorite operation emits three aliases; only IsFavorite changes this Card.
+            if (args.PropertyName is nameof(MediaGridCardViewModel.ShowFavoriteBadge)
+                or nameof(MediaGridCardViewModel.IsVideoAndFavorite)) return;
+            UiDispatch.Run(UpdateVisual);
+        };
         card.PropertyChanged += _observer;
         UpdateVisual();
     }
@@ -308,18 +314,18 @@ public sealed class MediaCardView : Grid, IDisposable
         UpdateMetadata(_belowText, card);
         UpdateMetadata(_sideText, card);
 
-        _badges.Children.Clear();
+        // Attention is immutable for a bound MediaGridItem; avoid rebuilding its badge
+        // on every selection, favorite or thumbnail notification.
+        if (card.HasAttention && _badges.Children.Count == 0)
+            _badges.Children.Add(UI.Badge("!", "warning"));
+        else if (!card.HasAttention && _badges.Children.Count != 0)
+            _badges.Children.Clear();
         _placeholder.Visibility = card.IsModel && card.ThumbnailSource is null && string.IsNullOrWhiteSpace(card.ThumbnailPath)
             ? Visibility.Visible : Visibility.Collapsed;
         _typeText.Text = MediaSurfaceText.Type(card.MediaType);
         _typeBadge.Visibility = _layout.ShowTypeBadge && !card.IsImage
             && _layout.MetadataPlacement is not (MediaMetadataPlacement.HoverOverlay or MediaMetadataPlacement.PersistentOverlay)
             ? Visibility.Visible : Visibility.Collapsed;
-
-        if (card.HasAttention)
-        {
-            _badges.Children.Add(UI.Badge("!", "warning"));
-        }
 
         if (_favorite.Content is IconView icon)
         {

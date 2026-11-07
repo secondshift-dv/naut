@@ -541,6 +541,7 @@ internal sealed class BackdropCanvas : SKCanvasElement
 
     private readonly BackdropView _owner;
     private readonly BackdropLayer[] _layers;
+    private readonly SKPaint[] _paints;
     private readonly Dictionary<BackdropLayer, SKImage?> _images = [];
     private readonly Dictionary<BackdropLayer, SKImage?> _blurred = [];
     private readonly Dictionary<BackdropLayer, Particle[]> _particles = [];
@@ -574,6 +575,7 @@ internal sealed class BackdropCanvas : SKCanvasElement
     {
         _owner = owner;
         _layers = layers;
+        _paints = [.. layers.Select(layer => new SKPaint { IsAntialias = true, BlendMode = Blend(layer.Blend) })];
         IsHitTestVisible = false;
         Prepare();
         foreach (var layer in layers.Where(l => l.Kind == "image" && l.AssetPath is not null))
@@ -697,6 +699,7 @@ internal sealed class BackdropCanvas : SKCanvasElement
         _images.Clear();
         foreach (var shader in _bokehShaders.Values) shader.Dispose();
         _bokehShaders.Clear();
+        foreach (var paint in _paints) paint.Dispose();
         _sparklePath?.Dispose();
         _sparklePath = null;
         _wavePath?.Dispose();
@@ -721,7 +724,16 @@ internal sealed class BackdropCanvas : SKCanvasElement
         {
             var layer = _layers[i];
             var colors = i < _colors.Length ? _colors[i] : default;
-            using var paint = new SKPaint { IsAntialias = true, BlendMode = Blend(layer.Blend) };
+            var paint = _paints[i];
+            paint.Shader = null;
+            paint.ColorFilter = null;
+            paint.ImageFilter = null;
+            paint.IsAntialias = true;
+            paint.Color = SKColors.White;
+            paint.Style = SKPaintStyle.Fill;
+            paint.StrokeCap = SKStrokeCap.Butt;
+            paint.StrokeWidth = 1;
+            paint.BlendMode = Blend(layer.Blend);
             var wave = Math.Sin(2 * Math.PI * t / Math.Max(2, layer.Period));
             var wave2 = Math.Cos(2 * Math.PI * t / Math.Max(2, layer.Period * 1.3));
             var depthX = (float)((px - 0.5) * layer.Depth * 60 * parallax);
@@ -739,8 +751,9 @@ internal sealed class BackdropCanvas : SKCanvasElement
                     var angle = (layer.Angle + (wave * layer.Amplitude * 90)) * Math.PI / 180;
                     var dx = (float)Math.Cos(angle) * Math.Max(w, h) / 2;
                     var dy = (float)Math.Sin(angle) * Math.Max(w, h) / 2;
-                    paint.Shader = SKShader.CreateLinearGradient(new SKPoint((w / 2) - dx, (h / 2) - dy), new SKPoint((w / 2) + dx, (h / 2) + dy),
+                    using var gradientShader = SKShader.CreateLinearGradient(new SKPoint((w / 2) - dx, (h / 2) - dy), new SKPoint((w / 2) + dx, (h / 2) + dy),
                         [.. stops.Select(c => c.WithAlpha((byte)(c.Alpha * layer.Opacity)))], colors.Offsets, SKShaderTileMode.Clamp);
+                    paint.Shader = gradientShader;
                     canvas.DrawRect(rect, paint);
                     break;
                 }
@@ -752,8 +765,9 @@ internal sealed class BackdropCanvas : SKCanvasElement
                     var cy = (float)(layer.CenterY + (wave2 * layer.Amplitude)) * h + depthY;
                     var pulse = layer.Amplitude > 0 ? 1 + (0.25 * wave * layer.Amplitude * 4) : 1;
                     var radius = (float)(layer.Radius * Math.Max(w, h));
-                    paint.Shader = SKShader.CreateRadialGradient(new SKPoint(cx, cy), radius,
+                    using var glowShader = SKShader.CreateRadialGradient(new SKPoint(cx, cy), radius,
                         [color.WithAlpha((byte)Math.Clamp(color.Alpha * layer.Opacity * pulse, 0, 255)), color.WithAlpha(0)], null, SKShaderTileMode.Clamp);
+                    paint.Shader = glowShader;
                     canvas.DrawRect(rect, paint);
                     break;
                 }
@@ -783,8 +797,10 @@ internal sealed class BackdropCanvas : SKCanvasElement
                     var color = colors.Color ?? SKColors.White;
                     var shift = (float)(t * layer.Speed * 12);
                     var matrix = SKMatrix.CreateScale((float)(layer.Scale * 6), (float)(layer.Scale * 6)).PostConcat(SKMatrix.CreateTranslation(shift + depthX, (shift * 0.3f) + depthY));
-                    paint.Shader = SKShader.CreateImage(texture, SKShaderTileMode.Repeat, SKShaderTileMode.Repeat, matrix);
-                    paint.ColorFilter = SKColorFilter.CreateBlendMode(color.WithAlpha((byte)(255 * layer.Opacity)), SKBlendMode.SrcIn);
+                    using var fogShader = SKShader.CreateImage(texture, SKShaderTileMode.Repeat, SKShaderTileMode.Repeat, matrix);
+                    using var fogTint = SKColorFilter.CreateBlendMode(color.WithAlpha((byte)(255 * layer.Opacity)), SKBlendMode.SrcIn);
+                    paint.Shader = fogShader;
+                    paint.ColorFilter = fogTint;
                     canvas.DrawRect(rect, paint);
                     break;
                 }
@@ -874,8 +890,9 @@ internal sealed class BackdropCanvas : SKCanvasElement
                 case "noise":
                 {
                     var phase = layer.Amplitude > 0 ? Math.Floor(t * layer.Speed * 8) : 0;
-                    paint.Shader = SKShader.CreateImage(NoiseTexture.Value, SKShaderTileMode.Repeat, SKShaderTileMode.Repeat,
+                    using var noiseShader = SKShader.CreateImage(NoiseTexture.Value, SKShaderTileMode.Repeat, SKShaderTileMode.Repeat,
                         SKMatrix.CreateTranslation((float)(phase * 17 % 96), (float)(phase * 31 % 96)));
+                    paint.Shader = noiseShader;
                     paint.Color = SKColors.White.WithAlpha((byte)(255 * layer.Opacity));
                     paint.BlendMode = SKBlendMode.Overlay;
                     canvas.DrawRect(rect, paint);
@@ -928,8 +945,9 @@ internal sealed class BackdropCanvas : SKCanvasElement
 
                 case "vignette":
                 {
-                    paint.Shader = SKShader.CreateRadialGradient(new SKPoint(w / 2, h / 2), Math.Max(w, h) * 0.75f,
+                    using var vignetteShader = SKShader.CreateRadialGradient(new SKPoint(w / 2, h / 2), Math.Max(w, h) * 0.75f,
                         [SKColors.Black.WithAlpha(0), SKColors.Black.WithAlpha((byte)(255 * layer.Opacity))], [0.45f, 1f], SKShaderTileMode.Clamp);
+                    paint.Shader = vignetteShader;
                     canvas.DrawRect(rect, paint);
                     break;
                 }
@@ -946,9 +964,10 @@ internal sealed class BackdropCanvas : SKCanvasElement
                     var span = Math.Max(w, h);
                     var ax = (float)Math.Cos(angle) * span;
                     var ay = (float)Math.Sin(angle) * span;
-                    paint.Shader = SKShader.CreateLinearGradient(new SKPoint(0, 0), new SKPoint(ax, ay),
+                    using var sweepShader = SKShader.CreateLinearGradient(new SKPoint(0, 0), new SKPoint(ax, ay),
                         [color.WithAlpha(0), color.WithAlpha((byte)(color.Alpha * layer.Opacity)), color.WithAlpha(0)],
                         [Math.Clamp(position - band, 0, 1), Math.Clamp(position, 0, 1), Math.Clamp(position + band, 0, 1)], SKShaderTileMode.Clamp);
+                    paint.Shader = sweepShader;
                     paint.BlendMode = SKBlendMode.Plus;
                     canvas.DrawRect(rect, paint);
                     break;
@@ -978,6 +997,9 @@ internal sealed class BackdropCanvas : SKCanvasElement
                     break;
                 }
             }
+            paint.Shader = null;
+            paint.ColorFilter = null;
+            paint.ImageFilter = null;
         }
     }
 
@@ -1002,7 +1024,8 @@ internal sealed class BackdropCanvas : SKCanvasElement
             var scale = 0.5f;
             var info = new SKImageInfo(Math.Max(1, (int)(source.Width * scale)), Math.Max(1, (int)(source.Height * scale)));
             using var surface = SKSurface.Create(info);
-            using var paint = new SKPaint { ImageFilter = SKImageFilter.CreateBlur((float)layer.Blur * scale, (float)layer.Blur * scale, SKShaderTileMode.Clamp) };
+            using var blurFilter = SKImageFilter.CreateBlur((float)layer.Blur * scale, (float)layer.Blur * scale, SKShaderTileMode.Clamp);
+            using var paint = new SKPaint { ImageFilter = blurFilter };
             surface.Canvas.DrawImage(source, new SKRect(0, 0, info.Width, info.Height), new SKSamplingOptions(SKFilterMode.Linear), paint);
             blurred = surface.Snapshot();
             _blurred[layer] = blurred;

@@ -186,7 +186,9 @@ public sealed class SkImageView : SKCanvasElement
         get => _transform;
         set
         {
-            _transform = value ?? MediaTransformState.Default;
+            var next = value ?? MediaTransformState.Default;
+            if (_transform == next) return;
+            _transform = next;
             Invalidate();
         }
     }
@@ -196,6 +198,7 @@ public sealed class SkImageView : SKCanvasElement
         get => _cornerRadius;
         set
         {
+            if (_cornerRadius == value) return;
             _cornerRadius = value;
             Invalidate();
         }
@@ -206,6 +209,7 @@ public sealed class SkImageView : SKCanvasElement
         get => _circle;
         set
         {
+            if (_circle == value) return;
             _circle = value;
             Invalidate();
         }
@@ -217,6 +221,7 @@ public sealed class SkImageView : SKCanvasElement
         get => _blur;
         set
         {
+            if (_blur == value) return;
             _blur = value;
             Invalidate();
         }
@@ -227,6 +232,7 @@ public sealed class SkImageView : SKCanvasElement
         get => _placeholderToken;
         set
         {
+            if (_placeholderToken == value) return;
             _placeholderToken = value;
             Invalidate();
         }
@@ -325,10 +331,10 @@ public sealed class SkImageView : SKCanvasElement
         var placement = _transform.Place(_image.Width, _image.Height, rect.Width, rect.Height);
         using (var paint = new SKPaint { IsAntialias = true })
         {
-            if (_blur > 0)
-            {
-                paint.ImageFilter = SKImageFilter.CreateBlur((float)_blur, (float)_blur);
-            }
+            using var blurFilter = _blur > 0
+                ? SKImageFilter.CreateBlur((float)_blur, (float)_blur)
+                : null;
+            paint.ImageFilter = blurFilter;
 
             canvas.Save();
             if (Math.Abs(placement.Rotation) > 0.01)
@@ -374,6 +380,7 @@ public sealed class CoverFrameView : SKCanvasElement
         get => _showPlaceholderPerson;
         set
         {
+            if (_showPlaceholderPerson == value) return;
             _showPlaceholderPerson = value;
             Invalidate();
         }
@@ -408,6 +415,7 @@ public sealed class CoverFrameView : SKCanvasElement
         get => _appearance;
         set
         {
+            if (Equals(_appearance, value)) return;
             _appearance = value;
             UpdateAnimation();
             Invalidate();
@@ -431,7 +439,9 @@ public sealed class CoverFrameView : SKCanvasElement
         get => _transform;
         set
         {
-            _transform = value ?? MediaTransformState.Default;
+            var next = value ?? MediaTransformState.Default;
+            if (_transform == next) return;
+            _transform = next;
             Invalidate();
         }
     }
@@ -457,6 +467,7 @@ public sealed class CoverFrameView : SKCanvasElement
         get => _frameMode;
         set
         {
+            if (_frameMode == value) return;
             _frameMode = value;
             UpdateAnimation();
             Invalidate();
@@ -468,6 +479,7 @@ public sealed class CoverFrameView : SKCanvasElement
         get => _hover;
         set
         {
+            if (_hover == value) return;
             _hover = value;
             UpdateAnimation();
             Invalidate();

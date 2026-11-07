@@ -1,4 +1,4 @@
-# Naut v0.0.12 System Requirements
+# Naut v0.0.13 System Requirements
 
 These requirements describe the current Windows x64 implementation and build target. Figure / interactive 3D is an optional workload tier; Naut is intended to remain usable without high-end discrete GPU hardware.
 
@@ -34,4 +34,10 @@ Normal Figure viewing uses textures up to **2048 × 2048**; close zoom can refin
 
 ## Release assumptions
 
-Windows x64, the self-contained v0.0.12 package, and Direct3D 11 Figure rendering are implementation constraints. The 2-core CPU, 8/16 GB RAM, and 1280×720/1920×1080 tiers are conservative release-support boundaries; Naut v0.0.12 does not enforce explicit CPU-core, RAM, or display-resolution checks in code.
+Windows x64, the self-contained v0.0.13 package, and Direct3D 11 Figure rendering are implementation constraints. The 2-core CPU, 8/16 GB RAM, and 1280×720/1920×1080 tiers are conservative release-support boundaries; Naut v0.0.13 does not enforce explicit CPU-core, RAM, or display-resolution checks in code.
+
+## Performance evidence and limits
+
+The v0.0.13 implementation reduces presentation allocation pressure without changing source-detail geometry, prepared media quality, Vault integrity, or FFmpeg output cadence. A deterministic 640×360 in-process frame test (120 frames) measured a median 0.650 ms through the prior Skia BMP decode kernel versus 0.256 ms through direct BGRA row transfer with reusable bitmaps. These results **do not** mean the complete app is 2.5 times faster.
+
+An isolated empty-Vault startup/idle sample ran on Windows 11 with AMD Ryzen 3 5300U (4 cores, 8 threads), Radeon integrated graphics and approximately 10 GiB RAM. The app working set was approximately 322–325 MiB in both before/after samples; there is no established general RAM reduction. There is not yet equivalent controlled evidence for a 2-core system, 8 GiB RAM, every Direct3D driver, large Vaults, high-resolution concurrent video/3D, or full Import under presentation pressure. These tiers are guidance, not a verified responsiveness promise. The application install root was approximately 0.63 GiB on the tested build, and update staging/rollback plus copied media require additional free space.

@@ -36,6 +36,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
     private CancellationTokenSource? _decodeCancellation;
     private Process? _process;
     private SKBitmap? _frame;
+    private readonly SKPaint _renderPaint = new() { IsAntialias = true };
     private string? _sourcePath;
     private MediaTransformState _presentation = MediaTransformState.Default;
     private bool _loop;
@@ -332,12 +333,14 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
         var errorDrain = process.StandardError.ReadToEndAsync();
         var playbackClock = new Stopwatch();
         long frameIndex = 0;
+        SKBitmap? spare = null;
         try
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                var bitmap = await ReadBmpFrameAsync(process.StandardOutput.BaseStream, cancellationToken)
+                var bitmap = await ReadBmpFrameAsync(process.StandardOutput.BaseStream, cancellationToken, spare)
                     .ConfigureAwait(false);
+                spare = null;
                 if (bitmap is null)
                 {
                     break;
@@ -376,7 +379,9 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
                             _frame = bitmap;
                             accepted = true;
                             Invalidate();
-                            previous?.Dispose();
+                            // The previous frame is no longer render-owned; recycle its native
+                            // pixel allocation in the next decode instead of allocating each frame.
+                            spare = previous;
                             if (previous is null)
                             {
                                 FrameReady?.Invoke();
@@ -417,6 +422,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
         }
         finally
         {
+            spare?.Dispose();
             lock (_processLock)
             {
                 if (ReferenceEquals(_process, process))
@@ -475,6 +481,10 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
             startInfo.ArgumentList.Add("-frames:v");
             startInfo.ArgumentList.Add("1");
         }
+        // Opaque BGRA frames permit a bounded row copy instead of decoding a BMP into
+        // a second pixel buffer on every video frame.
+        startInfo.ArgumentList.Add("-pix_fmt");
+        startInfo.ArgumentList.Add("bgra");
         startInfo.ArgumentList.Add("-f");
         startInfo.ArgumentList.Add("image2pipe");
         startInfo.ArgumentList.Add("-vcodec");
@@ -483,11 +493,12 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
         return startInfo;
     }
 
-    private static async Task<SKBitmap?> ReadBmpFrameAsync(Stream stream, CancellationToken cancellationToken)
+    private static async Task<SKBitmap?> ReadBmpFrameAsync(Stream stream, CancellationToken cancellationToken, SKBitmap? reusable)
     {
         var header = new byte[54];
         if (!await ReadExactlyOrEofAsync(stream, header, cancellationToken).ConfigureAwait(false))
         {
+            reusable?.Dispose();
             return null;
         }
 
@@ -523,6 +534,36 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
                     cancellationToken)
                 .ConfigureAwait(false);
 
+            // FFmpeg's BGRA BMP is bottom-up and tightly packed. Validate its
+            // uncompressed header before copying rows directly into Skia's pixel buffer.
+            // Keep the existing decoder for supported non-BGRA BMPs used by fixtures.
+            var compression = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(30, 4));
+            if (bits == 32 && pixelOffset == 54 && compression == 0 && rawHeight > 0)
+            {
+                var info = new SKImageInfo(width, checked((int)height), SKColorType.Bgra8888, SKAlphaType.Opaque);
+                var bitmap = reusable is not null && reusable.Info == info
+                    ? reusable
+                    : new SKBitmap(info);
+                if (!ReferenceEquals(bitmap, reusable)) reusable?.Dispose();
+                try
+                {
+                    var pixels = bitmap.GetPixelSpan();
+                    var rowBytes = checked(width * 4);
+                    for (var row = 0; row < info.Height; row++)
+                    {
+                        buffer.AsSpan(pixelOffset + (info.Height - row - 1) * rowBytes, rowBytes)
+                            .CopyTo(pixels.Slice(row * bitmap.RowBytes, rowBytes));
+                    }
+                    return bitmap;
+                }
+                catch
+                {
+                    bitmap.Dispose();
+                    throw;
+                }
+            }
+
+            reusable?.Dispose();
             using var encoded = new MemoryStream(buffer, 0, frameLength, writable: false, publiclyVisible: true);
             return SKBitmap.Decode(encoded)
                 ?? throw new InvalidDataException("FFmpeg returned a BMP frame that Skia could not decode.");
@@ -649,8 +690,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
 
         canvas.Save();
         canvas.ClipRect(new SKRect(0, 0, (float)area.Width, (float)area.Height));
-        using var paint = new SKPaint { IsAntialias = true };
-        canvas.DrawBitmap(_frame, destination, paint);
+        canvas.DrawBitmap(_frame, destination, _renderPaint);
         canvas.Restore();
     }
 
@@ -666,5 +706,6 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
         _active = false;
         _sourcePath = null;
         StopDecoder(clearFrame: true);
+        _renderPaint.Dispose();
     }
 }
