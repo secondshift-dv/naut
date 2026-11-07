@@ -1,19 +1,13 @@
 {
   "schemaVersion": 1,
   "packId": "naut.overworld-expedition",
-  "version": "1.1.0",
-  "name": "Overworld Expedition",
+  "version": "2.0.0",
+  "name": "Voxel Playground",
   "author": "Anas / Second Shift",
-  "description": "A calm voxel expedition: collection shelves, cozy landscapes and cute portrait companions.",
+  "description": "An original playful voxel sandbox: creative worlds, grassland and workshop scenery, square controls, collectible block-companions and sparse pixel particles. Inspired by block-building game aesthetics without game assets or logos.",
   "license": "CC-BY-4.0 (original definitions/artwork); SIL-OFL-1.1 (fonts)",
   "minContractVersion": 1,
   "assets": [
-    {
-      "kind": "Image",
-      "bytes": 2415603,
-      "path": "assets/backdrop-forest.png",
-      "id": "backdrop-forest"
-    },
     {
       "kind": "Image",
       "bytes": 2128771,
@@ -25,18 +19,6 @@
       "bytes": 1885309,
       "path": "assets/backdrop-workshop.png",
       "id": "backdrop-workshop"
-    },
-    {
-      "kind": "Image",
-      "bytes": 1236424,
-      "path": "assets/frame-bee.png",
-      "id": "frame-bee"
-    },
-    {
-      "kind": "Image",
-      "bytes": 1395926,
-      "path": "assets/frame-bunny.png",
-      "id": "frame-bunny"
     },
     {
       "kind": "Image",
@@ -73,46 +55,46 @@
     {
       "id": "naut.overworld-expedition.theme-field-notes",
       "kind": "theme",
-      "name": "Field Notes",
-      "description": "Cream canvas, contrasting pale moss surfaces, timber borders and clear semantic colors.",
+      "name": "Builder's Daylight",
+      "description": "Bright sky-and-grass palette with squared blocks, strong edges and playful sandbox contrast.",
       "previewAccent": "#FF476338",
       "spec": {
         "theme": {
           "schemaVersion": 1,
           "id": "overworld-field-notes",
-          "name": "Field Notes",
+          "name": "Builder's Daylight",
           "isDark": false,
           "colors": {
-            "surfaceOverlay": "#F2F4EBD8",
-            "surfaceElevated": "#FFF9F1E2",
+            "surfaceOverlay": "#F2EAF6FF",
+            "surfaceElevated": "#FFFDFCF2",
             "warning": "#FF805812",
-            "surfaceSelected": "#FFDCC98F",
-            "accent": "#FF476338",
-            "borderSelected": "#FF805812",
-            "surface2": "#FFE6DBC3",
-            "surface3": "#FFD8C9A9",
+            "surfaceSelected": "#FFBDE3BF",
+            "accent": "#FF287B4C",
+            "borderSelected": "#FF287B4C",
+            "surface2": "#FFE3EFD6",
+            "surface3": "#FFCBDEBE",
             "success": "#FF315D29",
-            "surfaceHover": "#FFF2E6CD",
-            "surfacePressed": "#FFD7C7A6",
-            "textPrimary": "#FF282D20",
-            "focus": "#FF805812",
-            "accentSecondary": "#FF805812",
-            "selectionHover": "#FFE6D7AA",
+            "surfaceHover": "#FFD4EAC6",
+            "surfacePressed": "#FFBED9AD",
+            "textPrimary": "#FF223C30",
+            "focus": "#FF245F9C",
+            "accentSecondary": "#FF327FB8",
+            "selectionHover": "#FFCDE8CE",
             "info": "#FF255B72",
             "dangerHover": "#FF7B2423",
             "borderSubtle": "#FFB7B99C",
-            "canvas": "#FFF4EBD8",
-            "selection": "#FFDCC98F",
-            "surface1": "#FFCED8BB",
-            "borderDefault": "#FF8A896D",
-            "textSecondary": "#FF424937",
-            "borderStrong": "#FF66634B",
+            "canvas": "#FFEAF6FF",
+            "selection": "#FFBDE3BF",
+            "surface1": "#FFF7FAEB",
+            "borderDefault": "#FF739479",
+            "textSecondary": "#FF3A5746",
+            "borderStrong": "#FF416B4B",
             "danger": "#FF9B3430",
-            "accentPressed": "#FF2C4621",
-            "borderInteractive": "#FF476338",
-            "textLink": "#FF315B2B",
-            "textMuted": "#FF59604E",
-            "accentHover": "#FF3C592D",
+            "accentPressed": "#FF175134",
+            "borderInteractive": "#FF287B4C",
+            "textLink": "#FF24699A",
+            "textMuted": "#FF526D5A",
+            "accentHover": "#FF1C6940",
             "textOnAccent": "#FFFFF9EA",
             "textInverse": "#FFF9F4E8",
             "textDisabled": "#FF7B7F6D"
@@ -143,27 +125,29 @@
             "motionIntensity": 0.35,
             "focusTreatment": "Ring",
             "glowStrength": 0,
-            "borderWeight": 1.5,
+            "borderWeight": 1.6,
             "elevationStrength": 0.15,
             "cardPersonality": "Framed",
             "chromeTreatment": "Elevated",
             "panelOpacity": 1,
-            "navigationRadiusScale": 0.2,
+            "navigationRadiusScale": 0.16,
             "navigationTreatment": "StrongBorder"
           }
         },
         "artwork": "theme-field-notes",
         "material": {
           "personality": "milky-paper",
-          "atmosphere": "editorial"
+          "atmosphere": "daylight",
+          "glassOpacity": 1,
+          "specular": 0.06
         }
       }
     },
     {
       "id": "naut.overworld-expedition.font-trail-journal",
       "kind": "typography",
-      "name": "Trail Journal",
-      "description": "Pixel display titles with readable Inter headings and body text.",
+      "name": "Pixel Headings",
+      "description": "Silkscreen display titles; Inter for all longer and interactive text.",
       "previewAccent": "#FF476338",
       "spec": {
         "mono": {
@@ -187,28 +171,86 @@
     {
       "id": "naut.overworld-expedition.controls-blockcraft",
       "kind": "control-skin",
-      "name": "Blockcraft Controls",
-      "description": "Compact square controls with distinct hover, press and keyboard focus.",
+      "name": "Studwork Controls",
+      "description": "Beveled block buttons, inset text fields, square chips and tactile slider pieces.",
       "previewAccent": "#FF476338",
       "spec": {
-        "height": 30,
-        "radius": 2,
+        "height": 33,
+        "radius": 1,
         "pressedFill": "token:surfacePressed",
         "fill": "token:surface2",
-        "scrollbarWidth": 7,
+        "scrollbarWidth": 9,
         "verticalPadding": 4,
         "hoverFill": "token:surfaceHover",
-        "borderWidth": 1,
+        "borderWidth": 2,
         "horizontalPadding": 10,
         "border": "token:borderDefault",
-        "focus": "token:focus"
+        "focus": "token:focus",
+        "material": "bevel",
+        "edge": "all",
+        "relief": 0.32,
+        "families": {
+          "button": {
+            "radius": 1,
+            "height": 35,
+            "borderWidth": 2,
+            "material": "bevel",
+            "relief": 0.37
+          },
+          "icon-button": {
+            "radius": 1,
+            "height": 33,
+            "borderWidth": 2,
+            "material": "bevel",
+            "relief": 0.33
+          },
+          "chip": {
+            "radius": 1,
+            "height": 27,
+            "borderWidth": 1.5,
+            "material": "inset",
+            "relief": 0.24
+          },
+          "tab": {
+            "radius": 1,
+            "height": 30,
+            "borderWidth": 2,
+            "edge": "bottom",
+            "material": "bevel",
+            "relief": 0.27
+          },
+          "input": {
+            "radius": 1,
+            "height": 33,
+            "material": "inset",
+            "relief": 0.28
+          },
+          "toggle": {
+            "radius": 1,
+            "material": "bevel",
+            "relief": 0.3
+          },
+          "slider": {
+            "radius": 1,
+            "material": "bevel",
+            "relief": 0.31,
+            "thumbWidth": 24,
+            "thumbHeight": 24
+          },
+          "scrollbar": {
+            "radius": 1,
+            "material": "bevel",
+            "relief": 0.2,
+            "scrollbarWidth": 10
+          }
+        }
       }
     },
     {
       "id": "naut.overworld-expedition.home-base-camp",
       "kind": "home-layout",
-      "name": "Base Camp",
-      "description": "Still split hero, full-width recent finds, compact camp statistics and activity.",
+      "name": "Creative Hub",
+      "description": "Feature a world and its recent builds above the session record and activity counters.",
       "previewAccent": "#FF476338",
       "spec": {
         "hero": {
@@ -286,8 +328,8 @@
     {
       "id": "naut.overworld-expedition.spotlight-trailhead",
       "kind": "spotlight-style",
-      "name": "Trailhead Spotlight",
-      "description": "Still artwork, framed portrait and concise identity without an overview.",
+      "name": "World Portal",
+      "description": "A quiet split portal for one featured world, separate from the Dashboard spotlight composition.",
       "previewAccent": "#FF476338",
       "spec": {
         "showCover": true,
@@ -295,38 +337,18 @@
         "scrimStrength": 0.7,
         "motion": "still",
         "pagination": "counter",
-        "transition": "fade",
-        "rotationSeconds": 30,
+        "rotationSeconds": 24,
         "composition": "split-glass"
-      }
-    },
-    {
-      "id": "naut.overworld-expedition.gallery-trophy-shelves",
-      "kind": "gallery-layout",
-      "name": "Trophy Shelves",
-      "description": "A regular compact wall of collection cards with even spacing.",
-      "previewAccent": "#FF476338",
-      "spec": {
-        "itemMaxWidth": 240,
-        "maxColumns": 8,
-        "itemMinWidth": 200,
-        "spacing": 10,
-        "toolbar": "catalog",
-        "rowHeight": 300,
-        "primitive": "VirtualizedUniformGrid"
       }
     },
     {
       "id": "naut.overworld-expedition.card-keepsake",
       "kind": "profile-card",
-      "name": "Keepsake Card",
-      "description": "Framed portrait over a quiet banner; video banner plays on hover, with readable identity below.",
+      "name": "World Keepsake",
+      "description": "A collectible voxel-world token: framed identity above a softly animated Banner on hover.",
       "previewAccent": "#FF476338",
       "spec": {
-        "legacyVariant": "prestige",
         "aspect": 0.7,
-        "art": "cover-over-banner",
-        "density": "detailed",
         "hover": "banner",
         "frame": "full",
         "composition": {
@@ -399,11 +421,10 @@
     {
       "id": "naut.overworld-expedition.profile-collection-lodge",
       "kind": "profile-layout",
-      "name": "Collection Lodge",
-      "description": "Identity, optional Recent Media and the full-width collection wall before context; Delete remains last.",
+      "name": "Builder's Workshop",
+      "description": "Split world Banner and builder identity on wide screens, with contained Banner on narrow screens, recent builds and media before context.",
       "previewAccent": "#FF476338",
       "spec": {
-        "preset": "compact-hero",
         "surface": {
           "spacing": 12,
           "children": [
@@ -451,14 +472,62 @@
             }
           ],
           "type": "stack"
+        },
+        "layout": {
+          "schemaVersion": 1,
+          "id": "voxel-workshop",
+          "name": "Builder's Workshop",
+          "bannerMode": "Split",
+          "height": "Medium",
+          "coverPlacement": "InlineLeft",
+          "coverSize": "Medium",
+          "coverDetailLevel": "Full",
+          "identityAlignment": "Left",
+          "contentWidth": "Wide",
+          "overlay": "Medium",
+          "blur": "Off",
+          "fade": "Bottom",
+          "sectionDensity": "Compact",
+          "modules": [
+            {
+              "id": "overview",
+              "order": 0,
+              "visible": true,
+              "width": "Full"
+            },
+            {
+              "id": "related",
+              "order": 1,
+              "visible": true,
+              "width": "Full"
+            },
+            {
+              "id": "faces",
+              "order": 2,
+              "visible": true,
+              "width": "Full"
+            },
+            {
+              "id": "recentMedia",
+              "order": 3,
+              "visible": true,
+              "width": "Full"
+            },
+            {
+              "id": "media",
+              "order": 4,
+              "visible": true,
+              "width": "Full"
+            }
+          ]
         }
       }
     },
     {
       "id": "naut.overworld-expedition.media-display-crates",
       "kind": "profile-media-layout",
-      "name": "Display Crates",
-      "description": "Square framed media tiles with names and useful metadata below.",
+      "name": "Build Tiles",
+      "description": "Square media tiles with double block borders and metadata labels beneath.",
       "previewAccent": "#FF476338",
       "spec": {
         "metadataPlacement": "below",
@@ -488,8 +557,8 @@
     {
       "id": "naut.overworld-expedition.backdrop-meadow",
       "kind": "backdrop",
-      "name": "Meadow Morning",
-      "description": "Original static voxel artwork with a restrained cream scrim and a quiet central area.",
+      "name": "Grassland Day",
+      "description": "Open voxel grassland for the Home creative hub, keeping UI content readable.",
       "previewAccent": "#FF476338",
       "spec": {
         "variants": {
@@ -542,63 +611,10 @@
       ]
     },
     {
-      "id": "naut.overworld-expedition.backdrop-forest",
-      "kind": "backdrop",
-      "name": "Forest Hideaway",
-      "description": "Original static voxel artwork with a restrained cream scrim and a quiet central area.",
-      "previewAccent": "#FF476338",
-      "spec": {
-        "variants": {
-          "fallback": {
-            "layers": [
-              {
-                "opacity": 1,
-                "kind": "image",
-                "asset": "backdrop-forest"
-              },
-              {
-                "opacity": 0.22,
-                "kind": "scrim",
-                "color": "#FFF4EBD8"
-              }
-            ]
-          },
-          "reduced": {
-            "layers": [
-              {
-                "opacity": 1,
-                "kind": "image",
-                "asset": "backdrop-forest"
-              },
-              {
-                "opacity": 0.22,
-                "kind": "scrim",
-                "color": "#FFF4EBD8"
-              }
-            ]
-          },
-          "full": {
-            "layers": [
-              {
-                "opacity": 1,
-                "kind": "image",
-                "asset": "backdrop-forest"
-              },
-              {
-                "opacity": 0.22,
-                "kind": "scrim",
-                "color": "#FFF4EBD8"
-              }
-            ]
-          }
-        }
-      }
-    },
-    {
       "id": "naut.overworld-expedition.backdrop-workshop",
       "kind": "backdrop",
-      "name": "Cozy Workshop",
-      "description": "Original static voxel artwork with a restrained cream scrim and a quiet central area.",
+      "name": "Workshop Evening",
+      "description": "Warm block-built workshop for Profile context, with a quiet center.",
       "previewAccent": "#FF476338",
       "spec": {
         "variants": {
@@ -653,114 +669,57 @@
     {
       "id": "naut.overworld-expedition.effect-meadow-drift",
       "kind": "effect",
-      "name": "Meadow Drift",
-      "description": "Sparse slow particles; reduced motion has fewer particles and a static fallback.",
+      "name": "Pixel Dust",
+      "description": "Slow, square-edged pixel glints near the edges of Home or Profile; static fallback.",
       "previewAccent": "#FF476338",
       "spec": {
         "channel": "particles",
         "targets": [
-          "effect.home"
-        ],
-        "variants": {
-          "fallback": {
-            "layers": [
-              {
-                "opacity": 0.08,
-                "kind": "radial-glow",
-                "radius": 0.8,
-                "color": "#FF8E613A"
-              }
-            ]
-          },
-          "reduced": {
-            "layers": [
-              {
-                "particleShape": "petal",
-                "color": "#FF8E613A",
-                "count": 4,
-                "sizeMin": 2,
-                "sizeMax": 3,
-                "speed": 0.04,
-                "kind": "particles",
-                "opacity": 0.16,
-                "direction": "diagonal"
-              }
-            ]
-          },
-          "full": {
-            "layers": [
-              {
-                "particleShape": "petal",
-                "color": "#FF8E613A",
-                "count": 10,
-                "sizeMin": 2,
-                "sizeMax": 4,
-                "speed": 0.1,
-                "kind": "particles",
-                "opacity": 0.24,
-                "direction": "diagonal"
-              }
-            ]
-          }
-        },
-        "interactionOnly": false
-      },
-      "performance": {
-        "tier": "light",
-        "maxAnimatedLayers": 1,
-        "offscreenPolicy": "pause",
-        "continuousAnimation": true
-      }
-    },
-    {
-      "id": "naut.overworld-expedition.effect-golden-dust",
-      "kind": "effect",
-      "name": "Golden Dust",
-      "description": "Sparse slow particles; reduced motion has fewer particles and a static fallback.",
-      "previewAccent": "#FF476338",
-      "spec": {
-        "channel": "particles",
-        "targets": [
+          "effect.home",
           "effect.profile"
         ],
         "variants": {
-          "fallback": {
+          "full": {
             "layers": [
               {
-                "opacity": 0.08,
-                "kind": "radial-glow",
-                "radius": 0.8,
-                "color": "#FF996B20"
+                "kind": "particles",
+                "particleShape": "pixel",
+                "color": "token:accentSecondary",
+                "count": 14,
+                "sizeMin": 1.5,
+                "sizeMax": 3.5,
+                "speed": 0.14,
+                "opacity": 0.22,
+                "direction": "up",
+                "drift": 0.08,
+                "twinkle": 0.28,
+                "spawnRegion": "edges"
               }
             ]
           },
           "reduced": {
             "layers": [
               {
-                "particleShape": "dot",
-                "color": "#FF996B20",
-                "count": 4,
-                "sizeMin": 2,
-                "sizeMax": 3,
-                "speed": 0.04,
                 "kind": "particles",
-                "opacity": 0.16,
-                "direction": "diagonal"
+                "particleShape": "pixel",
+                "color": "token:accentSecondary",
+                "count": 5,
+                "sizeMin": 1.5,
+                "sizeMax": 3,
+                "speed": 0.05,
+                "opacity": 0.15,
+                "direction": "up",
+                "spawnRegion": "edges"
               }
             ]
           },
-          "full": {
+          "fallback": {
             "layers": [
               {
-                "particleShape": "dot",
-                "color": "#FF996B20",
-                "count": 10,
-                "sizeMin": 2,
-                "sizeMax": 4,
-                "speed": 0.08,
-                "kind": "particles",
-                "opacity": 0.24,
-                "direction": "diagonal"
+                "kind": "radial-glow",
+                "color": "token:accentSecondary",
+                "opacity": 0.09,
+                "radius": 0.8
               }
             ]
           }
@@ -772,32 +731,13 @@
         "maxAnimatedLayers": 1,
         "offscreenPolicy": "pause",
         "continuousAnimation": true
-      }
-    },
-    {
-      "id": "naut.overworld-expedition.frame-bunny",
-      "kind": "cover-frame",
-      "name": "Moss Bunny",
-      "description": "Original square voxel ornament with a transparent portrait opening.",
-      "previewAccent": "#FF476338",
-      "spec": {
-        "family": "Minimal",
-        "shapes": [
-          "Square"
-        ],
-        "overlayAsset": "frame-bunny",
-        "category": "Ornate",
-        "coverInset": 0.15,
-        "animated": false,
-        "tint": false,
-        "scale": 1
       }
     },
     {
       "id": "naut.overworld-expedition.frame-piglet",
       "kind": "cover-frame",
-      "name": "Piglet Patch",
-      "description": "Original square voxel ornament with a transparent portrait opening.",
+      "name": "Block Companion",
+      "description": "A single original square piglet ornament for the Cover, with a transparent aperture.",
       "previewAccent": "#FF476338",
       "spec": {
         "family": "Minimal",
@@ -807,25 +747,6 @@
         "overlayAsset": "frame-piglet",
         "category": "Ornate",
         "coverInset": 0.17,
-        "animated": false,
-        "tint": false,
-        "scale": 1
-      }
-    },
-    {
-      "id": "naut.overworld-expedition.frame-bee",
-      "kind": "cover-frame",
-      "name": "Bee Meadow",
-      "description": "Original square voxel ornament with a transparent portrait opening.",
-      "previewAccent": "#FF476338",
-      "spec": {
-        "family": "Minimal",
-        "shapes": [
-          "Square"
-        ],
-        "overlayAsset": "frame-bee",
-        "category": "Ornate",
-        "coverInset": 0.18,
         "animated": false,
         "tint": false,
         "scale": 1

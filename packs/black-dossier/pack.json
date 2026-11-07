@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "packId": "naut.black-dossier",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "name": "Black Dossier",
   "author": "Anas / Second Shift",
-  "description": "A black architectural collection: cinematic banners, framed Cover identities, condensed dossiers and restrained crimson motion. Requires Naut 0.0.6 or later.",
+  "description": "An independent black-architecture dossier set: restrained crimson, condensed evidence typography, banner-first identity, a gunmetal portrait seal and signal traces.",
   "license": "CC-BY-4.0 (original definitions/artwork); SIL-OFL-1.1 (fonts)",
   "minContractVersion": 1,
   "assets": [
@@ -133,14 +133,10 @@
           "atmosphere": "precision",
           "grain": 0.015,
           "glassOpacity": 0.9,
-          "glassBlur": 10,
           "specular": 0.35,
           "rimLight": 0.25,
           "ambientPrimary": "#FFB72739",
-          "ambientSecondary": "#FFD5D8DE",
-          "frameAffinity": [
-            "naut.black-dossier.frame"
-          ]
+          "ambientSecondary": "#FFD5D8DE"
         },
         "artwork": "theme-obsidian"
       }
@@ -264,29 +260,11 @@
       "spec": {
         "composition": "cinematic-left",
         "motion": "still",
-        "transition": "fade",
         "rotationSeconds": 30,
         "showCover": true,
         "showOverview": true,
         "pagination": "counter-rail",
         "scrimStrength": 0.78
-      }
-    },
-    {
-      "id": "naut.black-dossier.gallery",
-      "kind": "gallery-layout",
-      "name": "Dossier Wall",
-      "description": "Even virtualized cards with a separate widescreen Banner area and framed Cover identity.",
-      "previewAccent": "#FFB72739",
-      "spec": {
-        "primitive": "VirtualizedUniformGrid",
-        "itemMinWidth": 260,
-        "itemMaxWidth": 340,
-        "itemAspect": 1.0,
-        "spacing": 18,
-        "rowHeight": 280,
-        "maxColumns": 6,
-        "toolbar": "catalog"
       }
     },
     {
@@ -296,10 +274,7 @@
       "description": "Separate Banner still from its selected video; hover plays that Banner. Cover stays framed in the identity panel.",
       "previewAccent": "#FFB72739",
       "spec": {
-        "legacyVariant": "prestige",
         "aspect": 1.0,
-        "art": "cover-over-banner",
-        "density": "detailed",
         "hover": "banner",
         "frame": "full",
         "composition": {
@@ -472,37 +447,6 @@
             }
           ]
         }
-      }
-    },
-    {
-      "id": "naut.black-dossier.media",
-      "kind": "profile-media-layout",
-      "name": "Evidence Grid",
-      "description": "Wide media tiles with undistorted images, crisp selection frames and useful metadata below.",
-      "previewAccent": "#FFB72739",
-      "spec": {
-        "metadataPlacement": "below",
-        "frameStyle": "hairline",
-        "mediaWidthFraction": 1,
-        "cardWidth": 260,
-        "metadataLines": 2,
-        "layoutId": "editorial",
-        "frameRadius": 2,
-        "metadataFields": [
-          "name",
-          "dimensions",
-          "duration",
-          "favorite"
-        ],
-        "frameColor": "token:borderDefault",
-        "hoverStyle": "lift",
-        "frameGlow": 0,
-        "selectedFrameColor": "token:accent",
-        "showTypeBadge": true,
-        "browse": "wall",
-        "frameThickness": 1,
-        "aspect": 1.5,
-        "fit": "fit"
       }
     },
     {

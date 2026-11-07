@@ -1,45 +1,25 @@
-# Black Dossier 1.1.0
+# Black Dossier ? source 2.0.0
 
-Neutral black. Cinematic identity. Restrained crimson.
+Black architectural evidence archive: condensed white headings, angular surfaces, thin gunmetal framing and controlled crimson signals. Nine independent definitions:
 
-**Optimized for Naut 0.0.7** for selected Banner-video thumbnails and the card's explicit no-Cover-fallback image policy.
-
-![Asset composition preview](preview.png)
-
-The preview is an asset board, not a live app screenshot. Inspired by the discipline of cinematic briefing interfaces; all artwork and branding here are original.
-
-## Eleven independent components
-
-| Component | Selection |
-|---|---|
+| Category | Definition |
+| --- | --- |
 | Theme | Obsidian Protocol |
 | Typography | Dossier Type |
 | Home | Operations Desk |
 | Spotlight | Opening Brief |
-| Gallery | Dossier Wall |
-| Card | Dual Identity |
+| Profile Card | Dual Identity |
 | Profile | Subject Dossier |
-| Media grid | Evidence Grid |
 | Backdrop | Obsidian Atrium |
-| Cover frame | Gunmetal Seal |
+| Cover Frame | Gunmetal Seal |
 | Effect | Signal Trace |
 
-## Install and select
+**Removed:** Dossier Wall gallery and Evidence Grid media layout. Both reused existing virtualized grid/tile mechanisms without enough structural variation. Choose the built-in Gallery and Media alternatives instead. Surviving definition IDs are unchanged; removed user selections use the existing built-in fallback.
 
-Download the `.ntpack`, then open **Settings > Presentation > Packs / Advanced > Install from file**. Installation does not select components automatically. Select the theme and typography in Appearance; select each layout in its Customize screen and save changes. Select Obsidian Atrium for Home and/or Profile. Select Signal Trace independently for Home, Profile and Card. Imported components appear with the User label.
+Obsidian Protocol has much harder corners, stronger chrome and flatter surfaces than Naut's built-in Obsidian. Dual Identity keeps a separate Banner still and plays the prepared Banner on permitted hover without substituting Cover. Subject Dossier presents media before context; Delete stays in the app-owned footer. Signal Trace uses a grid, silver lines and a crimson sweep with bounded reduced and static fallbacks.
 
-Use **Square** Covers with Gunmetal Seal. Cover is the framed identity portrait. Banner is the separately selected prepared video. Dual Identity shows that video's canonical thumbnail at rest, plays the same Banner on permitted hover, then returns to its thumbnail. Missing Banner/thumbnail leaves the black Banner area empty; it never substitutes Cover. Hover remains subject to Naut's scrolling, playback and resource policies. No runtime media generation is added.
+Install from Settings ? Presentation ? Packs / Advanced, then choose Theme and Typography in Appearance, Home in Home Customize, and Profile/Frame/Backdrop/Effect in Profile Customize. Card is selected in Customize Card. Save independently.
 
-Subject Dossier keeps the full Banner. The native Figure remains beside identity on wide screens and stacks on narrow screens with its existing pedestal and controls. Media comes first; context, review and Delete follow, with Delete at the bottom. Recent media follows the profile's visibility toggle.
+[Download 2.0.0](https://secondshift-dv.github.io/naut/packs/black-dossier-2.0.0.ntpack). [Earlier 1.1.0 archive](https://secondshift-dv.github.io/naut/packs/black-dossier-1.1.0.ntpack).
 
-Signal Trace uses 24 silver traces and a crimson sweep in Full; Reduced uses 12 traces and a slower sweep. Static fallback retains the grid and crimson glow. Reduced Motion uses the static fallback. Offscreen/minimized effects pause. No effect can be seen until it is selected and saved for the desired surface.
-
-Original artwork and definitions: CC BY 4.0, Anas / Second Shift. Fonts retain OFL. See [provenance](PROVENANCE.txt) and [license](LICENSE.txt).
-
-## Changes in 1.1.0
-
-- The pack and Theme display names use Black Dossier (title case); stable technical ids are unchanged.
-- Obsidian Protocol has a small 320 x 180 artwork thumbnail in Settings > Appearance.
-- Operations Desk removes the redundant Favorites rail and balances statistics, recent Profiles and activity.
-- Subject Dossier places optional Recent Media below its media wall, above context and Delete.
-- Existing component selections can be updated by installing the new pack with Replace.
+Original artwork and definitions: CC BY 4.0; bundled fonts have separate SIL OFL notices. See [PROVENANCE.txt](PROVENANCE.txt) and [LICENSE.txt](LICENSE.txt).

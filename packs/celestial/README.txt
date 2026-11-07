@@ -1,34 +1,49 @@
-Neu Terradise · Celestial Collection
+Nightfall Murim ? source version 2.0.0
 
-INSTALL
-Settings > Presentation > Packs / Advanced > Install from archive
-Choose celestial-1.3.0.ntpack (or the matching .zip).
-If using Install from folder, select the folder containing pack.json.
+An original nighttime murim/jianghu collection influenced by the atmosphere
+of martial-arts manhwa: ink, moonlight, sect halls, phoenix seals and quiet
+blade-aura motion. No copyrighted manhwa characters or scenes are included.
 
-All components are independent. Installing does not change active selections.
-Themes and fonts: Settings > Appearance.
-Layouts, backdrops, frames, effects and control styles: the corresponding
-Presentation library or Home/Profile Customize. Save changes to apply.
-Frames use the 1254x1254 artwork stage and 0.16 Cover inset of Naut's
-built-in Imperial ornate frame. No renderer or global Cover size changes.
-Celestial Showcase uses a centered poster composition with no Overview. Home and Profile effect choices
-remain independent, including the Profile Card effect.
+Manifest display name: Nightfall Murim
+Legacy folder/slug: celestial
+Legacy pack ID: neuterradise.celestial
+These technical identifiers remain stable for installation compatibility.
 
-RECOMMENDED COMBINATIONS
-Celestial Violet / Violet Palace / Celestial Stardust / Astral Sovereign
-Celestial Violet / Moonlit Citadel / Celestial Stardust / Imperial Phoenix
-Moonlit Azure / Astral Glass / Celestial Stardust / Lunar Seraph
+INCLUDED DEFINITIONS (11)
+  Themes:          Violet Sect Night; Jade Moon Night
+  Home Layout:     Sect Hall
+  Spotlight:       Moonlit Duel
+  Profile Card:    Disciple Insignia
+  Profile Layout:  Disciple Chronicle
+  Media Layout:    Martial Scrolls
+  Backdrop:        Moonlit Sect Court
+  Effect:          Moonblade Resonance
+  Cover Frame:     Vermilion Phoenix Seal
+  Control Style:   Jade Seal Controls
 
-Shared composition: Observatory, Constellation Wall, Celestial Relic,
-Sanctuary, Moonlit Archive, Celestial Showcase spotlight. Font: Celestial Display or Celestial Modern.
-Use Astral Glass for a quieter background without illustrated scenery.
+Violet Sect Night favors dark plum and lantern-gold; Jade Moon Night uses
+navy and jade. Disciple Insignia uses lift hover: its portrait remains
+present rather than disappearing through an incomplete Spotlight reveal.
+Jade Seal Controls implement native family overrides for tactile inset
+inputs/tabs and beveled controls. Moonblade Resonance blends an engineered
+chi wave with a glint, using less movement or a static layer when required.
 
-This pack contains 19 independently selectable definitions, not presets
-that automatically change multiple bindings. Source art provenance and
-font licenses are included. No application code or media import is needed.
+REMOVED FROM 1.3.0
+Constellation Wall, Violet Palace, Astral Glass, Celestial Display,
+Celestial Modern, Astral Controls, Astral Sovereign, Lunar Seraph.
+These definitions used redundant virtualized grids, font combinations,
+control profiles, image backdrop shells or similar Cover frame geometry.
+Naut resolves removed selected definition IDs to its normal fallback.
 
-CHANGES IN 1.3.0
-Both Themes now use independent 320 x 180 artwork thumbnails in Appearance.
-Observatory removes the redundant Favorites rail.
-Sanctuary places optional Recent Media ahead of the media collection.
-Component ids remain stable, allowing an existing pack to be replaced.
+INSTALL AND SELECT
+Settings > Presentation > Packs / Advanced > Install from folder/file.
+Theme and Control Style: Settings > Appearance.
+Home Layout and Spotlight: Home Customize.
+Profile Layout, Media, Backdrop, Frame, Effect: Profile Customize.
+Profile Card (and Card Effect): Customize Card. Save each choice.
+The Presentation Library is a read-only catalogue, not a selector.
+
+Download 2.0.0 from:
+https://secondshift-dv.github.io/naut/packs/celestial-2.0.0.ntpack
+The earlier archive was celestial-1.3.0.ntpack.
+See PROVENANCE.txt and LICENSE.txt.

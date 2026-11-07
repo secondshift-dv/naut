@@ -1,19 +1,13 @@
 {
   "schemaVersion": 1,
   "packId": "neuterradise.celestial",
-  "version": "1.3.0",
-  "name": "Neu Terradise · Celestial Collection",
+  "version": "2.0.0",
+  "name": "Nightfall Murim",
   "author": "Anas",
-  "description": "Curated celestial atmosphere, collectible portraits and a compact archive composition.",
+  "description": "Nighttime murim / jianghu: moonlit sect halls, disciplined martial identity, jade and plum ink, a phoenix seal and restrained blade-aura motion. Original fantasy artwork; no licensed manhwa material.",
   "license": "CC-BY-4.0 (original definitions/artwork); SIL-OFL-1.1 (fonts)",
   "minContractVersion": 1,
   "assets": [
-    {
-      "id": "palace",
-      "kind": "Image",
-      "path": "assets/violet-palace.jpg",
-      "bytes": 1299161
-    },
     {
       "id": "citadel",
       "kind": "Image",
@@ -21,40 +15,10 @@
       "bytes": 766709
     },
     {
-      "id": "frame-astral-sovereign",
-      "kind": "Image",
-      "path": "assets/frame-astral-sovereign.png",
-      "bytes": 2049107
-    },
-    {
       "id": "frame-imperial-phoenix",
       "kind": "Image",
       "path": "assets/frame-imperial-phoenix.png",
       "bytes": 2423254
-    },
-    {
-      "id": "frame-lunar-seraph",
-      "kind": "Image",
-      "path": "assets/frame-lunar-seraph.png",
-      "bytes": 2387149
-    },
-    {
-      "id": "font-inter",
-      "kind": "Font",
-      "path": "assets/inter.ttf",
-      "bytes": 341396
-    },
-    {
-      "id": "font-display",
-      "kind": "Font",
-      "path": "assets/instrument-condensed.ttf",
-      "bytes": 111184
-    },
-    {
-      "id": "font-mono",
-      "kind": "Font",
-      "path": "assets/notosansmono.ttf",
-      "bytes": 405760
     },
     {
       "id": "theme-violet",
@@ -73,44 +37,44 @@
     {
       "id": "neuterradise.celestial.theme-violet",
       "kind": "theme",
-      "name": "Celestial Violet",
-      "description": "Luminous violet glass, pearl accents and softly curved surfaces.",
+      "name": "Violet Sect Night",
+      "description": "Ink-plum sect hall, lantern-gold moonlight and subdued jade accents; broad dark night hierarchy.",
       "previewAccent": "#FFA78BFA",
       "spec": {
         "theme": {
           "schemaVersion": 1,
           "id": "celestial-violet",
-          "name": "Celestial Violet",
+          "name": "Violet Sect Night",
           "isDark": true,
           "colors": {
-            "canvas": "#FF0C0918",
-            "surface1": "#FF171126",
-            "surface2": "#FF211A35",
-            "surface3": "#FF2A2142",
-            "surfaceElevated": "#FF211A35",
+            "canvas": "#FF110D18",
+            "surface1": "#FF1B1525",
+            "surface2": "#FF282034",
+            "surface3": "#FF342A42",
+            "surfaceElevated": "#FF30243B",
             "surfaceOverlay": "#F2171126",
-            "surfaceHover": "#FF2A2142",
-            "surfacePressed": "#FF211A35",
-            "surfaceSelected": "#FF2A2142",
-            "textPrimary": "#FFF5F1FC",
-            "textSecondary": "#FFD1C9DE",
-            "textMuted": "#FFA59CB6",
+            "surfaceHover": "#FF3C304A",
+            "surfacePressed": "#FF4A3750",
+            "surfaceSelected": "#FF483143",
+            "textPrimary": "#FFF6F0E7",
+            "textSecondary": "#FFD9CFC9",
+            "textMuted": "#FFB0A19F",
             "textDisabled": "#FF777080",
             "textInverse": "#FF0C0918",
-            "textOnAccent": "#FF0C0918",
-            "textLink": "#FFA78BFA",
+            "textOnAccent": "#FF221626",
+            "textLink": "#FFE3BC80",
             "borderSubtle": "#18A78BFA",
             "borderDefault": "#35A78BFA",
             "borderStrong": "#70A78BFA",
-            "borderInteractive": "#A0A78BFA",
-            "borderSelected": "#FFA78BFA",
-            "focus": "#FFA78BFA",
-            "accent": "#FFA78BFA",
-            "accentHover": "#FFC4AAFF",
-            "accentPressed": "#FF9070D8",
-            "accentSecondary": "#FFE2B8E8",
-            "selection": "#30A78BFA",
-            "selectionHover": "#48A78BFA",
+            "borderInteractive": "#B0E3BC80",
+            "borderSelected": "#FFE3BC80",
+            "focus": "#FFE3BC80",
+            "accent": "#FFE3BC80",
+            "accentHover": "#FFF3D29B",
+            "accentPressed": "#FFC8A06B",
+            "accentSecondary": "#FFAA9DC7",
+            "selection": "#42E3BC80",
+            "selectionHover": "#62E3BC80",
             "info": "#FF7DD3FC",
             "success": "#FF86EFAC",
             "warning": "#FFFCD34D",
@@ -140,28 +104,27 @@
             "kind": "RadialGlow"
           },
           "morphology": {
-            "navigationTreatment": "Glow",
-            "cardPersonality": "Glass",
+            "navigationTreatment": "AccentEdge",
+            "cardPersonality": "Framed",
             "chromeTreatment": "Accented",
             "focusTreatment": "Ring",
-            "borderWeight": 0.8,
+            "borderWeight": 1.1,
             "elevationStrength": 0.55,
-            "glowStrength": 0.16,
-            "panelOpacity": 0.88,
-            "motionIntensity": 0.8,
+            "glowStrength": 0.06,
+            "panelOpacity": 0.97,
+            "motionIntensity": 0.38,
             "navigationRadiusScale": 0.65
           }
         },
         "material": {
-          "personality": "energy-glass",
-          "atmosphere": "electric",
-          "grain": 0.008,
-          "glassOpacity": 0.94,
-          "glassBlur": 16,
-          "specular": 0.22,
+          "personality": "ink-glass",
+          "atmosphere": "ink",
+          "grain": 0.018,
+          "glassOpacity": 0.98,
+          "specular": 0.12,
           "rimLight": 0.28,
-          "ambientPrimary": "#FFA78BFA",
-          "ambientSecondary": "#FF60A5FA"
+          "ambientPrimary": "#FFE3BC80",
+          "ambientSecondary": "#FFAA9DC7"
         },
         "artwork": "theme-violet"
       }
@@ -169,44 +132,44 @@
     {
       "id": "neuterradise.celestial.theme-azure",
       "kind": "theme",
-      "name": "Moonlit Azure",
-      "description": "Crystalline blue, silver rules and quiet framed surfaces.",
+      "name": "Jade Moon Night",
+      "description": "Midnight blue, moon-silver type and jade-focus states for a quiet martial-arts archive.",
       "previewAccent": "#FF7DD3FC",
       "spec": {
         "theme": {
           "schemaVersion": 1,
           "id": "celestial-azure",
-          "name": "Moonlit Azure",
+          "name": "Jade Moon Night",
           "isDark": true,
           "colors": {
-            "canvas": "#FF080F1C",
-            "surface1": "#FF111D2D",
-            "surface2": "#FF19283B",
-            "surface3": "#FF223449",
-            "surfaceElevated": "#FF19283B",
+            "canvas": "#FF0C1420",
+            "surface1": "#FF152231",
+            "surface2": "#FF203240",
+            "surface3": "#FF2A4050",
+            "surfaceElevated": "#FF233748",
             "surfaceOverlay": "#F2111D2D",
-            "surfaceHover": "#FF223449",
-            "surfacePressed": "#FF19283B",
-            "surfaceSelected": "#FF223449",
-            "textPrimary": "#FFEDF6FF",
-            "textSecondary": "#FFB8CFDF",
-            "textMuted": "#FF90AFC4",
+            "surfaceHover": "#FF35505A",
+            "surfacePressed": "#FF405963",
+            "surfaceSelected": "#FF274A50",
+            "textPrimary": "#FFEAF4F0",
+            "textSecondary": "#FFC6D9D5",
+            "textMuted": "#FF96B4B1",
             "textDisabled": "#FF777080",
             "textInverse": "#FF080F1C",
-            "textOnAccent": "#FF080F1C",
-            "textLink": "#FF7DD3FC",
+            "textOnAccent": "#FF0C2025",
+            "textLink": "#FFA8DED0",
             "borderSubtle": "#187DD3FC",
             "borderDefault": "#357DD3FC",
             "borderStrong": "#707DD3FC",
-            "borderInteractive": "#A07DD3FC",
-            "borderSelected": "#FF7DD3FC",
-            "focus": "#FF7DD3FC",
-            "accent": "#FF7DD3FC",
-            "accentHover": "#FFA8E4FF",
-            "accentPressed": "#FF50ACDA",
-            "accentSecondary": "#FFC1E4ED",
-            "selection": "#307DD3FC",
-            "selectionHover": "#487DD3FC",
+            "borderInteractive": "#B083C3AA",
+            "borderSelected": "#FF83C3AA",
+            "focus": "#FF9ED9C2",
+            "accent": "#FF83C3AA",
+            "accentHover": "#FFB0DBC4",
+            "accentPressed": "#FF5C9B87",
+            "accentSecondary": "#FFC1D2E4",
+            "selection": "#4483C3AA",
+            "selectionHover": "#6683C3AA",
             "info": "#FF7DD3FC",
             "success": "#FF86EFAC",
             "warning": "#FFFCD34D",
@@ -236,28 +199,27 @@
             "kind": "RadialGlow"
           },
           "morphology": {
-            "navigationTreatment": "AccentEdge",
+            "navigationTreatment": "StrongBorder",
             "cardPersonality": "Framed",
             "chromeTreatment": "Elevated",
             "focusTreatment": "Ring",
             "borderWeight": 1.2,
             "elevationStrength": 0.55,
-            "glowStrength": 0.16,
+            "glowStrength": 0.03,
             "panelOpacity": 0.98,
-            "motionIntensity": 0.4,
+            "motionIntensity": 0.3,
             "navigationRadiusScale": 0.65
           }
         },
         "material": {
-          "personality": "white-frost",
+          "personality": "smoked-glass",
           "atmosphere": "fog",
-          "grain": 0.008,
-          "glassOpacity": 0.94,
-          "glassBlur": 16,
-          "specular": 0.22,
+          "grain": 0.012,
+          "glassOpacity": 0.98,
+          "specular": 0.14,
           "rimLight": 0.28,
-          "ambientPrimary": "#FF7DD3FC",
-          "ambientSecondary": "#FFA5B4FC"
+          "ambientPrimary": "#FF83C3AA",
+          "ambientSecondary": "#FFC1D2E4"
         },
         "artwork": "theme-azure"
       }
@@ -265,8 +227,8 @@
     {
       "id": "neuterradise.celestial.home-observatory",
       "kind": "home-layout",
-      "name": "Observatory",
-      "description": "Compact observatory hero, collection statistics, recent finds and quiet activity panels.",
+      "name": "Sect Hall",
+      "description": "Moonlit sect records: featured disciple, registers, recent entries and quiet activity in asymmetric columns.",
       "previewAccent": "#FFA78BFA",
       "spec": {
         "hero": {
@@ -342,46 +304,31 @@
       }
     },
     {
-      "id": "neuterradise.celestial.gallery-constellation",
-      "kind": "gallery-layout",
-      "name": "Constellation Wall",
-      "description": "A balanced portrait wall with close spacing; each Profile keeps its own card.",
-      "previewAccent": "#FFA78BFA",
-      "spec": {
-        "primitive": "VirtualizedUniformGrid",
-        "itemMinWidth": 180,
-        "itemMaxWidth": 236,
-        "spacing": 12,
-        "maxColumns": 10,
-        "rowHeight": 288
-      }
-    },
-    {
       "id": "neuterradise.celestial.card-relic",
       "kind": "profile-card",
-      "name": "Celestial Relic",
-      "description": "Centered portrait and frame, readable identity, compact tags and rating.",
+      "name": "Disciple Insignia",
+      "description": "A centered emblem portrait, lineage tags and rank; an understated lift without a second banner reveal.",
       "previewAccent": "#FFA78BFA",
       "spec": {
-        "legacyVariant": "prestige",
         "aspect": 0.78,
-        "art": "cover-over-banner",
-        "density": "detailed",
-        "hover": "spotlight",
+        "hover": "lift",
         "frame": "full",
         "composition": {
           "type": "overlay",
           "children": [
             {
               "type": "shape",
-              "fill": "token:surface1"
+              "fill": "token:surface1",
+              "stroke": "token:borderStrong",
+              "strokeThickness": 2,
+              "cornerRadius": 4
             },
             {
               "type": "image",
               "slot": "profile.identity.banner",
               "stretch": "uniform-to-fill",
               "ambient": true,
-              "opacity": 0.1
+              "opacity": 0.08
             },
             {
               "type": "stack",
@@ -445,11 +392,11 @@
     {
       "id": "neuterradise.celestial.profile-sanctuary",
       "kind": "profile-layout",
-      "name": "Sanctuary",
-      "description": "Identity, balanced context columns, optional Recent Media and the full collection wall.",
+      "name": "Disciple Chronicle",
+      "description": "Banner-led disciple identity and compact martial records with related people, reviews and media.",
       "previewAccent": "#FFA78BFA",
       "spec": {
-        "preset": "cinematic",
+        "preset": "editorial",
         "surface": {
           "type": "stack",
           "spacing": 16,
@@ -509,8 +456,8 @@
     {
       "id": "neuterradise.celestial.media-archive",
       "kind": "profile-media-layout",
-      "name": "Moonlit Archive",
-      "description": "Framed prints with useful metadata below the artwork.",
+      "name": "Martial Scrolls",
+      "description": "Tall framed scroll-like media cards, close metadata and quiet hover attention.",
       "previewAccent": "#FFA78BFA",
       "spec": {
         "layoutId": "editorial",
@@ -537,75 +484,10 @@
       }
     },
     {
-      "id": "neuterradise.celestial.backdrop-palace",
-      "kind": "backdrop",
-      "name": "Violet Palace",
-      "description": "Original ZIP artwork with a restrained scrim and vignette.",
-      "previewAccent": "#FFA78BFA",
-      "spec": {
-        "variants": {
-          "full": {
-            "layers": [
-              {
-                "kind": "image",
-                "asset": "palace",
-                "opacity": 1
-              },
-              {
-                "kind": "scrim",
-                "color": "#FF070A14",
-                "opacity": 0.34
-              },
-              {
-                "kind": "vignette",
-                "opacity": 0.3
-              }
-            ]
-          },
-          "reduced": {
-            "layers": [
-              {
-                "kind": "image",
-                "asset": "palace",
-                "opacity": 1
-              },
-              {
-                "kind": "scrim",
-                "color": "#FF070A14",
-                "opacity": 0.34
-              },
-              {
-                "kind": "vignette",
-                "opacity": 0.3
-              }
-            ]
-          },
-          "fallback": {
-            "layers": [
-              {
-                "kind": "image",
-                "asset": "palace",
-                "opacity": 1
-              },
-              {
-                "kind": "scrim",
-                "color": "#FF070A14",
-                "opacity": 0.34
-              },
-              {
-                "kind": "vignette",
-                "opacity": 0.3
-              }
-            ]
-          }
-        }
-      }
-    },
-    {
       "id": "neuterradise.celestial.backdrop-citadel",
       "kind": "backdrop",
-      "name": "Moonlit Citadel",
-      "description": "Original ZIP artwork with a restrained scrim and vignette.",
+      "name": "Moonlit Sect Court",
+      "description": "Original moonlit architecture with a darkened readable courtyard. Static across resource tiers.",
       "previewAccent": "#FFE4BD75",
       "spec": {
         "variants": {
@@ -618,8 +500,8 @@
               },
               {
                 "kind": "scrim",
-                "color": "#FF070A14",
-                "opacity": 0.34
+                "color": "#FF09121B",
+                "opacity": 0.3
               },
               {
                 "kind": "vignette",
@@ -636,8 +518,8 @@
               },
               {
                 "kind": "scrim",
-                "color": "#FF070A14",
-                "opacity": 0.34
+                "color": "#FF09121B",
+                "opacity": 0.3
               },
               {
                 "kind": "vignette",
@@ -654,137 +536,12 @@
               },
               {
                 "kind": "scrim",
-                "color": "#FF070A14",
-                "opacity": 0.34
+                "color": "#FF09121B",
+                "opacity": 0.3
               },
               {
                 "kind": "vignette",
                 "opacity": 0.3
-              }
-            ]
-          }
-        }
-      }
-    },
-    {
-      "id": "neuterradise.celestial.backdrop-astral",
-      "kind": "backdrop",
-      "name": "Astral Glass",
-      "description": "A quiet violet and azure atmosphere for minimal compositions.",
-      "previewAccent": "#FFA78BFA",
-      "spec": {
-        "variants": {
-          "full": {
-            "layers": [
-              {
-                "kind": "gradient",
-                "angle": 135,
-                "stops": [
-                  {
-                    "color": "#FF0C0918",
-                    "offset": 0
-                  },
-                  {
-                    "color": "#FF18243E",
-                    "offset": 1
-                  }
-                ]
-              },
-              {
-                "kind": "radial-glow",
-                "color": "#FFA78BFA",
-                "opacity": 0.2,
-                "centerX": 0.2,
-                "centerY": 0.2,
-                "radius": 0.85
-              },
-              {
-                "kind": "radial-glow",
-                "color": "#FF7DD3FC",
-                "opacity": 0.12,
-                "centerX": 0.85,
-                "centerY": 0.65,
-                "radius": 0.7
-              },
-              {
-                "kind": "vignette",
-                "opacity": 0.22
-              }
-            ]
-          },
-          "reduced": {
-            "layers": [
-              {
-                "kind": "gradient",
-                "angle": 135,
-                "stops": [
-                  {
-                    "color": "#FF0C0918",
-                    "offset": 0
-                  },
-                  {
-                    "color": "#FF18243E",
-                    "offset": 1
-                  }
-                ]
-              },
-              {
-                "kind": "radial-glow",
-                "color": "#FFA78BFA",
-                "opacity": 0.2,
-                "centerX": 0.2,
-                "centerY": 0.2,
-                "radius": 0.85
-              },
-              {
-                "kind": "radial-glow",
-                "color": "#FF7DD3FC",
-                "opacity": 0.12,
-                "centerX": 0.85,
-                "centerY": 0.65,
-                "radius": 0.7
-              },
-              {
-                "kind": "vignette",
-                "opacity": 0.22
-              }
-            ]
-          },
-          "fallback": {
-            "layers": [
-              {
-                "kind": "gradient",
-                "angle": 135,
-                "stops": [
-                  {
-                    "color": "#FF0C0918",
-                    "offset": 0
-                  },
-                  {
-                    "color": "#FF18243E",
-                    "offset": 1
-                  }
-                ]
-              },
-              {
-                "kind": "radial-glow",
-                "color": "#FFA78BFA",
-                "opacity": 0.2,
-                "centerX": 0.2,
-                "centerY": 0.2,
-                "radius": 0.85
-              },
-              {
-                "kind": "radial-glow",
-                "color": "#FF7DD3FC",
-                "opacity": 0.12,
-                "centerX": 0.85,
-                "centerY": 0.65,
-                "radius": 0.7
-              },
-              {
-                "kind": "vignette",
-                "opacity": 0.22
               }
             ]
           }
@@ -794,54 +551,48 @@
     {
       "id": "neuterradise.celestial.effect-stardust",
       "kind": "effect",
-      "name": "Celestial Stardust",
-      "description": "Sparse floating stars inspired by the archive celestial particles.",
+      "name": "Moonblade Resonance",
+      "description": "A thin passing blade glint over a restrained chi ripple, with reduced and still alternatives.",
       "previewAccent": "#FFA78BFA",
       "spec": {
         "targets": [
-          "all"
+          "effect.home",
+          "effect.profile",
+          "effect.card"
         ],
-        "channel": "particles",
+        "channel": "lighting",
         "interactionOnly": false,
         "variants": {
           "full": {
             "layers": [
               {
-                "kind": "particles",
-                "count": 26,
-                "color": "#FFEDE9FE",
-                "sizeMin": 0.6,
-                "sizeMax": 1.8,
-                "speed": 0.18,
-                "opacity": 0.22,
-                "direction": "up",
-                "particleShape": "dot"
+                "kind": "wave-field",
+                "color": "token:accentSecondary",
+                "opacity": 0.16,
+                "scale": 1.12,
+                "amplitude": 0.2,
+                "speed": 0.18
               },
               {
-                "kind": "particles",
-                "count": 7,
-                "color": "#FFA78BFA",
-                "sizeMin": 1,
-                "sizeMax": 2.8,
-                "speed": 0.12,
-                "opacity": 0.13,
-                "direction": "up",
-                "particleShape": "diamond"
+                "kind": "light-sweep",
+                "color": "token:accent",
+                "opacity": 0.18,
+                "width": 0.085,
+                "angle": 110,
+                "period": 26,
+                "speed": 0.12
               }
             ]
           },
           "reduced": {
             "layers": [
               {
-                "kind": "particles",
-                "count": 12,
-                "color": "#FFEDE9FE",
-                "sizeMin": 0.6,
-                "sizeMax": 1.8,
-                "speed": 0.08,
-                "opacity": 0.16,
-                "direction": "up",
-                "particleShape": "dot"
+                "kind": "wave-field",
+                "color": "token:accentSecondary",
+                "opacity": 0.12,
+                "scale": 1.12,
+                "amplitude": 0,
+                "speed": 0
               }
             ]
           },
@@ -849,9 +600,11 @@
             "layers": [
               {
                 "kind": "radial-glow",
-                "color": "#FFA78BFA",
-                "opacity": 0.08,
-                "radius": 0.8
+                "color": "token:accentSecondary",
+                "opacity": 0.09,
+                "centerX": 0.82,
+                "centerY": 0.18,
+                "radius": 0.7
               }
             ]
           }
@@ -867,14 +620,13 @@
     {
       "id": "neuterradise.celestial.spotlight-celestial",
       "kind": "spotlight-style",
-      "name": "Celestial Showcase",
-      "description": "Centered framed portrait, name and metadata over drifting artwork; no overview or side panel.",
+      "name": "Moonlit Duel",
+      "description": "Centered featured disciple against moonlit imagery, without verbose biography.",
       "previewAccent": "#FFA78BFA",
       "spec": {
         "composition": "centered-poster",
-        "motion": "parallax-drift",
-        "transition": "fade",
-        "rotationSeconds": 18,
+        "motion": "still",
+        "rotationSeconds": 22,
         "showCover": true,
         "showOverview": false,
         "pagination": "counter-rail",
@@ -882,29 +634,10 @@
       }
     },
     {
-      "id": "neuterradise.celestial.frame-astral-sovereign",
-      "kind": "cover-frame",
-      "name": "Astral Sovereign",
-      "description": "Sculpted fantasy artwork with a clear transparent circular portrait opening.",
-      "previewAccent": "#FFA78BFA",
-      "spec": {
-        "family": "Arcane",
-        "shapes": [
-          "Circle"
-        ],
-        "scale": 1,
-        "tint": false,
-        "animated": false,
-        "category": "Ornate",
-        "overlayAsset": "frame-astral-sovereign",
-        "coverInset": 0.16
-      }
-    },
-    {
       "id": "neuterradise.celestial.frame-imperial-phoenix",
       "kind": "cover-frame",
-      "name": "Imperial Phoenix",
-      "description": "Sculpted fantasy artwork with a clear transparent circular portrait opening.",
+      "name": "Vermilion Phoenix Seal",
+      "description": "An original ornate circular phoenix seal for an honored disciple portrait.",
       "previewAccent": "#FFE4BD75",
       "spec": {
         "family": "Royal",
@@ -920,112 +653,70 @@
       }
     },
     {
-      "id": "neuterradise.celestial.frame-lunar-seraph",
-      "kind": "cover-frame",
-      "name": "Lunar Seraph",
-      "description": "Sculpted fantasy artwork with a clear transparent circular portrait opening.",
-      "previewAccent": "#FF7DD3FC",
-      "spec": {
-        "family": "Celestial",
-        "shapes": [
-          "Circle"
-        ],
-        "scale": 1,
-        "tint": false,
-        "animated": false,
-        "category": "Ornate",
-        "overlayAsset": "frame-lunar-seraph",
-        "coverInset": 0.16
-      }
-    },
-    {
-      "id": "neuterradise.celestial.font-display",
-      "kind": "typography",
-      "name": "Celestial Display",
-      "description": "Condensed sans-serif display with clear Inter interface text, suited to Violet and Azure.",
-      "previewAccent": "#FFA78BFA",
-      "spec": {
-        "display": {
-          "family": "Naut Instrument Condensed",
-          "asset": "font-display"
-        },
-        "heading": {
-          "family": "Inter",
-          "asset": "font-inter"
-        },
-        "body": {
-          "family": "Inter",
-          "asset": "font-inter"
-        },
-        "mono": {
-          "family": "Noto Sans Mono",
-          "asset": "font-mono"
-        }
-      }
-    },
-    {
-      "id": "neuterradise.celestial.font-modern",
-      "kind": "typography",
-      "name": "Celestial Modern",
-      "description": "A compact, clear sans-serif system with a matching mono companion.",
-      "previewAccent": "#FFA78BFA",
-      "spec": {
-        "display": {
-          "family": "Inter",
-          "asset": "font-inter"
-        },
-        "heading": {
-          "family": "Inter",
-          "asset": "font-inter"
-        },
-        "body": {
-          "family": "Inter",
-          "asset": "font-inter"
-        },
-        "mono": {
-          "family": "Noto Sans Mono",
-          "asset": "font-mono"
-        }
-      }
-    },
-    {
-      "id": "neuterradise.celestial.controls-glass",
-      "kind": "control-skin",
-      "name": "Astral Controls",
-      "description": "Compact controls with distinct focus and coordinated theme tokens.",
-      "previewAccent": "#FFA78BFA",
-      "spec": {
-        "radius": 8,
-        "borderWidth": 1,
-        "horizontalPadding": 10,
-        "verticalPadding": 4,
-        "height": 30,
-        "scrollbarWidth": 7,
-        "fill": "token:surface2",
-        "hoverFill": "token:surfaceHover",
-        "pressedFill": "token:surfacePressed",
-        "border": "token:borderDefault",
-        "focus": "token:focus"
-      }
-    },
-    {
       "id": "neuterradise.celestial.controls-seal",
       "kind": "control-skin",
-      "name": "Imperial Controls",
-      "description": "Compact controls with distinct focus and coordinated theme tokens.",
+      "name": "Jade Seal Controls",
+      "description": "Inset lacquer controls with carved buttons, jade-focused tabs and stamped toggles.",
       "previewAccent": "#FFA78BFA",
       "spec": {
         "radius": 4,
-        "borderWidth": 1,
+        "borderWidth": 1.6,
         "horizontalPadding": 10,
         "verticalPadding": 4,
-        "height": 30,
+        "height": 31,
         "scrollbarWidth": 7,
         "fill": "token:surface2",
         "hoverFill": "token:surfaceHover",
         "pressedFill": "token:surfacePressed",
         "border": "token:borderDefault",
-        "focus": "token:focus"
+        "focus": "token:focus",
+        "material": "inset",
+        "relief": 0.22,
+        "edge": "all",
+        "families": {
+          "button": {
+            "material": "bevel",
+            "relief": 0.24,
+            "borderWidth": 1.7,
+            "radius": 4,
+            "height": 33
+          },
+          "icon-button": {
+            "material": "bevel",
+            "relief": 0.12,
+            "radius": 8,
+            "height": 32
+          },
+          "chip": {
+            "material": "inset",
+            "relief": 0.17,
+            "radius": 3,
+            "borderWidth": 1.4
+          },
+          "tab": {
+            "material": "inset",
+            "relief": 0.12,
+            "edge": "bottom",
+            "borderWidth": 2
+          },
+          "input": {
+            "material": "inset",
+            "relief": 0.26,
+            "radius": 3,
+            "borderWidth": 1.4
+          },
+          "toggle": {
+            "material": "inset",
+            "relief": 0.18,
+            "radius": 4
+          },
+          "slider": {
+            "material": "bevel",
+            "relief": 0.18,
+            "thumbWidth": 18,
+            "thumbHeight": 22
+          }
+        }
       }
     }
   ]

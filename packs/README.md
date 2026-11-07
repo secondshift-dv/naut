@@ -1,59 +1,39 @@
-# Official optional packs
+# Official optional presentation packs
 
-Give your collection another atmosphere. These packs are reviewed by Naut's
-maintainer and installed only when you choose them. They are customization
-content with independent versions; they do not replace the application.
+The packs below contain independent definitions, not mandatory all-category bundles. Installation never changes user selections. The versions below are distributed as reviewed .ntpack archives through the independent optional-pack publishing channel.
 
-## Black Dossier — 1.1.0
+## Black Dossier ? 2.0.0 source
 
 ![Black Dossier](black-dossier/preview.png)
 
-A neutral black cinematic collection with restrained crimson accents. Eleven independently selectable components, including bundled typography, separate Cover/Banner cards, the native Figure and a visible three-tier effect. Optimized for **Naut 0.0.7**. The Theme uses a small static image in Appearance. Preview is an asset composition.
+Nine distinct definitions: Obsidian Protocol Theme, Dossier Type, Operations Desk, Opening Brief, Dual Identity Card, Subject Dossier Profile, Obsidian Atrium Backdrop, Gunmetal Seal Frame, and Signal Trace Effect. The gallery and media-layout definitions were removed because the engine already offers their basic layout mechanisms.
 
-**[Download Black Dossier 1.1.0](https://secondshift-dv.github.io/naut/packs/black-dossier-1.1.0.ntpack)** · [Setup](black-dossier/README.md) · [Provenance](black-dossier/PROVENANCE.txt) · [Checksums](https://secondshift-dv.github.io/naut/packs/checksums.json)
+[Download 2.0.0](https://secondshift-dv.github.io/naut/packs/black-dossier-2.0.0.ntpack) ? [Source and setup](black-dossier/README.md) ? [Provenance](black-dossier/PROVENANCE.txt) ? [Previous 1.1.0 archive](https://secondshift-dv.github.io/naut/packs/black-dossier-1.1.0.ntpack)
 
-## Overworld Expedition — 1.1.0
+## Nightfall Murim ? 2.0.0 source
 
-![Overworld Expedition](overworld-expedition/preview.png)
+![Nightfall Murim original artwork board](celestial/preview.png)
 
-**A calm voxel expedition**: cream and moss colors, compact block controls,
-collection shelves, three cozy backdrops and three cute square portrait frames.
-17 independently selectable components. The Profile layout puts the media wall
-before context and moves Delete to the bottom; the spotlight omits overview.
-Sparse effects drift slowly and provide reduced-motion/static variants.
-The preview is an asset composition, not a live app screenshot. The Theme has a lightweight artwork thumbnail for Appearance. Home removes redundant Favorites; Profile adds optional Recent Media.
+An original nighttime martial-arts manhwa / jianghu atmosphere: sect halls, moonlight, restrained lantern-gold and jade, disciplined disciple records, scroll media and blade-aura motion. Eleven definitions: two Themes plus Home, Spotlight, Profile Card, Profile, Media, Backdrop, Effect, Cover Frame and Control Style. Overlapping typography, gallery, backdrop, frame and control alternatives have been removed.
 
-**[Download Overworld Expedition 1.1.0](https://secondshift-dv.github.io/naut/packs/overworld-expedition-1.1.0.ntpack)**
-· [Checksums](https://secondshift-dv.github.io/naut/packs/checksums.json)
-· [Setup and recommended components](overworld-expedition/README.md)
-· [Pack source](overworld-expedition/pack.json)
-· [Artwork/font provenance](overworld-expedition/PROVENANCE.txt)
+The historical folder slug celestial and technical pack ID neuterradise.celestial are preserved for upgrades, not used as the user-facing name.
 
-Original artwork and definitions: CC BY 4.0, **Anas / Second Shift**.
-Fonts retain OFL. Use Square Covers for the portrait frames.
-Topbar colors share Naut's surface palette; page ornaments and Customize Card
-size remain engine controlled.
+[Download 2.0.0](https://secondshift-dv.github.io/naut/packs/celestial-2.0.0.ntpack) ? [Source/setup](celestial/README.txt) ? [Manifest](celestial/pack.json) ? [Provenance](celestial/PROVENANCE.txt) ? [Previous 1.3.0 archive](https://secondshift-dv.github.io/naut/packs/celestial-1.3.0.ntpack)
 
-## Celestial Collection · 1.3.0
+## Voxel Playground ? 2.0.0 source
 
-![Celestial Collection](celestial/preview.png)
+![Voxel Playground original artwork board](overworld-expedition/preview.png)
 
-**Violet and Moonlit Azure**, three ornate portrait frames, a centered spotlight,
-compact layouts, atmospheric backdrops, stardust, typography and control styles.
-19 independently selectable components. Frame geometry follows Naut's ornate
-frame stage. The preview is an asset composition, not a live app screenshot. Both Themes have lightweight artwork thumbnails for Appearance. Home removes redundant Favorites; Profile adds optional Recent Media.
+An original voxel sandbox inspired by the building/exploring possibilities of Minecraft and Roblox without third-party game assets, brands or characters. Twelve definitions: a sky-and-grass Theme, pixel-heading Typography, block-built Controls, Home, Spotlight, Card, Profile, Media, two scope-specific Backdrops, Pixel Dust Effect, and one piglet Cover Frame. Repetitive layouts, effects and ornamental frames are removed.
 
-**[Download Celestial 1.3.0](https://secondshift-dv.github.io/naut/packs/celestial-1.3.0.ntpack)**
-· [Checksums](https://secondshift-dv.github.io/naut/packs/checksums.json)
-· [Pack source](celestial/pack.json) · [Artwork/font provenance](celestial/PROVENANCE.txt)
+The historical folder slug overworld-expedition and technical pack ID naut.overworld-expedition remain stable for upgrades.
 
-In Naut, open **Settings → Presentation → Packs / Advanced → Install from file…**.
-Select the downloaded `.ntpack`. Choose its components in Appearance or the
-corresponding Customize screen, then **Save changes**. For an existing pack,
-choose **Replace**. Installation does not select components automatically.
+[Download 2.0.0](https://secondshift-dv.github.io/naut/packs/overworld-expedition-2.0.0.ntpack) ? [Source/setup](overworld-expedition/README.md) ? [Manifest](overworld-expedition/pack.json) ? [Provenance](overworld-expedition/PROVENANCE.txt) ? [Previous 1.1.0 archive](https://secondshift-dv.github.io/naut/packs/overworld-expedition-1.1.0.ntpack)
 
-No new in-app Official badge is implied: imported packs use Naut's **User** label.
-Official means reviewed and distributed from this repository's collection.
+## Installation and fallback
 
-[Installation and updates](../docs/pack-collection.md)
-· [Contribute a pack](../docs/contributing-packs.md)
+Install a folder or published archive through Settings ? Presentation ? Packs / Advanced. Choose global Theme, Typography and Controls in Settings ? Appearance. Choose Home/Profile-scoped components in their Customize panels, and Profile Card / Card Effect in Customize Card. Save the selection; the Presentation Library is for browsing, not selecting.
+
+Surviving definition IDs are unchanged. When a previously selected definition was removed, Naut uses its established built-in fallback, without changing Vault media.
+
+[Installation and updates](../docs/pack-collection.md) ? [Contribute a pack](../docs/contributing-packs.md)

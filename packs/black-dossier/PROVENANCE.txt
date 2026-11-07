@@ -1,4 +1,4 @@
-Black Dossier 1.1.0
+Black Dossier 2.0.0
 Author: Anas / Second Shift.
 Original architectural artwork: AI-assisted image created specifically for this pack on 2026-10-09. No third-party game assets, logos or reference imagery are included. Prompt describes a neutral black concrete atrium, quiet left area, white slit lights on the right and a thin crimson architectural accent.
 Gunmetal Seal: original mathematically symmetric raster frame constructed for this pack; transparent 80% central portrait opening. Preview is a composed asset board, not an application screenshot.
