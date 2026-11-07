@@ -70,8 +70,8 @@
                     {
                       "type": "text",
                       "slot": "profile.statistics.media-count",
-                      "role": "caption",
-                      "maxLines": 2,
+                      "role": "badge",
+                      "maxLines": 1,
                       "color": "token:onMediaPrimary",
                       "onMedia": true
                     },

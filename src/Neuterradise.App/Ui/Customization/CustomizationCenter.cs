@@ -321,6 +321,16 @@ public sealed partial class CustomizationCenter : IDisposable
             UpdateStatus();
             return;
         }
+        if (slot == PresentationSlots.BannerEffect && _slot == PresentationSlots.ProfileBanner
+            && _session.ProfileWorking is { } bannerProfile)
+        {
+            // An effect only changes the overlay. Rebuilding the entire preview detaches the
+            // active video host, discards decoded frames and restarts FFmpeg unnecessarily.
+            _profilePreviewHeader.UpdateFraming(bannerProfile.Overrides);
+            UpdateStatus();
+            RenderInspector();
+            return;
+        }
         if (slot is PresentationSlots.ProfileCover or PresentationSlots.ProfileBanner)
         {
             SyncSourcePreviews();

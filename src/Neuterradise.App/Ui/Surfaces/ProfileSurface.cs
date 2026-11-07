@@ -492,7 +492,8 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         _page.Children.Add(_modulesHost);
         _modulesHost.Content = Modules();
         _profileHeader.RefreshDetails();
-        _profileActionsHost.Content = _surface is null ? ProfileActions() : null;
+        // Delete Profile is owned by the page footer, never by a Presentation Pack region.
+        _profileActionsHost.Content = ProfileActions();
         _page.Children.Add(_profileActionsHost);
 
         // Reparenting can transiently unload the native child. Reassert the logical route state
@@ -580,7 +581,6 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         var regions = new Dictionary<string, FrameworkElement>(StringComparer.Ordinal)
         {
             ["identity"] = _profileHeader,
-            ["actions"] = ProfileActions() ?? new Grid(),
             ["statistics"] = UI.V(6, UI.Text(UI.T("Profile.Media", "Media"), "section-title"), UI.Text(_vm.MediaGrid.RangeText, "numeric")),
         };
         wrap.Margin = new Thickness(padding, 12, padding, 18);
@@ -670,7 +670,11 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             foreach (var region in regions.Values) region.Width = double.NaN;
             // The surface owns the inset content allocation. Descendant desired sizes (including
             // a native Figure and media columns) cannot enlarge the page and trigger another rebuild.
-            var composition = SurfaceComposer.Build(_surface, id => regions.GetValueOrDefault(id), available);
+            // The pack's required "actions" semantic remains compatible at compile time,
+            // but cannot reposition the destructive Delete action above Profile modules.
+            var body = SurfaceComposer.WithoutSemantic(_surface, "actions");
+            if (body is null) return new Grid();
+            var composition = SurfaceComposer.Build(body, id => regions.GetValueOrDefault(id), available);
             composition.Width = available;
             composition.HorizontalAlignment = HorizontalAlignment.Center;
             return composition.Margin(padding, 12, padding, 18);

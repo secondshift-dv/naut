@@ -1979,7 +1979,7 @@
     <sys:String x:Key="Settings.About.Rendering">렌더러</sys:String>
     <sys:String x:Key="Settings.About.Source">소스 코드</sys:String>
     <sys:String x:Key="Settings.About.Released">출시일: {0}</sys:String>
-    <sys:String x:Key="Settings.About.ReleaseUnavailable">출시일을 확인할 수 없습니다</sys:String>
+    <sys:String x:Key="Settings.About.ReleaseLookup">출시일: GitHub Releases 확인</sys:String>
     <sys:String x:Key="Settings.About.Version">버전 {0}</sys:String>
     <sys:String x:Key="Settings.About.Summary">A Navigator for Your Things Worth Keeping</sys:String>
     <sys:String x:Key="Settings.About.Releases">GitHub 릴리스</sys:String>

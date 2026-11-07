@@ -1979,7 +1979,7 @@
     <sys:String x:Key="Settings.About.Rendering">Renderer</sys:String>
     <sys:String x:Key="Settings.About.Source">Quellcode</sys:String>
     <sys:String x:Key="Settings.About.Released">Veröffentlicht am {0}</sys:String>
-    <sys:String x:Key="Settings.About.ReleaseUnavailable">Veröffentlichungsdatum nicht verfügbar</sys:String>
+    <sys:String x:Key="Settings.About.ReleaseLookup">Veröffentlichungsdatum: siehe GitHub Releases</sys:String>
     <sys:String x:Key="Settings.About.Version">Version {0}</sys:String>
     <sys:String x:Key="Settings.About.Summary">A Navigator for Your Things Worth Keeping</sys:String>
     <sys:String x:Key="Settings.About.Releases">GitHub-Veröffentlichungen</sys:String>

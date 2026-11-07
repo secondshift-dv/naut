@@ -1979,7 +1979,7 @@
     <sys:String x:Key="Settings.About.Rendering">渲染器</sys:String>
     <sys:String x:Key="Settings.About.Source">源代码</sys:String>
     <sys:String x:Key="Settings.About.Released">发布于{0}</sys:String>
-    <sys:String x:Key="Settings.About.ReleaseUnavailable">发布日期不可用</sys:String>
+    <sys:String x:Key="Settings.About.ReleaseLookup">发布日期：请查看 GitHub Releases</sys:String>
     <sys:String x:Key="Settings.About.Version">版本{0}</sys:String>
     <sys:String x:Key="Settings.About.Summary">A Navigator for Your Things Worth Keeping</sys:String>
     <sys:String x:Key="Settings.About.Releases">GitHub版本</sys:String>

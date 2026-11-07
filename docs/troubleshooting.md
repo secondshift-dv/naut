@@ -40,6 +40,13 @@ Yes. Figure is optional and independent from the rest of the Profile experience.
 
 Naut v0.0.11 prevents a temporary Profile layout reflow from canceling an initial 3D scene load. If the prepared model, compatible graphics device or renderer is unavailable, the static thumbnail remains the fallback.
 
+Naut v0.0.12 also prevents Figure layout collisions with Profile identity and controls in narrow windows and with optional layouts.
+
+## Why does About not immediately show a release date?
+
+About retrieves the published date for **the installed Naut version** from the official GitHub Release. Keep Internet access available for the first lookup; opening About again retries a failed request. Once fetched, the date is cached locally in AppState and remains visible offline. Naut does not guess an unverified publication date or use a different version to fill the field.
+
+
 ## Which interface languages are included?
 
 Naut v0.0.7 includes English, Bahasa Indonesia, 日本語, 한국어, 简体中文, Deutsch, Français, and Español. See [Languages](languages.md).

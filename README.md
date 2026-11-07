@@ -7,7 +7,7 @@
 <p align="center">Local-first media collections for Windows — offline face intelligence, interactive 3D Figures, and your own portable Vault.</p>
 
 <p align="center">
-  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.11"><strong>Download Naut v0.0.11</strong></a>
+  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.12"><strong>Download Naut v0.0.12</strong></a>
   ·
   <a href="https://secondshift-dv.github.io/naut/"><strong>View Live Demo</strong></a>
   ·
@@ -84,14 +84,15 @@ The portable app package and the Vault are separate boundaries. Imports copy fil
 - **3D is additive, not mandatory.** Normal Naut use does not require a discrete GPU or a Figure.
 - **Portable application, durable collection.** Updating the app package does not replace the Vault.
 
-## What changed in v0.0.11
+## What changed in v0.0.12
 
-- **Banner playback recovery:** Profile and Customize video Banners now resume when their header is moved by layout changes.
-- **Figure first-open recovery:** pending 3D scene loading survives transient Profile reflow, while foreground Figure requests take priority over optional prewarm.
-- **Responsive Spotlight:** ready Home Spotlight video rechecks playback on activation and resource changes; Import reduces decorative detail rather than automatically stopping the selected video.
-- **Existing safeguards:** reduced-motion settings, inactive windows, memory pressure, NFIG validation and durable Import checkpoints retain their authority.
+- **Stable Profile Banners:** effects update in place without freezing or restarting a ready video.
+- **Collision-free Profile Figures:** built-in and optional Profile layouts reserve separate Figure and identity/action regions; Delete Profile stays at the bottom.
+- **Readable Home and Card UI:** Home labels use bold outlined text without background plates, Identity Card metadata aligns, and rating/favorite Profile glyphs are filled.
+- **Distinct Favorite Media:** an outlined Flame replaces the media favorite star in Media cards and Inspector.
+- **Release date in About:** the matching public GitHub date is shown when fetched and cached for later offline use.
 
-See the [v0.0.11 release notes](docs/releases/v0.0.11.md) for details and verification limits.
+See the [v0.0.12 release notes](docs/releases/v0.0.12.md) for compatibility details, fallback behavior and verification limits.
 
 ## See it in action
 
@@ -108,7 +109,7 @@ See the [v0.0.11 release notes](docs/releases/v0.0.11.md) for details and verifi
 
 ## Quick Start
 
-1. Open the official [Naut v0.0.11 download](https://github.com/secondshift-dv/naut/releases/tag/v0.0.11) and choose **`naut-v0.0.11-win-x64.zip`** under Assets.
+1. Open the official [Naut v0.0.12 download](https://github.com/secondshift-dv/naut/releases/tag/v0.0.12) and choose **`naut-v0.0.12-win-x64.zip`** under Assets.
 2. Extract the complete ZIP to a normal folder.
 3. Run `naut.exe`.
 4. Choose **where to keep** your Vault.
@@ -129,7 +130,7 @@ Naut's normal collection experience is intentionally lighter than its optional F
 | **Display** | 1280 × 720 | 1920 × 1080 or higher |
 | **Free app/update space** | 3 GB | 3 GB+ on SSD |
 
-Vault storage is separate and depends on the size of your collection. See the full [Naut v0.0.11 System Requirements](docs/system-requirements.md).
+Vault storage is separate and depends on the size of your collection. See the full [Naut v0.0.12 System Requirements](docs/system-requirements.md).
 
 ## Optional pack collection
 

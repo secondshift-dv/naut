@@ -6,6 +6,25 @@ namespace Neuterradise.App.Ui;
 
 public static class SurfaceComposer
 {
+    public static SurfaceNode? WithoutSemantic(SurfaceNode node, string excluded)
+    {
+        if (node.Kind == "semantic" && node.Semantic == excluded) return null;
+        if (node.Children.Count == 0) return node;
+
+        var children = new List<SurfaceNode>(node.Children.Count);
+        var columns = node.Columns.Count == node.Children.Count ? new List<string>(node.Children.Count) : null;
+        for (var index = 0; index < node.Children.Count; index++)
+        {
+            var child = WithoutSemantic(node.Children[index], excluded);
+            if (child is null) continue;
+            children.Add(child);
+            if (columns is not null) columns.Add(node.Columns[index]);
+        }
+
+        if (children.Count == 0) return null;
+        return node with { Children = children, Columns = columns is null ? node.Columns : columns };
+    }
+
     public static FrameworkElement Build(SurfaceNode node, Func<string, FrameworkElement?> semantic, double width)
     {
         if (node.Kind == "semantic")

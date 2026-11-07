@@ -1979,7 +1979,7 @@
     <sys:String x:Key="Settings.About.Rendering">Perender</sys:String>
     <sys:String x:Key="Settings.About.Source">Kode sumber</sys:String>
     <sys:String x:Key="Settings.About.Released">Dirilis {0}</sys:String>
-    <sys:String x:Key="Settings.About.ReleaseUnavailable">Tanggal rilis tidak tersedia</sys:String>
+    <sys:String x:Key="Settings.About.ReleaseLookup">Tanggal rilis: lihat GitHub Releases</sys:String>
     <sys:String x:Key="Settings.About.Version">Versi {0}</sys:String>
     <sys:String x:Key="Settings.About.Summary">A Navigator for Your Things Worth Keeping</sys:String>
     <sys:String x:Key="Settings.About.Releases">Rilis GitHub</sys:String>

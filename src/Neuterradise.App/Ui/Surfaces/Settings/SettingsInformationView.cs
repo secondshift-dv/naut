@@ -46,7 +46,7 @@ internal static class SettingsInformationView
 
         var releaseLine = vm.PublishedRelease is { } release
             ? UI.F("Settings.About.Released", "Released {0}", release.PublishedAt.ToLocalTime().ToString("d MMM yyyy"))
-            : UI.T("Settings.About.ReleaseUnavailable", "Release date unavailable");
+            : UI.T("Settings.About.ReleaseLookup", "Release date: see GitHub Releases");
         var product = UI.V(8,
             BrandAssets.Image(BrandAssets.PrimaryMarkUri, 72, "naut").Align(HorizontalAlignment.Center),
             UI.Text(vm.AppTitle, "page-title").Align(HorizontalAlignment.Center),

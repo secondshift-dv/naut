@@ -15,6 +15,50 @@ public static class GitHubReleaseInformation
     public const string RepositoryTagline = "A Navigator for Your Things Worth Keeping";
     public const string ReleasesUrl = "https://github.com/secondshift-dv/naut/releases";
 
+    // Display-only cache under AppStateRoot. It never participates in signed-update trust.
+    public static ReleaseInformation? ReadCached(string installedVersion, string appStateRoot)
+    {
+        var path = Path.Combine(appStateRoot, "published-release.json");
+        try
+        {
+            var file = new FileInfo(path);
+            if (!file.Exists || file.Length is <= 0 or > 2048) return null;
+            return Parse(File.ReadAllBytes(path), installedVersion);
+        }
+        catch (IOException) { return null; }
+        catch (UnauthorizedAccessException) { return null; }
+        catch (JsonException) { return null; }
+        catch (InvalidOperationException) { return null; }
+    }
+
+    public static void Cache(ReleaseInformation release, string appStateRoot)
+    {
+        var path = Path.Combine(appStateRoot, "published-release.json");
+        var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            Directory.CreateDirectory(appStateRoot);
+            var json = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                tag_name = "v" + release.Version,
+                draft = false,
+                published_at = release.PublishedAt,
+                html_url = release.Page.AbsoluteUri,
+            });
+            if (Parse(json, release.Version) != release) return;
+            File.WriteAllBytes(temp, json);
+            File.Move(temp, path, overwrite: true);
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+        finally
+        {
+            try { if (File.Exists(temp)) File.Delete(temp); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+    }
+
     public static async Task<ReleaseInformation?> ReadAsync(string installedVersion, CancellationToken cancellationToken)
     {
         using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };

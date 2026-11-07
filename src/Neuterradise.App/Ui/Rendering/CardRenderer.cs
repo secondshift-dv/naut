@@ -282,6 +282,12 @@ public sealed class CardVisual : Grid
                     block.Text = UI.T(key, key);
                 }
 
+                if (text.Slot == SemanticSlots.ProfileMediaCount)
+                {
+                    block.VerticalAlignment = VerticalAlignment.Center;
+                    block.TextWrapping = TextWrapping.NoWrap;
+                }
+
                 if (Plan.Hover == "sheen" && text.OnMedia
                     && text.Slot is SemanticSlots.ProfileName or SemanticSlots.ProfileCategory)
                 {
@@ -470,6 +476,9 @@ public sealed class CardVisual : Grid
             theme.TrackThemeElement(shapedBorder, value => value.CornerRadius = new CornerRadius(ThemeRuntime.Current.Tokens.ResolveRadius(radius)));
         }
         ApplyLayout(element, node.Layout);
+        if (node is BadgeNode { Slot: SemanticSlots.ProfileRating or SemanticSlots.ProfileFavorite }
+            or TextNode { Slot: SemanticSlots.ProfileMediaCount })
+            element.VerticalAlignment = VerticalAlignment.Center;
         if (!_buildingArtBase && Plan.Hover == "spotlight")
         {
             if (ReferenceEquals(element, _hoverBanner)) element.Opacity = 0;
@@ -500,8 +509,14 @@ public sealed class CardVisual : Grid
             _ => null,
         };
         var label = UI.Text(null, "badge", textColor);
-        var badgeIcon = icon is null ? null : new IconView(icon, 12, textColor);
+        label.VerticalAlignment = VerticalAlignment.Center;
+        var badgeIcon = icon is null ? null : new IconView(icon, 14, textColor)
+        {
+            Filled = badge.Slot is SemanticSlots.ProfileRating or SemanticSlots.ProfileFavorite,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
         var content = UI.H(4, badgeIcon, label);
+        content.VerticalAlignment = VerticalAlignment.Center;
         _binders.Add(data =>
         {
             label.Text = badge.Slot == SemanticSlots.ProfileFavorite
@@ -510,7 +525,7 @@ public sealed class CardVisual : Grid
                 badgeIcon.ColorToken = badge.Slot switch
                 {
                     SemanticSlots.ProfileFavorite when data.IsFavorite => "danger",
-                    SemanticSlots.ProfileFavorite when Plan.Hover == "sheen" => "warning",
+                    SemanticSlots.ProfileFavorite => onMedia ? "onMediaPrimary" : "textSecondary",
                     SemanticSlots.ProfileRating when data.Rating is > 0 => "warning",
                     _ => textColor,
                 };

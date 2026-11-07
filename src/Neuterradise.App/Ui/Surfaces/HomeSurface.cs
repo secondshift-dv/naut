@@ -1116,7 +1116,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         };
 
         var title = UI.Grid("auto", "*,auto");
-        title.Children.Add(UI.Text("Vault", "page-title").At(0, 0));
+        title.Children.Add(HomeReadability.Heading("Vault", "page-title").At(0, 0));
         title.Children.Add(
             UI.Button(
                     UI.T("Home.Gallery", "Browse all"),
@@ -1160,10 +1160,10 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
                 FrameworkElement item = rail.Style switch
                 {
                     "tile" or "poster" => PulseStatCard(stats[index].Value, stats[index].Label, rail.Style),
-                    "compact" => UI.V(
+                    "compact" => HomeReadability.Region(UI.V(
                         2,
-                        UI.Text(stats[index].Label, "caption", "textSecondary"),
-                        UI.Text(stats[index].Value, "section-title", "textPrimary"))
+                        HomeReadability.Text(stats[index].Label, "caption"),
+                        HomeReadability.Text(stats[index].Value, "section-title")), 10)
                         .Margin(10, 6, 10, 6),
                     _ => PulseStat(stats[index].Value, stats[index].Label),
                 };
@@ -1181,23 +1181,19 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         return UI.V(8, title, body).Margin(padding, 12, padding, 0);
     }
 
-    private static FrameworkElement PulseStat(string value, string label)
-    {
-        return UI.V(1,
-            UI.Text(value, "section-title", maxLines: 1),
-            UI.Text(label, "caption", "textSecondary"))
+    private static FrameworkElement PulseStat(string value, string label) =>
+        HomeReadability.Region(UI.V(1,
+            HomeReadability.Text(value, "section-title", 1),
+            HomeReadability.Text(label, "caption")), 12)
             .Margin(16, 8, 16, 8);
-    }
 
     private static FrameworkElement PulseStatCard(string value, string label, string style)
     {
-        var card = UI.Surface(
+        var card = HomeReadability.Region(
             UI.V(
                 style == "poster" ? 6 : 3,
-                UI.Text(value, style == "poster" ? "page-title" : "section-title", maxLines: 1),
-                UI.Text(label, "caption", "textSecondary", 1)),
-            style == "poster" ? Material.Glass : Material.Raised,
-            style == "poster" ? 14 : 10,
+                HomeReadability.Text(value, style == "poster" ? "page-title" : "section-title", 1),
+                HomeReadability.Text(label, "caption", 1)),
             style == "poster" ? 16 : 12);
         card.MaxWidth = style == "poster" ? 178 : 148;
         card.HorizontalAlignment = HorizontalAlignment.Stretch;
@@ -1226,11 +1222,10 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         }
 
         var title = UI.H(8,
-            UI.Text(titleText, "section-title"),
-            UI.Text(
+            HomeReadability.Heading(titleText),
+            HomeReadability.Heading(
                 UI.F("Home.Rail.Recent.Count", "{0} Profiles", items.Count),
-                "micro",
-                "textMuted").Align(vertical: VerticalAlignment.Center));
+                "micro", 6).Align(vertical: VerticalAlignment.Center));
         var (itemWidth, itemHeight) = ProfileRailGeometry(rail.Style);
         return UI.V(6, title, ProfileCarousel(items, itemWidth, itemHeight, rail.Style))
             .Margin(padding, 10, padding, 0);
@@ -1382,7 +1377,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         }
 
         return UI.V(10,
-            UI.Text(UI.T("Home.Rail.Attention", "Needs your attention"), "section-title"),
+            HomeReadability.Heading(UI.T("Home.Rail.Attention", "Needs your attention")),
             UI.Scroll(cards, horizontal: true))
             .Margin(padding, 16, padding, 0);
     }
@@ -1395,11 +1390,9 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         FrameworkElement body;
         if (items.Count == 0)
         {
-            body = UI.Text(
+            body = HomeReadability.Heading(
                 UI.T("Home.Rail.Activity.Empty", "No activity this month yet."),
-                "caption",
-                "textMuted",
-                1);
+                "caption");
         }
         else if (rail.Style == "compact")
         {
@@ -1445,7 +1438,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
 
         return UI.V(
             10,
-            UI.Text(UI.T("Home.Rail.Activity", "Recently"), "section-title"),
+            HomeReadability.Heading(UI.T("Home.Rail.Activity", "Recently")),
             body)
             .Margin(padding, 16, padding, 0);
     }
@@ -1467,7 +1460,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         }
 
         return UI.V(10,
-            UI.Text(UI.T("Home.Rail.Imports", "Importing"), "section-title"),
+            HomeReadability.Heading(UI.T("Home.Rail.Imports", "Importing")),
             UI.Scroll(items, horizontal: true))
             .Margin(padding, 16, padding, 0);
     }

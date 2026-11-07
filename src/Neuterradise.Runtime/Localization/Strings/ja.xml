@@ -1979,7 +1979,7 @@
     <sys:String x:Key="Settings.About.Rendering">レンダラー</sys:String>
     <sys:String x:Key="Settings.About.Source">ソースコード</sys:String>
     <sys:String x:Key="Settings.About.Released">公開日：{0}</sys:String>
-    <sys:String x:Key="Settings.About.ReleaseUnavailable">公開日を取得できません</sys:String>
+    <sys:String x:Key="Settings.About.ReleaseLookup">公開日: GitHub Releases を確認</sys:String>
     <sys:String x:Key="Settings.About.Version">バージョン {0}</sys:String>
     <sys:String x:Key="Settings.About.Summary">A Navigator for Your Things Worth Keeping</sys:String>
     <sys:String x:Key="Settings.About.Releases">GitHubのリリース</sys:String>

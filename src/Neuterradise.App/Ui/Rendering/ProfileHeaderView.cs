@@ -210,7 +210,12 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         Unloaded += (_, _) =>
         {
             Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.Changed -= OnGovernorChanged;
-            ClearBanner();
+            // Customize can detach and reattach this header in one dispatcher turn. An Unloaded
+            // callback from the old host must not stop a decoder already resumed by the new host.
+            DispatcherQueue?.TryEnqueue(() =>
+            {
+                if (!_disposed && !IsLoaded) ClearBanner();
+            });
         };
         _bannerFrame.Child = _bannerRegion;
         Grid.SetColumnSpan(_bannerFrame, 2);
@@ -317,7 +322,9 @@ public sealed class ProfileHeaderView : Grid, IDisposable
             && (!string.IsNullOrWhiteSpace(state.BannerVideoPath) || state.BannerPoster is not null);
         _tagOverlay.Visibility = showBanner && layout.Id == "portrait" ? Visibility.Visible : Visibility.Collapsed;
         _tagOverlay.Margin = new Thickness(pagePadding, 16, pagePadding, 16);
-        _tagOverlay.MaxWidth = Math.Max(0, width - pagePadding * 2);
+        _tagOverlay.MaxWidth = CanOverlayFigure(layout, showBanner, state.FigureView is not null, width)
+            ? Math.Max(0, width * 0.5 - pagePadding * 2)
+            : Math.Max(0, width - pagePadding * 2);
         _tagOverlay.Content = TagCapsules.Create(state.Tags ?? [], width < 600 ? 2 : 4);
         var wideSplit = showBanner && layout.BannerMode == ProfileLayoutBannerMode.Split && width >= 960;
         var splitBannerOnLeft = layout.Id != "split-right";
@@ -505,11 +512,13 @@ public sealed class ProfileHeaderView : Grid, IDisposable
             _figureRegion.MaxWidth = 360;
             _figureRegion.HorizontalAlignment = HorizontalAlignment.Center;
             _figureRegion.Margin = new Thickness(0);
-            var portraitOverlay = layout.Id == "portrait" && overlap && !wideSplit && identityWidth >= 760;
-            if (portraitOverlay)
+            var bannerFigureOverlay = CanOverlayFigure(layout, hasBanner, true, width);
+            if (bannerFigureOverlay)
             {
-                // A native Figure clipped by the identity row cannot overlap the Banner.
-                // The shared two-row header owns its viewport and paints it after the Banner.
+                // Figure and actions must occupy disjoint grid columns even while Figure spans
+                // both Banner and identity rows. A full-width identity host can cover the
+                // native viewport despite the Figure itself having a bounded width.
+                Grid.SetColumnSpan(_identityHost, 1);
                 var top = Math.Max(0, _bannerFrame.Height - _figureRegion.Height * 0.62);
                 RowDefinitions[1].MinHeight = Math.Max(0,
                     top + _figureRegion.Height - _bannerFrame.Height) + 16;
@@ -521,7 +530,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
                 _figureRegion.Margin = new Thickness(0, top, UI.PagePadding(identityWidth), 0);
                 Children.Add(_figureRegion);
             }
-            else if (identityWidth >= 760)
+            else if (identityWidth >= 960)
             {
                 var composition = UI.Grid("auto", "*,auto");
                 composition.ColumnSpacing = 16;
@@ -570,12 +579,25 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         else
         {
             band.Margin = new Thickness(padding, overlap ? -coverSize * 0.45 : 10, padding, 8);
-            band.MaxWidth = layout.ContentWidth == ProfileLayoutContentWidth.Wide ? 1440 : 1000;
-            band.HorizontalAlignment = HorizontalAlignment.Center;
+            if (CanOverlayFigure(layout, hasBanner, state.FigureView is not null, width))
+            {
+                band.MaxWidth = Math.Max(1, width * 0.5 - padding * 2);
+                band.HorizontalAlignment = HorizontalAlignment.Stretch;
+            }
+            else
+            {
+                band.MaxWidth = layout.ContentWidth == ProfileLayoutContentWidth.Wide ? 1440 : 1000;
+                band.HorizontalAlignment = HorizontalAlignment.Center;
+            }
         }
         _identityHost.Content = band;
         _identityLayoutBucket = IdentityLayoutBucket(width);
     }
+
+    private static bool CanOverlayFigure(ProfileLayoutDefinition layout, bool hasBanner, bool hasFigure, double width) =>
+        hasFigure && hasBanner && width >= 960 && layout.BannerMode != ProfileLayoutBannerMode.Split
+        && layout.CoverPlacement == ProfileLayoutCoverPlacement.BottomLeftOverlap
+        && layout.IdentityAlignment == ProfileLayoutIdentityAlignment.Left;
 
     private void AlignChronicleDetails(double identityRegionWidth)
     {

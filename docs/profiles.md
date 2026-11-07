@@ -25,6 +25,8 @@ Since v0.0.9, each Profile can retain an ordered collection of Banner alternativ
 
 In Naut v0.0.11, a ready video Banner resumes after Profile/Customize header reflow. Import pressure alone reduces decorative presentation detail instead of automatically stopping a selected Profile Banner; inactive windows, Reduced Motion and memory pressure still use a static poster when appropriate.
 
+In Naut v0.0.12, changing Film, Glitter or Shimmer effects no longer tears down Banner playback. The 3D Figure occupies reserved space so Profile text and buttons do not overlap it, including with optional Profile packs. **Delete Profile always appears last**, below the Profile modules. Card rating stars and favorite hearts are filled, while Favorite Media is marked by a distinct outline Flame.
+
 ## Face-aware Profile suggestions
 
 For applicable media, Naut can use [Face Intelligence](face-intelligence.md) to detect faces and compare compatible embeddings with locally confirmed identity samples.

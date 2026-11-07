@@ -103,7 +103,7 @@ public sealed class InspectorPanel : IDisposable
         _favorite.Tip(_vm.FavoriteToggleTooltip);
         if (_favorite.Content is IconView favoriteIcon)
         {
-            favoriteIcon.ColorToken = _vm.IsFavorite ? "danger" : "textMuted";
+            favoriteIcon.ColorToken = _vm.IsFavorite ? "#FF9A45" : "textMuted";
         }
         foreach (var (name, button) in _tabs)
         {

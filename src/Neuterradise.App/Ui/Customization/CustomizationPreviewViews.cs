@@ -231,9 +231,13 @@ public sealed partial class CustomizationCenter
                 if (id == "recent-media" && !profile.Overrides.ShowRecentMedia) return null;
                 return UI.Surface(UI.Text(id.Replace('-', ' '), "caption"), Material.Raised, 8, 12);
             }
-            var composition = SurfaceComposer.Build(surface, Region, 1100);
-            composition.Width = 1100;
-            stage.Children.Add(new Viewbox { Stretch = Stretch.Uniform, Child = composition });
+            var body = SurfaceComposer.WithoutSemantic(surface, "actions");
+            if (body is not null)
+            {
+                var composition = SurfaceComposer.Build(body, Region, 1100);
+                composition.Width = 1100;
+                stage.Children.Add(new Viewbox { Stretch = Stretch.Uniform, Child = composition });
+            }
         }
         else if (_figureEditorOpen)
             stage.Children.Add(UI.Scroll(_profilePreviewHeader));

@@ -238,10 +238,9 @@ public sealed class HomePreviewView : Grid
 
         if (rails.Children.Count == 0)
         {
-            rails.Children.Add(UI.Text(
+            rails.Children.Add(HomeReadability.Heading(
                 UI.T("Customize.HomePreview.NoRails", "No Home rails in this layout."),
-                "micro",
-                "textMuted"));
+                "micro", _compact ? 4 : 8));
         }
 
         rails.Margin = _compact
@@ -278,7 +277,7 @@ public sealed class HomePreviewView : Grid
 
         return UI.V(
             _compact ? 1 : 3,
-            UI.Text(title, "micro", "textSecondary", 1),
+            HomeReadability.Heading(title, "micro", _compact ? 4 : 8),
             row);
     }
     private FrameworkElement BuildProfileTile(HomeRailPlan rail, CardData data)
@@ -305,13 +304,15 @@ public sealed class HomePreviewView : Grid
                 : rail.Id == "discovery" ? "icon.profile.related"
                 : "icon.profile.person",
                 _compact ? 9 : 13)
-            : UI.Text(value, rail.Style == "poster" && !_compact ? "control" : "micro");
+            : HomeReadability.Text(value, rail.Style == "poster" && !_compact ? "control" : "micro");
 
-        var tile = UI.Surface(
-            content,
-            rail.Style == "poster" ? Material.Glass : Material.Raised,
-            _compact ? 4 : rail.Style == "poster" ? 10 : 7,
-            _compact ? 3 : rail.Style == "poster" ? 10 : 6);
+        var tile = rail.Id == "statistics"
+            ? HomeReadability.Region(content, _compact ? 3 : rail.Style == "poster" ? 10 : 6)
+            : UI.Surface(
+                content,
+                rail.Style == "poster" ? Material.Glass : Material.Raised,
+                _compact ? 4 : rail.Style == "poster" ? 10 : 7,
+                _compact ? 3 : rail.Style == "poster" ? 10 : 6);
 
         (tile.Width, tile.Height) = rail.Style switch
         {

@@ -157,6 +157,7 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
     private DiagnosticVersionReport? _versionReport;
     private long _initializeGeneration;
     private bool _isDisposed;
+    private bool _releaseLookupInProgress;
 
     private SettingsSection _activeSection;
     private SettingsSubsection? _activeSubsection;
@@ -280,7 +281,9 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
 
         StartRouteTask(InitializeAsync, SurfaceText.Get("Settings.LoadFailed", "Settings could not be loaded."));
         StartRouteTask(LoadThirdPartyNoticesAsync, SurfaceText.Get("Settings.ThirdPartyNotices.LoadFailed", "Third-party notices could not be loaded."));
-        StartRouteTask(LoadReleaseInformationAsync, SurfaceText.Get("Settings.LoadFailed", "Settings could not be loaded."));
+        PublishedRelease = GitHubReleaseInformation.ReadCached(
+            AppVersion, AppStatePaths.CreateProduction().Root);
+        RequestReleaseInformation();
     }
 
     public SettingsSection Section { get; }
@@ -318,6 +321,7 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
         if (!sectionChanged && !subsectionChanged)
         {
             LoadActiveSection();
+            if (route.Section == SettingsSection.About) RequestReleaseInformation();
             return;
         }
 
@@ -334,6 +338,7 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
         }
 
         LoadActiveSection();
+        if (route.Section == SettingsSection.About) RequestReleaseInformation();
     }
 
     public IReadOnlyList<SettingsRailItem> RailItems { get; } =
@@ -523,14 +528,28 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
         private set => SetProperty(ref _thirdPartyComponents, value);
     }
 
+    private void RequestReleaseInformation()
+    {
+        if (_isDisposed || _releaseLookupInProgress || PublishedRelease is not null) return;
+        _releaseLookupInProgress = true;
+        StartRouteTask(LoadReleaseInformationAsync, SurfaceText.Get("Settings.LoadFailed", "Settings could not be loaded."));
+    }
+
     private async Task LoadReleaseInformationAsync(CancellationToken cancellationToken = default)
     {
-        try { PublishedRelease = await GitHubReleaseInformation.ReadAsync(AppVersion, cancellationToken).ConfigureAwait(true); }
+        try
+        {
+            var published = await GitHubReleaseInformation.ReadAsync(AppVersion, cancellationToken).ConfigureAwait(true);
+            if (published is null || _isDisposed) return;
+            PublishedRelease = published;
+            GitHubReleaseInformation.Cache(published, AppStatePaths.CreateProduction().Root);
+        }
         catch (OperationCanceledException) { }
         catch (System.Net.Http.HttpRequestException) { }
         catch (System.Text.Json.JsonException) { }
         catch (InvalidOperationException) { }
         catch (IOException) { }
+        finally { _releaseLookupInProgress = false; }
     }
 
     public string RuntimeInfo => string.Create(

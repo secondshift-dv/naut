@@ -12,6 +12,8 @@ Naut can reuse a verified prepared Figure on supported NTFS drives when file ide
 
 Naut v0.0.11 keeps a pending Figure first-load request alive when Profile layout changes briefly reattach its header. Visible Figure loading has priority over optional background prewarm, which yields during interaction, Import or memory pressure. Figure validation and the static-thumbnail fallback remain intact.
 
+Naut v0.0.12 reserves disjoint space for Figure and Profile identity/actions across built-in and installed-pack layouts. On wide compatible layouts, the Figure may overlap the Banner visually without covering text or buttons; on narrow layouts, content stacks.
+
 ## Supported formats
 
 Naut v0.0.7 can prepare **GLB, FBX, OBJ, STL and 3MF** as Figures. They display a static scene with rotation, pan and zoom. Animation playback and rig editing are not included; your original file is preserved.

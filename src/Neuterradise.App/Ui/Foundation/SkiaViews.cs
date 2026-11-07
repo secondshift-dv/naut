@@ -28,6 +28,7 @@ public sealed class IconView : SKCanvasElement
     private static readonly LinkedList<CachedPath> PathRecency = new();
     private string _key;
     private string _color;
+    private bool _filled;
 
     private sealed record CachedPath(string Data, SKPath Path);
 
@@ -70,6 +71,17 @@ public sealed class IconView : SKCanvasElement
                 _color = value;
                 Invalidate();
             }
+        }
+    }
+
+    public bool Filled
+    {
+        get => _filled;
+        set
+        {
+            if (_filled == value) return;
+            _filled = value;
+            Invalidate();
         }
     }
 
@@ -116,6 +128,13 @@ public sealed class IconView : SKCanvasElement
         };
         canvas.Save();
         canvas.Scale(scale);
+        if (_filled)
+        {
+            paint.Style = SKPaintStyle.Fill;
+            canvas.DrawPath(path, paint);
+            paint.Style = SKPaintStyle.Stroke;
+            paint.StrokeWidth = 0.85f;
+        }
         canvas.DrawPath(path, paint);
         canvas.Restore();
     }
