@@ -183,7 +183,9 @@ internal sealed class LivingNavigationButton : Button
     {
         if (_secondaryLabel is not null)
         {
-            _secondaryLabel.MaxWidth = Math.Max(48, width);
+            var maxWidth = Math.Max(48, width);
+            if (_secondaryLabel.MaxWidth != maxWidth)
+                _secondaryLabel.MaxWidth = maxWidth;
         }
     }
 

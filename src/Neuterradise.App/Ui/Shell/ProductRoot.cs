@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -41,6 +42,13 @@ public sealed class ProductRoot : Grid
     private readonly StackPanel _toasts = new() { Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 20, 20) };
     private readonly Dictionary<Type, Surface> _topLevel = [];
     private readonly LinkedList<(AppRoute Route, Surface Surface)> _contextual = new();
+    private readonly ConditionalWeakTable<Surface, NativeControlScan> _nativeControlScans = new();
+
+    private sealed class NativeControlScan
+    {
+        public AppRoute? Route;
+        public ThemeRuntime? Theme;
+    }
     private readonly List<(AppRoute Route, LivingNavigationButton Button, string LabelKey, string Fallback)> _navButtons = [];
     private readonly Grid _customizationLayer = new() { Visibility = Visibility.Collapsed };
     private LivingNavigationButton? _vaultButton;
@@ -434,12 +442,16 @@ public sealed class ProductRoot : Grid
         var compactUtilities = width < 980;
         if (_activityHeadline is not null)
         {
-            _activityHeadline.Visibility = compactUtilities ? Visibility.Collapsed : Visibility.Visible;
+            var visibility = compactUtilities ? Visibility.Collapsed : Visibility.Visible;
+            if (_activityHeadline.Visibility != visibility)
+                _activityHeadline.Visibility = visibility;
         }
 
         if (_activityProgress is not null)
         {
-            _activityProgress.Width = compactUtilities ? 44 : 72;
+            var progressWidth = compactUtilities ? 44 : 72;
+            if (_activityProgress.Width != progressWidth)
+                _activityProgress.Width = progressWidth;
         }
 
         foreach (var item in _navButtons) item.Button.SetCompact(width < 820);
@@ -516,7 +528,17 @@ public sealed class ProductRoot : Grid
         UpdateBreadcrumb(route);
         UpdateNavSelection();
         UpdateContextualAction();
-        ThemeRuntime.Current.TrackNativeControls(next.View);
+        // A cached Surface returns to the shell repeatedly without replacing its
+        // native controls. Re-scan only on first mount, a changed route (which can
+        // replace child controls), or a new ThemeRuntime registration authority.
+        var theme = ThemeRuntime.Current;
+        var scan = _nativeControlScans.GetOrCreateValue(next);
+        if (scan.Route != route || !ReferenceEquals(scan.Theme, theme))
+        {
+            theme.TrackNativeControls(next.View);
+            scan.Route = route;
+            scan.Theme = theme;
+        }
         RefreshFigureOcclusion();
     }
 

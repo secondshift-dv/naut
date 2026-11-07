@@ -117,8 +117,13 @@ internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
                 var written = safeOffset;
                 var lastCheckpoint = safeOffset;
                 var checkpointSavedThisRun = false;
+                var lastProgressReport = System.Diagnostics.Stopwatch.GetTimestamp();
                 var nextThrottleBoundary = (safeOffset / Neuterradise.App.SystemServices.Resources.ResourceGovernor.TransferThrottleQuantumBytes + 1)
                     * Neuterradise.App.SystemServices.Resources.ResourceGovernor.TransferThrottleQuantumBytes;
+                // Publish the starting state once; subsequent progress is coalesced at the
+                // same 100 ms cadence as the scheduler, while EOF always reports exactly.
+                await context.Progress.ReportProgressAsync(written, length, "Transferring", cancellationToken)
+                    .ConfigureAwait(false);
                 while (written < length && !cancellationToken.IsCancellationRequested)
                 {
                     var ioStarted = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -138,8 +143,16 @@ internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
                             await Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared
                                 .YieldBackgroundDiskAsync(cancellationToken).ConfigureAwait(false);
                     }
-                    await context.Progress.ReportProgressAsync(written, length, "Transferring", cancellationToken)
-                        .ConfigureAwait(false);
+                    // The scheduler's progress hub publishes at most 10 times per second.
+                    // Reporting each 1 MiB chunk still allocates and locks the hub repeatedly.
+                    // Preserve the final progress event and durable checkpoints independently.
+                    if (written == length || System.Diagnostics.Stopwatch.GetElapsedTime(lastProgressReport)
+                        >= TimeSpan.FromMilliseconds(100))
+                    {
+                        await context.Progress.ReportProgressAsync(written, length, "Transferring", cancellationToken)
+                            .ConfigureAwait(false);
+                        lastProgressReport = System.Diagnostics.Stopwatch.GetTimestamp();
+                    }
                     if (written - lastCheckpoint >= _checkpointInterval)
                     {
                         await SaveCheckpointAsync(context, partial, checkpoint.ImportItemId, item.UnitId, identity, length,

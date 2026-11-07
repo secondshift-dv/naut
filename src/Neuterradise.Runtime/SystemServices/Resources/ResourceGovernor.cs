@@ -92,7 +92,9 @@ public sealed class ResourceGovernor : IDisposable
     private readonly Dictionary<ResourceClass, ClassState> _classes = [];
     private readonly Func<long> _clock;
     private readonly Timer _timer;
+    private readonly Timer _interactionTimer;
     private readonly bool _systemTimer;
+    private long _interactionWakeAt;
 
     private long _interactiveUntil;
     private bool _windowActive = true;
@@ -137,7 +139,12 @@ public sealed class ResourceGovernor : IDisposable
         }
 
         _systemTimer = startTimer;
-        _timer = new Timer(_ => Tick(), null, startTimer ? TimeSpan.FromMilliseconds(250) : Timeout.InfiniteTimeSpan, startTimer ? TimeSpan.FromMilliseconds(250) : Timeout.InfiniteTimeSpan);
+        _interactionTimer = new Timer(_ => SettleInteraction(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        // Memory pressure needs periodic sampling, but interaction expiration has an exact
+        // deadline. Idle work no longer wakes the governor four times per second.
+        _timer = new Timer(_ => Tick(), null,
+            startTimer ? TimeSpan.FromSeconds(2) : Timeout.InfiniteTimeSpan,
+            startTimer ? TimeSpan.FromSeconds(2) : Timeout.InfiniteTimeSpan);
     }
 
     /// <summary>The process-wide instance. Composition may replace it once before work starts.</summary>
@@ -219,6 +226,29 @@ public sealed class ResourceGovernor : IDisposable
         }
     }
 
+    private void ScheduleInteractionWakeLocked()
+    {
+        if (!_systemTimer || _disposed || _mode != InteractionMode.ForegroundInteractive
+            || _interactionWakeAt != 0) return;
+
+        var now = _clock();
+        var dueMilliseconds = Math.Max(1, _interactiveUntil - now);
+        _interactionWakeAt = now + dueMilliseconds;
+        _interactionTimer.Change(TimeSpan.FromMilliseconds(dueMilliseconds), Timeout.InfiniteTimeSpan);
+    }
+
+    private void SettleInteraction()
+    {
+        bool changed;
+        lock (_sync)
+        {
+            if (_disposed) return;
+            _interactionWakeAt = 0;
+            changed = Recompute();
+        }
+        if (changed) RaiseChanged();
+    }
+
     public void SetWindowState(bool isActive, bool isMinimized)
     {
         bool changed;
@@ -255,11 +285,11 @@ public sealed class ResourceGovernor : IDisposable
         bool changed;
         lock (_sync)
         {
-            var previousLimits = CaptureLimitsLocked();
-            var eligibilityChanged = _memoryPressure != memoryPressure && _tier == PresentationTier.Reduced;
+            var previousMemoryPressure = _memoryPressure;
+            var eligibilityChanged = previousMemoryPressure != memoryPressure && _tier == PresentationTier.Reduced;
             _workingSet = Math.Max(0, workingSetBytes);
             _memoryPressure = memoryPressure;
-            changed = Recompute(previousLimits) || eligibilityChanged;
+            changed = Recompute(previousMemoryPressure) || eligibilityChanged;
         }
 
         if (changed)
@@ -309,12 +339,21 @@ public sealed class ResourceGovernor : IDisposable
 
     public void ReportTransferIoLatency(TimeSpan latency)
     {
+        if (latency.TotalMilliseconds < ContendedOperationMilliseconds) return;
+
+        // Import reports once per read. With no active or recently completed foreground
+        // disk work, do not contend on the governor lock for every transfer buffer.
+        var now = _clock();
+        if (Volatile.Read(ref _foregroundDiskWork) == 0)
+        {
+            var lastForeground = Volatile.Read(ref _lastForegroundCompletion);
+            if (lastForeground == 0 || now - lastForeground > ObservationMilliseconds) return;
+        }
+
         lock (_sync)
         {
-            var now = _clock();
-            if (latency.TotalMilliseconds < ContendedOperationMilliseconds
-                || (Volatile.Read(ref _foregroundDiskWork) == 0
-                    && (_lastForegroundCompletion == 0 || now - _lastForegroundCompletion > ObservationMilliseconds))) return;
+            if (Volatile.Read(ref _foregroundDiskWork) == 0
+                && (_lastForegroundCompletion == 0 || now - _lastForegroundCompletion > ObservationMilliseconds)) return;
             if (_lastContention == 0 || now - _lastContention > ObservationMilliseconds)
                 _contentionSince = now;
             _lastContention = now;
@@ -332,10 +371,22 @@ public sealed class ResourceGovernor : IDisposable
                     return _diskDelay = 0;
                 if (now - _lastContention > ObservationMilliseconds
                     || _lastContention - _contentionSince < ObservationMilliseconds) return _diskDelay;
-                var samples = _dispatcherLatencies.Where(sample => now - sample.At <= RecoveryMilliseconds)
-                    .Select(sample => sample.Latency).Order().ToArray();
-                var degraded = samples.Length >= 8
-                    && samples[(int)Math.Ceiling(samples.Length * .95) - 1] >= DispatcherLatencyThresholdMilliseconds;
+                // At most 32 recent samples. Keep the 95th percentile calculation on
+                // the stack: the 4 MiB transfer throttle must not allocate per check.
+                Span<double> samples = stackalloc double[32];
+                var sampleCount = 0;
+                foreach (var sample in _dispatcherLatencies)
+                {
+                    if (now - sample.At <= RecoveryMilliseconds)
+                        samples[sampleCount++] = sample.Latency;
+                }
+                var degraded = false;
+                if (sampleCount >= 8)
+                {
+                    var recent = samples[..sampleCount];
+                    recent.Sort();
+                    degraded = recent[(int)Math.Ceiling(sampleCount * .95) - 1] >= DispatcherLatencyThresholdMilliseconds;
+                }
                 return _diskDelay = degraded ? 4 : 2;
             }
         }
@@ -411,9 +462,11 @@ public sealed class ResourceGovernor : IDisposable
         return false;
     }
 
-    public int CurrentLimit(ResourceClass resourceClass)
+    public int CurrentLimit(ResourceClass resourceClass) => LimitFor(resourceClass, _mode, _memoryPressure);
+
+    private int LimitFor(ResourceClass resourceClass, InteractionMode mode, bool memoryPressure)
     {
-        var limits = _mode switch
+        var limits = mode switch
         {
             InteractionMode.ForegroundInteractive => InteractiveLimits,
             InteractionMode.ForegroundIdle => IdleLimits,
@@ -421,7 +474,7 @@ public sealed class ResourceGovernor : IDisposable
         };
 
         var limit = limits.For(resourceClass);
-        if (_memoryPressure && resourceClass is ResourceClass.Prefetch or ResourceClass.VideoHover)
+        if (memoryPressure && resourceClass is ResourceClass.Prefetch or ResourceClass.VideoHover)
         {
             limit = Math.Min(limit, resourceClass == ResourceClass.VideoHover ? 1 : 0);
         }
@@ -466,42 +519,29 @@ public sealed class ResourceGovernor : IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-        _timer.Dispose();
         lock (_sync)
         {
+            if (_disposed) return;
+            _disposed = true;
             foreach (var state in _classes.Values)
             {
                 foreach (var waiter in state.Waiting)
-                {
                     waiter.TrySetCanceled();
-                }
-
                 state.Waiting.Clear();
             }
         }
-    }
 
-    private int _tickCount;
+        // The deadline callback takes the same lock, so none can rearm its timer
+        // after disposal wins the lock.
+        _interactionTimer.Dispose();
+        _timer.Dispose();
+    }
 
     private void Tick()
     {
-        if (_disposed)
-        {
-            return;
-        }
-
-        if (_systemTimer && Interlocked.Increment(ref _tickCount) % 8 == 0)
-        {
-            SampleMemory();
-        }
-
-        Update();
+        if (_disposed) return;
+        // UpdateMemoryPressure performs Recompute, so a second Update is redundant.
+        SampleMemory();
     }
 
     private void SampleMemory()
@@ -535,9 +575,10 @@ public sealed class ResourceGovernor : IDisposable
         }
     }
 
-    private bool Recompute(IReadOnlyDictionary<ResourceClass, int>? previousLimits = null)
+    private bool Recompute(bool? previousMemoryPressure = null)
     {
-        previousLimits ??= CaptureLimitsLocked();
+        var previousMode = _mode;
+        var previousPressure = previousMemoryPressure ?? _memoryPressure;
         var now = _clock();
         if (IsScrolling && now >= _interactiveUntil)
         {
@@ -561,20 +602,23 @@ public sealed class ResourceGovernor : IDisposable
         var changed = mode != _mode || tier != _tier;
         _mode = mode;
         _tier = tier;
+        // Covers both direct interaction and a foreground window being restored
+        // while a prior interaction deadline is still active.
+        ScheduleInteractionWakeLocked();
 
-        foreach (var resourceClass in _classes.Keys)
+        if (mode != previousMode || _memoryPressure != previousPressure)
         {
-            if (CurrentLimit(resourceClass) > previousLimits[resourceClass])
+            foreach (var resourceClass in _classes.Keys)
             {
-                PumpLocked(resourceClass);
+                if (CurrentLimit(resourceClass) > LimitFor(resourceClass, previousMode, previousPressure))
+                {
+                    PumpLocked(resourceClass);
+                }
             }
         }
 
         return changed;
     }
-
-    private Dictionary<ResourceClass, int> CaptureLimitsLocked() =>
-        _classes.Keys.ToDictionary(resourceClass => resourceClass, CurrentLimit);
 
     private void PumpLocked(ResourceClass resourceClass)
     {

@@ -121,8 +121,17 @@ public sealed class ProfileRuntimeSnapshotCache : IAsyncDisposable
             ObjectDisposedException.ThrowIf(_disposed, this);
             if (_entries.TryGetValue(profileId, out var existing))
             {
-                Touch(profileId);
-                return existing;
+                // A transient read failure (or an absent Profile later published) must
+                // not poison every subsequent navigation until an unrelated invalidation.
+                if (!existing.IsFaulted && !existing.IsCanceled
+                    && (!existing.IsCompletedSuccessfully || existing.Result is not null))
+                {
+                    Touch(profileId);
+                    return existing;
+                }
+
+                _entries.Remove(profileId);
+                if (_nodes.Remove(profileId, out var failedNode)) _lru.Remove(failedNode);
             }
 
             var task = BuildAsync(profileId, _lifetime.Token);
@@ -180,15 +189,64 @@ public sealed class ProfileRuntimeSnapshotCache : IAsyncDisposable
             }
             return;
         }
-        if (invalidation.DomainKind is CatalogInvalidationDomain.Media
-            or CatalogInvalidationDomain.Category
-            or CatalogInvalidationDomain.Tag
-            or CatalogInvalidationDomain.Import
-            or CatalogInvalidationDomain.Trash
-            or CatalogInvalidationDomain.TaxonomyUsage)
+        // Import domain events describe unit/job/checkpoint status, not published Profile
+        // content. Publishing real media separately signals Profile/Media/Appearance.
+        // Clearing here made every Import status write evict all warm Profile snapshots.
+        if (invalidation.DomainKind is CatalogInvalidationDomain.Media)
         {
-            Clear();
+            if (invalidation.EntityIds.Count == 0)
+                Clear();
+            else
+                InvalidateAffectedMedia(invalidation.EntityIds);
+            return;
         }
+
+        // Category and Tag definition changes publish targeted Profile invalidations for
+        // their assignments. The definition event is for list consumers, not all Profiles.
+        // Trash events can represent a Profile or Media operation; retain the broad
+        // invalidation because their entity IDs do not distinguish those two kinds.
+        if (invalidation.DomainKind is CatalogInvalidationDomain.Trash)
+            Clear();
+    }
+
+    private void InvalidateAffectedMedia(IReadOnlyList<Guid> mediaIds)
+    {
+        var changed = new HashSet<Guid>(mediaIds);
+        lock (_sync)
+        {
+            for (var node = _lru.First; node is not null;)
+            {
+                var next = node.Next;
+                var profileId = node.Value;
+                var task = _entries[profileId];
+
+                // Unfinished reads might be materializing the changed Media right now.
+                if (!task.IsCompletedSuccessfully
+                    || task.Result is not { } snapshot
+                    || ReferencesAnyMedia(snapshot, changed))
+                {
+                    _entries.Remove(profileId);
+                    _nodes.Remove(profileId);
+                    _lru.Remove(node);
+                }
+                node = next;
+            }
+        }
+    }
+
+    private static bool ReferencesAnyMedia(ProfileRuntimeSnapshot snapshot, HashSet<Guid> changed)
+    {
+        var detail = snapshot.Detail;
+        if (detail.CoverMediaId is Guid cover && changed.Contains(cover)
+            || detail.BannerMediaId is Guid banner && changed.Contains(banner)
+            || detail.FigureMediaId is Guid figure && changed.Contains(figure))
+            return true;
+
+        if (detail.BannerEntries is not null
+            && detail.BannerEntries.Any(entry => changed.Contains(entry.MediaId)))
+            return true;
+
+        return snapshot.InitialMediaPage.Items.Any(item => changed.Contains(item.MediaId));
     }
 
     private void Touch(Guid profileId)
