@@ -2,9 +2,11 @@
 
 The packs below contain independent definitions, not mandatory all-category bundles. Installation never changes user selections. The versions below are distributed as reviewed .ntpack archives through the independent optional-pack publishing channel.
 
+The showcase images below are static compositions made from artwork retained in the 2.0.0 packs. They are not in-app screenshots and do not change the published archives.
+
 ## Black Dossier - 2.0.0 source
 
-![Black Dossier](black-dossier/preview.png)
+![Black Dossier 2.0.0 architectural showcase](showcase/black-dossier.png)
 
 Nine distinct definitions: Obsidian Protocol Theme, Dossier Type, Operations Desk, Opening Brief, Dual Identity Card, Subject Dossier Profile, Obsidian Atrium Backdrop, Gunmetal Seal Frame, and Signal Trace Effect. The gallery and media-layout definitions were removed because the engine already offers their basic layout mechanisms.
 
@@ -12,7 +14,7 @@ Nine distinct definitions: Obsidian Protocol Theme, Dossier Type, Operations Des
 
 ## Nightfall Murim - 2.0.0 source
 
-![Nightfall Murim original artwork board](celestial/preview.png)
+![Nightfall Murim 2.0.0 themes, nightscape, and Cover Frame](showcase/nightfall-murim.png)
 
 An original nighttime martial-arts manhwa / jianghu atmosphere: sect halls, moonlight, restrained lantern-gold and jade, disciplined disciple records, scroll media and blade-aura motion. Eleven definitions: two Themes plus Home, Spotlight, Profile Card, Profile, Media, Backdrop, Effect, Cover Frame and Control Style. Overlapping typography, gallery, backdrop, frame and control alternatives have been removed.
 
@@ -22,7 +24,7 @@ The historical folder slug celestial and technical pack ID neuterradise.celestia
 
 ## Voxel Playground - 2.0.0 source
 
-![Voxel Playground original artwork board](overworld-expedition/preview.png)
+![Voxel Playground 2.0.0 retained backdrop and frame artwork](showcase/voxel-playground.png)
 
 An original voxel sandbox inspired by the building/exploring possibilities of Minecraft and Roblox without third-party game assets, brands or characters. Twelve definitions: a sky-and-grass Theme, pixel-heading Typography, block-built Controls, Home, Spotlight, Card, Profile, Media, two scope-specific Backdrops, Pixel Dust Effect, and one piglet Cover Frame. Repetitive layouts, effects and ornamental frames are removed.
 
