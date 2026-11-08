@@ -20,6 +20,14 @@ README, translations and ordinary public copy are usually low risk. Ordinary UI,
 
 Report security vulnerabilities privately using the repository's Security reporting surface rather than a public issue.
 
+## Documentation integrity
+
+Public README pages, translations, guides, release notes and pack previews must describe the currently published version, not a development-only or retired definition. Keep the active download and versioned links aligned with `Directory.Build.props`; keep pack display names and counts aligned with `packs/catalog.json` and the shipped `pack.json`. Historical release notes remain archival and must not be rewritten to present them as current behavior.
+
+Use UTF-8 throughout. Do not substitute a bare `?` for punctuation or publish repeated `?` placeholders, damaged replacement characters, control bytes or mojibake. Legitimate questions, URL query syntax and code examples can retain their question marks. Keep relative links valid, preserve attribution, and display only shipped pack components in documentation artwork. Treat static compositions as illustrations, never as verified in-app screenshots.
+
+Run `pwsh ./scripts/verification/verify-documentation.ps1` after documentation edits; it also runs during `pwsh ./scripts/verify.ps1 -Scope Source`. The automated guard checks encoding, suspicious punctuation, links, versioned downloads and pack identity; feature accuracy still requires comparing documentation with implementation and release evidence.
+
 ## Release notes
 
 Product releases require reviewed, versioned user-facing notes. Follow the [Release notes policy](docs/release-notes.md) and run `pwsh ./scripts/verification/verify-release-notes.ps1` before release preparation. A Full Changelog link alone is insufficient.

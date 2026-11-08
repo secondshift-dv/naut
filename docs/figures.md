@@ -6,17 +6,17 @@ A compatible 3D model can become an optional interactive **Figure** inside a Pro
 
 A suitable model can be prepared into Naut's durable Figure representation and displayed in the Profile identity region.
 
-The Figure viewer supports direct interaction such as **rotate, pan, and zoom** while Naut keeps camera behavior, framing, pedestal presentation, texture policy, and renderer behavior under the application engine. In v0.0.7, the live Figure blends transparently with the selected Profile Backdrop; a static thumbnail remains the fallback.
+The Figure viewer supports direct interaction such as **rotate, pan, and zoom** while Naut keeps camera behavior, framing, pedestal presentation, texture policy, and renderer behavior under the application engine. The live Figure blends transparently with the selected Profile Backdrop; a static thumbnail remains the fallback.
 
 Naut can reuse a verified prepared Figure on supported NTFS drives when file identity and journal evidence prove it unchanged. If that proof is unavailable or uncertain, Naut performs full validation instead; Deep Health always validates fully.
 
-Naut v0.0.11 keeps a pending Figure first-load request alive when Profile layout changes briefly reattach its header. Visible Figure loading has priority over optional background prewarm, which yields during interaction, Import or memory pressure. Figure validation and the static-thumbnail fallback remain intact.
+Naut keeps a pending Figure first-load request alive when Profile layout changes briefly reattach its header. Visible Figure loading has priority over optional background prewarm, which yields during interaction, Import or memory pressure. Figure validation and the static-thumbnail fallback remain intact.
 
-Naut v0.0.12 reserves disjoint space for Figure and Profile identity/actions across built-in and installed-pack layouts. On wide compatible layouts, the Figure may overlap the Banner visually without covering text or buttons; on narrow layouts, content stacks.
+Naut reserves disjoint space for Figure and Profile identity/actions across built-in and installed-pack layouts. On wide compatible layouts, the Figure may overlap the Banner visually without covering text or buttons; on narrow layouts, content stacks.
 
 ## Supported formats
 
-Naut v0.0.7 can prepare **GLB, FBX, OBJ, STL and 3MF** as Figures. They display a static scene with rotation, pan and zoom. Animation playback and rig editing are not included; your original file is preserved.
+Naut can prepare **GLB, FBX, OBJ, STL and 3MF** as Figures. They display a static scene with rotation, pan and zoom. Animation playback and rig editing are not included; your original file is preserved.
 
 Import the model into a Profile, wait for preparation, then choose it in **Customize > 3D Figure**. Keep OBJ material and texture files together when importing. For FBX, use embedded textures; unrecorded external texture dependencies cannot be loaded.
 
@@ -35,7 +35,7 @@ The Figure renderer uses **Direct3D 11**.
 
 Normal viewing uses textures up to **2048 × 2048**. Close zoom can refine to **4096 × 4096**; the Reduced tier uses up to **1024 × 1024**. Larger imported textures are prepared into these bounded runtime sizes.
 
-See [System Requirements](system-requirements.md) for the v0.0.7 minimum and recommended tiers.
+See [System Requirements](system-requirements.md) for the current minimum and recommended tiers.
 
 ## If a Figure is not available
 

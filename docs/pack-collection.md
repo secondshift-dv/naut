@@ -10,8 +10,10 @@ They use the existing Presentation Pack contract and contain data/art only.
 1. Download a `.ntpack` from the collection page.
 2. Open Settings → Presentation → Packs / Advanced → Install from file….
 3. Select the downloaded pack and wait for validation.
-4. Select Theme/Font in Appearance and other components in their library or
-   Home/Profile Customize screen. Save changes to commit a preview.
+4. Select Theme, Typography and Control Style in Settings → Appearance. Choose
+   Home and Profile components in their Customize panels, and Profile Card
+   through Customize Card. The Presentation Library is for browsing only.
+   Save changes to commit each preview.
 
 To use the source folder instead, choose Install from folder… and select the
 directory containing `pack.json`, for example `packs/celestial/` in a checkout.

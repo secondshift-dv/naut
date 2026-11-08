@@ -4,7 +4,7 @@ Naut is a local-first media collection manager for Windows. Start here if you ar
 
 ## Using Naut
 
-- [Naut v0.0.15 release notes](releases/v0.0.15.md) ? clearer Banner effects, Home/Profile Bubbles, Gallery search and optional pack README corrections.
+- [Naut v0.0.15 release notes](releases/v0.0.15.md) — clearer Banner effects, Home/Profile Bubbles, Gallery search and optional pack README corrections.
 - [Naut v0.0.14 release notes](releases/v0.0.14.md) — Figure 3D hot-cache entry, targeted Profile invalidation, deadline-driven Governor, and lower Import/navigation overhead.
 - [Naut v0.0.13 release notes](releases/v0.0.13.md) — BGRA frame reuse, Backdrop resource cleanup, fewer redundant UI invalidations, and updated system guidance.
 - [Naut v0.0.12 release notes](releases/v0.0.12.md) — Banner effects, Profile layout safety, readable Home/Card labels, Flame media favorites, and About release dates.

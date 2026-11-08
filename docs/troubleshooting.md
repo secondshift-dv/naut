@@ -24,7 +24,7 @@ No. A candidate is a reviewable model suggestion. Naut keeps confirmation as a s
 
 ## MPG or MPEG stays at Preparing media
 
-Naut v0.0.4 fixes candidate imports that had finished metadata and face-analysis jobs but kept waiting for assets created only after confirmation. Update to v0.0.4 and open Import again. A completed candidate can offer **Review**; imports with failed required work remain under **Needs attention**. If you already cancelled the import, import the original files again.
+Current builds no longer wait for assets created only after candidate confirmation. Open Import and check **Review** for completed candidates or **Needs attention** for failed required work. Keep the original files available for retry or recovery. If the import was cancelled, import the originals again.
 
 ## Why does an original video open outside Naut?
 
@@ -49,7 +49,7 @@ About retrieves the published date for **the installed Naut version** from the o
 
 ## Which interface languages are included?
 
-Naut v0.0.7 includes English, Bahasa Indonesia, 日本語, 한국어, 简体中文, Deutsch, Français, and Español. See [Languages](languages.md).
+Naut includes English, Bahasa Indonesia, 日本語, 한국어, 简体中文, Deutsch, Français, and Español. See [Languages](languages.md).
 
 ## Where should I put the Vault?
 
@@ -63,9 +63,9 @@ Keep a complete copy of the Vault together. Install/extract Naut separately on t
 
 Open **Import → Activity / Needs attention** to review exceptional items. A cancelled transfer is settled at a safe checkpoint before staging cleanup. If cleanup or recovery remains incomplete, use **Settings → Vault → Vault Health** to resume, retry or finish the pending operation. Retain the original external files until import has succeeded.
 
-## Can I use an older Naut build after opening a Vault in v0.0.7?
+## Can I use an older Naut build after a Vault schema upgrade?
 
-A recognized Catalog Schema v1 Vault is upgraded to v2 on first compatible open. Older v1 binaries reject that upgraded database; restore a complete pre-upgrade Vault backup if you must downgrade. Do not replace individual catalog files independently.
+Naut can upgrade recognized Catalog v1 and v2 Vaults to schema v3, preserving existing collection data. Older builds may reject the upgraded database or be unable to write it safely. To downgrade, restore a complete pre-upgrade Vault backup; do not replace individual catalog files independently. See [Vault compatibility](vault.md#compatibility-and-text-files).
 
 ## Why does a Profile Overview or Private Note report an external edit?
 

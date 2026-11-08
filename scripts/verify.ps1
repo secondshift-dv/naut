@@ -76,6 +76,7 @@ function Verify-WorkflowPolicy {
     Write-Host 'PUBLIC_WORKFLOW_POLICY=PASS'
 }
 if ($Scope -in @('Source','Hygiene','Closure')) { Verify-PublicTree }
+if ($Scope -in @('Source','Hygiene','Closure')) { & (Join-Path $PSScriptRoot 'verification/verify-documentation.ps1') }
 if ($Scope -in @('Source','WorkflowPolicy','Closure')) { Verify-WorkflowPolicy }
 if ($Scope -in @('Source','Compile')) { & (Join-Path $PSScriptRoot 'verification/verify-compile.ps1') -Offline:$Offline }
 if ($Scope -eq 'Updater') { & (Join-Path $PSScriptRoot 'verification/verify-updater.ps1') -Offline:$Offline }

@@ -25,13 +25,13 @@ The import review can suggest presentation media, but **Cover and Banner can alw
 
 ## Imports, recovery and supported containers
 
-In v0.0.7, **Add media** from a Profile imports eligible files directly into that Profile. The general **Import** surface still supports explicit review. Durable Import Activity records successes and exceptions; compatible exact duplicates can reuse existing content.
+**Add media** from a Profile imports eligible files directly into that Profile. The general **Import** surface still supports explicit review. Durable Import Activity records successes and exceptions; compatible exact duplicates can reuse existing content.
 
 Transfers retain a staged copy and incremental SHA-256, with durable Resume and safe Cancel. Cancel settles an active copy at a checkpoint before cleaning interrupted staging; **Settings → Vault → Vault Health** can help resume, retry or finish interrupted cleanup. The copied originals in the Vault and original files outside the Vault are not silently removed by cancelling.
 
-In v0.0.8, a transfer that finishes exactly at an already-durable checkpoint no longer repeats that final flush and catalog write. The 64 MiB checkpoint interval, staged copy, source integrity checks, and restart recovery remain unchanged.
+A transfer that finishes exactly at an already-durable checkpoint no longer repeats that final flush and catalog write. The 64 MiB checkpoint interval, staged copy, source integrity checks, and restart recovery remain unchanged.
 
-In v0.0.9, new video imports prepare a bounded 480p/24 FPS HOVER rendition; Banner candidates can prepare a separate rendition of up to 900p/24 FPS. New Profiles may receive up to three initial Banner alternatives. Existing Profile imports preserve their current Banner collection and appearance. When storage contention is measured, background transfer yields adaptively without changing source bytes, SHA-256 integrity or durable checkpoints. These changes are not a claim of measured transfer-speed improvement.
+New video imports prepare a bounded 480p/24 FPS HOVER rendition; Banner candidates can prepare a separate rendition of up to 900p/24 FPS. New Profiles may receive up to three initial Banner alternatives. Existing Profile imports preserve their current Banner collection and appearance. When storage contention is measured, background transfer yields adaptively without changing source bytes, SHA-256 integrity or durable checkpoints. These changes are not a claim of measured transfer-speed improvement.
 
 Additional eligible inputs include JPEG 2000 (`.jp2`, `.j2k`), OGV/Theora, VOB and representative MXF containers. Actual support depends on the contained codec; damaged or unsupported media can still require attention. Video previews use prepared Thumbnail and Hover assets where supported.
 

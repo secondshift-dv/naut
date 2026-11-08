@@ -21,11 +21,11 @@ Cover and Banner are presentation choices, not replacements for the original med
 
 Video Banners can loop on the Profile surface when ready. Video hover presentation is intentionally brief and bounded.
 
-Since v0.0.9, each Profile can retain an ordered collection of Banner alternatives. Use **Add as Banner** in Customize to prepare an additional eligible video without replacing the active choice. Choosing an active Banner, framing and effects is a preview until **Save**; **Cancel** discards those preview changes. When a selected Banner rendition is unavailable or requires repair, Naut falls back to a still image without discarding the saved selection.
+Each Profile can retain an ordered collection of Banner alternatives. Use **Add as Banner** in Customize to prepare an additional eligible video without replacing the active choice. Choosing an active Banner, framing and effects is a preview until **Save**; **Cancel** discards those preview changes. When a selected Banner rendition is unavailable or requires repair, Naut falls back to a still image without discarding the saved selection.
 
-In Naut v0.0.11, a ready video Banner resumes after Profile/Customize header reflow. Import pressure alone reduces decorative presentation detail instead of automatically stopping a selected Profile Banner; inactive windows, Reduced Motion and memory pressure still use a static poster when appropriate.
+A ready video Banner resumes after Profile/Customize header reflow. Import pressure alone reduces decorative presentation detail instead of automatically stopping a selected Profile Banner; inactive windows, Reduced Motion and memory pressure still use a static poster when appropriate.
 
-In Naut v0.0.12, changing Film, Glitter or Shimmer effects no longer tears down Banner playback. The 3D Figure occupies reserved space so Profile text and buttons do not overlap it, including with optional Profile packs. **Delete Profile always appears last**, below the Profile modules. Card rating stars and favorite hearts are filled, while Favorite Media is marked by a distinct outline Flame.
+Changing Film, Glitter or Shimmer effects no longer tears down Banner playback. The 3D Figure occupies reserved space so Profile text and buttons do not overlap it, including with optional Profile packs. **Delete Profile always appears last**, below the Profile modules. Card rating stars and favorite hearts are filled, while Favorite Media is marked by a distinct outline Flame.
 
 ## Face-aware Profile suggestions
 
