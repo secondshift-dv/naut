@@ -1962,7 +1962,7 @@
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.backdrop.calm-blue.Name">Calm Blue</sys:String>
     <sys:String x:Key="Customize.Media.Dragging">드래그 중</sys:String>
     <sys:String x:Key="Settings.Presentation.Library.Title">설치된 구성 요소 라이브러리</sys:String>
-    <sys:String x:Key="Settings.Presentation.Library.Notice">미리보기 전용입니다. 테마, 글꼴, 컨트롤 스타일은 외관에서, 다른 구성 요소는 사용자 정의에서 선택하세요.</sys:String>
+    <sys:String x:Key="Settings.Presentation.Library.Notice">여기에서 가져온 파일을 미리 보고 관리할 수 있습니다. 테마, 글꼴, 컨트롤 스타일은 외관에서, 다른 구성 요소는 사용자 정의에서 선택하세요.</sys:String>
     <sys:String x:Key="Settings.Presentation.Assets">가져올 수 있는 에셋</sys:String>
     <sys:String x:Key="Settings.Presentation.Components">팩 구성 요소</sys:String>
     <sys:String x:Key="Settings.Presentation.Fonts.ImportHelp">.ttf 또는 .otf 글꼴을 추가한 후 외관 → 글꼴에서 선택하세요.</sys:String>
@@ -2165,4 +2165,15 @@
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.shimmer.Description">느리고 부드러운 빛의 흐름.</sys:String>
     <sys:String x:Key="Banner.CollectionEmpty">배너 컬렉션이 비어 있습니다. 배너로 추가를 선택해 동영상을 준비하세요.</sys:String>
     <sys:String x:Key="Banner.NotReady">선택한 배너가 준비되지 않았습니다. 추가하거나 복구한 뒤 다시 시도하세요.</sys:String>
+    <sys:String x:Key="Settings.Presentation.LocalAsset">개별 파일</sys:String>
+    <sys:String x:Key="Settings.Presentation.PackManaged">팩에서 관리</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteAsset">파일 삭제</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteFailed">파일을 삭제할 수 없습니다.</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteTitle">가져온 파일을 삭제할까요?</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteHelp">개별 파일로 가져온 글꼴, 프레임, 배경은 여기에서 삭제할 수 있습니다. .ntpack, ZIP 및 폴더 팩은 Packs / Advanced에서 관리하며 기본 구성 요소는 삭제할 수 없습니다. 사용 중인 파일을 삭제하면 표시 설정만 초기화되고 프로필과 미디어 데이터는 유지됩니다.</sys:String>
+    <sys:String x:Key="Settings.Presentation.AssetDeleted">파일 삭제됨</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrash">미디어 삭제…</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashFailed">미디어를 휴지통으로 이동할 수 없습니다.</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashTitle">미디어를 휴지통으로 이동할까요?</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashBody">{0}을(를) 휴지통으로 이동할까요? 프로필 연결과 커버, 배너, Figure 선택이 해제됩니다. 얼굴 데이터는 복원 가능한 미디어 기록에 남습니다. 30일 이내에 설정 → 휴지통에서 복원할 수 있습니다.</sys:String>
 </ResourceDictionary>

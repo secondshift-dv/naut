@@ -1962,7 +1962,7 @@
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.backdrop.calm-blue.Name">Calm Blue</sys:String>
     <sys:String x:Key="Customize.Media.Dragging">拖动中</sys:String>
     <sys:String x:Key="Settings.Presentation.Library.Title">已安装组件库</sys:String>
-    <sys:String x:Key="Settings.Presentation.Library.Notice">仅供预览。主题、字体和控件样式请在“外观”中选择，其他组件请在“定制”中选择。</sys:String>
+    <sys:String x:Key="Settings.Presentation.Library.Notice">在此预览和管理导入的文件。主题、字体和控件样式请在“外观”中选择，其他组件请在“定制”中选择。</sys:String>
     <sys:String x:Key="Settings.Presentation.Assets">可导入的资源</sys:String>
     <sys:String x:Key="Settings.Presentation.Components">资源包组件</sys:String>
     <sys:String x:Key="Settings.Presentation.Fonts.ImportHelp">添加 .ttf 或 .otf 字体，然后在“外观 → 字体”中选择。</sys:String>
@@ -2165,4 +2165,15 @@
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.shimmer.Description">缓慢而柔和的光线扫过。</sys:String>
     <sys:String x:Key="Banner.CollectionEmpty">横幅集合为空。请选择添加为横幅来准备视频。</sys:String>
     <sys:String x:Key="Banner.NotReady">所选横幅尚未就绪。请添加或修复后重试。</sys:String>
+    <sys:String x:Key="Settings.Presentation.LocalAsset">单独文件</sys:String>
+    <sys:String x:Key="Settings.Presentation.PackManaged">由素材包管理</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteAsset">删除文件</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteFailed">无法删除文件。</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteTitle">删除导入的文件？</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteHelp">单独导入的字体、边框和背景可在此删除。.ntpack、ZIP 和文件夹素材包仍在 Packs / Advanced 中管理；内置组件不可删除。删除使用中的文件只会重置其外观绑定，不会删除资料或媒体数据。</sys:String>
+    <sys:String x:Key="Settings.Presentation.AssetDeleted">文件已删除</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrash">删除媒体…</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashFailed">无法将媒体移至回收站。</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashTitle">将媒体移至回收站？</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashBody">将 {0} 移至回收站？其资料关联以及封面、横幅和 Figure 选择将被移除。人脸数据仍保留在可恢复的媒体记录中。可在 30 天内通过设置 → 回收站恢复。</sys:String>
 </ResourceDictionary>

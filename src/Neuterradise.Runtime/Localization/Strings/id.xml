@@ -1962,7 +1962,7 @@
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.backdrop.calm-blue.Name">Calm Blue</sys:String>
     <sys:String x:Key="Customize.Media.Dragging">Menggeser</sys:String>
     <sys:String x:Key="Settings.Presentation.Library.Title">Library komponen terpasang</sys:String>
-    <sys:String x:Key="Settings.Presentation.Library.Notice">Hanya pratinjau. Pilih Tema, Font, dan Gaya Kontrol di Tampilan; pilih komponen lain di Sesuaikan.</sys:String>
+    <sys:String x:Key="Settings.Presentation.Library.Notice">Pratinjau dan kelola file impor di sini. Pilih Tema, Font, dan Gaya Kontrol di Tampilan; pilih komponen lain di Sesuaikan.</sys:String>
     <sys:String x:Key="Settings.Presentation.Assets">Aset yang dapat diimpor</sys:String>
     <sys:String x:Key="Settings.Presentation.Components">Komponen paket</sys:String>
     <sys:String x:Key="Settings.Presentation.Fonts.ImportHelp">Tambahkan font .ttf atau .otf. Pilih di Tampilan → Font.</sys:String>
@@ -2165,4 +2165,15 @@
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.shimmer.Description">Sapuan cahaya lembut dan lambat.</sys:String>
     <sys:String x:Key="Banner.CollectionEmpty">Koleksi Banner masih kosong. Pilih Tambahkan sebagai Banner untuk menyiapkan video.</sys:String>
     <sys:String x:Key="Banner.NotReady">Banner yang dipilih belum siap. Tambahkan atau perbaiki Banner tersebut, lalu coba lagi.</sys:String>
+    <sys:String x:Key="Settings.Presentation.LocalAsset">File mandiri</sys:String>
+    <sys:String x:Key="Settings.Presentation.PackManaged">Dikelola paket</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteAsset">Hapus file</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteFailed">File tidak dapat dihapus.</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteTitle">Hapus file yang diimpor?</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteHelp">Font, frame, dan backdrop yang diimpor sebagai file mandiri dapat dihapus di sini. Paket .ntpack, ZIP, dan folder dikelola lewat Packs / Advanced; komponen bawaan tidak dapat dihapus. Menghapus file yang sedang digunakan mengatur ulang pengaturan tampilannya, bukan data Profil atau media.</sys:String>
+    <sys:String x:Key="Settings.Presentation.AssetDeleted">File dihapus</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrash">Hapus media…</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashFailed">Media tidak dapat dipindahkan ke Sampah.</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashTitle">Pindahkan media ke Sampah?</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashBody">Pindahkan {0} ke Sampah? Tautan Profil dan pilihan Cover, Banner, serta Figure akan dilepas. Data Face tetap bersama rekaman media yang dapat dipulihkan. Pulihkan melalui Pengaturan → Tong Sampah dalam 30 hari.</sys:String>
 </ResourceDictionary>

@@ -26,6 +26,9 @@ public sealed record InstalledPack(
     public bool IsUsable => Diagnostics.All(d => !d.IsError);
 
     public string PackId => Manifest.PackId;
+
+    public bool IsStandaloneAsset => Origin == PackOrigin.User && RootPath is not null
+        && File.Exists(Path.Combine(RootPath, PresentationPackStore.StandaloneAssetMarker));
 }
 
 public sealed record PackInstallResult(bool Succeeded, InstalledPack? Pack, IReadOnlyList<PackDiagnostic> Diagnostics, string? Message = null);
@@ -51,6 +54,7 @@ public interface IPresentationAssetStore
 public sealed class PresentationPackStore : IPresentationAssetStore
 {
     public const string PackArchiveExtension = ".ntpack";
+    internal const string StandaloneAssetMarker = ".naut-standalone-asset";
     private const string StagingFolderName = ".staging";
     private const int MaxJournalBytes = 512 * 1024;
     private const long MaxArchiveUncompressedBytes = PackValidator.MaxPackBytes + (16L * 1024 * 1024);
@@ -230,7 +234,8 @@ public sealed class PresentationPackStore : IPresentationAssetStore
     internal async Task<PackInstallResult> InstallWithPublicationAsync(
         string sourcePath, bool replaceExisting,
         Func<InstalledPack, CancellationToken, Task> publish,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool standaloneAsset = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
         Directory.CreateDirectory(_userPacksRoot);
@@ -266,6 +271,10 @@ public sealed class PresentationPackStore : IPresentationAssetStore
                 return new(false, null, [new(PackDiagnosticCodes.FieldMissing, "pack.json", "The pack has no pack.json manifest.")], "This is not a Presentation Pack.");
             }
 
+            var markerPath = Path.Combine(root, StandaloneAssetMarker);
+            if (File.Exists(markerPath) || Directory.Exists(markerPath))
+                return new(false, null, [new(PackDiagnosticCodes.ForbiddenContent, StandaloneAssetMarker, "The file is reserved for local asset imports.")], "This pack contains a reserved internal file.");
+
             var manifestPath = Path.Combine(root, PackManifestReader.ManifestFileName);
             if (new FileInfo(manifestPath).Length > PackManifestReader.MaxManifestBytes)
                 return new(false, null, [new(PackDiagnosticCodes.PackTooLarge, "pack.json", "The manifest exceeds 4 MiB.")], "The pack manifest is too large.");
@@ -297,6 +306,9 @@ public sealed class PresentationPackStore : IPresentationAssetStore
                     return new(false, null, [.. diagnostics, conflict], conflict.Detail);
                 }
             }
+
+            if (standaloneAsset)
+                File.WriteAllText(markerPath, "1", Encoding.ASCII);
 
             var destination = Path.Combine(_userPacksRoot, packId);
             var hash = HashDirectory(root);
@@ -370,6 +382,7 @@ public sealed class PresentationPackStore : IPresentationAssetStore
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         var relative = Path.GetRelativePath(pack.RootPath!, file).Replace('\\', '/');
+                        if (string.Equals(relative, StandaloneAssetMarker, StringComparison.Ordinal)) continue;
                         archive.CreateEntryFromFile(file, relative, CompressionLevel.Optimal);
                     }
                 }

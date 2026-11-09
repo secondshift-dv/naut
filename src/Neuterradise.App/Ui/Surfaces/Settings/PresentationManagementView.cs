@@ -58,7 +58,7 @@ public sealed class PresentationManagementView
         _editor.Children.Add(UI.V(4,
             UI.Text(UI.T("Settings.Presentation.Library.Title", "Installed component library"), "card-title"),
             UI.WrappedText(UI.T("Settings.Presentation.Library.Notice",
-                "Previews only. Choose Theme, Font and Control Style in Appearance; select other components in Customize."), "body")));
+                "Preview and manage imported files here. Choose Theme, Font and Control Style in Appearance; select other components in Customize."), "body")));
         _editor.Children.Add(UI.V(4,
             UI.Text(UI.T("Settings.Presentation.Assets", "Importable assets"), "micro", "textMuted"), assets,
             UI.Text(UI.T("Settings.Presentation.Components", "Pack components"), "micro", "textMuted").Margin(0, 4, 0, 0), components));
@@ -90,6 +90,10 @@ public sealed class PresentationManagementView
         {
             _editor.Children.Add(actions);
         }
+        if (_tab is "fonts" or "frames" or "backdrops")
+            _editor.Children.Add(UI.WrappedText(
+                UI.T("Settings.Presentation.DeleteHelp", "Individual fonts, frames and backdrops imported as files can be deleted here. .ntpack, ZIP and folder packs stay in Packs / Advanced; built-in components cannot be deleted. Removing a file in use resets its appearance binding, not Profile or media data."),
+                "caption", "textMuted"));
 
         var definitions = DefinitionsForCurrentTab().ToList();
         var frameGrid = UI.Grid(string.Empty, "*,*,*");
@@ -101,6 +105,10 @@ public sealed class PresentationManagementView
             var name = SurfaceText.PresentationName(definition);
             var description = SurfaceText.PresentationDescription(definition);
             var isDefault = PresentationSlots.All.Any(slot => slot.Default == definition.Ref);
+            var pack = _services.Presentation.Packs.FirstOrDefault(item => item.PackId == definition.Ref.PackId);
+            var isStandaloneAsset = pack?.IsStandaloneAsset == true
+                && pack.Manifest.Definitions.Count == 1
+                && pack.Manifest.Definitions[0].Id == definition.Ref.DefinitionId;
             var badges = UI.Wrap(
                 4,
                 isDefault ? UI.Badge(UI.T("Settings.Presentation.Default", "Default"), "accent") : null,
@@ -110,6 +118,11 @@ public sealed class PresentationManagementView
                         : UI.T("Settings.Presentation.BuiltIn", "Built-in"),
                     definition.Origin == PackOrigin.User ? "accent" : "neutral"),
                 UI.Badge(KindLabel(definition.Kind)),
+                definition.Origin == PackOrigin.User
+                    ? UI.Badge(isStandaloneAsset
+                        ? UI.T("Settings.Presentation.LocalAsset", "Individual file")
+                        : UI.T("Settings.Presentation.PackManaged", "Pack-managed"))
+                    : null,
                 definition.Plan is EffectPlan effect
                     ? UI.Badge(EffectChannelLabel(effect.Channel))
                     : null);
@@ -121,7 +134,16 @@ public sealed class PresentationManagementView
                 string.IsNullOrWhiteSpace(description)
                     ? UI.Text(KindDescription(definition.Kind), "caption", "textMuted", maxLines: 2)
                     : UI.WrappedText(description, "caption"),
-                badges);
+                badges,
+                isStandaloneAsset
+                    ? UI.Button(
+                        UI.T("Settings.Presentation.DeleteAsset", "Delete file"),
+                        () => Run(RemoveAsync(definition.Ref.PackId, name, _services.Presentation.CountUsages(definition.Ref.PackId), standaloneAsset: true),
+                            "PresentationManagementView.DeleteAsset",
+                            UI.T("Settings.Presentation.DeleteFailed", "The file could not be removed.")),
+                        ButtonKind.Destructive,
+                        "icon.action.delete")
+                    : null);
 
             var card = UI.Surface(body, Material.Raised, 12, 12);
             if (_tab == "frames")
@@ -368,7 +390,7 @@ public sealed class PresentationManagementView
                 ButtonKind.Secondary));
 
         var list = UI.V(10);
-        foreach (var pack in _services.Presentation.Packs.OrderBy(pack => pack.Origin))
+        foreach (var pack in _services.Presentation.Packs.Where(pack => !pack.IsStandaloneAsset).OrderBy(pack => pack.Origin))
         {
             var manifest = pack.Manifest;
             var errors = pack.Diagnostics.Count(diagnostic => diagnostic.IsError);
@@ -526,8 +548,11 @@ public sealed class PresentationManagementView
         }
     }
 
-    private async Task RemoveAsync(string packId, string name, int usages)
+    private async Task RemoveAsync(string packId, string name, int usages, bool standaloneAsset = false)
     {
+        if (standaloneAsset && !_services.Presentation.Packs.Any(pack => pack.PackId == packId && pack.IsStandaloneAsset && pack.Manifest.Definitions.Count == 1))
+            return;
+
         var message = usages > 0
             ? UI.F(
                 "Customize.RemoveUsed",
@@ -536,18 +561,26 @@ public sealed class PresentationManagementView
                 usages)
             : UI.F("Customize.RemoveBody", "Remove {0}? Your Profiles and media are not affected.", name);
         if (!await _services.ConfirmAsync(
-            UI.T("Customize.RemoveTitle", "Remove pack?"),
+            standaloneAsset
+                ? UI.T("Settings.Presentation.DeleteTitle", "Delete imported file?")
+                : UI.T("Customize.RemoveTitle", "Remove pack?"),
             message,
-            UI.T("Customize.Remove", "Remove"),
+            standaloneAsset
+                ? UI.T("Settings.Presentation.DeleteAsset", "Delete file")
+                : UI.T("Customize.Remove", "Remove"),
             destructive: true).ConfigureAwait(true))
         {
             return;
         }
 
-        var result = await _services.Presentation.RemovePackAsync(packId).ConfigureAwait(true);
+        var result = standaloneAsset
+            ? await _services.Presentation.RemoveStandaloneAssetAsync(packId).ConfigureAwait(true)
+            : await _services.Presentation.RemovePackAsync(packId).ConfigureAwait(true);
         _services.Toast(
             result.Removed
-                ? UI.T("Customize.Removed", "Pack removed")
+                ? standaloneAsset
+                    ? UI.T("Settings.Presentation.AssetDeleted", "File removed")
+                    : UI.T("Customize.Removed", "Pack removed")
                 : result.Message ?? string.Empty,
             result.Removed ? "success" : "danger");
         PresentationBinder.ApplyGlobal(_services.Presentation);
@@ -566,7 +599,7 @@ public sealed class PresentationManagementView
         {
             using var package = CustomFrameImportBuilder.Build(source);
             var result = await _services.Presentation
-                .InstallPackAsync(package.StagingPath, replaceExisting: false)
+                .InstallStandaloneAssetAsync(package.StagingPath)
                 .ConfigureAwait(true);
 
             if (!result.Succeeded
@@ -625,7 +658,7 @@ public sealed class PresentationManagementView
         using var package = await Task.Run(() => font
             ? PresentationAssetImportBuilder.Font(source)
             : PresentationAssetImportBuilder.Backdrop(source)).ConfigureAwait(true);
-        var result = await _services.Presentation.InstallPackAsync(package.StagingPath, replaceExisting: false).ConfigureAwait(true);
+        var result = await _services.Presentation.InstallStandaloneAssetAsync(package.StagingPath).ConfigureAwait(true);
         if (!result.Succeeded
             && !result.Diagnostics.Any(diagnostic => diagnostic.Code == PackDiagnosticCodes.AlreadyInstalled))
         {

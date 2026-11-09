@@ -1962,7 +1962,7 @@
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.backdrop.calm-blue.Name">Calm Blue</sys:String>
     <sys:String x:Key="Customize.Media.Dragging">ドラッグ中</sys:String>
     <sys:String x:Key="Settings.Presentation.Library.Title">インストール済みコンポーネントのライブラリ</sys:String>
-    <sys:String x:Key="Settings.Presentation.Library.Notice">プレビュー専用です。テーマ、フォント、コントロールスタイルは「外観」、その他のコンポーネントは「カスタマイズ」で選択してください。</sys:String>
+    <sys:String x:Key="Settings.Presentation.Library.Notice">ここで取り込んだファイルの確認と管理ができます。テーマ、フォント、コントロールスタイルは「外観」、その他のコンポーネントは「カスタマイズ」で選択してください。</sys:String>
     <sys:String x:Key="Settings.Presentation.Assets">インポート可能なアセット</sys:String>
     <sys:String x:Key="Settings.Presentation.Components">パックのコンポーネント</sys:String>
     <sys:String x:Key="Settings.Presentation.Fonts.ImportHelp">.ttf または .otf フォントを追加し、外観 → フォント で選択してください。</sys:String>
@@ -2165,4 +2165,15 @@
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.shimmer.Description">ゆっくりと流れる柔らかな光。</sys:String>
     <sys:String x:Key="Banner.CollectionEmpty">バナーコレクションは空です。「バナーとして追加」で動画を準備できます。</sys:String>
     <sys:String x:Key="Banner.NotReady">選択したバナーの準備ができていません。追加または修復してから再試行してください。</sys:String>
+    <sys:String x:Key="Settings.Presentation.LocalAsset">個別ファイル</sys:String>
+    <sys:String x:Key="Settings.Presentation.PackManaged">パック管理</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteAsset">ファイルを削除</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteFailed">ファイルを削除できませんでした。</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteTitle">インポートしたファイルを削除しますか？</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteHelp">ファイルとして個別に取り込んだフォント、フレーム、背景はここで削除できます。.ntpack、ZIP、フォルダのパックは Packs / Advanced で管理します。標準コンポーネントは削除できません。使用中のファイルを削除すると表示設定のみ初期化され、プロフィールやメディアは保持されます。</sys:String>
+    <sys:String x:Key="Settings.Presentation.AssetDeleted">ファイルを削除しました</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrash">メディアを削除…</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashFailed">メディアをゴミ箱に移動できませんでした。</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashTitle">メディアをゴミ箱に移動しますか？</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashBody">{0} をゴミ箱に移動しますか？プロフィールとの関連付けとカバー、バナー、Figure の選択が解除されます。顔データは復元可能なメディア記録に保持されます。30 日以内に設定 → ゴミ箱から復元できます。</sys:String>
 </ResourceDictionary>

@@ -7,7 +7,7 @@
 <p align="center">Local-first media collections for Windows — offline face intelligence, interactive 3D Figures, and your own portable Vault.</p>
 
 <p align="center">
-  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.16"><strong>Download Naut v0.0.16</strong></a>
+  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.17"><strong>Download Naut v0.0.17</strong></a>
   ·
   <a href="https://secondshift-dv.github.io/naut/"><strong>View Live Demo</strong></a>
   ·
@@ -84,13 +84,13 @@ The portable app package and the Vault are separate boundaries. Imports copy fil
 - **3D is additive, not mandatory.** Normal Naut use does not require a discrete GPU or a Figure.
 - **Portable application, durable collection.** Updating the app package does not replace the Vault.
 
-## What changed in v0.0.16
+## What changed in v0.0.17
 
-- **Reliable video thumbnails:** avoids seeking beyond the last decodable video frame when a container reports a longer duration.
-- **Automatic recovery:** retries thumbnail creation from the beginning when a selected frame is unavailable, retaining valid Hover and Banner previews.
-- **More useful Import errors:** the review screen now shows the failed capability, error code and safe diagnostic detail, so users can retry the affected media.
+- **Delete standalone presentation files in Settings:** remove individually imported Fonts, Frames and Backdrops directly from their respective library pages.
+- **Keep pack contracts intact:** `.ntpack`, ZIP and folder packs stay managed through Packs / Advanced, while built-in components remain protected.
+- **Recoverable media deletion:** Media Inspector now offers a confirmed Delete action through Trash, preserving Face data and detaching affected Profile, Cover, Banner and Figure references safely.
 
-See the [v0.0.16 release notes](docs/releases/v0.0.16.md) for update instructions and compatibility notes.
+See the [v0.0.17 release notes](docs/releases/v0.0.17.md) for update instructions and compatibility notes.
 
 ## See it in action
 
@@ -107,7 +107,7 @@ See the [v0.0.16 release notes](docs/releases/v0.0.16.md) for update instruction
 
 ## Quick Start
 
-1. Open the official [Naut v0.0.16 download](https://github.com/secondshift-dv/naut/releases/tag/v0.0.16) and choose **`naut-v0.0.16-win-x64.zip`** under Assets.
+1. Open the official [Naut v0.0.17 download](https://github.com/secondshift-dv/naut/releases/tag/v0.0.17) and choose **`naut-v0.0.17-win-x64.zip`** under Assets.
 2. Extract the complete ZIP to a normal folder.
 3. Run `naut.exe`.
 4. Choose **where to keep** your Vault.
@@ -128,7 +128,7 @@ Naut's normal collection experience is intentionally lighter than its optional F
 | **Display** | 1280 × 720 | 1920 × 1080 or higher |
 | **Free app/update space** | 3 GB | 3 GB+ on SSD |
 
-Vault storage is separate and depends on the size of your collection. See the full [Naut v0.0.16 System Requirements](docs/system-requirements.md).
+Vault storage is separate and depends on the size of your collection. See the full [Naut v0.0.17 System Requirements](docs/system-requirements.md).
 
 ## Optional pack collection
 

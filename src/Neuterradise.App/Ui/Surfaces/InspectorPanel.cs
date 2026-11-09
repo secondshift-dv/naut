@@ -28,6 +28,8 @@ public sealed class InspectorPanel : IDisposable
     private readonly TextBlock _title = UI.Text(null, "body-strong", maxLines: 1);
     private readonly Dictionary<string, Button> _tabs = [];
     private readonly Button _favorite;
+    private readonly Button _deleteMedia;
+    private bool _deletingMedia;
 
     public InspectorPanel(AppServices services, MediaDetailViewModel vm, Action close, PresentationContext context)
     {
@@ -70,6 +72,16 @@ public sealed class InspectorPanel : IDisposable
         var navigation = UI.Grid("auto", "*,auto",
             UI.H(4, previous, next).At(0, 0),
             _favorite.At(0, 1));
+        _deleteMedia = UI.Button(
+            UI.T("Inspector.MoveToTrash", "Delete media…"),
+            () => _services.RunUserAction(
+                ConfirmMoveToTrashAsync(),
+                "Inspector.MoveToTrash",
+                UI.T("Inspector.MoveToTrashFailed", "The media could not be moved to Trash.")),
+            ButtonKind.Destructive,
+            "icon.action.delete");
+        _deleteMedia.HorizontalAlignment = HorizontalAlignment.Stretch;
+
         var previewFrame = UI.Surface(_preview, Material.Grounded, 10, 0);
         previewFrame.BorderBrush = ThemeRuntime.Current.Brush("borderSubtle");
         var previewControls = new Grid();
@@ -79,13 +91,14 @@ public sealed class InspectorPanel : IDisposable
         previewControls.Children.Add(_modelControls);
         View = new Border
         {
-            Child = UI.Grid("auto,auto,auto,auto,auto,*", "*",
+            Child = UI.Grid("auto,auto,auto,auto,auto,auto,*", "*",
                 header.Margin(12, 12, 12, 8).At(0),
                 previewFrame.Margin(12, 0, 12, 6).At(1),
                 previewControls.Margin(12, 0, 12, 6).At(2),
                 navigation.Margin(12, 0, 12, 8).At(3),
                 tabs.Margin(12, 0, 12, 8).At(4),
-                UI.Scroll(_tab).Margin(12, 0, 12, 12).At(5)),
+                _deleteMedia.Margin(12, 0, 12, 8).At(5),
+                UI.Scroll(_tab).Margin(12, 0, 12, 12).At(6)),
             Background = ThemeRuntime.Current.Brush("surface1"),
             BorderBrush = ThemeRuntime.Current.Brush("borderDefault"),
             BorderThickness = new Thickness(1, 0, 0, 0),
@@ -101,6 +114,7 @@ public sealed class InspectorPanel : IDisposable
     {
         _title.Text = _vm.OriginalName;
         _favorite.Tip(_vm.FavoriteToggleTooltip);
+        _deleteMedia.IsEnabled = _vm.CanMoveToTrash && !_deletingMedia;
         if (_favorite.Content is IconView favoriteIcon)
         {
             favoriteIcon.ColorToken = _vm.IsFavorite ? "#FF9A45" : "textMuted";
@@ -273,6 +287,31 @@ public sealed class InspectorPanel : IDisposable
                     _tab.Children.Add(UI.WrappedText(MediaSurfaceText.InspectorFeedback(_vm.ActionFeedbackMessage), "caption", "accent"));
                 }
                 break;
+        }
+    }
+
+    private async Task ConfirmMoveToTrashAsync()
+    {
+        if (_deletingMedia || !_vm.CanMoveToTrash) return;
+        var mediaId = _vm.MediaId;
+        var name = _vm.OriginalName;
+        if (!await _services.ConfirmAsync(
+                UI.T("Inspector.MoveToTrashTitle", "Move media to Trash?"),
+                UI.F("Inspector.MoveToTrashBody", "Move {0} to Trash? It will be removed from Profile links and Cover, Banner and Figure selections. Its Face data stays with the recoverable media record. Restore it from Settings → Trash Bin within 30 days.", name),
+                UI.T("Inspector.MoveToTrash", "Delete media…"),
+                destructive: true).ConfigureAwait(true))
+            return;
+        if (_vm.MediaId != mediaId || !_vm.CanMoveToTrash || _deletingMedia) return;
+        _deletingMedia = true;
+        _deleteMedia.IsEnabled = false;
+        try
+        {
+            await _vm.MoveToTrashAsync().ConfigureAwait(true);
+        }
+        finally
+        {
+            _deletingMedia = false;
+            _deleteMedia.IsEnabled = _vm.CanMoveToTrash;
         }
     }
 

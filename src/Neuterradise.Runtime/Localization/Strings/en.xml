@@ -1962,7 +1962,7 @@
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.backdrop.calm-blue.Name">Calm Blue</sys:String>
     <sys:String x:Key="Customize.Media.Dragging">Dragging</sys:String>
     <sys:String x:Key="Settings.Presentation.Library.Title">Installed component library</sys:String>
-    <sys:String x:Key="Settings.Presentation.Library.Notice">Previews only. Choose Theme, Font and Control Style in Appearance; select other components in Customize.</sys:String>
+    <sys:String x:Key="Settings.Presentation.Library.Notice">Preview and manage imported files here. Choose Theme, Font and Control Style in Appearance; select other components in Customize.</sys:String>
     <sys:String x:Key="Settings.Presentation.Assets">Importable assets</sys:String>
     <sys:String x:Key="Settings.Presentation.Components">Pack components</sys:String>
     <sys:String x:Key="Settings.Presentation.Fonts.ImportHelp">Add a .ttf or .otf font. Choose it in Appearance → Fonts.</sys:String>
@@ -2165,4 +2165,15 @@
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.shimmer.Description">A slow, gentle sweep of light.</sys:String>
     <sys:String x:Key="Banner.CollectionEmpty">Your Banner Collection is empty. Choose Add as Banner to prepare a video.</sys:String>
     <sys:String x:Key="Banner.NotReady">The selected Banner is not ready. Add or repair it, then try again.</sys:String>
+    <sys:String x:Key="Settings.Presentation.LocalAsset">Individual file</sys:String>
+    <sys:String x:Key="Settings.Presentation.PackManaged">Pack-managed</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteAsset">Delete file</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteFailed">The file could not be removed.</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteTitle">Delete imported file?</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteHelp">Individual fonts, frames and backdrops imported as files can be deleted here. .ntpack, ZIP and folder packs stay in Packs / Advanced; built-in components cannot be deleted. Removing a file in use resets its appearance binding, not Profile or media data.</sys:String>
+    <sys:String x:Key="Settings.Presentation.AssetDeleted">File removed</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrash">Delete media…</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashFailed">The media could not be moved to Trash.</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashTitle">Move media to Trash?</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashBody">Move {0} to Trash? It will be removed from Profile links and Cover, Banner and Figure selections. Its Face data stays with the recoverable media record. Restore it from Settings → Trash Bin within 30 days.</sys:String>
 </ResourceDictionary>

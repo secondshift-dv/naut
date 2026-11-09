@@ -1962,7 +1962,7 @@
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.backdrop.calm-blue.Name">Calm Blue</sys:String>
     <sys:String x:Key="Customize.Media.Dragging">Ziehen</sys:String>
     <sys:String x:Key="Settings.Presentation.Library.Title">Bibliothek installierter Komponenten</sys:String>
-    <sys:String x:Key="Settings.Presentation.Library.Notice">Nur Vorschau. Wählen Sie Thema, Schriftart und Bedienelementstil unter Darstellung; weitere Komponenten unter Anpassen.</sys:String>
+    <sys:String x:Key="Settings.Presentation.Library.Notice">Hier importierte Dateien ansehen und verwalten. Thema, Schriftart und Bedienelementstil unter Darstellung wählen; weitere Komponenten unter Anpassen.</sys:String>
     <sys:String x:Key="Settings.Presentation.Assets">Importierbare Assets</sys:String>
     <sys:String x:Key="Settings.Presentation.Components">Paketkomponenten</sys:String>
     <sys:String x:Key="Settings.Presentation.Fonts.ImportHelp">Fügen Sie eine .ttf- oder .otf-Schrift hinzu. Wählen Sie sie unter Darstellung → Schriften.</sys:String>
@@ -2165,4 +2165,15 @@
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.shimmer.Description">Ein langsamer, sanfter Lichtschimmer.</sys:String>
     <sys:String x:Key="Banner.CollectionEmpty">Die Banner-Sammlung ist leer. Wählen Sie Als Banner hinzufügen, um ein Video vorzubereiten.</sys:String>
     <sys:String x:Key="Banner.NotReady">Das ausgewählte Banner ist nicht bereit. Fügen Sie es hinzu oder reparieren Sie es und versuchen Sie es erneut.</sys:String>
+    <sys:String x:Key="Settings.Presentation.LocalAsset">Einzeldatei</sys:String>
+    <sys:String x:Key="Settings.Presentation.PackManaged">Paketverwaltet</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteAsset">Datei löschen</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteFailed">Die Datei konnte nicht entfernt werden.</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteTitle">Importierte Datei löschen?</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteHelp">Einzeln importierte Schriftarten, Rahmen und Hintergründe können hier gelöscht werden. .ntpack-, ZIP- und Ordnerpakete werden unter Packs / Advanced verwaltet; integrierte Komponenten sind geschützt. Das Entfernen einer verwendeten Datei setzt die Darstellung zurück, nicht Profil- oder Mediendaten.</sys:String>
+    <sys:String x:Key="Settings.Presentation.AssetDeleted">Datei entfernt</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrash">Medium löschen…</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashFailed">Das Medium konnte nicht in den Papierkorb verschoben werden.</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashTitle">Medium in den Papierkorb verschieben?</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashBody">{0} in den Papierkorb verschieben? Profilverknüpfungen und Cover-, Banner- sowie Figure-Auswahlen werden entfernt. Die Gesichtsdaten bleiben beim wiederherstellbaren Medieneintrag. Innerhalb von 30 Tagen unter Einstellungen → Papierkorb wiederherstellen.</sys:String>
 </ResourceDictionary>

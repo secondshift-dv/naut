@@ -1962,7 +1962,7 @@
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.backdrop.calm-blue.Name">Calm Blue</sys:String>
     <sys:String x:Key="Customize.Media.Dragging">Déplacement</sys:String>
     <sys:String x:Key="Settings.Presentation.Library.Title">Bibliothèque des composants installés</sys:String>
-    <sys:String x:Key="Settings.Presentation.Library.Notice">Aperçus uniquement. Choisissez le thème, la police et le style des contrôles dans Apparence ; les autres composants dans Personnaliser.</sys:String>
+    <sys:String x:Key="Settings.Presentation.Library.Notice">Prévisualisez et gérez ici les fichiers importés. Choisissez le thème, la police et le style des contrôles dans Apparence ; les autres composants dans Personnaliser.</sys:String>
     <sys:String x:Key="Settings.Presentation.Assets">Ressources importables</sys:String>
     <sys:String x:Key="Settings.Presentation.Components">Composants du pack</sys:String>
     <sys:String x:Key="Settings.Presentation.Fonts.ImportHelp">Ajoutez une police .ttf ou .otf. Sélectionnez-la dans Apparence → Polices.</sys:String>
@@ -2165,4 +2165,15 @@
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.shimmer.Description">Un reflet lumineux lent et doux.</sys:String>
     <sys:String x:Key="Banner.CollectionEmpty">La collection de bannières est vide. Choisissez Ajouter comme bannière pour préparer une vidéo.</sys:String>
     <sys:String x:Key="Banner.NotReady">La bannière sélectionnée n’est pas prête. Ajoutez-la ou réparez-la, puis réessayez.</sys:String>
+    <sys:String x:Key="Settings.Presentation.LocalAsset">Fichier individuel</sys:String>
+    <sys:String x:Key="Settings.Presentation.PackManaged">Géré par un pack</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteAsset">Supprimer le fichier</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteFailed">Impossible de supprimer le fichier.</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteTitle">Supprimer le fichier importé ?</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteHelp">Les polices, cadres et arrière-plans importés séparément peuvent être supprimés ici. Les packs .ntpack, ZIP et dossier restent gérés dans Packs / Advanced ; les éléments intégrés ne peuvent pas être supprimés. Supprimer un fichier utilisé réinitialise son apparence, pas les données de profil ou de média.</sys:String>
+    <sys:String x:Key="Settings.Presentation.AssetDeleted">Fichier supprimé</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrash">Supprimer le média…</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashFailed">Impossible de déplacer le média dans la corbeille.</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashTitle">Déplacer le média dans la corbeille ?</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashBody">Déplacer {0} dans la corbeille ? Ses liens de profil et sélections de couverture, bannière et figure seront retirés. Les données de visage restent liées au média récupérable. Restaurez-le via Paramètres → Corbeille dans les 30 jours.</sys:String>
 </ResourceDictionary>

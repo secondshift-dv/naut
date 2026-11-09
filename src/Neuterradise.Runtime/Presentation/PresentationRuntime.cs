@@ -580,13 +580,19 @@ public sealed class PresentationRuntime
 
     // ---------------------------------------------------------------- packs
 
-    public async Task<PackInstallResult> InstallPackAsync(string sourcePath, bool replaceExisting, CancellationToken cancellationToken = default)
+    public Task<PackInstallResult> InstallPackAsync(string sourcePath, bool replaceExisting, CancellationToken cancellationToken = default) =>
+        InstallPackCoreAsync(sourcePath, replaceExisting, standaloneAsset: false, cancellationToken: cancellationToken);
+
+    public Task<PackInstallResult> InstallStandaloneAssetAsync(string sourcePath, CancellationToken cancellationToken = default) =>
+        InstallPackCoreAsync(sourcePath, replaceExisting: false, standaloneAsset: true, cancellationToken: cancellationToken);
+
+    private async Task<PackInstallResult> InstallPackCoreAsync(string sourcePath, bool replaceExisting, bool standaloneAsset, CancellationToken cancellationToken)
     {
         await _packMutations.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             var result = await _packs.InstallWithPublicationAsync(sourcePath, replaceExisting,
-                _store.RecordPackAsync, cancellationToken).ConfigureAwait(false);
+                _store.RecordPackAsync, cancellationToken, standaloneAsset).ConfigureAwait(false);
             if (result.Succeeded && result.Pack is { } pack)
             {
                 _compiler.Invalidate(pack.PackId);
@@ -621,6 +627,22 @@ public sealed class PresentationRuntime
         await _packMutations.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            return await RemovePackCoreAsync(packId, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _packMutations.Release();
+        }
+    }
+
+    public async Task<PackRemovalResult> RemoveStandaloneAssetAsync(string packId, CancellationToken cancellationToken = default)
+    {
+        await _packMutations.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var pack = _packs.Packs.FirstOrDefault(candidate => candidate.PackId == packId);
+            if (pack?.IsStandaloneAsset != true || pack.Manifest.Definitions.Count != 1)
+                return new PackRemovalResult(false, 0, "Only individually imported files can be deleted here.");
             return await RemovePackCoreAsync(packId, cancellationToken).ConfigureAwait(false);
         }
         finally

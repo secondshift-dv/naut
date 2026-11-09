@@ -1962,7 +1962,7 @@
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.backdrop.calm-blue.Name">Calm Blue</sys:String>
     <sys:String x:Key="Customize.Media.Dragging">Arrastrando</sys:String>
     <sys:String x:Key="Settings.Presentation.Library.Title">Biblioteca de componentes instalados</sys:String>
-    <sys:String x:Key="Settings.Presentation.Library.Notice">Solo vistas previas. Elige tema, fuente y estilo de controles en Apariencia; los demás componentes, en Personalizar.</sys:String>
+    <sys:String x:Key="Settings.Presentation.Library.Notice">Consulta y administra aquí los archivos importados. Elige tema, fuente y estilo de controles en Apariencia; los demás componentes, en Personalizar.</sys:String>
     <sys:String x:Key="Settings.Presentation.Assets">Recursos importables</sys:String>
     <sys:String x:Key="Settings.Presentation.Components">Componentes del paquete</sys:String>
     <sys:String x:Key="Settings.Presentation.Fonts.ImportHelp">Añade una fuente .ttf u .otf. Elígela en Apariencia → Fuentes.</sys:String>
@@ -2165,4 +2165,15 @@
     <sys:String x:Key="Presentation.Definition.builtin.neuterradise.effect.shimmer.Description">Un barrido de luz lento y suave.</sys:String>
     <sys:String x:Key="Banner.CollectionEmpty">La colección de banners está vacía. Elija Añadir como banner para preparar un vídeo.</sys:String>
     <sys:String x:Key="Banner.NotReady">El banner seleccionado no está listo. Añádalo o repárelo e inténtelo de nuevo.</sys:String>
+    <sys:String x:Key="Settings.Presentation.LocalAsset">Archivo individual</sys:String>
+    <sys:String x:Key="Settings.Presentation.PackManaged">Gestionado por paquete</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteAsset">Eliminar archivo</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteFailed">No se pudo eliminar el archivo.</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteTitle">¿Eliminar archivo importado?</sys:String>
+    <sys:String x:Key="Settings.Presentation.DeleteHelp">Aquí puedes eliminar fuentes, marcos y fondos importados como archivos individuales. Los paquetes .ntpack, ZIP y de carpeta se administran en Packs / Advanced; los componentes integrados están protegidos. Si el archivo está en uso, se restablece su aspecto, no los datos de perfiles ni medios.</sys:String>
+    <sys:String x:Key="Settings.Presentation.AssetDeleted">Archivo eliminado</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrash">Eliminar medio…</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashFailed">No se pudo mover el medio a la papelera.</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashTitle">¿Mover el medio a la papelera?</sys:String>
+    <sys:String x:Key="Inspector.MoveToTrashBody">¿Mover {0} a la papelera? Se quitarán sus vínculos con perfiles y las selecciones de portada, banner y figura. Los datos faciales permanecerán con el registro recuperable. Restáuralo en Configuración → Papelera durante 30 días.</sys:String>
 </ResourceDictionary>
