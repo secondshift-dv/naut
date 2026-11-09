@@ -1595,16 +1595,26 @@ public sealed class ImportSurface : Surface
 
             foreach (var problem in wizard.PreparationProblems)
             {
+                var failure = problem.Failures.FirstOrDefault();
                 problems.Children.Add(UI.Surface(UI.V(6,
                     UI.Text(UI.T("Import.PreparationFailed", "Some media needs attention"), "body-strong"),
                     UI.Text(problem.SourceFileName, "caption", maxLines: 2),
                     UI.Text(
-                        UI.T(
-                            "Import.PreparationFailedDetail",
-                            "naut could not prepare everything needed for this import. Try again or cancel the import."),
+                        string.IsNullOrWhiteSpace(failure?.ErrorDetailSafe)
+                            ? UI.T(
+                                "Import.PreparationFailedDetail",
+                                "naut could not prepare everything needed for this import. Try again or cancel the import.")
+                            : failure.ErrorDetailSafe,
                         "caption",
                         "textSecondary",
                         3),
+                    UI.Text(
+                        string.IsNullOrWhiteSpace(failure?.ErrorCode)
+                            ? string.Empty
+                            : $"{failure.Capability}: {failure.ErrorCode}",
+                        "caption",
+                        "textSecondary",
+                        2),
                     UI.H(8,
                         UI.Button(
                             UI.T("Import.PreparationRetry", "Try again"),

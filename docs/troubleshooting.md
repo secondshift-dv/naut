@@ -26,6 +26,12 @@ No. A candidate is a reviewable model suggestion. Naut keeps confirmation as a s
 
 Current builds no longer wait for assets created only after candidate confirmation. Open Import and check **Review** for completed candidates or **Needs attention** for failed required work. Keep the original files available for retry or recovery. If the import was cancelled, import the originals again.
 
+## Video import says “Could not prepare” or “Needs attention”
+
+Naut v0.0.16 handles videos whose reported duration or face-analysis timestamp extends beyond their last decoded frame: thumbnail generation first uses a safer timestamp, then retries an initial frame if needed. Successfully prepared Hover/Banner renditions are retained when possible.
+
+After updating, open the failed Import review and choose **Try again**. If the item still needs attention, check its capability/error code and safe failure detail. Undecodable or unsupported media can still fail; keep the external original until the import succeeds or is cancelled.
+
 ## Why does an original video open outside Naut?
 
 Opening an original media item uses the Windows default application for that file. For original video playback, the available Windows player/codecs therefore matter.

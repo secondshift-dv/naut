@@ -43,6 +43,8 @@ Opening an original media item still uses the normal Windows application associa
 
 ## If an import needs attention
 
-Open the Import surface and check **Needs attention**. Keep the original file available until the import has completed successfully.
+Open the Import surface and check **Needs attention**. Failed required preparation displays a safe technical reason and the affected capability/error code. Choose **Try again** to retry that item; keep the original file available until import has completed successfully.
+
+Naut guards against video thumbnail timestamps beyond the last decodable frame and retries from the beginning when needed. A valid Hover or Banner rendition from the first attempt is retained. Damaged or unsupported video streams can still require your attention.
 
 Face-analysis availability is separate from whether an image or video can belong to a Profile. Figure eligibility is likewise separate from normal Profile use.

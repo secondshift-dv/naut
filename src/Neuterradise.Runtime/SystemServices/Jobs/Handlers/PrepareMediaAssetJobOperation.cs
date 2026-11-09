@@ -175,7 +175,8 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
                 return Invalid("BANNER_TIMESTAMP_UNAVAILABLE", "The prepared Hover has no authoritative source timestamp.");
             hoverStart = timestamp;
         }
-        var thumbnailOffset = Math.Max(0, representativeTimestamp - hoverStart);
+        var thumbnailTimestamp = representativeTimestamp;
+        var thumbnailOffset = Math.Max(0, thumbnailTimestamp - hoverStart);
 
         var tempDirectory = _paths.ResolveContainedPath(
             VaultPathArea.TempMediaAssets, $"{source.MediaId:N}/{Guid.NewGuid():N}");
@@ -194,23 +195,28 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
                     "MEDIA_ASSET_TOOL_UNAVAILABLE",
                     "The approved video encoder is unavailable.");
 
-            var outputs = new List<(string Label, string Filter)>();
-            if (needThumbnail) outputs.Add(("thumb", $"select='gte(t,{TimestampSeconds(thumbnailOffset)})',scale='min(1024,iw)':'min(1024,ih)':force_original_aspect_ratio=decrease"));
-            if (needHover) outputs.Add(("hover", HoverScale + ",fps=24"));
-            if (needBanner) outputs.Add(("banner", BannerScale + ",fps=24"));
-            var filter = "[0:v]setpts=PTS-STARTPTS";
-            if (outputs.Count > 1) filter += ",split=" + outputs.Count + string.Concat(outputs.Select(output => "[" + output.Label + "src]"));
-            else filter += "[" + outputs[0].Label + "src]";
-            filter += ";" + string.Join(";", outputs.Select(output => "[" + output.Label + "src]" + output.Filter + "[" + output.Label + "]"));
-            var args = new List<string> { "-y", "-ss", TimestampSeconds(hoverStart), "-i", path,
-                "-filter_complex", filter, "-progress", "pipe:1", "-nostats" };
-            foreach (var output in outputs)
+            List<string> BuildArguments(long startMs, long frameOffsetMs, bool renderThumbnail,
+                bool renderHover, bool renderBanner)
             {
-                args.AddRange(["-map", "[" + output.Label + "]", "-an"]);
-                if (output.Label == "thumb") args.AddRange(["-frames:v", "1", "-c:v", "mjpeg", "-threads", "2", frameTemp]);
-                else args.AddRange(["-t", "5.8", "-r", "24", "-c:v", "libopenh264", "-threads", "2",
-                    "-b:v", output.Label == "banner" ? "6000k" : "1000k", "-rc_mode", "bitrate",
-                    "-movflags", "+faststart", output.Label == "banner" ? bannerTemp : hoverTemp]);
+                var outputs = new List<(string Label, string Filter)>();
+                if (renderThumbnail) outputs.Add(("thumb", $"select='gte(t,{TimestampSeconds(frameOffsetMs)})',scale='min(1024,iw)':'min(1024,ih)':force_original_aspect_ratio=decrease"));
+                if (renderHover) outputs.Add(("hover", HoverScale + ",fps=24"));
+                if (renderBanner) outputs.Add(("banner", BannerScale + ",fps=24"));
+                var filter = "[0:v]setpts=PTS-STARTPTS";
+                if (outputs.Count > 1) filter += ",split=" + outputs.Count + string.Concat(outputs.Select(output => "[" + output.Label + "src]"));
+                else filter += "[" + outputs[0].Label + "src]";
+                filter += ";" + string.Join(";", outputs.Select(output => "[" + output.Label + "src]" + output.Filter + "[" + output.Label + "]"));
+                var args = new List<string> { "-y", "-ss", TimestampSeconds(startMs), "-i", path,
+                    "-filter_complex", filter, "-progress", "pipe:1", "-nostats" };
+                foreach (var output in outputs)
+                {
+                    args.AddRange(["-map", "[" + output.Label + "]", "-an"]);
+                    if (output.Label == "thumb") args.AddRange(["-frames:v", "1", "-c:v", "mjpeg", "-threads", "2", frameTemp]);
+                    else args.AddRange(["-t", "5.8", "-r", "24", "-c:v", "libopenh264", "-threads", "2",
+                        "-b:v", output.Label == "banner" ? "6000k" : "1000k", "-rc_mode", "bitrate",
+                        "-movflags", "+faststart", output.Label == "banner" ? bannerTemp : hoverTemp]);
+                }
+                return args;
             }
             var duration = Math.Max(1, Math.Min(5800, (source.DurationMilliseconds ?? 5800) - hoverStart));
             await context.Progress.ReportProgressAsync(0, duration + 1, "Preparing", ct).ConfigureAwait(false);
@@ -221,12 +227,47 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
                     await context.Progress.ReportProgressAsync(Math.Clamp(microseconds / 1000, 0, duration), duration + 1, "Encoding", ct).ConfigureAwait(false);
             }
 
-            var result = await _launcher.RunAsync(
-                new ProcessRunRequest(ffmpeg, args, Timeout: TimeSpan.FromMinutes(3), OutputLineReceived: OnProgress), ct)
+            async Task<ProcessRunResult> RenderAsync(long startMs, long frameOffsetMs,
+                bool renderThumbnail, bool renderHover, bool renderBanner) =>
+                await _launcher.RunAsync(new ProcessRunRequest(ffmpeg,
+                    BuildArguments(startMs, frameOffsetMs, renderThumbnail, renderHover, renderBanner),
+                    Timeout: TimeSpan.FromMinutes(3), OutputLineReceived: OnProgress), ct)
+                    .ConfigureAwait(false);
+
+            async Task<bool> HasValidRenditionAsync(string file, MediaAssetRole role)
+            {
+                if (!File.Exists(file)) return false;
+                try
+                {
+                    await _validator.ValidateAsync(file, role, ct, contractVersion: 2).ConfigureAwait(false);
+                    return true;
+                }
+                catch (Exception ex) when (ex is IOException or InvalidDataException
+                    or UnauthorizedAccessException or TimeoutException)
+                {
+                    return false;
+                }
+            }
+
+            var result = await RenderAsync(hoverStart, thumbnailOffset, needThumbnail, needHover, needBanner)
                 .ConfigureAwait(false);
+            if (!result.TimedOut && needThumbnail && (!File.Exists(frameTemp) || new FileInfo(frameTemp).Length == 0))
+            {
+                // If face evidence lands beyond the final decoded frame, recover the still from
+                // the beginning. Keep independently valid video renditions from the first pass.
+                var keepVideo = (!needHover || await HasValidRenditionAsync(hoverTemp, MediaAssetRole.Hover).ConfigureAwait(false))
+                    && (!needBanner || await HasValidRenditionAsync(bannerTemp, MediaAssetRole.Banner).ConfigureAwait(false));
+                result = await RenderAsync(0, 0, true, !keepVideo && needHover, !keepVideo && needBanner)
+                    .ConfigureAwait(false);
+                if (!result.TimedOut && result.ExitCode == 0)
+                {
+                    thumbnailTimestamp = 0;
+                    if (!keepVideo) hoverStart = 0;
+                }
+            }
             if (result.TimedOut || result.ExitCode != 0)
                 return Invalid("MEDIA_ASSET_RENDER_FAILED",
-                    "The managed video could not produce the required MediaAssets.");
+                    "The managed video could not produce the required thumbnail or video rendition.");
 
             if (needThumbnail)
             {
@@ -236,7 +277,7 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
                     MediaAssetRole.Thumbnail,
                     ContractVersion,
                     thumbnailTemp,
-                    representativeTimestamp,
+                    thumbnailTimestamp,
                     ct: ct).ConfigureAwait(false);
             }
 
@@ -415,8 +456,10 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
         command.Parameters.AddWithValue("$asset", DbGuid.Format(assetId));
         var evidence = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
         var fallback = durationMs is > 0 ? durationMs.Value / 3 : 0;
+        // Container duration can outlast the last decoded video frame, particularly for VFR media.
+        // Leave a one-second tail margin before seeking to face evidence near the container end.
         return Math.Max(0, Math.Min(evidence is long timestamp ? timestamp : fallback,
-            Math.Max(0, (durationMs ?? long.MaxValue) - 100)));
+            Math.Max(0, (durationMs ?? long.MaxValue) - 1000)));
     }
 
     private static string TimestampSeconds(long milliseconds) =>
