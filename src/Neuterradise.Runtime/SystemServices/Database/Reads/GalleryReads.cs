@@ -65,18 +65,21 @@ public sealed class GalleryReads
 
         var (whereClause, whereParams) = BuildWhereClause(query);
 
-        // Always include the CTEs for the count query so it can reference oc/rc if the
-        // WHERE clause or sort needs them (e.g. HasMedia, HasRelatedEvidence, MediaCountDesc).
+        var countCtes = new List<string>(2);
+        if (query.HasMedia.HasValue) countCtes.Add(OwnedCountCte);
+        if (query.HasRelatedEvidence.HasValue) countCtes.Add(RelatedCountCte);
+        var countWith = countCtes.Count == 0 ? "" : $"WITH {string.Join(",", countCtes)}";
+        var countOwnedJoin = query.HasMedia.HasValue ? "LEFT JOIN owned_counts oc ON oc.profile_id = p.profile_id" : "";
+        var countRelatedJoin = query.HasRelatedEvidence.HasValue ? "LEFT JOIN related_counts rc ON rc.profile_id = p.profile_id" : "";
         long totalCount;
         await using (var countCommand = connection.CreateCommand())
         {
             countCommand.CommandText = $"""
-                WITH {OwnedCountCte},
-                     {RelatedCountCte}
+                {countWith}
                 SELECT COUNT(*)
                 FROM profiles p
-                LEFT JOIN owned_counts oc ON oc.profile_id = p.profile_id
-                LEFT JOIN related_counts rc ON rc.profile_id = p.profile_id
+                {countOwnedJoin}
+                {countRelatedJoin}
                 {whereClause};
                 """;
             foreach (var (name, value) in whereParams)

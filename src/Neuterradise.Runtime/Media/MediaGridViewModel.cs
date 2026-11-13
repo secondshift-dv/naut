@@ -313,14 +313,27 @@ public sealed class MediaGridViewModel : INotifyPropertyChanged, IDisposable
         get => _isFavoriteOnly;
         set
         {
-            if (SetField(ref _isFavoriteOnly, value))
-            {
-                _currentPage = 1;
-                Selection.Clear();
-                NotifyPaginationChanged();
+            if (_isFavoriteOnly == value || _isDisposed)
+                return;
+
+            if (FavoriteFilterRequested is { } request)
+                request(value);
+            else if (ApplyFavoriteFilter(value))
                 QueryChangedAction?.Invoke();
-            }
         }
+    }
+
+    internal Action<bool>? FavoriteFilterRequested { get; set; }
+
+    internal void NotifyFavoriteFilter() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsFavoriteOnly)));
+
+    internal bool ApplyFavoriteFilter(bool value)
+    {
+        if (!SetField(ref _isFavoriteOnly, value, nameof(IsFavoriteOnly))) return false;
+        _currentPage = 1;
+        Selection.Clear();
+        NotifyPaginationChanged();
+        return true;
     }
 
     public int PageSize

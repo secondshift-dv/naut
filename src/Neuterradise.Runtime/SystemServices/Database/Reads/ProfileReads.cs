@@ -521,26 +521,27 @@ public sealed class ProfileReads
         string favoriteFilter = isFavoriteOnly ? "AND a.is_favorite = 1" : "";
 
         string cursorCondition = "";
-        if (!string.IsNullOrWhiteSpace(continuationToken)
-            && TryParseMediaCursor(continuationToken, out var cursorTime, out var cursorMediaId))
+        long offset = Math.Max(0L, (long)pageIndex - 1) * pageSize;
+        if (!string.IsNullOrWhiteSpace(continuationToken))
         {
-            cursorCondition = "AND (coalesce(a.added_to_library_at_ms, a.created_at_ms) < $cursorTime OR (coalesce(a.added_to_library_at_ms, a.created_at_ms) = $cursorTime AND a.media_id < $cursorMediaId))";
-            parameters.Add(("$cursorTime", cursorTime));
-            parameters.Add(("$cursorMediaId", DbGuid.Format(cursorMediaId)));
+            if (sort == MediaGridSort.NewestFirst && TryParseMediaCursor(continuationToken, out var cursorTime, out var cursorMediaId))
+            {
+                cursorCondition = "AND (coalesce(a.added_to_library_at_ms, a.created_at_ms) < $cursorTime OR (coalesce(a.added_to_library_at_ms, a.created_at_ms) = $cursorTime AND a.media_id < $cursorMediaId))";
+                parameters.Add(("$cursorTime", cursorTime));
+                parameters.Add(("$cursorMediaId", DbGuid.Format(cursorMediaId)));
+                offset = 0;
+            }
+            else if (sort != MediaGridSort.NewestFirst && TryParseMediaOffset(continuationToken, sort, out var cursorOffset))
+            {
+                offset = cursorOffset;
+            }
+            else
+            {
+                throw new ArgumentException("Media continuation token does not match the selected sort.", nameof(continuationToken));
+            }
         }
 
-        var orderByClause = sort switch
-        {
-            MediaGridSort.OldestFirst => "ORDER BY coalesce(a.added_to_library_at_ms, a.created_at_ms) ASC, a.media_id ASC",
-            MediaGridSort.NameAscending => "ORDER BY coalesce(a.current_managed_file_name, a.original_file_name, '') ASC, a.media_id ASC",
-            MediaGridSort.CapturedNewestFirst => "ORDER BY CASE WHEN am.captured_at_ms IS NULL THEN 1 ELSE 0 END, am.captured_at_ms DESC, a.media_id DESC",
-            MediaGridSort.SizeLargestFirst => "ORDER BY coalesce(a.byte_length, 0) DESC, a.media_id DESC",
-            _ => "ORDER BY coalesce(a.added_to_library_at_ms, a.created_at_ms) DESC, a.media_id DESC"
-        };
-
-        var offset = string.IsNullOrWhiteSpace(continuationToken) && pageIndex > 1
-            ? (pageIndex - 1) * pageSize
-            : 0;
+        var orderByClause = BuildProfileMediaOrderClause(sort);
         var offsetClause = offset > 0 ? $"OFFSET {offset}" : "";
 
         // Windowed COUNT(*) OVER() avoids a separate COUNT round-trip for most pages.
@@ -577,7 +578,7 @@ public sealed class ProfileReads
               {favoriteFilter}
               {cursorCondition}
             GROUP BY a.media_id
-            {orderByClause}
+            ORDER BY {orderByClause}
             LIMIT {pageSize + 1} {offsetClause};
             """;
 
@@ -641,7 +642,7 @@ public sealed class ProfileReads
         }
 
         // Empty page fallback — only run COUNT when windowed total is unavailable.
-        if (items.Count == 0 && pageIndex > 1)
+        if (items.Count == 0 && offset > 0)
         {
             // Out-of-range page: windowed count is unavailable, do a lightweight COUNT.
             var countSql = $"""
@@ -676,7 +677,9 @@ public sealed class ProfileReads
         {
             var last = items[^1];
             var timeMs = (last.AddedToLibraryAtUtc ?? last.CreatedAtUtc).ToUnixTimeMilliseconds();
-            nextPageToken = $"{timeMs}:{last.MediaId:D}";
+            nextPageToken = sort == MediaGridSort.NewestFirst
+                ? FormattableString.Invariant($"{timeMs}:{last.MediaId:D}")
+                : FormattableString.Invariant($"{sort}:{offset + items.Count}");
         }
 
         return new ProfileMediaPage(items, nextPageToken, hasMore, totalCount);
@@ -810,7 +813,17 @@ public sealed class ProfileReads
             return false;
         }
 
-        return long.TryParse(parts[0], out timeMs) && DomainId.TryParse(parts[1], out assetId);
+        return long.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out timeMs)
+            && DomainId.TryParse(parts[1], out assetId);
+    }
+
+    private static bool TryParseMediaOffset(string token, MediaGridSort sort, out long offset)
+    {
+        offset = 0;
+        var prefix = $"{sort}:";
+        return token.StartsWith(prefix, StringComparison.Ordinal)
+            && long.TryParse(token.AsSpan(prefix.Length), NumberStyles.None, CultureInfo.InvariantCulture, out offset)
+            && offset > 0 && offset <= long.MaxValue - 500;
     }
 
     // ── Shared filtered-media SQL semantics ────────────────────────

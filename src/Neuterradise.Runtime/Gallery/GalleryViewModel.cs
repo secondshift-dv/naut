@@ -11,7 +11,6 @@ using Neuterradise.App.Profiles;
 using Neuterradise.App.Shell;
 using Neuterradise.App.SystemServices.Database;
 using Neuterradise.App.SystemServices.Database.Reads;
-using Neuterradise.App.SystemServices.Storage;
 using Neuterradise.App.SystemServices;
 
 namespace Neuterradise.App.Gallery;
@@ -759,8 +758,7 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
             snapshot.Add(new ArtworkResolveRequest(
                 card.ProfileId,
                 card.RowVersion,
-                card.BannerMediaAssetId,
-                card.BannerAssetRelativePath));
+                card.BannerMediaAssetId));
         }
 
         TaskObserver.Observe(
@@ -774,23 +772,8 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
         CancellationToken cancellationToken)
     {
         // Selections are Profile-scoped; Media identity cannot select Banner media.
-        var coverPaths = new Dictionary<Guid, string?>();
-        var bannerPaths = new Dictionary<Guid, string?>();
-        var motionPaths = new Dictionary<Guid, string?>();
-        foreach (var req in requests)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var cover = await _mediaResources!.ResolveSelectedProfileCoverAsync(req.ProfileId, cancellationToken)
-                .ConfigureAwait(false);
-            coverPaths[req.ProfileId] = cover.State == MediaAssetResourceState.Ready ? cover.PhysicalPath : null;
-            if (req.BannerMediaAssetId is { } bannerId)
-            {
-                var banner = await _mediaResources.ResolveSelectedProfileBannerThumbnailAsync(
-                    req.ProfileId, bannerId, cancellationToken).ConfigureAwait(false);
-                bannerPaths[req.ProfileId] = banner.State == MediaAssetResourceState.Ready ? banner.PhysicalPath : null;
-            }
-            motionPaths[req.ProfileId] = ResolvePreparedAssetPath(req.BannerAssetRelativePath);
-        }
+        var artwork = await _mediaResources!.ResolveProfileArtworkAsync(
+            requests.Select(req => req.ProfileId).ToArray(), cancellationToken, resolveHover: true).ConfigureAwait(false);
 
         if (cancellationToken.IsCancellationRequested || generation != _artworkResolveGeneration)
         {
@@ -816,55 +799,20 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
                     continue;
                 }
 
-                card.CoverSource = ImageRef.FromPath(coverPaths.GetValueOrDefault(req.ProfileId), CardCoverDecodeWidth);
-                card.BannerImageSource = ImageRef.FromPath(bannerPaths.GetValueOrDefault(req.ProfileId), CardCoverDecodeWidth);
-                card.BannerHoverPath = motionPaths.GetValueOrDefault(req.ProfileId);
+                var resolved = artwork.GetValueOrDefault(req.ProfileId);
+                card.CoverSource = ImageRef.FromPath(resolved?.CoverPath, CardCoverDecodeWidth);
+                var banner = resolved?.HoverAssetId == req.BannerMediaAssetId ? resolved : null;
+                card.BannerImageSource = ImageRef.FromPath(banner?.BannerPosterPath, CardCoverDecodeWidth);
+                card.BannerHoverPath = banner?.HoverPath;
             }
         });
 
     }
 
-    private string? ResolveMediaAssetPath(MediaAssetRecord? asset)
-    {
-        if (_catalog is null || asset is null || asset.State != MediaAssetState.Ready)
-        {
-            return null;
-        }
-
-        try
-        {
-            return _catalog.Paths.ResolveVaultRelativePath(VaultPathArea.MediaAssets, asset.RelativePath);
-        }
-        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
-        {
-            Trace.TraceWarning("Gallery MediaAsset path resolution failed: {0}", exception.GetType().Name);
-            return null;
-        }
-    }
-
-    private string? ResolvePreparedAssetPath(string? relativePath)
-    {
-        if (_catalog is null || string.IsNullOrWhiteSpace(relativePath))
-        {
-            return null;
-        }
-
-        try
-        {
-            return _catalog.Paths.ResolveVaultRelativePath(VaultPathArea.MediaAssets, relativePath);
-        }
-        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
-        {
-            Trace.TraceWarning("Gallery prepared MediaAsset path resolution failed: {0}", exception.GetType().Name);
-            return null;
-        }
-    }
-
     private sealed record ArtworkResolveRequest(
         Guid ProfileId,
         long RowVersion,
-        Guid? BannerMediaAssetId,
-        string? BannerAssetRelativePath);
+        Guid? BannerMediaAssetId);
 
     public void ApplyPage(GalleryPage page)
     {

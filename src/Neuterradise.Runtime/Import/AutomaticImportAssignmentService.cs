@@ -168,13 +168,14 @@ public sealed class AutomaticImportAssignmentService
             }
         }
 
+        var facesByItem = faces.ToLookup(static face => face.ItemId);
         var evidence = new List<ImportAssignmentEvidenceItem>(items.Count);
         foreach (var item in items.Values)
         {
             var owners = ownersByItem[item.ItemId];
             var durableOwner = owners.Count == 1 ? owners.Single() : (Guid?)null;
 
-            var itemFaces = faces.Where(face => face.ItemId == item.ItemId).ToArray();
+            var itemFaces = facesByItem[item.ItemId];
             var strongProfiles = itemFaces
                 .Where(static face => face.ProfileId.HasValue)
                 .Select(static face => face.ProfileId!.Value)
@@ -200,7 +201,7 @@ public sealed class AutomaticImportAssignmentService
                 faceAmbiguous));
         }
 
-        var clusters = BuildClusters(items.Values, faces, ownersByItem);
+        var clusters = BuildClusters(items.Values, faces, facesByItem, ownersByItem);
         var decision = _policy.EvaluateBatch(evidence);
         var supported = evidence.Count(item => _policy.Resolve(
             null,
@@ -225,6 +226,7 @@ public sealed class AutomaticImportAssignmentService
     private static IReadOnlyList<ImportAssignmentCluster> BuildClusters(
         IEnumerable<ItemEvidence> items,
         IReadOnlyList<FaceObservation> faces,
+        ILookup<Guid, FaceObservation> facesByItem,
         IReadOnlyDictionary<Guid, HashSet<Guid>> ownersByItem)
     {
         var result = new List<ImportAssignmentCluster>();
@@ -250,8 +252,8 @@ public sealed class AutomaticImportAssignmentService
         var conflictingItems = items
             .Where(item =>
             {
-                var faceProfiles = faces
-                    .Where(face => face.ItemId == item.ItemId && face.ProfileId.HasValue)
+                var faceProfiles = facesByItem[item.ItemId]
+                    .Where(static face => face.ProfileId.HasValue)
                     .Select(static face => face.ProfileId!.Value)
                     .Distinct()
                     .Count();
@@ -321,9 +323,8 @@ public sealed class AutomaticImportAssignmentService
                 itemIds));
         }
 
-        var itemsWithFaces = faces.Select(static face => face.ItemId).ToHashSet();
         var noFaceItems = items
-            .Where(item => !itemsWithFaces.Contains(item.ItemId))
+            .Where(item => !facesByItem.Contains(item.ItemId))
             .Select(static item => item.ItemId)
             .Order()
             .ToArray();

@@ -18,15 +18,15 @@ public sealed class MediaResourceAuthority
     public Task<MediaAssetResource> ResolveMediaThumbnailAsync(Guid assetId, CancellationToken ct = default) =>
         _mediaAssets.ResolveMediaThumbnailAsync(assetId, ct);
 
+    internal Task<Dictionary<Guid, ProfileArtwork>> ResolveProfileArtworkAsync(
+        IReadOnlyCollection<Guid> profileIds, CancellationToken ct, bool resolveHover = false) =>
+        _mediaAssets.ResolveProfileArtworkAsync(profileIds, ct, resolveHover);
+
     public Task<MediaAssetResource> ResolveSelectedProfileCoverAsync(Guid profileId, CancellationToken ct = default) =>
         _mediaAssets.ResolveSelectedProfileCoverAsync(profileId, ct);
 
     public Task<MediaAssetResource> ResolveProfileBannerAsync(Guid profileId, Guid hoverAssetId, CancellationToken ct = default) =>
         _mediaAssets.ResolveProfileBannerAsync(profileId, hoverAssetId, ct);
-
-    public Task<MediaAssetResource> ResolveSelectedProfileBannerThumbnailAsync(
-        Guid profileId, Guid bannerMediaAssetId, CancellationToken ct = default) =>
-        _mediaAssets.ResolveSelectedProfileBannerThumbnailAsync(profileId, bannerMediaAssetId, ct);
 
     public Task<MediaAssetResource> ResolveImportCandidateMediaAssetAsync(Guid importUnitId, Guid assetId,
         MediaAssetRole role, CancellationToken ct = default) =>

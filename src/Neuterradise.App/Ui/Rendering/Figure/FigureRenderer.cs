@@ -23,6 +23,12 @@ public sealed class FigureRenderer : IDisposable
     private GpuScene? _scene;
     private bool _disposed;
     private GpuMesh? _pedestal, _accentRim, _contactShadow;
+    private readonly byte[] _constantBytes = new byte[Marshal.SizeOf<ShaderConstants>()];
+    private readonly int?[] _materialTextureIds = new int?[5];
+    private readonly IntPtr[] _materialViews = new IntPtr[5];
+    private readonly IntPtr[] _materialSamplers = new IntPtr[5];
+    private readonly IntPtr[] _emptyMaterialBindings = new IntPtr[5];
+    private readonly float[] _blendFactor = [1, 1, 1, 1];
     private Vector3 _stageAccent = new(0.27f, 0.36f, 0.70f);
 
     public FigureRenderer(IntPtr device, IntPtr context)
@@ -166,17 +172,24 @@ public sealed class FigureRenderer : IDisposable
             var opaque = scene.Meshes.Where(mesh => scene.Header.Materials[mesh.Material].AlphaMode != "BLEND");
             var transparent = scene.Meshes.Where(mesh => scene.Header.Materials[mesh.Material].AlphaMode == "BLEND")
                 .OrderByDescending(mesh => Vector3.DistanceSquared(eye, Vector3.Transform(mesh.Center, world)));
+            var normalMatrix = NormalMatrix(world);
+            var textureIds = _materialTextureIds;
             foreach (var mesh in opaque.Concat(transparent))
             {
                 var material = scene.Header.Materials[mesh.Material];
                 var blend = material.AlphaMode == "BLEND";
                 FigureNative.Method<FigureD3D.SetOne>(_context, 43)(_context, material.DoubleSided ? _cullNone : _cullBack);
                 FigureNative.Method<FigureD3D.SetDepth>(_context, 36)(_context, blend ? _blendDepth : _opaqueDepth, 0);
-                FigureNative.Method<FigureD3D.SetBlend>(_context, 35)(_context, blend ? _alphaBlend : IntPtr.Zero, [1, 1, 1, 1], uint.MaxValue);
-                var textureIds = new[] { material.BaseColorTexture, material.MetallicRoughnessTexture, material.NormalTexture,
-                    material.OcclusionTexture, material.EmissiveTexture };
-                var views = new IntPtr[5];
-                var samplers = new IntPtr[5];
+                FigureNative.Method<FigureD3D.SetBlend>(_context, 35)(_context, blend ? _alphaBlend : IntPtr.Zero, _blendFactor, uint.MaxValue);
+                textureIds[0] = material.BaseColorTexture;
+                textureIds[1] = material.MetallicRoughnessTexture;
+                textureIds[2] = material.NormalTexture;
+                textureIds[3] = material.OcclusionTexture;
+                textureIds[4] = material.EmissiveTexture;
+                var views = _materialViews;
+                var samplers = _materialSamplers;
+                Array.Clear(views);
+                Array.Clear(samplers);
                 for (var i = 0; i < textureIds.Length; i++)
                     if (textureIds[i] is { } index && scene.Textures.TryGetValue(index, out var texture))
                     { views[i] = texture.View; samplers[i] = texture.Sampler; }
@@ -184,7 +197,7 @@ public sealed class FigureRenderer : IDisposable
                 FigureNative.Method<FigureD3D.SetArray>(_context, 10)(_context, 0, 5, samplers);
                 var constants = new ShaderConstants
                 {
-                    World = world, NormalMatrix = NormalMatrix(world), ViewProjection = viewProjection,
+                    World = world, NormalMatrix = normalMatrix, ViewProjection = viewProjection,
                     Base = new(material.BaseColor[0], material.BaseColor[1], material.BaseColor[2], material.BaseColor[3]),
                     Emissive = new(material.Emissive[0], material.Emissive[1], material.Emissive[2], 0),
                     Properties = new(material.Metallic, material.Roughness, material.NormalScale, material.OcclusionStrength),
@@ -206,7 +219,8 @@ public sealed class FigureRenderer : IDisposable
         {
             // Swapchain resize must not retain a back-buffer reference through the shared context.
             FigureNative.Method<FigureD3D.SetTargets>(_context, 33)(_context, 0, [], IntPtr.Zero);
-            FigureNative.Method<FigureD3D.SetArray>(_context, 8)(_context, 0, 5, new IntPtr[5]);
+            FigureNative.Method<FigureD3D.SetArray>(_context, 8)(_context, 0, 5, _emptyMaterialBindings);
+            FigureNative.Method<FigureD3D.SetArray>(_context, 10)(_context, 0, 5, _emptyMaterialBindings);
             FigureNative.Method<FigureD3D.SetVertexBuffers>(_context, 18)(_context, 0, 1, [IntPtr.Zero], [48], [0]);
             FigureNative.Method<FigureD3D.SetIndexBuffer>(_context, 19)(_context, IntPtr.Zero, 42, 0);
         }
@@ -302,8 +316,8 @@ public sealed class FigureRenderer : IDisposable
 
     private void DrawStage(Matrix4x4 viewProjection, Vector3 eye, float radius, bool reduced)
     {
-        FigureNative.Method<FigureD3D.SetArray>(_context, 8)(_context, 0, 5, new IntPtr[5]);
-        FigureNative.Method<FigureD3D.SetArray>(_context, 10)(_context, 0, 5, new IntPtr[5]);
+        FigureNative.Method<FigureD3D.SetArray>(_context, 8)(_context, 0, 5, _emptyMaterialBindings);
+        FigureNative.Method<FigureD3D.SetArray>(_context, 10)(_context, 0, 5, _emptyMaterialBindings);
         FigureNative.Method<FigureD3D.SetOne>(_context, 43)(_context, _cullNone);
         if (!reduced) Draw(_contactShadow!, 3, new Vector3(0), 0, 1, radius * 1.85f, blend: true);
         Draw(_pedestal!, 1, new Vector3(0.30f, 0.32f, 0.36f), 0.05f, 0.62f, radius, blend: false);
@@ -440,9 +454,8 @@ public sealed class FigureRenderer : IDisposable
 
     private void UpdateConstants(ShaderConstants constants)
     {
-        var bytes = new byte[Marshal.SizeOf<ShaderConstants>()];
-        MemoryMarshal.Write(bytes, in constants);
-        var pin = GCHandle.Alloc(bytes, GCHandleType.Pinned);
+        MemoryMarshal.Write(_constantBytes, in constants);
+        var pin = GCHandle.Alloc(_constantBytes, GCHandleType.Pinned);
         try { FigureNative.Method<FigureD3D.Update>(_context, 48)(_context, _constants, 0, IntPtr.Zero, pin.AddrOfPinnedObject(), 0, 0); }
         finally { pin.Free(); }
     }

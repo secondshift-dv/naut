@@ -189,6 +189,7 @@ public sealed class DerivedImageLoader : IDisposable
     private readonly LinkedList<Entry> _recency = new();
     private readonly Dictionary<ImageKey, Task<Entry?>> _inflight = [];
     private readonly CancellationTokenSource _lifetime = new();
+    private long _generation;
     private bool _disposed;
     private long _bytes;
 
@@ -320,7 +321,7 @@ public sealed class DerivedImageLoader : IDisposable
             else
             {
                 Interlocked.Increment(ref _misses);
-                var task = DecodeAndStoreAsync(key);
+                var task = DecodeAndStoreAsync(key, _generation);
                 _inflight[key] = task;
                 pending = task;
             }
@@ -359,7 +360,7 @@ public sealed class DerivedImageLoader : IDisposable
             else
             {
                 Interlocked.Increment(ref _misses);
-                pending = DecodeAndStoreAsync(key);
+                pending = DecodeAndStoreAsync(key, _generation);
                 _inflight[key] = pending;
             }
         }
@@ -377,6 +378,8 @@ public sealed class DerivedImageLoader : IDisposable
         List<Entry> retired;
         lock (_sync)
         {
+            _generation++;
+            _inflight.Clear();
             retired = [.. _entries.Values.Select(node => node.Value)];
             _entries.Clear();
             _recency.Clear();
@@ -405,13 +408,19 @@ public sealed class DerivedImageLoader : IDisposable
         retired.ForEach(static entry => entry.Retire());
     }
 
-    private async Task<Entry?> DecodeAndStoreAsync(ImageKey key)
+    private async Task<Entry?> DecodeAndStoreAsync(ImageKey key, long generation)
     {
+        // The caller registers this task under the cache lock before cleanup can remove it.
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
         try
         {
             await _decodeSlots.WaitAsync(_lifetime.Token).ConfigureAwait(false);
             try
             {
+                lock (_sync)
+                {
+                    if (_disposed || generation != _generation) return null;
+                }
                 var image = await Task.Run(() =>
                 {
                     using var foregroundDisk = Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.EnterForegroundDiskWork();
@@ -424,7 +433,7 @@ public sealed class DerivedImageLoader : IDisposable
                 }
 
                 Interlocked.Increment(ref _decodes);
-                return Store(key, image);
+                return Store(key, image, generation);
             }
             finally
             {
@@ -439,7 +448,8 @@ public sealed class DerivedImageLoader : IDisposable
         {
             lock (_sync)
             {
-                _inflight.Remove(key);
+                if (generation == _generation)
+                    _inflight.Remove(key);
             }
         }
     }
@@ -465,7 +475,7 @@ public sealed class DerivedImageLoader : IDisposable
         }
     }
 
-    private Entry? Store(ImageKey key, DecodedImage image)
+    private Entry? Store(ImageKey key, DecodedImage image, long generation)
     {
         var bytes = Math.Max(1L, image.Bytes);
         if (bytes > _maxBytes)
@@ -479,7 +489,7 @@ public sealed class DerivedImageLoader : IDisposable
         Entry nodeValue;
         lock (_sync)
         {
-            if (_disposed)
+            if (_disposed || generation != _generation)
             {
                 DisposeResource(image.Image);
                 return null;

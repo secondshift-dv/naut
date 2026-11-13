@@ -16,7 +16,6 @@ using Neuterradise.App.SystemServices.Database;
 using Neuterradise.App.SystemServices.Database.Reads;
 using Neuterradise.App.SystemServices.Jobs.Handlers;
 using Neuterradise.App.SystemServices.Operations;
-using Neuterradise.App.SystemServices.Storage;
 
 namespace Neuterradise.App.Home;
 
@@ -205,41 +204,22 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
             if (!spotlight.IsSuccess) failures.Add(spotlight.Section);
             if (!recent.IsSuccess) failures.Add(recent.Section);
             if (!health.IsSuccess) failures.Add(health.Section);
+            if (!actionableFaceCount.IsSuccess) failures.Add(actionableFaceCount.Section);
             if (!units.IsSuccess) failures.Add(units.Section);
             if (!featured.IsSuccess) failures.Add(featured.Section);
             if (!chronicle.IsSuccess) failures.Add(chronicle.Section);
 
-            SpotlightResolution? spotlightVisuals = null;
-            RecentCoverResolution? recentVisuals = null;
-            if (spotlight.IsSuccess)
-            {
-                spotlightVisuals = await ResolveSpotlightVisualsAsync(
-                        spotlight.Value!,
-                        cancellation)
-                    .ConfigureAwait(false);
-                if (spotlightVisuals.Degraded)
-                {
-                    failures.Add("Spotlight media");
-                }
-            }
-
-            if (recent.IsSuccess)
-            {
-                recentVisuals = await ResolveRecentCoverPathsAsync(
-                        recent.Value!,
-                        cancellation)
-                    .ConfigureAwait(false);
-                if (recentVisuals.Degraded)
-                {
-                    failures.Add("Recent media");
-                }
-            }
+            var (spotlightVisuals, recentVisuals) = await ResolveGalleryVisualsAsync(
+                spotlight.Value, recent.Value, cancellation).ConfigureAwait(false);
+            if (spotlightVisuals?.Degraded == true) failures.Add("Spotlight media");
+            if (recentVisuals?.Degraded == true) failures.Add("Recent media");
 
             if (!_loadGuard.IsCurrent(token)) return;
 
             var appliedSections = 0;
             UiDispatch.Run(() =>
             {
+                if (!_loadGuard.IsCurrent(token) || _disposed) return;
                 if (spotlight.IsSuccess)
                 {
                     ApplySpotlight(spotlightVisuals?.Items ?? []);
@@ -258,7 +238,7 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
                     appliedSections++;
                 }
 
-                if (health.IsSuccess && units.IsSuccess)
+                if (health.IsSuccess && actionableFaceCount.IsSuccess && units.IsSuccess)
                 {
                     ApplyNeedsAttention(units.Value!, health.Value!, actionableFaceCount.Value);
                     appliedSections++;
@@ -346,61 +326,57 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
         }
     }
 
+    private async Task<Dictionary<Guid, ProfileArtwork>> ResolveHomeArtworkAsync(
+        IEnumerable<Guid> profileIds, CancellationToken cancellationToken)
+    {
+        return _mediaResources is null
+            ? []
+            : await _mediaResources.ResolveProfileArtworkAsync(profileIds.Distinct().ToArray(), cancellationToken)
+                .ConfigureAwait(false);
+    }
+
     private async Task<SpotlightResolution> ResolveSpotlightVisualsAsync(
         IReadOnlyList<HomeSpotlightCandidateReadModel> candidates,
+        IReadOnlyDictionary<Guid, ProfileArtwork> artwork,
         CancellationToken cancellationToken)
     {
-        if (_catalog is null)
-        {
-            return new SpotlightResolution([], false);
-        }
-
+        var degraded = false;
         var resolved = new List<(HomeSpotlightCandidateReadModel Candidate, string? BannerPath, string? CoverPath, string? BannerVideoPath)>(candidates.Count);
         foreach (var item in candidates)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var selectedBanner = await ResolveSelectedBannerAsync(item.Summary.ProfileId, cancellationToken)
-                .ConfigureAwait(false);
-            var cover = await ResolveHomeCoverAsync(item.Summary.ProfileId, cancellationToken)
-                .ConfigureAwait(false);
-            var rendition = selectedBanner is not null && _mediaResources is not null
-                ? await _mediaResources.ResolveProfileBannerAsync(item.Summary.ProfileId, selectedBanner.MediaAssetId, cancellationToken).ConfigureAwait(false) : null;
-            var bannerVideo = rendition?.State == MediaAssetResourceState.Ready ? rendition.PhysicalPath : null;
-            string? bannerPath = null;
-            if (selectedBanner?.Role == MediaAssetRole.Hover && _mediaResources is not null)
+            var profileId = item.Summary.ProfileId;
+            artwork.TryGetValue(profileId, out var visual);
+            degraded |= visual is { CoverNeedsRepair: true } or { PosterNeedsRepair: true };
+            string? video = null;
+            if (_mediaResources is not null && visual?.HoverAssetId is { } hoverId)
             {
-                var thumbnail = await _mediaResources.ResolveSelectedProfileBannerThumbnailAsync(
-                    item.Summary.ProfileId, selectedBanner.MediaAssetId, cancellationToken).ConfigureAwait(false);
-                bannerPath = thumbnail.State == MediaAssetResourceState.Ready ? thumbnail.PhysicalPath : null;
+                var rendition = await LoadHomeSectionAsync("Spotlight Banner",
+                    () => _mediaResources.ResolveProfileBannerAsync(profileId, hoverId, cancellationToken)).ConfigureAwait(false);
+                degraded |= !rendition.IsSuccess || rendition.Value?.State == MediaAssetResourceState.NeedsRepair;
+                video = rendition.Value?.PhysicalPath;
             }
-            resolved.Add((item, bannerPath, cover, bannerVideo));
+            resolved.Add((item, visual?.BannerPosterPath, visual?.CoverPath, video));
         }
-
-        return new SpotlightResolution(resolved, false);
+        return new SpotlightResolution(resolved, degraded);
     }
 
-    private async Task<RecentCoverResolution> ResolveRecentCoverPathsAsync(
-        GalleryPage page,
-        CancellationToken cancellationToken)
+    private async Task<(SpotlightResolution? Spotlight, RecentCoverResolution? Recent)> ResolveGalleryVisualsAsync(
+        IReadOnlyList<HomeSpotlightCandidateReadModel>? spotlight, GalleryPage? recent, CancellationToken cancellationToken)
     {
-        if (_catalog is null)
-        {
-            return new RecentCoverResolution(new Dictionary<Guid, string?>(), false);
-        }
-
-        var covers = new Dictionary<Guid, string?>();
-        foreach (var summary in page.Items)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!covers.ContainsKey(summary.ProfileId))
-            {
-                covers[summary.ProfileId] = await ResolveHomeCoverAsync(
-                    summary.ProfileId, cancellationToken).ConfigureAwait(false);
-            }
-        }
-
-        var degraded = false;
-        return new RecentCoverResolution(covers, degraded);
+        var profileIds = (spotlight?.Select(item => item.Summary.ProfileId) ?? [])
+            .Concat(recent?.Items.Select(item => item.ProfileId) ?? []);
+        var artwork = await LoadHomeSectionAsync("Home artwork",
+            () => ResolveHomeArtworkAsync(profileIds, cancellationToken)).ConfigureAwait(false);
+        var paths = artwork.Value ?? [];
+        var spotlightVisuals = spotlight is null ? null
+            : await ResolveSpotlightVisualsAsync(spotlight, paths, cancellationToken).ConfigureAwait(false);
+        if (spotlightVisuals is not null && !artwork.IsSuccess)
+            spotlightVisuals = spotlightVisuals with { Degraded = true };
+        var recentVisuals = recent is null ? null : new RecentCoverResolution(
+            recent.Items.ToDictionary(item => item.ProfileId, item => paths.GetValueOrDefault(item.ProfileId)?.CoverPath),
+            !artwork.IsSuccess || recent.Items.Any(item => paths.GetValueOrDefault(item.ProfileId)?.CoverNeedsRepair == true));
+        return (spotlightVisuals, recentVisuals);
     }
 
     private void ReplaceRefreshFailures(IEnumerable<string> failures)
@@ -540,62 +516,6 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
             _recentlyActive.Add(new HomeProfileTileViewModel(summary) { CoverImagePath = coverPath });
         }
         RaisePropertyChanged(nameof(IsLibraryEmpty));
-    }
-
-    private async Task<string?> ResolveHomeCoverAsync(
-        Guid profileId,
-        CancellationToken cancellationToken)
-    {
-        if (_mediaResources is null)
-        {
-            return null;
-        }
-
-        try
-        {
-            var resource = await _mediaResources.ResolveSelectedProfileCoverAsync(profileId, cancellationToken)
-                .ConfigureAwait(false);
-            return resource.State == MediaAssetResourceState.Ready ? resource.PhysicalPath : null;
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            Trace.TraceWarning("Home cover resolution failed: {0}", exception.GetType().Name);
-            return null;
-        }
-    }
-
-    private string? ResolveMediaAssetPath(MediaAssetRecord? asset)
-    {
-        if (_catalog is null || asset is null || asset.State != MediaAssetState.Ready)
-        {
-            return null;
-        }
-
-        try
-        {
-            return _catalog.Paths.ResolveVaultRelativePath(VaultPathArea.MediaAssets, asset.RelativePath);
-        }
-        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
-        {
-            Trace.TraceWarning("Home MediaAsset path resolution failed: {0}", exception.GetType().Name);
-            return null;
-        }
-    }
-
-    private async Task<MediaAssetRecord?> ResolveSelectedBannerAsync(
-        Guid profileId, CancellationToken cancellationToken)
-    {
-        if (_catalog is null) return null;
-        var selection = await _catalog.MediaAssetReads.GetPublicSelectionAsync(profileId, cancellationToken)
-            .ConfigureAwait(false);
-        return selection?.BannerMediaAssetId is { } id
-            ? await _catalog.MediaAssetReads.GetPublicSelectedMediaAsync(profileId, id, cancellationToken)
-                .ConfigureAwait(false)
-            : null;
     }
 
     public void ApplyNeedsAttention(
@@ -801,28 +721,13 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
 
         var spotlight = spotlightTask.Result;
         var recent = recentTask.Result;
-        SpotlightResolution? spotlightVisuals = null;
-        RecentCoverResolution? recentVisuals = null;
-
-        if (spotlight.IsSuccess)
-        {
-            spotlightVisuals = await ResolveSpotlightVisualsAsync(
-                    spotlight.Value!,
-                    cancellationToken)
-                .ConfigureAwait(false);
-        }
-
-        if (recent.IsSuccess)
-        {
-            recentVisuals = await ResolveRecentCoverPathsAsync(
-                    recent.Value!,
-                    cancellationToken)
-                .ConfigureAwait(false);
-        }
+        var (spotlightVisuals, recentVisuals) = await ResolveGalleryVisualsAsync(
+            spotlight.Value, recent.Value, cancellationToken).ConfigureAwait(false);
 
         if (_disposed) return;
         UiDispatch.Run(() =>
         {
+            if (_disposed || cancellationToken.IsCancellationRequested) return;
             if (spotlight.IsSuccess)
             {
                 ApplySpotlight(spotlightVisuals?.Items ?? []);
@@ -868,6 +773,7 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
         var units = unitsTask.Result;
         UiDispatch.Run(() =>
         {
+            if (_disposed || cancellationToken.IsCancellationRequested) return;
             if (health.IsSuccess)
             {
                 ApplyVaultPulse(health.Value!);
@@ -896,6 +802,7 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
 
         UiDispatch.Run(() =>
         {
+            if (_disposed || cancellationToken.IsCancellationRequested) return;
             if (result.IsSuccess)
             {
                 ApplyFeaturedConnection(result.Value);
@@ -929,6 +836,7 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
 
         UiDispatch.Run(() =>
         {
+            if (_disposed || cancellationToken.IsCancellationRequested) return;
             if (result.IsSuccess)
             {
                 ApplyChronicle(result.Value!);

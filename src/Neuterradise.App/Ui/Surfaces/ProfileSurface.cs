@@ -328,6 +328,10 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         var plan = ResolvePresentation(PresentationSlots.ProfileLayout, Context).PlanAs<ProfileLayoutPlan>();
         _layout = plan.Layout;
         _surface = plan.Surface;
+        if (Preview is null)
+            _vm.SetRecentMediaModuleVisible(
+                _layout.Modules.Any(module => module.Id == ProfileLayoutModuleId.RecentMedia && module.Visible)
+                && (_surface is null || HasRecentMediaRegion(_surface)));
         _backdrop.Plan = ResolvePresentation(PresentationSlots.ProfileBackdrop, Context).PlanAs<BackdropPlan>();
         _backdrop.AmbientImagePath = Preview is not null && _hasPreviewMedia ? _previewCover?.Path : _vm.CoverSource?.Path;
         _backdrop.AmbientVideoPath = Preview is not null && _hasPreviewMedia ? _previewBannerVideo : _vm.BannerVideoPath;
@@ -411,6 +415,9 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             status: status, assignedTags: _vm.AssignedTags,
             showTags: _layout.Id != "portrait" || (string.IsNullOrWhiteSpace(_vm.BannerVideoPath) && string.IsNullOrWhiteSpace(_vm.BannerPosterPath)));
     }
+    private static bool HasRecentMediaRegion(SurfaceNode node) =>
+        node.Kind == "semantic" && node.Semantic == "recent-media" || node.Children.Any(HasRecentMediaRegion);
+
     private void QueueModulesRefresh() => QueueModulesRefresh(force: true);
 
     private void QueueModulesRefreshForResize(double width)

@@ -95,9 +95,11 @@ public sealed class IdentityIndex
         };
     }
 
-    public double? ScoreIdentity(Guid identityId, IReadOnlyList<float> probe)
+    public double? ScoreIdentity(Guid identityId, IReadOnlyList<float> probe) =>
+        ScoreIdentity(_identities.FirstOrDefault(candidate => candidate.IdentityId == identityId), probe);
+
+    private static double? ScoreIdentity(IndexedIdentity? identity, IReadOnlyList<float> probe)
     {
-        var identity = _identities.FirstOrDefault(candidate => candidate.IdentityId == identityId);
         if (identity is null || identity.Samples.Length == 0)
         {
             return null;
@@ -125,7 +127,7 @@ public sealed class IdentityIndex
             .Select(identity => new
             {
                 identity.IdentityId,
-                Score = ScoreIdentity(identity.IdentityId, probe) ?? double.NegativeInfinity
+                Score = ScoreIdentity(identity, probe) ?? double.NegativeInfinity
             })
             .Where(scored => !double.IsNegativeInfinity(scored.Score) && scored.Score >= threshold)
             .OrderByDescending(static scored => scored.Score)

@@ -2,11 +2,64 @@ using Microsoft.Data.Sqlite;
 
 namespace Neuterradise.App.SystemServices.Database.Reads;
 
+internal sealed record ArtworkAsset(Guid Id, string RelativePath, long ByteLength);
+internal sealed record ProfileArtworkAssets(ArtworkAsset? Cover, ArtworkAsset? BannerPoster, Guid? HoverId, ArtworkAsset? ReadyHover);
+
 public sealed class MediaAssetReads
 {
     private readonly CatalogDb _catalog;
 
     public MediaAssetReads(CatalogDb catalog) => _catalog = catalog;
+
+    internal async Task<Dictionary<Guid, ProfileArtworkAssets>> GetPublicProfileArtworkAsync(
+        IReadOnlyCollection<Guid> profileIds, CancellationToken ct)
+    {
+        var result = new Dictionary<Guid, ProfileArtworkAssets>(profileIds.Count);
+        if (profileIds.Count == 0) return result;
+
+        await using var connection = await _catalog.OpenConnectionAsync(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        foreach (var id in profileIds)
+            command.Parameters.AddWithValue($"$p{command.Parameters.Count}", DbGuid.Format(id));
+
+        var keys = string.Join(", ", command.Parameters.Cast<SqliteParameter>().Select(p => p.ParameterName));
+        command.CommandText = $"""
+            SELECT p.profile_id,
+                   cover.media_asset_id, cover.relative_path, cover.byte_length,
+                   poster.media_asset_id, poster.relative_path, poster.byte_length,
+                   hover.media_asset_id,
+                   CASE WHEN hover.state = 'READY' THEN hover.media_asset_id END,
+                   hover.relative_path, hover.byte_length
+            FROM profiles p
+            JOIN profile_appearance a ON a.profile_id = p.profile_id
+            LEFT JOIN media_assets cover
+              ON cover.media_asset_id = a.cover_media_asset_id AND cover.role = 'THUMBNAIL'
+             AND cover.state = 'READY' AND EXISTS (
+                SELECT 1 FROM profile_media pm JOIN media m ON m.media_id = pm.media_id
+                WHERE pm.profile_id = p.profile_id AND pm.media_id = cover.media_id
+                  AND pm.publication_import_unit_id IS NULL AND m.state = 'ACTIVE')
+            LEFT JOIN media_assets hover
+              ON hover.media_asset_id = a.banner_media_asset_id AND hover.role = 'HOVER'
+             AND EXISTS (
+                SELECT 1 FROM profile_media pm JOIN media m ON m.media_id = pm.media_id
+                WHERE pm.profile_id = p.profile_id AND pm.media_id = hover.media_id
+                  AND pm.publication_import_unit_id IS NULL AND m.state = 'ACTIVE')
+            LEFT JOIN media_assets poster
+              ON poster.media_id = hover.media_id AND poster.role = 'THUMBNAIL' AND poster.state = 'READY'
+            WHERE p.profile_id IN ({keys}) AND p.visibility = 'PUBLISHED' AND p.trashed_at_ms IS NULL;
+            """;
+        await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        while (await reader.ReadAsync(ct).ConfigureAwait(false))
+        {
+            result.Add(DbGuid.Parse(reader.GetString(0)), new ProfileArtworkAssets(
+                ReadArtwork(reader, 1), ReadArtwork(reader, 4), OptionalGuid(reader, 7), ReadArtwork(reader, 8)));
+        }
+        return result;
+    }
+
+    private static ArtworkAsset? ReadArtwork(SqliteDataReader reader, int ordinal) => reader.IsDBNull(ordinal)
+        ? null
+        : new ArtworkAsset(DbGuid.Parse(reader.GetString(ordinal)), reader.GetString(ordinal + 1), reader.GetInt64(ordinal + 2));
 
     public Task<MediaAssetRecord?> GetPublicMediaAssetAsync(Guid assetId, MediaAssetRole role,
         CancellationToken cancellationToken = default) =>

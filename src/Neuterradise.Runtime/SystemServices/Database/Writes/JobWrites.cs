@@ -264,7 +264,11 @@ public sealed class JobWrites
                 row_version = row_version + 1
             WHERE job_id = $jobId
               AND row_version = $expectedRowVersion
-              AND state = 'PENDING';
+              AND state = 'PENDING'
+              AND NOT EXISTS (
+                  SELECT 1 FROM job_dependencies dependency
+                  JOIN jobs predecessor ON predecessor.job_id = dependency.depends_on_job_id
+                  WHERE dependency.job_id = jobs.job_id AND predecessor.state <> 'SUCCEEDED');
             """);
         update.Parameters.AddWithValue("$jobId", DbGuid.Format(jobId));
         update.Parameters.AddWithValue("$expectedRowVersion", expectedRowVersion);

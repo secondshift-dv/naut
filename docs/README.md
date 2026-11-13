@@ -4,6 +4,7 @@ Naut is a local-first media collection manager for Windows. Start here if you ar
 
 ## Using Naut
 
+- [Naut v0.0.18 release notes](releases/v0.0.18.md) — Profile media preferences, catalog refreshes, artwork loading, and long Poster titles.
 - [Naut v0.0.17 release notes](releases/v0.0.17.md) — individual presentation-file deletion, pack-managed boundaries, and recoverable Media Inspector deletion.
 - [Naut v0.0.15 release notes](releases/v0.0.15.md) — clearer Banner effects, Home/Profile Bubbles, Gallery search and optional pack README corrections.
 - [Naut v0.0.14 release notes](releases/v0.0.14.md) — Figure 3D hot-cache entry, targeted Profile invalidation, deadline-driven Governor, and lower Import/navigation overhead.
@@ -22,7 +23,7 @@ Naut is a local-first media collection manager for Windows. Start here if you ar
 - [Languages](languages.md) — the eight interface languages and what changing language does and does not affect.
 - [3D Figures](figures.md) — optional interactive 3D presentation and its performance tier.
 - [Model formats](model-formats.md) — GLB, FBX, OBJ, STL and 3MF preparation, textures and package dependencies.
-- [System Requirements](system-requirements.md) — minimum and recommended requirements for Naut v0.0.17, with measurement limits.
+- [System Requirements](system-requirements.md) — minimum and recommended requirements for Naut v0.0.18, with measurement limits.
 - [FAQ & Troubleshooting](troubleshooting.md) — common installation, media, face analysis, video, Figure, and update questions.
 
 ## Developers and contributors

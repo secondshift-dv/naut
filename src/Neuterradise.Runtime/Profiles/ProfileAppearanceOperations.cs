@@ -711,7 +711,7 @@ public sealed record ProfileAppearanceOverrides(
     double CoverOffsetY = 0,
     double CoverRotation = 0,
     string? MediaLayoutId = null,
-    bool ShowRecentMedia = true,
+    bool ShowRecentMedia = false,
     string BannerEffect = "none", double BannerEffectIntensity = .2)
 {
     // First canonical Profile appearance contract. The fresh v1 catalog has no appearance migrations.
@@ -740,7 +740,7 @@ public sealed record ProfileAppearanceOverrides(
         CoverSourceKind: null,
         MediaLayoutId: "mosaic",
         CoverVideoTimestampMilliseconds: null,
-        ShowRecentMedia: true);
+        ShowRecentMedia: false);
 
     public CoverVisualSourceKind ResolvedCoverSourceKind =>
         Enum.TryParse<CoverVisualSourceKind>(CoverSourceKind, ignoreCase: true, out var parsed)

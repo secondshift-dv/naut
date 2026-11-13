@@ -14,6 +14,7 @@ public sealed record ProfileRuntimeSnapshot(
     ProfileDetailReadModel Detail,
     ProfileFolderReadModel? Folder,
     string DefaultLayoutPresetId,
+    bool FavoritesOnly,
     ProfileMediaPage InitialMediaPage);
 
 public sealed class ProfileRuntimeSnapshotCache : IAsyncDisposable
@@ -147,24 +148,28 @@ public sealed class ProfileRuntimeSnapshotCache : IAsyncDisposable
     {
         var detailTask = _profileReads.GetDetailAsync(profileId, cancellationToken);
         var folderTask = _profileReads.GetFolderAsync(profileId, cancellationToken);
-        var mediaTask = _profileReads.GetMediaPageAsync(
-            profileId,
-            pageSize: MediaGridViewModel.DefaultPageSize,
-            cancellationToken: cancellationToken);
+        var favoritesTask = ProfileMediaPreferences.ReadFavoritesForSnapshotAsync(_catalog, profileId, cancellationToken);
 
-        await Task.WhenAll(detailTask, folderTask, mediaTask).ConfigureAwait(false);
+        await Task.WhenAll(detailTask, folderTask, favoritesTask).ConfigureAwait(false);
         var detail = detailTask.Result;
         if (detail is null)
         {
             return null;
         }
 
+        var media = await _profileReads.GetMediaPageAsync(
+            profileId,
+            pageSize: MediaGridViewModel.DefaultPageSize,
+            cancellationToken: cancellationToken,
+            isFavoriteOnly: favoritesTask.Result).ConfigureAwait(false);
+
         return new ProfileRuntimeSnapshot(
             profileId,
             detail,
             folderTask.Result,
             ProfileLayoutResolver.FallbackPresetId,
-            mediaTask.Result);
+            favoritesTask.Result,
+            media);
     }
 
     private void OnInvalidated(object? sender, CatalogInvalidation invalidation)
@@ -246,7 +251,8 @@ public sealed class ProfileRuntimeSnapshotCache : IAsyncDisposable
             && detail.BannerEntries.Any(entry => changed.Contains(entry.MediaId)))
             return true;
 
-        return snapshot.InitialMediaPage.Items.Any(item => changed.Contains(item.MediaId));
+        return snapshot.FavoritesOnly
+            || snapshot.InitialMediaPage.Items.Any(item => changed.Contains(item.MediaId));
     }
 
     private void Touch(Guid profileId)

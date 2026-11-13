@@ -324,6 +324,13 @@ public sealed class CardVisual : Grid
                         Padding = new Thickness(4, 2, 4, 2),
                     };
                 }
+                else if (text.MaxLines > 0 && text.Slot == SemanticSlots.ProfileName
+                    && text.Layout.VerticalAlignment == "bottom")
+                {
+                    var title = new Grid();
+                    title.Children.Add(block);
+                    element = title;
+                }
                 else element = block;
                 break;
             }

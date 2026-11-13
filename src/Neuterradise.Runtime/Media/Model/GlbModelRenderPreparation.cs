@@ -171,14 +171,13 @@ public sealed partial class GlbThumbnailPreviewAdapter
                 throw new InvalidDataException("GLB prepared texture allocation exceeds its budget.");
             _preparedTextureBytes += mipBytes;
             var pixels = new byte[checked(width * height * 4)];
+            var sourcePixels = bitmap.GetPixelSpan();
+            var rowBytes = width * 4;
             for (var y = 0; y < height; y++)
             {
                 ct.ThrowIfCancellationRequested();
-                for (var x = 0; x < width; x++)
-                {
-                    var color = bitmap.GetPixel(x,y); var at = (y * width + x) * 4;
-                    pixels[at] = color.Red; pixels[at+1] = color.Green; pixels[at+2] = color.Blue; pixels[at+3] = color.Alpha;
-                }
+                sourcePixels.Slice(y * bitmap.RowBytes, rowBytes)
+                    .CopyTo(pixels.AsSpan(y * rowBytes, rowBytes));
             }
             var mips = new List<int>();
             while (true)

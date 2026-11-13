@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using Neuterradise.App.Profiles;
 using Neuterradise.App.Settings;
 
 namespace Neuterradise.App.SystemServices.Database.Writes;
@@ -8,6 +9,7 @@ public sealed class SettingsWrites
     private readonly CatalogConnectionFactory _connectionFactory;
     private readonly CatalogWriteCoordinator _writeCoordinator;
     private readonly TimeProvider _timeProvider;
+    private readonly CatalogMutationAdmissionGate _mutationAdmission;
 
     public SettingsWrites(CatalogDb catalog, TimeProvider? timeProvider = null)
     {
@@ -15,6 +17,7 @@ public sealed class SettingsWrites
         _connectionFactory = catalog.ConnectionFactory;
         _writeCoordinator = catalog.WriteCoordinator;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _mutationAdmission = catalog.MutationAdmission;
     }
 
     public async Task SetSettingAsync(
@@ -27,7 +30,22 @@ public sealed class SettingsWrites
         string key,
         string valueJson,
         ActivityEntryPersistence? activityEntry,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        await SetSettingAsync(key, valueJson, activityEntry, null, cancellationToken).ConfigureAwait(false);
+
+    internal async Task SetProfileMediaFavoritesAsync(Guid profileId, bool value)
+    {
+        using var admission = _mutationAdmission.Enter(nameof(SetProfileMediaFavoritesAsync));
+        await SetSettingAsync(ProfileMediaPreferences.FavoritesKey(profileId), value ? "true" : "false",
+            null, profileId, CancellationToken.None).ConfigureAwait(false);
+    }
+
+    private async Task SetSettingAsync(
+        string key,
+        string valueJson,
+        ActivityEntryPersistence? activityEntry,
+        Guid? profileId,
+        CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         ArgumentNullException.ThrowIfNull(valueJson);
@@ -35,6 +53,15 @@ public sealed class SettingsWrites
         await using var lease = await _writeCoordinator.EnterAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = CatalogTransaction.Begin(connection, _writeCoordinator);
+
+        if (profileId is { } id)
+        {
+            // A queued toggle must never recreate a key after permanent Profile purge.
+            await using var profile = transaction.CreateCommand("SELECT 1 FROM profiles WHERE profile_id = $id;");
+            profile.Parameters.AddWithValue("$id", DbGuid.Format(id));
+            if (await profile.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is null)
+                throw new CatalogInvariantException("Profile no longer exists.");
+        }
 
         await SetSettingInTransactionAsync(
             transaction,

@@ -16,6 +16,7 @@ public sealed class RefreshCoalescer : IDisposable
     private readonly TimeSpan _quietPeriod;
     private readonly Lock _sync = new();
     private readonly CancellationTokenSource _lifetime = new();
+    private readonly CancellationToken _lifetimeToken;
 
     private CancellationTokenSource? _pending;
     private bool _running;
@@ -28,6 +29,7 @@ public sealed class RefreshCoalescer : IDisposable
     {
         _refresh = refresh ?? throw new ArgumentNullException(nameof(refresh));
         _quietPeriod = quietPeriod;
+        _lifetimeToken = _lifetime.Token;
     }
 
     public long SignalCount => Interlocked.Read(ref _signals);
@@ -39,6 +41,7 @@ public sealed class RefreshCoalescer : IDisposable
     {
         Interlocked.Increment(ref _signals);
         CancellationTokenSource debounce;
+        CancellationToken debounceToken;
         lock (_sync)
         {
             if (_disposed)
@@ -54,14 +57,14 @@ public sealed class RefreshCoalescer : IDisposable
 
             _pending?.Cancel();
             _pending?.Dispose();
-            _pending = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
-            debounce = _pending;
+            _pending = debounce = new CancellationTokenSource();
+            debounceToken = debounce.Token;
         }
 
-        TaskObserver.Observe(RunAfterQuietAsync(debounce.Token), "Coalesced refresh");
+        TaskObserver.Observe(RunAfterQuietAsync(debounce, debounceToken), "Coalesced refresh");
     }
 
-    private async Task RunAfterQuietAsync(CancellationToken debounceToken)
+    private async Task RunAfterQuietAsync(CancellationTokenSource debounce, CancellationToken debounceToken)
     {
         try
         {
@@ -72,46 +75,36 @@ public sealed class RefreshCoalescer : IDisposable
             return;
         }
 
+        lock (_sync)
+        {
+            if (_disposed || !ReferenceEquals(_pending, debounce)) return;
+            _pending = null;
+            debounce.Dispose();
+            _running = true;
+        }
+
         while (true)
         {
-            lock (_sync)
-            {
-                if (_disposed)
-                {
-                    return;
-                }
-
-                _running = true;
-                _rerunRequested = false;
-            }
-
             try
             {
                 Interlocked.Increment(ref _runs);
-                await _refresh(_lifetime.Token).ConfigureAwait(true);
+                await _refresh(_lifetimeToken).ConfigureAwait(true);
             }
-            catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+            catch (OperationCanceledException) when (_lifetimeToken.IsCancellationRequested)
             {
-                return;
             }
             catch (Exception exception)
             {
                 Trace.TraceWarning("Coalesced refresh failed: {0}", exception.GetType().Name);
             }
-            finally
-            {
-                lock (_sync)
-                {
-                    _running = false;
-                }
-            }
-
             lock (_sync)
             {
                 if (!_rerunRequested || _disposed)
                 {
+                    _running = false;
                     return;
                 }
+                _rerunRequested = false;
             }
         }
     }
@@ -128,6 +121,7 @@ public sealed class RefreshCoalescer : IDisposable
             _disposed = true;
             _pending?.Cancel();
             _pending?.Dispose();
+            _pending = null;
         }
 
         _lifetime.Cancel();

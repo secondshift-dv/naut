@@ -1,7 +1,12 @@
 using System.Globalization;
+using Microsoft.Data.Sqlite;
 using Neuterradise.App.SystemServices.Jobs;
 
 namespace Neuterradise.App.SystemServices.Database.Reads;
+
+internal readonly record struct RetryJobCandidate(Guid Id, long RowVersion, int Attempt, int MaxAttempts, string? ErrorCode);
+internal readonly record struct PendingJobCandidate(Guid Id, long RowVersion);
+internal readonly record struct RunnableJobCandidate(Guid Id, int Priority);
 
 public sealed class SchedulerReads
 {
@@ -43,7 +48,7 @@ public sealed class SchedulerReads
     public Task<JobRecord?> GetJobRecordAsync(Guid jobId, CancellationToken cancellationToken = default) =>
         GetJobAsync(jobId, cancellationToken);
 
-    public async Task<IReadOnlyList<Guid>> GetRunnableJobIdsAsync(
+    private async Task<IReadOnlyList<RunnableJobCandidate>> GetRunnableJobsAsync(
         JobLane lane,
         int limit,
         long nowMs,
@@ -57,7 +62,7 @@ public sealed class SchedulerReads
         // P0(≥95)→100, P1(≥80)→94, P2(≥60)→79, P3(≥40)→59, maintenance(<40)→39.
         command.CommandText =
             """
-            SELECT jobs.job_id
+            SELECT jobs.job_id, jobs.priority
             FROM jobs
             WHERE jobs.state = 'RUNNABLE'
               AND jobs.lane = $lane
@@ -88,10 +93,10 @@ public sealed class SchedulerReads
         command.Parameters.AddWithValue("$nowMs", nowMs);
         command.Parameters.AddWithValue("$limit", limit);
 
-        return await ReadGuidListAsync(command, cancellationToken).ConfigureAwait(false);
+        return await ReadRunnableCandidatesAsync(command, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyList<Guid>> GetRunnableJobIdsAsync(
+    internal async Task<IReadOnlyList<RunnableJobCandidate>> GetRunnableJobsAsync(
         JobLane lane,
         int limit,
         long nowMs,
@@ -101,7 +106,7 @@ public sealed class SchedulerReads
         ArgumentNullException.ThrowIfNull(aging);
         if (!aging.IsEnabled)
         {
-            return await GetRunnableJobIdsAsync(lane, limit, nowMs, cancellationToken).ConfigureAwait(false);
+            return await GetRunnableJobsAsync(lane, limit, nowMs, cancellationToken).ConfigureAwait(false);
         }
 
         ValidateLimit(limit);
@@ -112,7 +117,7 @@ public sealed class SchedulerReads
         // P0(≥95)→100, P1(≥80)→94, P2(≥60)→79, P3(≥40)→59, maintenance(<40)→39.
         command.CommandText =
             """
-            SELECT jobs.job_id
+            SELECT jobs.job_id, jobs.priority
             FROM jobs
             WHERE jobs.state = 'RUNNABLE'
               AND jobs.lane = $lane
@@ -145,7 +150,7 @@ public sealed class SchedulerReads
         command.Parameters.AddWithValue("$agingStep", aging.Step);
         command.Parameters.AddWithValue("$limit", limit);
 
-        return await ReadGuidListAsync(command, cancellationToken).ConfigureAwait(false);
+        return await ReadRunnableCandidatesAsync(command, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -155,7 +160,7 @@ public sealed class SchedulerReads
     /// <c>priority</c> column so that same-tier jobs are always excluded regardless of aging.
     /// Returns at most one job.
     /// </summary>
-    public async Task<Guid?> GetOldestLowerTierCandidateAsync(
+    internal async Task<RunnableJobCandidate?> GetOldestLowerTierCandidateAsync(
         JobLane lane,
         FairnessTier belowTier,
         long nowMs,
@@ -169,7 +174,7 @@ public sealed class SchedulerReads
         // candidate is never from the same semantic class.
         command.CommandText =
             """
-            SELECT job_id
+            SELECT job_id, priority
             FROM jobs
             WHERE state = 'RUNNABLE'
               AND lane = $lane
@@ -195,11 +200,11 @@ public sealed class SchedulerReads
         command.Parameters.AddWithValue("$nowMs", nowMs);
         command.Parameters.AddWithValue("$belowTier", (int)belowTier);
 
-        var ids = await ReadGuidListAsync(command, cancellationToken).ConfigureAwait(false);
-        return ids.Count > 0 ? ids[0] : null;
+        var candidates = await ReadRunnableCandidatesAsync(command, cancellationToken).ConfigureAwait(false);
+        return candidates.Count > 0 ? candidates[0] : null;
     }
 
-    public async Task<IReadOnlyList<Guid>> GetRetryableJobIdsAsync(
+    internal async Task<IReadOnlyList<RetryJobCandidate>> GetRetryableJobsAsync(
         JobLane lane,
         int limit,
         long nowMs,
@@ -211,7 +216,7 @@ public sealed class SchedulerReads
         await using var command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT job_id
+            SELECT job_id, row_version, attempt, max_attempts, error_code
             FROM jobs
             WHERE state = 'FAILED_RETRYABLE'
               AND lane = $lane
@@ -224,10 +229,10 @@ public sealed class SchedulerReads
         command.Parameters.AddWithValue("$nowMs", nowMs);
         command.Parameters.AddWithValue("$limit", limit);
 
-        return await ReadGuidListAsync(command, cancellationToken).ConfigureAwait(false);
+        return await ReadRetryCandidatesAsync(command, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyList<Guid>> GetExhaustedRetryJobIdsAsync(
+    internal async Task<IReadOnlyList<RetryJobCandidate>> GetExhaustedRetryJobsAsync(
         JobLane lane,
         int limit,
         CancellationToken cancellationToken = default)
@@ -238,7 +243,7 @@ public sealed class SchedulerReads
         await using var command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT job_id
+            SELECT job_id, row_version, attempt, max_attempts, error_code
             FROM jobs
             WHERE state = 'FAILED_RETRYABLE'
               AND lane = $lane
@@ -249,7 +254,7 @@ public sealed class SchedulerReads
         command.Parameters.AddWithValue("$lane", DbEnum.Format(lane));
         command.Parameters.AddWithValue("$limit", limit);
 
-        return await ReadGuidListAsync(command, cancellationToken).ConfigureAwait(false);
+        return await ReadRetryCandidatesAsync(command, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<Guid>> GetNonTerminalJobIdsForOwnerAsync(
@@ -457,7 +462,7 @@ public sealed class SchedulerReads
         return Convert.ToInt32(result, System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    public async Task<IReadOnlyList<Guid>> GetPendingJobIdsAsync(
+    internal async Task<IReadOnlyList<PendingJobCandidate>> GetReadyPendingJobsAsync(
         JobLane lane,
         int limit,
         CancellationToken cancellationToken = default)
@@ -468,45 +473,24 @@ public sealed class SchedulerReads
         await using var command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT job_id
+            SELECT job_id, row_version
             FROM jobs
             WHERE state = 'PENDING' AND lane = $lane
+              AND NOT EXISTS (
+                  SELECT 1 FROM job_dependencies dependency
+                  JOIN jobs predecessor ON predecessor.job_id = dependency.depends_on_job_id
+                  WHERE dependency.job_id = jobs.job_id AND predecessor.state <> 'SUCCEEDED')
             ORDER BY priority DESC, created_at_ms, job_id
             LIMIT $limit;
             """;
         command.Parameters.AddWithValue("$lane", DbEnum.Format(lane));
         command.Parameters.AddWithValue("$limit", limit);
 
-        return await ReadGuidListAsync(command, cancellationToken).ConfigureAwait(false);
-    }
-
-    public async Task<IReadOnlyList<JobDependencyFact>> GetDependenciesAsync(
-        Guid jobId,
-        CancellationToken cancellationToken = default)
-    {
-        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken)
-            .ConfigureAwait(false);
-        await using var command = connection.CreateCommand();
-        command.CommandText =
-            """
-            SELECT dependency.job_id, dependency.depends_on_job_id, predecessor.state
-            FROM job_dependencies dependency
-            JOIN jobs predecessor ON predecessor.job_id = dependency.depends_on_job_id
-            WHERE dependency.job_id = $jobId;
-            """;
-        command.Parameters.AddWithValue("$jobId", DbGuid.Format(jobId));
-
-        var facts = new List<JobDependencyFact>();
+        var candidates = new List<PendingJobCandidate>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-        {
-            facts.Add(new JobDependencyFact(
-                DbGuid.Parse(reader.GetString(0)),
-                DbGuid.Parse(reader.GetString(1)),
-                DbEnum.ParseJobState(reader.GetString(2))));
-        }
-
-        return facts;
+            candidates.Add(new PendingJobCandidate(DbGuid.Parse(reader.GetString(0)), reader.GetInt64(1)));
+        return candidates;
     }
 
     public async Task<IReadOnlyList<Guid>> GetDirectDependentsAsync(
@@ -868,6 +852,27 @@ public sealed class SchedulerReads
         return ids;
     }
 
+    private static async Task<IReadOnlyList<RetryJobCandidate>> ReadRetryCandidatesAsync(
+        SqliteCommand command, CancellationToken cancellationToken)
+    {
+        var jobs = new List<RetryJobCandidate>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            jobs.Add(new RetryJobCandidate(DbGuid.Parse(reader.GetString(0)), reader.GetInt64(1),
+                reader.GetInt32(2), reader.GetInt32(3), reader.IsDBNull(4) ? null : reader.GetString(4)));
+        return jobs;
+    }
+
+    private static async Task<IReadOnlyList<RunnableJobCandidate>> ReadRunnableCandidatesAsync(
+        SqliteCommand command, CancellationToken cancellationToken)
+    {
+        var jobs = new List<RunnableJobCandidate>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            jobs.Add(new RunnableJobCandidate(DbGuid.Parse(reader.GetString(0)), reader.GetInt32(1)));
+        return jobs;
+    }
+
     private static JobRecord ReadJobRecord(Microsoft.Data.Sqlite.SqliteDataReader reader)
     {
         return new JobRecord(
@@ -901,5 +906,3 @@ public sealed class SchedulerReads
         }
     }
 }
-
-public sealed record JobDependencyFact(Guid JobId, Guid DependsOnJobId, JobState PredecessorState);

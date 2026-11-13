@@ -45,4 +45,4 @@ Use **Edit details** for Profile identity fields. Managed NORMAL Profiles can mi
 
 Deleting a Profile creates a recoverable **30-day Group Trash** entry for the Profile and its exclusively owned media. Media still used by another active Profile remains accessible; restoring a group preserves later decisions affecting shared media. Permanent deletion cannot be undone.
 
-Recent Media visibility can be changed for a Profile independently of the selected Portrait, Dossier or Chronicle layout.
+Recent media is off by default. Enable it in **Customize Profile → Layout**. A saved choice applies across Profile layouts. The **Favorites** filter in the media grid is saved per Profile and still applies after you reopen it or restart Naut.

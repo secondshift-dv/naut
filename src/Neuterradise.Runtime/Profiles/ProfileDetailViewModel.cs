@@ -29,6 +29,7 @@ public sealed record ProfileTagOption(string TagId, string DisplayName);
 public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
 {
     public const int MaxMaterializedMedia = 200;
+    internal const int RecentMediaLimit = 12;
 
     private readonly CatalogDb? _catalog;
     private readonly NavigationCoordinator? _navigation;
@@ -99,6 +100,11 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
     private ProfileAppearanceOverrides? _appearanceOverrides;
     private readonly MediaResourceAuthority? _mediaResources;
     private readonly ProfileRuntimeSnapshotCache? _runtimeSnapshots;
+    private bool _favoriteFilterReady;
+    private bool _storedFavoriteFilter;
+    private long _favoriteFilterRequest;
+    private Task _favoriteFilterSettlement = Task.CompletedTask;
+    private bool _recentMediaModuleVisible = true;
     private string? _bannerVideoPath;
 
     public ProfileDetailViewModel(Guid profileId)
@@ -145,7 +151,7 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
         _overlay = overlay;
 
         MediaGrid = new MediaGridViewModel();
-        if (initialOrigin is not null)
+        if (initialOrigin is not null && initialOrigin.ProfileId == ProfileId)
         {
             MediaGrid.RestoreState(initialOrigin);
         }
@@ -160,6 +166,7 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
 
         if (_catalog is not null)
         {
+            MediaGrid.FavoriteFilterRequested = RequestFavoriteFilter;
             var assetWrites = _catalog.MediaWrites;
             MediaGrid.PersistFavoriteAction = (assetId, isFavorite) =>
                 assetWrites.SetFavoriteAsync(assetId, isFavorite);
@@ -228,14 +235,7 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
 
         if (_profileReads is not null)
         {
-            if (_runtimeSnapshots?.TryGetReady(ProfileId, out var warmSnapshot) == true
-                && warmSnapshot is not null)
-            {
-                var mediaApplied = ApplyRuntimeSnapshot(warmSnapshot);
-                ShowReady();
-                StartProgressiveProfileModules(RouteCancellationToken, includeMedia: !mediaApplied);
-            }
-            else if (_runtimeSnapshots is not null)
+            if (_runtimeSnapshots is not null)
             {
                 StartRouteTask(LoadFromRuntimeSnapshotAsync, "This profile could not be opened.");
             }
@@ -308,14 +308,14 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
 
     private bool IsMediaRelevant(IReadOnlyList<Guid> entityIds)
     {
-        if (entityIds.Count == 0)
+        if (entityIds.Count == 0 || MediaGrid.IsFavoriteOnly)
         {
             return true;
         }
 
         foreach (var id in entityIds)
         {
-            if (MediaItems.Any(item => item.MediaId == id))
+            if (MediaItems.Any(item => item.MediaId == id) || RecentMedia.Any(item => item.MediaId == id))
             {
                 return true;
             }
@@ -404,11 +404,19 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
         if (_profileReads is null) return;
         var appearance = await _profileReads.GetAppearanceAsync(ProfileId, cancellationToken).ConfigureAwait(false);
         if (appearance is null || cancellationToken.IsCancellationRequested) return;
+        var recentEnabled = false;
         await UiDispatch.InvokeAsync(() =>
         {
             if (!cancellationToken.IsCancellationRequested && !_isDisposed && IsRouteActive)
+            {
+                var wasEnabled = ShowsRecentMedia;
                 ApplyAppearance(appearance);
+                recentEnabled = !wasEnabled && ShowsRecentMedia;
+                if (!ShowsRecentMedia) RecentMedia.Clear();
+            }
         }).ConfigureAwait(false);
+        if (recentEnabled)
+            await LoadMediaAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private RefreshCoalescer MediaRefresh => _mediaRefresh ??= new RefreshCoalescer(
@@ -1096,6 +1104,18 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
 
     public ObservableCollection<ProfileMediaItemViewModel> MediaItems { get; } = [];
     public ObservableCollection<ProfileMediaItemViewModel> RecentMedia { get; } = [];
+    private bool ShowsRecentMedia => _recentMediaModuleVisible
+        && (_appearanceOverrides ?? ProfileAppearanceOverrides.Default).ShowRecentMedia;
+
+    public void SetRecentMediaModuleVisible(bool visible)
+    {
+        if (_recentMediaModuleVisible == visible) return;
+        _recentMediaModuleVisible = visible;
+        if (!visible)
+            RecentMedia.Clear();
+        else if (ShowsRecentMedia)
+            StartRouteTask(LoadMediaAsync, "Recent media could not be loaded.");
+    }
     public ObservableCollection<ImportAssignmentReviewCluster> AssignmentReviewClusters { get; } = [];
     public MediaGridViewModel MediaGrid { get; }
     public RelatedProfilesViewModel Related { get; }
@@ -1291,14 +1311,14 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
             count++;
         }
 
-        if (recentItems is null)
+        if (ShowsRecentMedia && recentItems is null)
         {
-            foreach (var item in MediaItems.Take(12))
+            foreach (var item in MediaItems.Take(RecentMediaLimit))
                 RecentMedia.Add(item);
         }
-        else
+        else if (ShowsRecentMedia && recentItems is not null)
         {
-            foreach (var item in recentItems.Take(12))
+            foreach (var item in recentItems.Take(RecentMediaLimit))
                 RecentMedia.Add(new ProfileMediaItemViewModel(item));
         }
 
@@ -1343,20 +1363,79 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
         RaisePropertyChanged(nameof(UnresolvedFaceCount));
     }
 
-    private bool ApplyRuntimeSnapshot(ProfileRuntimeSnapshot snapshot)
+    private bool ApplyRuntimeSnapshot(ProfileRuntimeSnapshot snapshot, bool storedFavorites)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         _defaultLayoutPresetId = snapshot.DefaultLayoutPresetId;
         PopulateProfile(snapshot.Detail);
         ApplyFolder(snapshot.Folder);
+        InitializeFavoriteFilter(storedFavorites);
 
-        if (!UsesInitialMediaQuery())
+        if (!UsesInitialMediaQuery() || snapshot.FavoritesOnly != MediaGrid.IsFavoriteOnly)
         {
             return false;
         }
 
-        PopulateMedia(snapshot.InitialMediaPage.Items, snapshot.InitialMediaPage.TotalCount);
+        PopulateMedia(snapshot.InitialMediaPage.Items, snapshot.InitialMediaPage.TotalCount,
+            snapshot.FavoritesOnly ? [] : null);
         return true;
+    }
+
+    private void InitializeFavoriteFilter(bool stored)
+    {
+        if (_favoriteFilterReady) return;
+        _storedFavoriteFilter = stored;
+        MediaGrid.ApplyFavoriteFilter(stored);
+        _favoriteFilterReady = true;
+    }
+
+    private void RequestFavoriteFilter(bool value)
+    {
+        if (_isDisposed || !IsRouteActive || !_favoriteFilterReady)
+        {
+            MediaGrid.NotifyFavoriteFilter();
+            return;
+        }
+
+        var request = ++_favoriteFilterRequest;
+        Interlocked.Increment(ref _mediaLoadGeneration);
+        _runtimeSnapshots?.Invalidate(ProfileId);
+        var write = _catalog!.SettingsWrites.SetProfileMediaFavoritesAsync(ProfileId, value);
+        MediaGrid.ApplyFavoriteFilter(value);
+        MediaGrid.State = MediaGridState.Loading;
+        _favoriteFilterSettlement = SettleFavoriteFilterAsync(_favoriteFilterSettlement, write, request, value);
+    }
+
+    private async Task SettleFavoriteFilterAsync(Task previous, Task write, long request, bool value)
+    {
+        await previous.ConfigureAwait(false);
+        var saved = false;
+        try
+        {
+            await write.ConfigureAwait(false);
+            saved = true;
+            _runtimeSnapshots?.Invalidate(ProfileId);
+        }
+        catch (Exception exception)
+        {
+            Trace.TraceWarning("Profile media Favorites filter could not be saved: {0}", exception);
+        }
+
+        await UiDispatch.InvokeAsync(() =>
+        {
+            if (saved) _storedFavoriteFilter = value;
+            if (_isDisposed || !IsRouteActive || request != _favoriteFilterRequest) return;
+
+            if (_storedFavoriteFilter == MediaGrid.IsFavoriteOnly)
+                MediaGrid.NotifyFavoriteFilter();
+            else
+                MediaGrid.ApplyFavoriteFilter(_storedFavoriteFilter);
+
+            OnMediaGridQueryChanged();
+
+            if (!saved)
+                FolderStatusMessage = SurfaceText.Get("Profile.FavoriteFailed", "The favorite state could not be saved.");
+        }).ConfigureAwait(false);
     }
 
     private void ApplyFolder(ProfileFolderReadModel? folder)
@@ -1378,7 +1457,6 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
         MediaGrid.RelationFilter == MediaRelationFilter.All
         && MediaGrid.TypeFilter == MediaTypeFilter.All
         && MediaGrid.Sort == MediaGridSort.NewestFirst
-        && !MediaGrid.IsFavoriteOnly
         && MediaGrid.CurrentPage == 1
         && MediaGrid.PageSize == MediaGridViewModel.DefaultPageSize;
 
@@ -1393,6 +1471,8 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
             }
         }).ConfigureAwait(false);
 
+        var storedFavorites = _catalog is not null
+            && await ProfileMediaPreferences.ReadFavoritesAsync(_catalog, ProfileId, cancellationToken).ConfigureAwait(false);
         var snapshot = await _runtimeSnapshots!.WarmAsync(ProfileId, cancellationToken).ConfigureAwait(false);
         if (generation != _loadGeneration || _isDisposed || !IsRouteActive)
         {
@@ -1413,14 +1493,34 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
                 return;
             }
 
-            mediaApplied = ApplyRuntimeSnapshot(snapshot);
+            mediaApplied = ApplyRuntimeSnapshot(snapshot, storedFavorites);
             ShowReady();
         }).ConfigureAwait(false);
 
         if (generation == _loadGeneration && !_isDisposed && IsRouteActive)
         {
             StartProgressiveProfileModules(cancellationToken, includeMedia: !mediaApplied);
+            if (mediaApplied && storedFavorites)
+                StartRouteTask(LoadRecentMediaAsync, "Recent media could not be loaded.");
         }
+    }
+
+    private async Task LoadRecentMediaAsync(CancellationToken cancellationToken)
+    {
+        var generation = _mediaLoadGeneration;
+        var visible = false;
+        await UiDispatch.InvokeAsync(() => visible = IsRouteActive && ShowsRecentMedia).ConfigureAwait(false);
+        if (!visible || _profileReads is null) return;
+
+        var page = await _profileReads.GetMediaPageAsync(ProfileId, pageSize: RecentMediaLimit,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        await UiDispatch.InvokeAsync(() =>
+        {
+            if (!IsRouteActive || !ShowsRecentMedia || generation != _mediaLoadGeneration) return;
+            RecentMedia.Clear();
+            foreach (var item in page.Items)
+                RecentMedia.Add(new ProfileMediaItemViewModel(item));
+        }).ConfigureAwait(false);
     }
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
@@ -1448,8 +1548,11 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
         {
             var detailTask = _profileReads.GetDetailAsync(ProfileId, cancellationToken);
             var folderTask = _profileReads.GetFolderAsync(ProfileId, cancellationToken);
+            var favoritesTask = _catalog is not null && !_favoriteFilterReady
+                ? ProfileMediaPreferences.ReadFavoritesAsync(_catalog, ProfileId, cancellationToken)
+                : Task.FromResult(false);
 
-            await Task.WhenAll(detailTask, folderTask).ConfigureAwait(false);
+            await Task.WhenAll(detailTask, folderTask, favoritesTask).ConfigureAwait(false);
 
             if (generation != _loadGeneration || _isDisposed || !IsRouteActive)
             {
@@ -1475,6 +1578,7 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
 
                 PopulateProfile(detail);
                 ApplyFolder(folder);
+                InitializeFavoriteFilter(favoritesTask.Result);
 
                 // Cold recovery path only. Warm navigation supplies the initial MediaGrid page
                 // before activation; related Profiles, faces and review modules remain progressive.
@@ -1544,13 +1648,15 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
         var isFavoriteOnly = false;
         MediaGridSort sort = default;
         var currentPage = 1;
+        var showRecentMedia = false;
         var queryCaptured = false;
 
         try
         {
             await UiDispatch.InvokeAsync(() =>
             {
-                if (generation != _mediaLoadGeneration || _isDisposed || !IsRouteActive)
+                if (generation != _mediaLoadGeneration || _isDisposed || !IsRouteActive || !_favoriteFilterReady
+                    || MediaGrid.IsFavoriteOnly != _storedFavoriteFilter)
                 {
                     return;
                 }
@@ -1573,6 +1679,7 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
                 isFavoriteOnly = MediaGrid.IsFavoriteOnly;
                 sort = MediaGrid.Sort;
                 currentPage = MediaGrid.CurrentPage;
+                showRecentMedia = ShowsRecentMedia;
                 MediaGrid.State = MediaGridState.Loading;
                 queryCaptured = true;
             }).ConfigureAwait(false);
@@ -1592,12 +1699,13 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
                 sort: sort,
                 pageIndex: currentPage).ConfigureAwait(false);
 
-            var recentPage = await _profileReads.GetMediaPageAsync(
-                ProfileId,
-                pageSize: 12,
-                cancellationToken: cancellationToken,
-                sort: MediaGridSort.NewestFirst,
-                pageIndex: 1).ConfigureAwait(false);
+            IReadOnlyList<ProfileMediaItemReadModel>? recentItems = null;
+            if (showRecentMedia && (relationFilter != ProfileMediaFilter.All || typeFilter.HasValue
+                || isFavoriteOnly || sort != MediaGridSort.NewestFirst || currentPage != 1 || pageSize < RecentMediaLimit))
+            {
+                recentItems = (await _profileReads.GetMediaPageAsync(ProfileId,
+                    pageSize: RecentMediaLimit, cancellationToken: cancellationToken).ConfigureAwait(false)).Items;
+            }
 
             await UiDispatch.InvokeAsync(() =>
             {
@@ -1608,7 +1716,7 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
 
                 try
                 {
-                    PopulateMedia(page.Items, page.TotalCount, recentPage.Items);
+                    PopulateMedia(page.Items, page.TotalCount, showRecentMedia ? recentItems : []);
                 }
                 catch (Exception exception)
                 {

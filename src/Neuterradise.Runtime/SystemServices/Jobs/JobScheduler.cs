@@ -28,7 +28,6 @@ public sealed class JobScheduler : IAsyncDisposable
     private readonly SchedulerReads _reads;
     private readonly JobWrites _writes;
     private readonly JobLeaseStore _leaseStore;
-    private readonly JobDependencyEvaluator _evaluator;
     private readonly JobDispatcher _dispatcher;
     private readonly JobProgressHub _hub;
     private readonly JobCancellationOperations _cancellation;
@@ -74,7 +73,6 @@ public sealed class JobScheduler : IAsyncDisposable
         _reads = new SchedulerReads(catalog);
         _writes = new JobWrites(catalog);
         _leaseStore = new JobLeaseStore(catalog, _clock);
-        _evaluator = new JobDependencyEvaluator(_reads);
         _hub = new JobProgressHub(_clock, PublishProgressAsync, progressUpdatesPerSecond);
         _cancellation = cancellation ?? new JobCancellationOperations(catalog, _clock);
         _importPriority = new ImportPriorityOperations(catalog);
@@ -474,36 +472,24 @@ public sealed class JobScheduler : IAsyncDisposable
         var now = _clock.UtcNow;
         var changed = false;
 
-        var retryable = await _reads.GetRetryableJobIdsAsync(
+        var retryable = await _reads.GetRetryableJobsAsync(
             lane, window, now.ToUnixTimeMilliseconds(), cancellationToken).ConfigureAwait(false);
-        foreach (var jobId in retryable)
+        foreach (var record in retryable)
         {
-            var record = await _reads.GetJobAsync(jobId, cancellationToken).ConfigureAwait(false);
-            if (record is null || record.State != JobState.FailedRetryable)
-            {
-                continue;
-            }
-
             if (await _writes.TryRescheduleRetryAsync(
-                    jobId, record.RowVersion, now, cancellationToken).ConfigureAwait(false))
+                    record.Id, record.RowVersion, now, cancellationToken).ConfigureAwait(false))
             {
                 Interlocked.Increment(ref _retryScheduledCount);
                 changed = true;
             }
         }
 
-        var exhausted = await _reads.GetExhaustedRetryJobIdsAsync(lane, window, cancellationToken)
+        var exhausted = await _reads.GetExhaustedRetryJobsAsync(lane, window, cancellationToken)
             .ConfigureAwait(false);
-        foreach (var jobId in exhausted)
+        foreach (var record in exhausted)
         {
-            var record = await _reads.GetJobAsync(jobId, cancellationToken).ConfigureAwait(false);
-            if (record is null || record.State != JobState.FailedRetryable)
-            {
-                continue;
-            }
-
             changed |= await _writes.TryExhaustRetriesAsync(
-                jobId,
+                record.Id,
                 record.RowVersion,
                 record.ErrorCode ?? "RETRY_BUDGET_EXHAUSTED",
                 $"Attempt {record.Attempt} of {record.MaxAttempts} exhausted the retry budget.",
@@ -517,26 +503,14 @@ public sealed class JobScheduler : IAsyncDisposable
     private async Task<bool> PromotePendingAsync(JobLane lane, CancellationToken cancellationToken)
     {
         var window = LaneQueueBounds.WindowSize(_laneConfigurations[lane]);
-        var pendingIds = await _reads.GetPendingJobIdsAsync(lane, window, cancellationToken).ConfigureAwait(false);
+        var candidates = await _reads.GetReadyPendingJobsAsync(lane, window, cancellationToken).ConfigureAwait(false);
         var promoted = false;
 
-        foreach (var pendingId in pendingIds)
+        foreach (var candidate in candidates)
         {
-            var evaluation = await _evaluator.EvaluateAsync(pendingId, cancellationToken).ConfigureAwait(false);
-            if (evaluation.Status != DependencyStatus.Satisfied)
-            {
-                continue;
-            }
-
-            var record = await _reads.GetJobAsync(pendingId, cancellationToken).ConfigureAwait(false);
-            if (record is null || record.State != JobState.Pending)
-            {
-                continue;
-            }
-
             promoted |= await _writes.MarkRunnableAsync(
-                pendingId,
-                record.RowVersion,
+                candidate.Id,
+                candidate.RowVersion,
                 _clock.UtcNow,
                 cancellationToken).ConfigureAwait(false);
         }
@@ -553,39 +527,27 @@ public sealed class JobScheduler : IAsyncDisposable
 
         if (evaluation.Kind == FairnessDispatchKind.Fairness)
         {
-            var fairnessId = await _reads.GetOldestLowerTierCandidateAsync(
+            var fairnessCandidate = await _reads.GetOldestLowerTierCandidateAsync(
                 lane, evaluation.BelowTier, nowMs, cancellationToken).ConfigureAwait(false);
-            if (fairnessId is { } fid && _inflight.TryAdd(fid, 0))
+            if (fairnessCandidate is { } candidate && _inflight.TryAdd(candidate.Id, 0))
             {
-                var fairnessRecord = await _reads.GetJobAsync(fid, cancellationToken)
-                    .ConfigureAwait(false);
-                var candidateTier = fairnessRecord is not null
-                    ? JobLaneFairness.ClassifyTier(fairnessRecord.Priority)
-                    : (FairnessTier?)null;
-
-                if (candidateTier is { } ct && ct > evaluation.BelowTier)
+                try
                 {
-                    try
-                    {
-                        await _dispatcher.EnqueueAsync(lane, fid, cancellationToken)
-                            .ConfigureAwait(false);
-                        _fairness.RecordFairnessDispatch(lane, ct);
-                        return true;
-                    }
-                    catch
-                    {
-                        _inflight.TryRemove(fid, out _);
-                        throw;
-                    }
+                    await _dispatcher.EnqueueAsync(lane, candidate.Id, cancellationToken).ConfigureAwait(false);
+                    _fairness.RecordFairnessDispatch(lane, JobLaneFairness.ClassifyTier(candidate.Priority));
+                    return true;
                 }
-
-                _inflight.TryRemove(fid, out _);
+                catch
+                {
+                    _inflight.TryRemove(candidate.Id, out _);
+                    throw;
+                }
             }
 
             _fairness.RecordFairnessDispatch(lane, evaluation.BelowTier);
         }
 
-        var runnableIds = await _reads.GetRunnableJobIdsAsync(
+        var runnable = await _reads.GetRunnableJobsAsync(
             lane,
             window,
             nowMs,
@@ -593,8 +555,9 @@ public sealed class JobScheduler : IAsyncDisposable
             cancellationToken).ConfigureAwait(false);
         var enqueued = false;
 
-        foreach (var jobId in runnableIds)
+        foreach (var candidate in runnable)
         {
+            var jobId = candidate.Id;
             if (!_inflight.TryAdd(jobId, 0))
             {
                 continue;
@@ -605,12 +568,7 @@ public sealed class JobScheduler : IAsyncDisposable
                 await _dispatcher.EnqueueAsync(lane, jobId, cancellationToken).ConfigureAwait(false);
                 enqueued = true;
 
-                var record = await _reads.GetJobAsync(jobId, cancellationToken)
-                    .ConfigureAwait(false);
-                var actualTier = record is not null
-                    ? JobLaneFairness.ClassifyTier(record.Priority)
-                    : FairnessTier.Background;
-                _fairness.RecordNormalDispatch(lane, actualTier);
+                _fairness.RecordNormalDispatch(lane, JobLaneFairness.ClassifyTier(candidate.Priority));
             }
             catch
             {

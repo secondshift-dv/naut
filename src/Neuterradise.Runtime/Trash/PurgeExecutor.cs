@@ -1,6 +1,7 @@
 using System.IO;
 using System.Security.Cryptography;
 using Microsoft.Data.Sqlite;
+using Neuterradise.App.Profiles;
 using Neuterradise.App.SystemServices.Database;
 using Neuterradise.App.SystemServices.Database.Writes;
 using Neuterradise.App.SystemServices.Operations;
@@ -906,6 +907,8 @@ public sealed class PurgeExecutor
         await ExecuteAsync(transaction, "UPDATE import_units SET destination_profile_id = NULL WHERE destination_profile_id = $id;", cancellationToken, ("$id", id)).ConfigureAwait(false);
         await ExecuteAsync(transaction, "DELETE FROM identities WHERE profile_id = $id;", cancellationToken, ("$id", id)).ConfigureAwait(false);
         await ExecuteAsync(transaction, "DELETE FROM storage_operations WHERE kind IN ('PROFILE_TEXT_SYNC','PROFILE_OVERVIEW_IMPORT') AND entity_id=$id;", cancellationToken, ("$id", id)).ConfigureAwait(false);
+        await ExecuteAsync(transaction, "DELETE FROM settings WHERE key = $key;", cancellationToken,
+            ("$key", ProfileMediaPreferences.FavoritesKey(profileId))).ConfigureAwait(false);
         await ExecuteAsync(transaction, "DELETE FROM profiles WHERE profile_id = $id;", cancellationToken, ("$id", id)).ConfigureAwait(false);
     }
 
