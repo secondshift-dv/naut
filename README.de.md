@@ -35,13 +35,13 @@
 
 Naut ist ein **local-first Medien-Sammlungsmanager für Windows**. Bilder, Videos und unterstützte 3D-Modelle werden zu Profile-zentrierten Sammlungen, die sich erkennen, präsentieren und erkunden lassen, ohne die Kontrolle an einen Cloud-Dienst abzugeben.
 
-## Optional pack collection
+## Sammlung optionaler Pakete
 
-Make Naut yours with reviewed, independently versioned customization packs.
-Download a pack, import it in **Settings → Presentation → Packs / Advanced**,
-then choose its components and save. Application code stays unchanged.
+Gestalte Naut mit geprüften Anpassungspaketen, die unabhängig voneinander versioniert werden.
+Lade ein Paket herunter und importiere es unter **Settings → Presentation → Packs / Advanced**.
+Wähle anschließend die gewünschten Komponenten aus und speichere. Der Anwendungscode bleibt unverändert.
 
-**[Browse and download packs](packs/README.md) · [Install or update a pack](docs/pack-collection.md) · [Contribute your own](docs/contributing-packs.md)**
+**[Pakete ansehen und herunterladen](packs/README.md) · [Paket installieren oder aktualisieren](docs/pack-collection.md) · [Eigenes Paket beitragen](docs/contributing-packs.md)**
 
 ## Highlights
 

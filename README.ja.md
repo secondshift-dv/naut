@@ -35,13 +35,13 @@
 
 Naut は Windows 向けの **local-first メディアコレクション管理アプリ**です。画像、動画、対応 3D モデルを Profile 中心のコレクションとして整理し、クラウドサービスに所有権を渡すことなく認識・表示・探索できます。
 
-## Optional pack collection
+## オプションパック集
 
-Make Naut yours with reviewed, independently versioned customization packs.
-Download a pack, import it in **Settings → Presentation → Packs / Advanced**,
-then choose its components and save. Application code stays unchanged.
+内容が確認され、個別にバージョン管理されているカスタマイズパックで、Naut を自分好みに設定できます。
+パックをダウンロードして **Settings → Presentation → Packs / Advanced** からインポートし、
+使用するコンポーネントを選択して保存してください。アプリケーションのコードは変更されません。
 
-**[Browse and download packs](packs/README.md) · [Install or update a pack](docs/pack-collection.md) · [Contribute your own](docs/contributing-packs.md)**
+**[パックを探してダウンロード](packs/README.md) · [パックのインストールと更新](docs/pack-collection.md) · [自作パックを提供](docs/contributing-packs.md)**
 
 ## 主な機能
 

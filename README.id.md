@@ -35,13 +35,13 @@
 
 Naut adalah **pengelola koleksi media local-first untuk Windows**. Gambar, video, dan model 3D yang didukung diolah menjadi koleksi berbasis Profile yang dapat dikenali, dipresentasikan, dan dijelajahi tanpa memindahkan kepemilikan koleksi ke layanan cloud.
 
-## Optional pack collection
+## Koleksi paket opsional
 
-Make Naut yours with reviewed, independently versioned customization packs.
-Download a pack, import it in **Settings → Presentation → Packs / Advanced**,
-then choose its components and save. Application code stays unchanged.
+Sesuaikan Naut dengan paket kustomisasi yang telah ditinjau dan memiliki versi masing-masing.
+Unduh paket, impor melalui **Settings → Presentation → Packs / Advanced**,
+lalu pilih komponennya dan simpan. Kode aplikasi tidak berubah.
 
-**[Browse and download packs](packs/README.md) · [Install or update a pack](docs/pack-collection.md) · [Contribute your own](docs/contributing-packs.md)**
+**[Jelajahi dan unduh paket](packs/README.md) · [Pasang atau perbarui paket](docs/pack-collection.md) · [Kontribusikan paket buatanmu](docs/contributing-packs.md)**
 
 ## Fitur unggulan
 

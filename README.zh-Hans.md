@@ -35,13 +35,13 @@
 
 Naut 是一款面向 Windows 的 **local-first 媒体收藏管理器**。它将图片、视频和受支持的 3D 模型组织成以 Profile 为中心的收藏，无需把所有权交给云服务即可识别、展示和探索。
 
-## Optional pack collection
+## 可选扩展包合集
 
-Make Naut yours with reviewed, independently versioned customization packs.
-Download a pack, import it in **Settings → Presentation → Packs / Advanced**,
-then choose its components and save. Application code stays unchanged.
+使用经过审核、各自独立管理版本的自定义扩展包，打造符合自己喜好的 Naut。
+下载扩展包后，通过 **Settings → Presentation → Packs / Advanced** 导入，
+再选择所需组件并保存。应用程序代码不会更改。
 
-**[Browse and download packs](packs/README.md) · [Install or update a pack](docs/pack-collection.md) · [Contribute your own](docs/contributing-packs.md)**
+**[浏览并下载扩展包](packs/README.md) · [安装或更新扩展包](docs/pack-collection.md) · [贡献自己的扩展包](docs/contributing-packs.md)**
 
 ## 核心功能
 

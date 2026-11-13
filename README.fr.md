@@ -122,13 +122,13 @@ L'expérience Naut normale est volontairement plus légère que la charge option
 
 Le stockage du Vault est séparé et dépend de la collection. Voir [Naut v0.0.18 System Requirements](docs/system-requirements.md).
 
-## Optional pack collection
+## Collection de packs optionnels
 
-Make Naut yours with reviewed, independently versioned customization packs.
-Download a pack, import it in **Settings → Presentation → Packs / Advanced**,
-then choose its components and save. Application code stays unchanged.
+Personnalisez Naut avec des packs vérifiés, chacun disposant de son propre versionnement.
+Téléchargez un pack, importez-le via **Settings → Presentation → Packs / Advanced**,
+puis choisissez ses composants et enregistrez. Le code de l’application reste inchangé.
 
-**[Browse and download packs](packs/README.md) · [Install or update a pack](docs/pack-collection.md) · [Contribute your own](docs/contributing-packs.md)**
+**[Parcourir et télécharger les packs](packs/README.md) · [Installer ou mettre à jour un pack](docs/pack-collection.md) · [Proposer votre propre pack](docs/contributing-packs.md)**
 
 ## Documentation
 
