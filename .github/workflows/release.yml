@@ -122,7 +122,7 @@ jobs:
         run: ./scripts/release.ps1 -NoBuild -ArtifactMode -SourceHead "${{ github.sha }}" -Publish
 
       - name: Remove consumed release handoff artifact
-        if: ${{ success() }}
+        if: ${{ always() }}
         continue-on-error: true
         shell: pwsh
         env:
