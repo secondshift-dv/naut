@@ -105,10 +105,6 @@ if (Test-Path -LiteralPath (Join-Path $root 'README.id.md')) {
             [void]$issues.Add("$($relative): stale GitHub release download link")
         }
     }
-    $index = Read-Document 'docs/README.md'
-    if ($null -eq $index -or -not $index.Contains("[Naut v$version release notes](releases/v$version.md)")) {
-        [void]$issues.Add("docs/README.md: current release must lead the release list (v$version)")
-    }
 }
 
 # The source notice is version-neutral; exact component inventory is packaged.
@@ -180,16 +176,57 @@ if (Test-Path -LiteralPath $requirementsPath -PathType Leaf) {
     }
 }
 
-# Public index covers every versioned note, while preserving historical contents.
-$indexPath = Join-Path $root 'docs/README.md'
-if (Test-Path -LiteralPath $indexPath -PathType Leaf) {
-    $index = Read-Document 'docs/README.md'
-    if ($null -ne $index) {
-        foreach ($releaseFile in @(Get-ChildItem -LiteralPath (Join-Path $root 'docs/releases') -Filter 'v*.md' -File)) {
-            if (-not $index.Contains("releases/$($releaseFile.Name)")) {
-                [void]$issues.Add("docs/README.md: missing historical note releases/$($releaseFile.Name)")
+# Keep stable user navigation separate from version-specific release history.
+$navigationPath = Join-Path $root 'docs/README.md'
+if (Test-Path -LiteralPath $navigationPath -PathType Leaf) {
+    $navigation = Read-Document 'docs/README.md'
+    if ($null -ne $navigation) {
+        $releaseNavigation = @([regex]::Matches($navigation, '(?m)^-\s+\[Release Notes\]\(releases/README\.md\)'))
+        if ($releaseNavigation.Count -ne 1) {
+            [void]$issues.Add('docs/README.md: exactly one Release Notes link to releases/README.md is required')
+        }
+        if ($navigation -match '(?i)\breleases/v\d+\.\d+\.\d+\.md\b') {
+            [void]$issues.Add('docs/README.md: individual versions belong only in docs/releases/README.md')
+        }
+        $usingNaut = [regex]::Match($navigation, '(?ms)^## Using Naut\s*\r?\n(?<items>.*?)(?=^## |\z)')
+        if (-not $usingNaut.Success) {
+            [void]$issues.Add('docs/README.md: missing Using Naut navigation')
+        } else {
+            $entries = @([regex]::Matches($usingNaut.Groups['items'].Value, '(?m)^-\s+\[(?<label>[^\]]+)\]\([^)]+\)') |
+                ForEach-Object { $_.Groups['label'].Value })
+            if ($entries.Count -lt 2 -or $entries[0] -cne 'Getting Started' -or
+                $entries[1] -cne 'FAQ & Troubleshooting') {
+                [void]$issues.Add('docs/README.md: Getting Started and FAQ & Troubleshooting must be the first two navigation links')
+            }
+            if ($entries -cnotcontains 'Release Notes') {
+                [void]$issues.Add('docs/README.md: Release Notes must appear in the user navigation')
             }
         }
+    }
+}
+
+$releaseIndex = Read-Document 'docs/releases/README.md'
+$releaseFiles = @(Get-ChildItem -LiteralPath (Join-Path $root 'docs/releases') -Filter 'v*.md' -File |
+    Where-Object { $_.Name -cmatch '^v\d+\.\d+\.\d+\.md$' } |
+    Sort-Object -Property @{ Expression = { [version]($_.BaseName.Substring(1)) }; Descending = $true })
+$expectedNotes = @($releaseFiles | ForEach-Object { $_.Name })
+if ($expectedNotes.Count -eq 0 -or $expectedNotes[0] -cne "v$version.md") {
+    [void]$issues.Add("docs/releases: newest notes must correspond to ProductVersion v$version")
+}
+if ($null -ne $releaseIndex) {
+    $releaseEntries = @([regex]::Matches($releaseIndex, '(?m)^-\s+\[v(?<version>\d+\.\d+\.\d+)\]\((?<file>v\d+\.\d+\.\d+\.md)\)\s*$'))
+    $listedNotes = @($releaseEntries | ForEach-Object { $_.Groups['file'].Value })
+    $allNoteLinks = @([regex]::Matches($releaseIndex, '\]\(v\d+\.\d+\.\d+\.md\)'))
+    if ($allNoteLinks.Count -ne $releaseEntries.Count) {
+        [void]$issues.Add('docs/releases/README.md: use one canonical [vX.Y.Z](vX.Y.Z.md) entry per release')
+    }
+    foreach ($entry in $releaseEntries) {
+        if ($entry.Groups['file'].Value -cne "v$($entry.Groups['version'].Value).md") {
+            [void]$issues.Add('docs/releases/README.md: release link label and filename must match')
+        }
+    }
+    if (($listedNotes -join '|') -cne ($expectedNotes -join '|')) {
+        [void]$issues.Add('docs/releases/README.md: list every versioned note exactly once, newest first')
     }
 }
 

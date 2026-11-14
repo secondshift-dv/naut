@@ -13,6 +13,16 @@ Required structure:
 
 A Full Changelog comparison link may follow these sections as supporting detail. Do not use commit titles as a substitute for user-facing explanations. Avoid unsupported claims, unfinished placeholders, internal implementation history, or promises about unverified behavior.
 
+Development notes describe implemented behavior without implying publication. Banner collection/schema upgrades must state compatibility and static fallback behavior; transfer policy changes must not claim benchmark gains without measurements.
+
+## Documentation navigation
+
+The public docs/README.md is a stable user guide index, not a release chronology. Keep Getting Started and FAQ & Troubleshooting as its first two user navigation links. Include exactly one Release Notes link to releases/README.md alongside the user guides. Never add per-version release links to docs/README.md.
+
+docs/releases/README.md is the single release-history index. For each new docs/releases/v<ProductVersion>.md, add one relative link labeled vX.Y.Z to the matching vX.Y.Z.md file there, newest first; retain links to all older notes. GitHub Releases holds the published assets and signed update metadata. This index may list development notes before publication but must not claim a release has shipped until verified.
+
+The documentation verifier checks the stable navigation and full ordered release index in both repositories; it runs with source/hygiene verification and before public release. Missing, duplicate, out-of-order or stale entries block verification. Do not relax the guard to accommodate a new version.
+
 Before releasing:
 
 1. Prepare and review the versioned notes alongside the product changes.

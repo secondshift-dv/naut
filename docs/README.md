@@ -4,25 +4,9 @@ Naut is a local-first media collection manager for Windows. Start here if you ar
 
 ## Using Naut
 
-- [Naut v0.0.20 release notes](releases/v0.0.20.md) — astronaut and nautilus identity and refreshed showcase visuals.
-- [Naut v0.0.19 release notes](releases/v0.0.19.md) — incremental update efficiency and stable component builds.
-- [Naut v0.0.18 release notes](releases/v0.0.18.md) — Profile media preferences, catalog refreshes, artwork loading, and long Poster titles.
-- [Naut v0.0.17 release notes](releases/v0.0.17.md) — individual presentation-file deletion, pack-managed boundaries, and recoverable Media Inspector deletion.
-- [Naut v0.0.16 release notes](releases/v0.0.16.md) — video thumbnail recovery, preview reuse, and clearer Import errors.
-- [Naut v0.0.15 release notes](releases/v0.0.15.md) — clearer Banner effects, Home/Profile Bubbles, Gallery search and optional pack README corrections.
-- [Naut v0.0.14 release notes](releases/v0.0.14.md) — Figure 3D hot-cache entry, targeted Profile invalidation, deadline-driven Governor, and lower Import/navigation overhead.
-- [Naut v0.0.13 release notes](releases/v0.0.13.md) — BGRA frame reuse, Backdrop resource cleanup, fewer redundant UI invalidations, and updated system guidance.
-- [Naut v0.0.12 release notes](releases/v0.0.12.md) — Banner effects, Profile layout safety, readable Home/Card labels, Flame media favorites, and About release dates.
-- [Naut v0.0.11 release notes](releases/v0.0.11.md) — Banner and Spotlight playback, Figure first-load recovery, and resource scheduling.
-- [Naut v0.0.10 release notes](releases/v0.0.10.md) — first-run Vault safety, initial appearance and About release-date fixes.
-- [Naut v0.0.9 release notes](releases/v0.0.9.md) — changes since v0.0.8, update instructions, Vault compatibility and verification limits.
-- [Naut v0.0.8 release notes](releases/v0.0.8.md) — durable Import checkpoints and reduced duplicate transfer bookkeeping.
-- [Naut v0.0.7 release notes](releases/v0.0.7.md) — interface refinements, Vault recovery, 3D Figures and broader media preparation.
-- [Naut v0.0.6 release notes](releases/v0.0.6.md) — independent Banner stills, compact card controls and image fallback.
-- [Naut v0.0.5 release notes](releases/v0.0.5.md) — more responsive update progress and safer updater handoff.
-- [Naut v0.0.4 release notes](releases/v0.0.4.md) — media preparation completion and additional 3D model formats.
-
 - [Getting Started](getting-started.md) — download, extract, create or pick a Vault, and start using Naut.
+- [FAQ & Troubleshooting](troubleshooting.md) — common installation, media, face analysis, video, Figure, and update questions.
+- [Release Notes](releases/README.md) — browse version-specific changes, update instructions, and previous releases.
 - [Import Media](import-media.md) — bring images, videos, folders, and supported 3D models into a Vault.
 - [Face Intelligence](face-intelligence.md) — how YuNet, SFace, local identity samples, and reviewable Profile candidates fit together.
 - [Profiles](profiles.md) — organize media around Profiles, Covers, Banners, relationships, ratings, notes, and optional Figures.
@@ -32,7 +16,12 @@ Naut is a local-first media collection manager for Windows. Start here if you ar
 - [3D Figures](figures.md) — optional interactive 3D presentation and its performance tier.
 - [Model formats](model-formats.md) — GLB, FBX, OBJ, STL and 3MF preparation, textures and package dependencies.
 - [System Requirements](system-requirements.md) — minimum and recommended requirements for Naut, with measurement limits.
-- [FAQ & Troubleshooting](troubleshooting.md) — common installation, media, face analysis, video, Figure, and update questions.
+
+## Optional pack collection
+
+- [Browse and download packs](../packs/README.md)
+- [Installation and updates](pack-collection.md)
+- [Contribute a customization pack](contributing-packs.md)
 
 ## Developers and contributors
 
@@ -44,9 +33,3 @@ Technical material is intentionally separated from user documentation:
 - [Presentation Pack examples](development/examples/)
 
 Naut-owned source is **Source Available** under PolyForm Shield 1.0.0. Third-party components retain their own licenses.
-
-## Optional pack collection
-
-- [Browse and download packs](../packs/README.md)
-- [Installation and updates](pack-collection.md)
-- [Contribute a customization pack](contributing-packs.md)

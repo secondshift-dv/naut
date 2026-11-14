@@ -93,16 +93,6 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
-          sparse-checkout: |
-            scripts/release.ps1
-            scripts/verification/verify-release-notes.ps1
-            docs/releases/
-            scripts/verification/verify-legacy-updates.ps1
-            scripts/verification/diagnostics/LegacyUpdateProbe.cs
-            global.json
-            Directory.Build.props
-            release-contract.json
-          sparse-checkout-cone-mode: false
 
       - name: Install .NET 10 SDK for exact legacy contract checks
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
