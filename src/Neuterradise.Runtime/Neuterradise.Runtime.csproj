@@ -12,10 +12,20 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <AssemblyName>Neuterradise.Runtime</AssemblyName>
+    <Version>$(ProductVersion)</Version>
+    <IncludeSourceRevisionInInformationalVersion>true</IncludeSourceRevisionInInformationalVersion>
     <RootNamespace>Neuterradise.App</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>ProductVersion</_Parameter1>
+      <_Parameter2>$(ProductVersion)</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>ProductRuntimeIdentifier</_Parameter1>
+      <_Parameter2>$(ProductRuntimeIdentifier)</_Parameter2>
+    </AssemblyAttribute>
     <ProjectReference Include="..\Neuterradise.Release.Contracts\Neuterradise.Release.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>

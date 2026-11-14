@@ -565,6 +565,7 @@ try {
     ) + $commonPublish + @(
         '-p:PublishSingleFile=true',
         '-p:IncludeNativeLibrariesForSelfExtract=true',
+        '-p:EnableCompressionInSingleFile=true',
         '--output', $updaterOutput
     )
     Invoke-DotNet -Arguments $updaterArgs

@@ -16,7 +16,14 @@ Directory.CreateDirectory(root);
 if (args.Length > 1)
 {
     var context = new System.Runtime.Loader.AssemblyLoadContext("packaged", true);
-    var runtime = context.LoadFromAssemblyPath(Path.Combine(Path.GetFullPath(args[1]), "runtime", "Neuterradise.Runtime.dll"));
+    var package = Path.GetFullPath(args[1]);
+    var runtime = context.LoadFromAssemblyPath(Path.Combine(package, "runtime", "Neuterradise.Runtime.dll"));
+    var productIdentity = runtime.GetType("Neuterradise.App.SystemServices.ProductIdentity")!;
+    var release = UpdateReleaseManifest.Parse(File.ReadAllText(Path.Combine(package, "release-manifest.json")));
+    Require((string?)productIdentity.GetProperty("Version")!.GetValue(null) == release.ProductVersion
+        && (string?)productIdentity.GetProperty("RuntimeId")!.GetValue(null) == release.RuntimeIdentifier,
+        "Packaged product version or runtime identifier differs from the release manifest");
+    Console.WriteLine("PACKAGED_UPDATE_IDENTITY=PASS");
     var classifier = runtime.GetType("Neuterradise.App.Import.Intake.SupportedMediaClassifier")!;
     foreach (var extension in new[] { ".mpg", ".mpeg", ".MPG", ".MPEG" })
         Require(classifier.GetMethod("Classify")!.Invoke(null, new object[] { extension })?.ToString() == "Video", "Packaged MPEG regression");
@@ -34,14 +41,16 @@ var state = new AppStatePaths(Path.Combine(root, "state"));
 var files = new List<UpdateManifestFile>();
 var data = new Dictionary<string, byte[]>();
 var members = ReleaseContract.Current.RequiredMembers.Append("runtime/OpenCvSharpExtern.dll")
-    .Append(IncrementalUpdateService.MarkerPath).Append("runtime/new.dll").Append("runtime/empty.marker").ToArray();
+    .Append(IncrementalUpdateService.MarkerPath).Append("runtime/new.dll")
+    .Append("runtime/duplicate.dll").Append("runtime/empty.marker").ToArray();
 foreach (var member in members)
 {
     var bytes = member == IncrementalUpdateService.MarkerPath ? Encoding.UTF8.GetBytes("{\"schemaVersion\":1}")
-        : member == "runtime/empty.marker" ? Array.Empty<byte>() : Encoding.UTF8.GetBytes("target:" + member);
+        : member == "runtime/empty.marker" ? Array.Empty<byte>()
+        : Encoding.UTF8.GetBytes("target:" + (member == "runtime/duplicate.dll" ? "runtime/new.dll" : member));
     files.Add(new(member, bytes.Length, Hash(bytes), "runtime"));
     data[Hash(bytes)] = bytes;
-    if (member is "runtime/new.dll" or "runtime/empty.marker") continue;
+    if (member is "runtime/new.dll" or "runtime/duplicate.dll" or "runtime/empty.marker") continue;
     var path = Path.Combine(installRoot, member);
     Directory.CreateDirectory(Path.GetDirectoryName(path)!);
     File.WriteAllBytes(path, bytes);
@@ -54,9 +63,11 @@ File.WriteAllText(Path.Combine(installRoot, "runtime/obsolete.dll"), "obsolete")
 var manifest = new UpdateManifest(1, "neuterradise", "0.0.4", "win-x64", 300_000_000, new string('0',64), "0.0.1", files);
 var feed = new Uri("https://github.com/secondshift-dv/naut/releases/download/v0.0.4/update.json");
 var plan = await IncrementalUpdateService.PlanAsync(manifest, installRoot);
-Require(plan.DownloadFiles.Count == 4 && plan.DownloadFiles.Contains(changed) && plan.DownloadFiles.Contains(corrupt)
+Require(plan.DownloadFiles.Count == 5 && plan.DownloadFiles.Contains(changed) && plan.DownloadFiles.Contains(corrupt)
     && plan.DownloadFiles.Any(f => f.RelativePath == "runtime/new.dll"), "Planner reused corrupt/changed bytes or missed new file");
-Require(plan.ReusedFiles.Count == files.Count - 4, "Unchanged file scheduled for transfer");
+Require(plan.ReusedFiles.Count == files.Count - 5, "Unchanged file scheduled for transfer");
+Require(plan.DownloadBytes == changed.ByteLength + corrupt.ByteLength
+    + files.Single(f => f.RelativePath == "runtime/new.dll").ByteLength, "Duplicate content counted twice");
 foreach (var unsafePath in new[] { "../escape", "runtime//a", "runtime/./a", "runtime/a.", "runtime/CON.bin", "runtime/a:stream" })
 {
     try { await IncrementalUpdateService.PlanAsync(manifest with { Files = new[] { changed with { RelativePath = unsafePath } } }, installRoot); throw new Exception("Unsafe path accepted"); }
@@ -93,7 +104,7 @@ var points = progress.Values.Where(v => v.Phase == UpdatePhase.Downloading).ToAr
 Require(points.Length > 1 && points.All(v => v.TotalBytes == plan.DownloadBytes && v.CompletedBytes <= v.TotalBytes
     && v.Percentage is >= 0 and <= 100), "Incremental denominator/bounds incorrect");
 Require(points.Zip(points.Skip(1)).All(pair => pair.First.CompletedBytes <= pair.Second.CompletedBytes), "Byte progress regressed");
-Require(points[^1].CompletedBytes == plan.DownloadBytes && points[^1].CompletedFiles == 4, "Final progress incomplete");
+Require(points[^1].CompletedBytes == plan.DownloadBytes && points[^1].CompletedFiles == 5, "Final progress incomplete");
 Require(new UpdateProgress(UpdatePhase.Planning, 0, null, 0, 0).Percentage is null, "Unknown denominator is determinate");
 foreach (var file in files)
     File.Copy(Path.Combine(payload, file.RelativePath), Path.Combine(installRoot, file.RelativePath), true);

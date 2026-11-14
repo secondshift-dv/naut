@@ -1,4 +1,4 @@
-# Naut v0.0.18 System Requirements
+# Naut v0.0.19 System Requirements
 
 These requirements describe the current Windows x64 implementation and build target. Figure / interactive 3D is an optional workload tier; Naut is intended to remain usable without high-end discrete GPU hardware.
 

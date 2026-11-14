@@ -1,23 +1,14 @@
 <Project>
   <PropertyGroup>
-    <ProductVersion>0.0.18</ProductVersion>
+    <ProductVersion>0.0.19</ProductVersion>
     <ProductAssemblyVersion>0.0.10.0</ProductAssemblyVersion>
     <ProductRuntimeIdentifier>win-x64</ProductRuntimeIdentifier>
-    <Version>$(ProductVersion)</Version>
+    <!-- Baseline for supporting binaries. Override Version when a component's release identity changes. -->
+    <Version>0.0.18</Version>
     <AssemblyVersion>$(ProductAssemblyVersion)</AssemblyVersion>
     <FileVersion>$(ProductAssemblyVersion)</FileVersion>
-    <InformationalVersion>$(ProductVersion)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <RestoreLockedMode>true</RestoreLockedMode>
   </PropertyGroup>
-  <ItemGroup>
-    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
-      <_Parameter1>ProductRuntimeIdentifier</_Parameter1>
-      <_Parameter2>$(ProductRuntimeIdentifier)</_Parameter2>
-    </AssemblyAttribute>
-    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
-      <_Parameter1>ProductVersion</_Parameter1>
-      <_Parameter2>$(ProductVersion)</_Parameter2>
-    </AssemblyAttribute>
-  </ItemGroup>
 </Project>

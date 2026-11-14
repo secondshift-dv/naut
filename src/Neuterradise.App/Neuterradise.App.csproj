@@ -16,6 +16,8 @@
     <ApplicationTitle>naut</ApplicationTitle>
     <ApplicationId>com.neuterradise.app</ApplicationId>
     <ApplicationDisplayVersion>$(ProductVersion)</ApplicationDisplayVersion>
+    <Version>$(ProductVersion)</Version>
+    <IncludeSourceRevisionInInformationalVersion>true</IncludeSourceRevisionInInformationalVersion>
     <ApplicationVersion>1</ApplicationVersion>
     <ApplicationPublisher>naut</ApplicationPublisher>
     <ApplicationIcon>Assets\Brand\app-icon.ico</ApplicationIcon>

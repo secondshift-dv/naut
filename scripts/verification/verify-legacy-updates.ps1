@@ -50,6 +50,12 @@ foreach ($version in @('0.0.1','0.0.2')) {
     <ProductVersion>$version</ProductVersion><ProductAssemblyVersion>$version.0</ProductAssemblyVersion>
   </PropertyGroup>
   <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>ProductVersion</_Parameter1><_Parameter2>$version</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>ProductRuntimeIdentifier</_Parameter1><_Parameter2>win-x64</_Parameter2>
+    </AssemblyAttribute>
     <EmbeddedResource Include="release-contract.json" LogicalName="Neuterradise.Release.Contracts.release-contract.json" />
   </ItemGroup>
 </Project>

@@ -37,7 +37,9 @@ public sealed class IncrementalUpdateService(AppStatePaths appState, InstallPath
             if (await MatchesAsync(path, file, cancellationToken).ConfigureAwait(false)) reused.Add(file);
             else required.Add(file);
         }
-        return new(reused, required, required.Sum(file => file.ByteLength));
+        return new(reused, required, required
+            .DistinctBy(file => (file.Sha256, file.ByteLength))
+            .Sum(file => file.ByteLength));
     }
 
     public async Task<IncrementalUpdateResult> StageAsync(Uri feed, UpdateManifest manifest, Guid operationId,
@@ -86,6 +88,7 @@ public sealed class IncrementalUpdateService(AppStatePaths appState, InstallPath
 
             long transferred = 0;
             var completedFiles = 0;
+            var downloadedFiles = new Dictionary<(string Sha256, long ByteLength), string>();
             progress?.Report(new(UpdatePhase.Downloading, 0, plan.DownloadBytes, 0, plan.DownloadFiles.Count));
             foreach (var file in plan.DownloadFiles)
             {
@@ -102,20 +105,31 @@ public sealed class IncrementalUpdateService(AppStatePaths appState, InstallPath
                         completedFiles, plan.DownloadFiles.Count));
                     continue;
                 }
-                var fileProgress = new UpdateProgressCallback(value =>
-                {
-                    if (value.Phase == UpdatePhase.Downloading)
-                        progress?.Report(new(UpdatePhase.Downloading, transferred + value.CompletedBytes,
-                            plan.DownloadBytes, completedFiles, plan.DownloadFiles.Count));
-                });
-                var downloaded = await download.DownloadAsync(new Uri(feed, AssetName(file.Sha256)), Guid.NewGuid(),
-                    file.ByteLength, file.Sha256, cancellationToken, fileProgress).ConfigureAwait(false);
-                if (!downloaded.IsSuccess) return new(false, downloaded.CanFallback, downloaded.SafeError);
                 var destination = Destination(staging, file.RelativePath);
                 written.Add(destination);
-                try { File.Move(downloaded.PayloadPath!, destination); }
-                finally { if (File.Exists(downloaded.PayloadPath)) File.Delete(downloaded.PayloadPath!); }
-                transferred = checked(transferred + file.ByteLength);
+                var identity = (file.Sha256, file.ByteLength);
+                if (downloadedFiles.TryGetValue(identity, out var stagedSource))
+                {
+                    var source = RootPathRules.ResolveContainedPath(staging, staging,
+                        Path.GetRelativePath(staging, stagedSource), nameof(staging));
+                    File.Copy(source, destination);
+                }
+                else
+                {
+                    var fileProgress = new UpdateProgressCallback(value =>
+                    {
+                        if (value.Phase == UpdatePhase.Downloading)
+                            progress?.Report(new(UpdatePhase.Downloading, transferred + value.CompletedBytes,
+                                plan.DownloadBytes, completedFiles, plan.DownloadFiles.Count));
+                    });
+                    var downloaded = await download.DownloadAsync(new Uri(feed, AssetName(file.Sha256)), Guid.NewGuid(),
+                        file.ByteLength, file.Sha256, cancellationToken, fileProgress).ConfigureAwait(false);
+                    if (!downloaded.IsSuccess) return new(false, downloaded.CanFallback, downloaded.SafeError);
+                    try { File.Move(downloaded.PayloadPath!, destination); }
+                    finally { if (File.Exists(downloaded.PayloadPath)) File.Delete(downloaded.PayloadPath!); }
+                    downloadedFiles.Add(identity, destination);
+                    transferred = checked(transferred + file.ByteLength);
+                }
                 completedFiles++;
                 progress?.Report(new(UpdatePhase.Downloading, transferred, plan.DownloadBytes,
                     completedFiles, plan.DownloadFiles.Count));
