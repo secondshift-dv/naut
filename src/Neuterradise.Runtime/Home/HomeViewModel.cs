@@ -31,6 +31,7 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
     private readonly ImportActivityService? _activity;
     private readonly MediaResourceAuthority? _mediaResources;
     private readonly StaleResultGuard _loadGuard = new();
+    private int _galleryGeneration, _attentionGeneration, _relatedGeneration, _chronicleGeneration;
     private readonly ObservableCollection<ImportActivityItem> _activeImports = [];
     private readonly ObservableCollection<HomeSpotlightViewModel> _spotlightCandidates = [];
     private readonly ObservableCollection<HomeProfileTileViewModel> _recentlyActive = [];
@@ -123,8 +124,12 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
 
     public async Task RefreshAsync()
     {
-        if (_catalog is null) return;
+        if (_catalog is null || _disposed) return;
         var token = _loadGuard.Begin();
+        var galleryGeneration = Interlocked.Increment(ref _galleryGeneration);
+        var attentionGeneration = Interlocked.Increment(ref _attentionGeneration);
+        var relatedGeneration = Interlocked.Increment(ref _relatedGeneration);
+        var chronicleGeneration = Interlocked.Increment(ref _chronicleGeneration);
         if (_spotlightCandidates.Count == 0 && _recentlyActive.Count == 0)
         {
             ShowLoading();
@@ -208,6 +213,8 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
             if (!units.IsSuccess) failures.Add(units.Section);
             if (!featured.IsSuccess) failures.Add(featured.Section);
             if (!chronicle.IsSuccess) failures.Add(chronicle.Section);
+            var anySectionLoaded = spotlight.IsSuccess || recent.IsSuccess || health.IsSuccess
+                || featured.IsSuccess || chronicle.IsSuccess;
 
             var (spotlightVisuals, recentVisuals) = await ResolveGalleryVisualsAsync(
                 spotlight.Value, recent.Value, cancellation).ConfigureAwait(false);
@@ -216,48 +223,44 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
 
             if (!_loadGuard.IsCurrent(token)) return;
 
-            var appliedSections = 0;
             UiDispatch.Run(() =>
             {
                 if (!_loadGuard.IsCurrent(token) || _disposed) return;
-                if (spotlight.IsSuccess)
+                if (spotlight.IsSuccess && galleryGeneration == _galleryGeneration)
                 {
                     ApplySpotlight(spotlightVisuals?.Items ?? []);
-                    appliedSections++;
                 }
 
-                if (recent.IsSuccess)
+                if (recent.IsSuccess && galleryGeneration == _galleryGeneration)
                 {
                     ApplyRecentlyActive(recent.Value!, recentVisuals?.CoverPaths);
-                    appliedSections++;
                 }
 
-                if (health.IsSuccess)
+                if (health.IsSuccess && attentionGeneration == _attentionGeneration)
                 {
                     ApplyVaultPulse(health.Value!);
-                    appliedSections++;
                 }
 
-                if (health.IsSuccess && actionableFaceCount.IsSuccess && units.IsSuccess)
+                if (health.IsSuccess && actionableFaceCount.IsSuccess && units.IsSuccess
+                    && attentionGeneration == _attentionGeneration)
                 {
                     ApplyNeedsAttention(units.Value!, health.Value!, actionableFaceCount.Value);
-                    appliedSections++;
                 }
 
-                if (featured.IsSuccess)
+                if (featured.IsSuccess && relatedGeneration == _relatedGeneration)
                 {
                     ApplyFeaturedConnection(featured.Value);
-                    appliedSections++;
                 }
 
-                if (chronicle.IsSuccess)
+                if (chronicle.IsSuccess && chronicleGeneration == _chronicleGeneration)
                 {
                     ApplyChronicle(chronicle.Value!);
-                    appliedSections++;
                 }
 
-                ReplaceRefreshFailures(failures);
-                if (appliedSections > 0)
+                if (galleryGeneration == _galleryGeneration && attentionGeneration == _attentionGeneration
+                    && relatedGeneration == _relatedGeneration && chronicleGeneration == _chronicleGeneration)
+                    ReplaceRefreshFailures(failures);
+                if (anySectionLoaded)
                 {
                     ShowReady();
                 }
@@ -702,6 +705,7 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
     private async Task RefreshGalleryAsync(CancellationToken cancellationToken)
     {
         if (_catalog is null) return;
+        var generation = Interlocked.Increment(ref _galleryGeneration);
 
         var spotlightTask = LoadHomeSectionAsync(
             "Spotlight",
@@ -728,7 +732,7 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
         if (_disposed) return;
         UiDispatch.Run(() =>
         {
-            if (_disposed || cancellationToken.IsCancellationRequested) return;
+            if (_disposed || cancellationToken.IsCancellationRequested || generation != _galleryGeneration) return;
             if (spotlight.IsSuccess)
             {
                 ApplySpotlight(spotlightVisuals?.Items ?? []);
@@ -753,6 +757,7 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
     private async Task RefreshAttentionAsync(CancellationToken cancellationToken)
     {
         if (_catalog is null) return;
+        var generation = Interlocked.Increment(ref _attentionGeneration);
 
         var healthTask = LoadHomeSectionAsync(
             "Vault health",
@@ -774,7 +779,7 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
         var units = unitsTask.Result;
         UiDispatch.Run(() =>
         {
-            if (_disposed || cancellationToken.IsCancellationRequested) return;
+            if (_disposed || cancellationToken.IsCancellationRequested || generation != _attentionGeneration) return;
             if (health.IsSuccess)
             {
                 ApplyVaultPulse(health.Value!);
@@ -794,6 +799,7 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
     private async Task RefreshRelatedAsync(CancellationToken cancellationToken)
     {
         if (_catalog is null) return;
+        var generation = Interlocked.Increment(ref _relatedGeneration);
 
         var result = await LoadHomeSectionAsync(
                 "Featured connection",
@@ -803,7 +809,7 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
 
         UiDispatch.Run(() =>
         {
-            if (_disposed || cancellationToken.IsCancellationRequested) return;
+            if (_disposed || cancellationToken.IsCancellationRequested || generation != _relatedGeneration) return;
             if (result.IsSuccess)
             {
                 ApplyFeaturedConnection(result.Value);
@@ -816,6 +822,7 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
     private async Task RefreshChronicleAsync(CancellationToken cancellationToken)
     {
         if (_catalog is null) return;
+        var generation = Interlocked.Increment(ref _chronicleGeneration);
 
         var localNow = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TimeZoneInfo.Local);
         var start = new DateTimeOffset(
@@ -837,7 +844,7 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
 
         UiDispatch.Run(() =>
         {
-            if (_disposed || cancellationToken.IsCancellationRequested) return;
+            if (_disposed || cancellationToken.IsCancellationRequested || generation != _chronicleGeneration) return;
             if (result.IsSuccess)
             {
                 ApplyChronicle(result.Value!);

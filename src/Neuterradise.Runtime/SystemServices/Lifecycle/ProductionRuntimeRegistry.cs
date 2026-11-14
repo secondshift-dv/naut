@@ -186,7 +186,7 @@ public sealed class ProductionRuntimeRegistry : IAsyncDisposable
                     services.SendToWorkerAsync,
                     analysisTimeout: null,
 
-                    identityBank: new IdentityBankProvider(context.Catalog))));
+                    identityBank: IdentityBankProvider.ForCatalog(context.Catalog))));
 
             // Wire media preparation capability tracking: when a job completes, update capability state
             // and attempt readiness join. After reconciliation, project terminal job state into

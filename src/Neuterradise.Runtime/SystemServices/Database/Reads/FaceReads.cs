@@ -43,7 +43,7 @@ public sealed class FaceReads
                    fd.sampled_timestamp_ms, fd.suggested_candidates_json
             FROM face_detections fd
             JOIN media a ON a.media_id = fd.media_id AND a.state = 'ACTIVE'
-            LEFT JOIN identities si ON fd.suggested_identity_id = si.identity_id
+            LEFT JOIN identities si ON fd.suggested_identity_id = si.identity_id AND si.is_active = 1
             LEFT JOIN profiles sp ON si.profile_id = sp.profile_id
             LEFT JOIN identities ci ON fd.confirmed_identity_id = ci.identity_id
             LEFT JOIN profiles cp ON ci.profile_id = cp.profile_id
@@ -89,7 +89,7 @@ public sealed class FaceReads
                    fd.sampled_timestamp_ms, fd.suggested_candidates_json
             FROM face_detections fd
             JOIN media a ON a.media_id = fd.media_id AND a.state = 'ACTIVE'
-            LEFT JOIN identities si ON fd.suggested_identity_id = si.identity_id
+            LEFT JOIN identities si ON fd.suggested_identity_id = si.identity_id AND si.is_active = 1
             LEFT JOIN profiles sp ON si.profile_id = sp.profile_id
             LEFT JOIN identities ci ON fd.confirmed_identity_id = ci.identity_id
             LEFT JOIN profiles cp ON ci.profile_id = cp.profile_id
@@ -130,7 +130,7 @@ public sealed class FaceReads
                    fd.sampled_timestamp_ms, fd.suggested_candidates_json
             FROM face_detections fd
             JOIN media a ON a.media_id = fd.media_id AND a.state = 'ACTIVE'
-            LEFT JOIN identities si ON fd.suggested_identity_id = si.identity_id
+            LEFT JOIN identities si ON fd.suggested_identity_id = si.identity_id AND si.is_active = 1
             LEFT JOIN profiles sp ON si.profile_id = sp.profile_id
             LEFT JOIN identities ci ON fd.confirmed_identity_id = ci.identity_id
             LEFT JOIN profiles cp ON ci.profile_id = cp.profile_id
@@ -184,7 +184,7 @@ public sealed class FaceReads
                    fd.sampled_timestamp_ms, fd.suggested_candidates_json
             FROM face_detections fd
             JOIN media a ON a.media_id = fd.media_id AND a.state = 'ACTIVE'
-            LEFT JOIN identities si ON fd.suggested_identity_id = si.identity_id
+            LEFT JOIN identities si ON fd.suggested_identity_id = si.identity_id AND si.is_active = 1
             LEFT JOIN profiles sp ON si.profile_id = sp.profile_id
             LEFT JOIN identities ci ON fd.confirmed_identity_id = ci.identity_id
             LEFT JOIN profiles cp ON ci.profile_id = cp.profile_id
@@ -250,7 +250,7 @@ public sealed class FaceReads
                    fd.sampled_timestamp_ms, fd.suggested_candidates_json
             FROM face_detections fd
             JOIN import_items ii ON (fd.media_id = ii.candidate_media_id OR fd.media_id = ii.reused_media_id)
-            LEFT JOIN identities si ON fd.suggested_identity_id = si.identity_id
+            LEFT JOIN identities si ON fd.suggested_identity_id = si.identity_id AND si.is_active = 1
             LEFT JOIN profiles sp ON si.profile_id = sp.profile_id
             LEFT JOIN identities ci ON fd.confirmed_identity_id = ci.identity_id
             LEFT JOIN profiles cp ON ci.profile_id = cp.profile_id
@@ -429,7 +429,7 @@ public sealed class FaceReads
                    fd.sampled_timestamp_ms, fd.suggested_candidates_json
             FROM face_detections fd
             JOIN media a ON a.media_id = fd.media_id AND a.state = 'ACTIVE'
-            LEFT JOIN identities si ON fd.suggested_identity_id = si.identity_id
+            LEFT JOIN identities si ON fd.suggested_identity_id = si.identity_id AND si.is_active = 1
             LEFT JOIN profiles sp ON si.profile_id = sp.profile_id
             LEFT JOIN identities ci ON fd.confirmed_identity_id = ci.identity_id
             LEFT JOIN profiles cp ON ci.profile_id = cp.profile_id
@@ -477,7 +477,7 @@ public sealed class FaceReads
 
         var recommendation = evidence?.GetRecommendation();
         FaceIdentityCandidate[] candidates = [];
-        if (decision == FaceDecisionState.Suggested && recommendation is not null
+        if (decision == FaceDecisionState.Suggested && suggestedProfileId.HasValue && recommendation is not null
             && recommendation.IdentityId == suggestedIdentityId)
         {
             candidates = [new(recommendation.IdentityId, null, null, recommendation.Similarity, 1)];

@@ -73,7 +73,8 @@ public sealed record StagedFaceDecision(
     Guid? SourceImportItemId = null,
     Guid? CandidateMediaId = null,
     string? CandidateModelId = null,
-    string? CandidateModelVersion = null);
+    string? CandidateModelVersion = null,
+    string? AutomaticBankSignature = null);
 
 public enum DuplicateDecisionAction
 {

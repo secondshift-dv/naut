@@ -57,6 +57,8 @@ public sealed class FaceDecisionOperations
             transaction, command.ProfileId, cancellationToken).ConfigureAwait(false);
         if (targetIdentityId is null)
         {
+            if (command.AutomaticBankSignature is not null)
+                return StaleAutomaticSuggestion();
             return OperationResult<FaceDecisionOutcome>.Validation(
                 OperationErrorCode.FaceTargetInvalid,
                 "A face can only be confirmed against an active Profile.");
@@ -79,6 +81,17 @@ public sealed class FaceDecisionOperations
             return OperationResult<FaceDecisionOutcome>.Conflict(
                 OperationErrorCode.FaceDecisionStateInvalid,
                 "That face is already confirmed to someone else. Change the confirmation instead.");
+        }
+
+        if (command.AutomaticBankSignature is { } signature)
+        {
+            var evidence = FaceSuggestionEvidenceV1.TryParse(detection.SuggestedCandidatesJson);
+            if (detection.DecisionState != FaceDecisionState.Suggested
+                || detection.RowVersion != command.ExpectedRowVersion || evidence?.BankSignature != signature
+                || await Neuterradise.App.Import.AutomaticMediaAssignmentPolicy.GetStrongFaceSuggestionAsync(
+                    _catalog, evidence, detection.EmbeddingSpaceKey, targetIdentityId.Value, command.ProfileId,
+                    cancellationToken).ConfigureAwait(false) is null)
+                return StaleAutomaticSuggestion();
         }
 
         if (detection.RowVersion != command.ExpectedRowVersion)
@@ -170,6 +183,12 @@ public sealed class FaceDecisionOperations
                 sampleCreated,
                 appearsEnsured));
     }
+
+    internal const string StaleAutomaticSuggestionCode = "FACE_SUGGESTION_STALE";
+
+    private static OperationResult<FaceDecisionOutcome> StaleAutomaticSuggestion() =>
+        OperationResult<FaceDecisionOutcome>.Conflict(StaleAutomaticSuggestionCode,
+            "The automatic face suggestion is no longer current.");
 
     public async Task<OperationResult<FaceDecisionOutcome>> RejectFaceAsync(
         RejectFaceCommand command,
@@ -478,7 +497,7 @@ public sealed class FaceDecisionOperations
         await using var command = transaction.CreateCommand(
             """
             SELECT media_id, decision_state, confirmed_identity_id, embedding, embedding_space_key,
-                   model_id, model_version, row_version
+                   model_id, model_version, row_version, suggested_candidates_json
             FROM face_detections
             WHERE face_id = $faceId;
             """);
@@ -497,7 +516,8 @@ public sealed class FaceDecisionOperations
             reader.IsDBNull(4) ? null : reader.GetString(4),
             reader.GetString(5),
             reader.GetString(6),
-            reader.GetInt64(7));
+            reader.GetInt64(7),
+            reader.IsDBNull(8) ? null : reader.GetString(8));
     }
 
     private static async Task<MediaRow> ReadMediaAsync(
@@ -611,6 +631,8 @@ public sealed class FaceDecisionOperations
             """
             UPDATE face_detections
             SET decision_state = $decision,
+                suggested_identity_id = CASE WHEN $decision = 'REJECTED' THEN NULL ELSE suggested_identity_id END,
+                suggested_candidates_json = CASE WHEN $decision = 'REJECTED' THEN NULL ELSE suggested_candidates_json END,
                 confirmed_identity_id = $confirmedIdentityId,
                 updated_at_ms = $now,
                 row_version = $newRowVersion
@@ -890,7 +912,8 @@ public sealed class FaceDecisionOperations
         string? EmbeddingSpaceKey,
         string ModelId,
         string ModelVersion,
-        long RowVersion);
+        long RowVersion,
+        string? SuggestedCandidatesJson);
 
     private sealed record MediaRow(MediaState State, bool IsTrashed);
 
@@ -899,7 +922,8 @@ public sealed class FaceDecisionOperations
     private readonly record struct ProfilePair(Guid Low, Guid High);
 }
 
-public sealed record ConfirmFaceCommand(Guid FaceId, Guid ProfileId, long ExpectedRowVersion);
+public sealed record ConfirmFaceCommand(Guid FaceId, Guid ProfileId, long ExpectedRowVersion,
+    string? AutomaticBankSignature = null);
 
 public sealed record RejectFaceCommand(Guid FaceId, long ExpectedRowVersion);
 

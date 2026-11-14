@@ -274,7 +274,7 @@ public sealed class StaleResultGuard : IDisposable
     {
         lock (_sync)
         {
-            return token.Generation == _generation;
+            return !_disposed && token.Generation == _generation && !token.CancellationToken.IsCancellationRequested;
         }
     }
 

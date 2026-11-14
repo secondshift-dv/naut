@@ -184,6 +184,9 @@ public sealed class ShutdownCoordinator
                 }
             }
 
+            if (_context.Catalog.MediaViewStates.HasFailedWrites)
+                failures.Add("MEDIA_VIEW_PREFERENCES_NOT_SAVED");
+
             if (!timedOut && failures.Count == 0)
             {
                 await WriteCleanMarkerAsync(cancellationToken).ConfigureAwait(false);

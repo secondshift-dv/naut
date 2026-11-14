@@ -425,9 +425,7 @@ public sealed class ProfilingFaceAnalysisJobOperation : IFaceAnalysisJobOperatio
             return empty;
         }
 
-        var signature = IdentityBankSignature.For(
-            space.Canonical,
-            samples.Select(static sample => sample.IdentitySampleId));
+        var signature = bank.Signature;
 
         var chunks = CreateIdentityIndexChunks(space, signature, samples);
             BuildIdentityIndexResult? completedBuild = null;

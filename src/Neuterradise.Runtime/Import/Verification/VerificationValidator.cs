@@ -14,18 +14,14 @@ namespace Neuterradise.App.Import.Verification;
 public sealed class VerificationValidator
 {
     private readonly CatalogConnectionFactory _connectionFactory;
+    private readonly CatalogDb _catalog;
     private readonly TimeProvider _timeProvider;
 
     public VerificationValidator(CatalogDb catalog, TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
+        _catalog = catalog;
         _connectionFactory = catalog.ConnectionFactory;
-        _timeProvider = timeProvider ?? TimeProvider.System;
-    }
-
-    public VerificationValidator(CatalogConnectionFactory connectionFactory, TimeProvider? timeProvider = null)
-    {
-        _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
@@ -490,12 +486,13 @@ public sealed class VerificationValidator
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT ii.import_item_id, fd.suggested_identity_id, fd.suggested_candidates_json, p.profile_id
+            SELECT ii.import_item_id, fd.suggested_identity_id, fd.suggested_candidates_json, p.profile_id, fd.embedding_space_key
             FROM import_items ii
             JOIN face_detections fd ON fd.media_id = COALESCE(ii.reused_media_id, ii.candidate_media_id)
             JOIN identities identity ON identity.identity_id = fd.suggested_identity_id
             JOIN profiles p ON p.profile_id = identity.profile_id
             WHERE ii.import_unit_id = $unitId AND ii.disposition = 'INCLUDED'
+              AND fd.decision_state = 'SUGGESTED' AND identity.is_active = 1
               AND p.kind = 'NORMAL' AND p.trashed_at_ms IS NULL;
             """;
         command.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
@@ -509,9 +506,11 @@ public sealed class VerificationValidator
                 continue;
             }
             var identityId = DbGuid.Parse(reader.GetString(1));
-            var suggestion = AutomaticMediaAssignmentPolicy.GetStrongFaceSuggestion(
-                FaceSuggestionEvidenceV1.TryParse(reader.GetString(2)));
-            if (suggestion?.IdentityId == identityId)
+            var profileId = DbGuid.Parse(reader.GetString(3));
+            var suggestion = await AutomaticMediaAssignmentPolicy.GetStrongFaceSuggestionAsync(
+                _catalog, FaceSuggestionEvidenceV1.TryParse(reader.GetString(2)),
+                reader.IsDBNull(4) ? null : reader.GetString(4), identityId, profileId, cancellationToken).ConfigureAwait(false);
+            if (suggestion is not null)
             {
                 evidence.Add((DbGuid.Parse(reader.GetString(0)), DbGuid.Parse(reader.GetString(3))));
             }

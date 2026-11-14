@@ -704,7 +704,10 @@ public sealed class ImportPublicationCoordinator
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
                 var evidence = FaceSuggestionEvidenceV1.TryParse(reader.IsDBNull(3) ? null : reader.GetString(3));
-                var top = AutomaticMediaAssignmentPolicy.GetStrongFaceSuggestion(evidence);
+                var top = await AutomaticMediaAssignmentPolicy.GetStrongFaceSuggestionAsync(
+                    _catalog, evidence, reader.IsDBNull(4) ? null : reader.GetString(4),
+                    DbGuid.Parse(reader.GetString(2)), DbGuid.Parse(reader.GetString(5)), cancellationToken)
+                    .ConfigureAwait(false);
                 var faceId = DbGuid.Parse(reader.GetString(0));
                 if (top is null || top.IdentityId != DbGuid.Parse(reader.GetString(2))
                     || reader.IsDBNull(4) || reader.IsDBNull(8) || reader.IsDBNull(9) || reader.IsDBNull(10)
@@ -714,7 +717,8 @@ public sealed class ImportPublicationCoordinator
                     || faces.Any(face => face.FaceId == faceId)) continue;
                 faces.Add(new StagedFaceDecision(faceId, reader.GetInt64(1), VerificationFaceDecision.Confirm,
                     VerificationFaceTargetKind.ExistingProfile, DbGuid.Parse(reader.GetString(5)),
-                    DbGuid.Parse(reader.GetString(6)), DbGuid.Parse(reader.GetString(7)), reader.GetString(8), reader.GetString(9)));
+                    DbGuid.Parse(reader.GetString(6)), DbGuid.Parse(reader.GetString(7)), reader.GetString(8), reader.GetString(9),
+                    AutomaticBankSignature: evidence.BankSignature));
             }
         }
         if (collisions.Length == (draft.ProfileCollisionDecisions?.Count ?? 0) && faces.Count == draft.FaceDecisions.Count)
@@ -761,10 +765,14 @@ public sealed class ImportPublicationCoordinator
             }
 
             var confirmed = await operations.ConfirmFaceAsync(
-                new ConfirmFaceCommand(decision.FaceId, targetProfileId, decision.ExpectedFaceRowVersion),
+                new ConfirmFaceCommand(decision.FaceId, targetProfileId, decision.ExpectedFaceRowVersion,
+                    decision.AutomaticBankSignature),
                 cancellationToken).ConfigureAwait(false);
             if (!confirmed.IsSuccess)
             {
+                if (decision.AutomaticBankSignature is not null
+                    && confirmed.ErrorCode == FaceDecisionOperations.StaleAutomaticSuggestionCode)
+                    continue;
                 return ImportPublicationResult.Pending("FACE_PUBLICATION_PENDING", "A reviewed face decision still needs recovery.");
             }
         }

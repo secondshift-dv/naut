@@ -115,6 +115,7 @@ public sealed class AutomaticImportAssignmentService
                  AND suggested.trashed_at_ms IS NULL
                 WHERE ii.import_unit_id = $unitId
                   AND ii.disposition IN ('INCLUDED', 'REUSED')
+                  AND fd.decision_state <> 'REJECTED'
                 ORDER BY ii.import_item_id, fd.face_id;
                 """;
             command.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
@@ -137,14 +138,18 @@ public sealed class AutomaticImportAssignmentService
                     profileId = DbGuid.Parse(reader.GetString(5));
                     confirmed = true;
                 }
-                else if (!reader.IsDBNull(6) && !reader.IsDBNull(7) && !reader.IsDBNull(8))
+                else if (decisionState == "SUGGESTED"
+                    && !reader.IsDBNull(6) && !reader.IsDBNull(7) && !reader.IsDBNull(8))
                 {
                     var identityId = DbGuid.Parse(reader.GetString(6));
                     var suggestion = FaceSuggestionEvidenceV1.TryParse(reader.GetString(8));
-                    var top = AutomaticMediaAssignmentPolicy.GetStrongFaceSuggestion(suggestion);
-                    if (top is not null && top.IdentityId == identityId)
+                    var suggestedProfileId = DbGuid.Parse(reader.GetString(7));
+                    var top = await AutomaticMediaAssignmentPolicy.GetStrongFaceSuggestionAsync(
+                        _catalog, suggestion, reader.IsDBNull(3) ? null : reader.GetString(3),
+                        identityId, suggestedProfileId, cancellationToken).ConfigureAwait(false);
+                    if (top is not null)
                     {
-                        profileId = DbGuid.Parse(reader.GetString(7));
+                        profileId = suggestedProfileId;
                         similarity = top.Similarity;
                     }
                 }
@@ -176,7 +181,9 @@ public sealed class AutomaticImportAssignmentService
             var durableOwner = owners.Count == 1 ? owners.Single() : (Guid?)null;
 
             var itemFaces = facesByItem[item.ItemId];
-            var strongProfiles = itemFaces
+            var confirmedFaces = itemFaces.Where(static face => face.IsConfirmed).ToArray();
+            var assignmentFaces = confirmedFaces.Length == 0 ? itemFaces : (IEnumerable<FaceObservation>)confirmedFaces;
+            var strongProfiles = assignmentFaces
                 .Where(static face => face.ProfileId.HasValue)
                 .Select(static face => face.ProfileId!.Value)
                 .Distinct()

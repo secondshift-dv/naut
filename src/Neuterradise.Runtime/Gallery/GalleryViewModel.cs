@@ -25,6 +25,7 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
     private readonly NavigationCoordinator? _navigation;
     private readonly TimeSpan _searchDebounce;
     private readonly StaleResultGuard _queryGuard = new();
+    private readonly StaleResultGuard _facetGuard = new();
     private readonly StaleResultGuard _suggestionGuard = new();
 
     private readonly ObservableCollection<GalleryCardViewModel> _cards = [];
@@ -584,18 +585,23 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
 
     public async Task InitializeAsync()
     {
-        if (_catalog is null)
+        if (_catalog is null || _disposed)
         {
             return;
         }
 
+        var request = _facetGuard.Begin();
         try
         {
-            var facets = await Task.Run(() => _catalog.GalleryReads.GetGalleryFacetsAsync());
+            var facets = await Task.Run(() => _catalog.GalleryReads.GetGalleryFacetsAsync(request.CancellationToken),
+                request.CancellationToken);
+            if (!_facetGuard.IsCurrent(request)) return;
             ApplyFacets(facets);
         }
+        catch (OperationCanceledException) when (request.CancellationToken.IsCancellationRequested) { return; }
         catch (Exception exception)
         {
+            if (!_facetGuard.IsCurrent(request)) return;
             Trace.TraceWarning("Gallery filter options could not be loaded: {0}", exception.GetType().Name);
             ErrorNotice = SurfaceText.Get(
                 "Gallery.Error.FiltersLoad",
@@ -621,18 +627,23 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
 
     public async Task RefreshAsync()
     {
-        if (_catalog is null)
+        if (_catalog is null || _disposed)
         {
             return;
         }
 
+        var request = _facetGuard.Begin();
         try
         {
-            var facets = await Task.Run(() => _catalog.GalleryReads.GetGalleryFacetsAsync()).ConfigureAwait(true);
+            var facets = await Task.Run(() => _catalog.GalleryReads.GetGalleryFacetsAsync(request.CancellationToken),
+                request.CancellationToken).ConfigureAwait(true);
+            if (!_facetGuard.IsCurrent(request)) return;
             ApplyFacets(facets);
         }
+        catch (OperationCanceledException) when (request.CancellationToken.IsCancellationRequested) { return; }
         catch (Exception exception)
         {
+            if (!_facetGuard.IsCurrent(request)) return;
             Trace.TraceWarning("Gallery filter options could not be refreshed: {0}", exception.GetType().Name);
             ErrorNotice = SurfaceText.Get(
                 "Gallery.Error.FiltersRefresh",
@@ -1386,6 +1397,7 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
             _catalog.WriteCoordinator.Invalidated -= OnCatalogInvalidated;
         }
         _queryGuard.Dispose();
+        _facetGuard.Dispose();
         _suggestionGuard.Dispose();
     }
 }

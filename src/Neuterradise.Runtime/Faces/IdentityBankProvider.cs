@@ -12,6 +12,10 @@ public sealed class IdentityBankProvider
     private const int MaximumSamplesPerIdentity = 8;
     private const double MaximumRedundantSimilarity = 0.92;
     private static readonly ConditionalWeakTable<CatalogDb, CatalogProviderSet> ProvidersByCatalog = new();
+    private static readonly ConditionalWeakTable<CatalogDb, IdentityBankProvider> SharedProviders = new();
+
+    internal static IdentityBankProvider ForCatalog(CatalogDb catalog) =>
+        SharedProviders.GetValue(catalog, static db => new IdentityBankProvider(db));
 
     private readonly FaceReads _reads;
     private readonly TimeProvider _timeProvider;
@@ -311,6 +315,8 @@ public sealed class IdentityBankSpace
         Diagnostics = diagnostics;
         LoadedAtUtc = loadedAtUtc;
         SampleCount = identities.Sum(static entry => entry.Samples.Count);
+        Signature = IdentityBankSignature.For(space.Canonical,
+            identities.SelectMany(static entry => entry.Samples.Select(static sample => sample.IdentitySampleId)));
         _byIdentityId = identities.ToDictionary(static entry => entry.IdentityId);
     }
 
@@ -321,6 +327,8 @@ public sealed class IdentityBankSpace
     public int IdentityCount => Identities.Count;
 
     public int SampleCount { get; }
+
+    public string Signature { get; }
 
     public IReadOnlyList<IdentityBankDiagnostic> Diagnostics { get; }
 

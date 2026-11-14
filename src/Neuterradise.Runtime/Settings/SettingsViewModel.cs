@@ -397,6 +397,8 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
         }
 
         _organizationCoalescer?.Dispose();
+        _organizationGuard.Dispose();
+        _metricsGuard.Dispose();
         Activity.Dispose();
         Trash.Dispose();
         Health.Dispose();
@@ -634,7 +636,10 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
+        if (_isDisposed) return;
         var generation = Interlocked.Increment(ref _initializeGeneration);
+        var organizationRequest = _organizationGuard.Begin();
+        var metricsRequest = _metricsGuard.Begin();
         await UiDispatch.InvokeAsync(() =>
         {
             if (!_isDisposed && IsRouteActive && generation == _initializeGeneration)
@@ -672,8 +677,8 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
 
                 RaisePropertyChanged(nameof(CurrentLanguage));
                 RaisePropertyChanged(nameof(UpdateFeedUrl));
-                ApplyOrganizationSnapshot(organization);
-                ApplySystemMetricsSnapshot(systemMetrics);
+                if (_organizationGuard.IsCurrent(organizationRequest)) ApplyOrganizationSnapshot(organization);
+                if (_metricsGuard.IsCurrent(metricsRequest)) ApplySystemMetricsSnapshot(systemMetrics);
                 ShowReady();
             }).ConfigureAwait(false);
         }
@@ -897,12 +902,18 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
 
     public async Task LoadOrganizationAsync(CancellationToken cancellationToken = default)
     {
-        if (_catalog is null) return;
-        var snapshot = await Task.Run(() => ReadOrganizationSnapshotAsync(cancellationToken), cancellationToken).ConfigureAwait(false);
-        await UiDispatch.InvokeAsync(() =>
+        if (_catalog is null || _isDisposed) return;
+        var request = _organizationGuard.Begin();
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, request.CancellationToken);
+        try
         {
-            if (!_isDisposed && IsRouteActive) ApplyOrganizationSnapshot(snapshot);
-        }).ConfigureAwait(false);
+            var snapshot = await Task.Run(() => ReadOrganizationSnapshotAsync(linked.Token), linked.Token).ConfigureAwait(false);
+            await UiDispatch.InvokeAsync(() =>
+            {
+                if (IsRouteActive && _organizationGuard.IsCurrent(request)) ApplyOrganizationSnapshot(snapshot);
+            }).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (linked.IsCancellationRequested) { }
     }
 
     public async Task CreateCategoryAsync(CancellationToken cancellationToken = default)
@@ -1143,23 +1154,25 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
 
     public async Task LoadSystemMetricsAsync(CancellationToken cancellationToken = default)
     {
-        if (_storageMetrics is null && _catalog is null) return;
+        if (_isDisposed || (_storageMetrics is null && _catalog is null)) return;
+        var request = _metricsGuard.Begin();
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, request.CancellationToken);
         try
         {
-            var snapshot = await Task.Run(() => ReadSystemMetricsSnapshotAsync(cancellationToken), cancellationToken).ConfigureAwait(false);
+            var snapshot = await Task.Run(() => ReadSystemMetricsSnapshotAsync(linked.Token), linked.Token).ConfigureAwait(false);
             await UiDispatch.InvokeAsync(() =>
             {
-                if (!_isDisposed && IsRouteActive) ApplySystemMetricsSnapshot(snapshot);
+                if (IsRouteActive && _metricsGuard.IsCurrent(request)) ApplySystemMetricsSnapshot(snapshot);
             }).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || !IsRouteActive)
+        catch (OperationCanceledException) when (linked.IsCancellationRequested || !IsRouteActive)
         {
         }
         catch (Exception ex)
         {
             await UiDispatch.InvokeAsync(() =>
             {
-                if (!_isDisposed && IsRouteActive)
+                if (IsRouteActive && _metricsGuard.IsCurrent(request))
                     ShowRecoverableError($"Could not evaluate system metrics: {OperationExecution.SafeMessage(ex)}");
             }).ConfigureAwait(false);
         }
@@ -1203,6 +1216,8 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
     }
 
     private RefreshCoalescer? _organizationCoalescer;
+    private readonly StaleResultGuard _organizationGuard = new();
+    private readonly StaleResultGuard _metricsGuard = new();
 
     private void SignalOrganizationCoalescer()
     {

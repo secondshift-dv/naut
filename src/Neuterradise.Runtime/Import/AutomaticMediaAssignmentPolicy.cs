@@ -1,5 +1,6 @@
 using Neuterradise.App.Import.Verification;
 using Neuterradise.App.Faces;
+using Neuterradise.App.SystemServices.Database;
 
 namespace Neuterradise.App.Import;
 
@@ -12,8 +13,22 @@ public sealed class AutomaticMediaAssignmentPolicy
 {
     public const double StrongFaceSimilarity = ImportProfileCollisionPolicy.StrongSimilarityThreshold;
 
-    public static FaceSuggestionEntryV1? GetStrongFaceSuggestion(FaceSuggestionEvidenceV1? evidence) =>
-        evidence?.GetRecommendation() is { Similarity: >= StrongFaceSimilarity } recommendation ? recommendation : null;
+    internal static async Task<FaceSuggestionEntryV1?> GetStrongFaceSuggestionAsync(
+        CatalogDb catalog, FaceSuggestionEvidenceV1? evidence, string? embeddingSpaceKey,
+        Guid identityId, Guid profileId, CancellationToken cancellationToken)
+    {
+        if (evidence?.GetRecommendation() is not { Similarity: >= StrongFaceSimilarity } recommendation
+            || recommendation.IdentityId != identityId
+            || evidence.EmbeddingSpaceKey != embeddingSpaceKey
+            || !EmbeddingSpaceKey.TryParse(embeddingSpaceKey, out var space))
+            return null;
+
+        var bank = await IdentityBankProvider.ForCatalog(catalog).GetSpaceAsync(space, cancellationToken)
+            .ConfigureAwait(false);
+        return bank.Signature == evidence.BankSignature
+            && bank.TryGetIdentity(identityId, out var identity) && identity.ProfileId == profileId
+            ? recommendation : null;
+    }
 
     public ImportAssignmentDecision Resolve(
         Guid? explicitProfileId,

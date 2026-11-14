@@ -565,13 +565,14 @@ public sealed class VerificationOperations
         command.CommandText = """
             SELECT ii.import_item_id, COALESCE(ii.reused_media_id, ii.candidate_media_id),
                    ii.source_file_name, fd.suggested_identity_id, fd.suggested_candidates_json,
-                   p.profile_id, p.display_name
+                   p.profile_id, p.display_name, fd.embedding_space_key
             FROM import_items ii
             JOIN face_detections fd ON fd.media_id = COALESCE(ii.reused_media_id, ii.candidate_media_id)
-            JOIN identities identity ON identity.identity_id = fd.suggested_identity_id
+            JOIN identities identity ON identity.identity_id = fd.suggested_identity_id AND identity.is_active = 1
             JOIN profiles p ON p.profile_id = identity.profile_id
             WHERE ii.import_unit_id = $unitId
               AND ii.disposition IN ('INCLUDED','REUSED')
+              AND fd.decision_state = 'SUGGESTED'
               AND p.kind = 'NORMAL' AND p.trashed_at_ms IS NULL;
             """;
         command.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
@@ -587,8 +588,10 @@ public sealed class VerificationOperations
 
             var identityId = DbGuid.Parse(reader.GetString(3));
             var parsed = FaceSuggestionEvidenceV1.TryParse(reader.GetString(4));
-            var recommendation = AutomaticMediaAssignmentPolicy.GetStrongFaceSuggestion(parsed);
-            if (recommendation?.IdentityId != identityId)
+            var recommendation = await AutomaticMediaAssignmentPolicy.GetStrongFaceSuggestionAsync(
+                _catalog, parsed, reader.IsDBNull(7) ? null : reader.GetString(7),
+                identityId, DbGuid.Parse(reader.GetString(5)), cancellationToken).ConfigureAwait(false);
+            if (recommendation is null)
             {
                 continue;
             }
@@ -792,7 +795,8 @@ public sealed class VerificationOperations
             var suggestion = FaceSuggestionEvidenceV1.TryParse(reader.IsDBNull(9) ? null : reader.GetString(9));
             var suggestedIdentityId = reader.IsDBNull(10) ? (Guid?)null : DbGuid.Parse(reader.GetString(10));
             var recommendation = suggestion?.GetRecommendation();
-            var showSuggestion = recommendation is not null && recommendation.IdentityId == suggestedIdentityId;
+            var showSuggestion = reader.GetString(8) == "SUGGESTED"
+                && recommendation is not null && recommendation.IdentityId == suggestedIdentityId;
             list.Add(new VerificationFaceCandidate(
                 DbGuid.Parse(reader.GetString(0)),
                 DbGuid.Parse(reader.GetString(1)),

@@ -36,12 +36,20 @@ public sealed class MediaViewStates
 {
     private const string KeyPrefix = "media-view.v1.";
     private static readonly TimeSpan CoalesceInterval = TimeSpan.FromMilliseconds(300);
+    private static readonly TimeSpan RetryInterval = TimeSpan.FromMilliseconds(200);
+    private const int MaximumAttempts = 3;
     private readonly CatalogDb _catalog;
     private readonly TimeProvider _clock;
     private readonly object _gate = new();
     private Dictionary<ViewKey, object> _pending = [];
     private Dictionary<ViewKey, object> _writing = [];
     private bool _running;
+    private bool _hasFailedWrites;
+
+    internal bool HasFailedWrites
+    {
+        get { lock (_gate) return _hasFailedWrites; }
+    }
 
     internal MediaViewStates(CatalogDb catalog, TimeProvider clock)
     {
@@ -127,17 +135,11 @@ public sealed class MediaViewStates
                     _pending = [];
                 }
 
-                try
-                {
-                    await PersistBatchAsync(_writing).ConfigureAwait(false);
-                }
-                catch (Exception exception) when (CatalogDb.IsDatabaseFailure(exception))
-                {
-                    Trace.TraceWarning("Media view preference write failed: {0}", exception.GetType().Name);
-                }
+                var persisted = await PersistWithRetryAsync(_writing).ConfigureAwait(false);
 
                 lock (_gate)
                 {
+                    if (!persisted) _hasFailedWrites = true;
                     _writing.Clear();
                     if (_pending.Count > 0) continue;
                     _running = false;
@@ -155,10 +157,36 @@ public sealed class MediaViewStates
         }
     }
 
+    private async Task<bool> PersistWithRetryAsync(Dictionary<ViewKey, object> batch)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await PersistBatchAsync(batch).ConfigureAwait(false);
+                return true;
+            }
+            catch (Microsoft.Data.Sqlite.SqliteException exception) when (attempt < MaximumAttempts
+                && exception.SqliteErrorCode is 5 or 6 or 10)
+            {
+                // Release SQLite and the writer gate before waiting. The same admitted writer
+                // owns every attempt, so pending newer values cannot be overtaken.
+                await Task.Delay(RetryInterval, _clock).ConfigureAwait(false);
+            }
+            catch (Exception exception) when (CatalogDb.IsDatabaseFailure(exception))
+            {
+                Trace.TraceError("Media view preferences could not be saved after {0} attempt(s): {1}",
+                    attempt, exception.Message);
+                return false;
+            }
+        }
+    }
+
     private async Task PersistBatchAsync(Dictionary<ViewKey, object> batch)
     {
         await using var lease = await _catalog.WriteCoordinator.EnterAsync().ConfigureAwait(false);
         await using var connection = await _catalog.OpenConnectionAsync().ConfigureAwait(false);
+        connection.DefaultTimeout = 1;
         await using var transaction = CatalogTransaction.Begin(connection, _catalog.WriteCoordinator);
         await using var exists = transaction.CreateCommand("""
             SELECT EXISTS(SELECT 1 FROM profiles WHERE profile_id = $profile)
