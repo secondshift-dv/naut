@@ -26,7 +26,7 @@ body:
     id: version
     attributes:
       label: Naut version
-      placeholder: 0.0.1
+      placeholder: Enter the version shown in Settings > About
     validations:
       required: true
   - type: input

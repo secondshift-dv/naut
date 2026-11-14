@@ -239,6 +239,8 @@ try {
     $tag = "v$productVersion"
     $zipName = "naut-v$productVersion-$runtimeIdentifier.zip"
     $notesPath = Join-Path $RepositoryRoot "docs/releases/$tag.md"
+    & (Join-Path $RepositoryRoot 'scripts/verification/verify-documentation.ps1') -RepositoryRoot $RepositoryRoot
+    if (-not $?) { throw 'Documentation contract failed before release publication.' }
     & (Join-Path $RepositoryRoot 'scripts/verification/verify-release-notes.ps1') -RepositoryRoot $RepositoryRoot -NotesPath $notesPath
     $notesText = [IO.File]::ReadAllText($notesPath).Replace("`r`n", "`n").Trim()
 

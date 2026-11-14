@@ -8,6 +8,7 @@ Naut is a local-first media collection manager for Windows. Start here if you ar
 - [Naut v0.0.19 release notes](releases/v0.0.19.md) — incremental update efficiency and stable component builds.
 - [Naut v0.0.18 release notes](releases/v0.0.18.md) — Profile media preferences, catalog refreshes, artwork loading, and long Poster titles.
 - [Naut v0.0.17 release notes](releases/v0.0.17.md) — individual presentation-file deletion, pack-managed boundaries, and recoverable Media Inspector deletion.
+- [Naut v0.0.16 release notes](releases/v0.0.16.md) — video thumbnail recovery, preview reuse, and clearer Import errors.
 - [Naut v0.0.15 release notes](releases/v0.0.15.md) — clearer Banner effects, Home/Profile Bubbles, Gallery search and optional pack README corrections.
 - [Naut v0.0.14 release notes](releases/v0.0.14.md) — Figure 3D hot-cache entry, targeted Profile invalidation, deadline-driven Governor, and lower Import/navigation overhead.
 - [Naut v0.0.13 release notes](releases/v0.0.13.md) — BGRA frame reuse, Backdrop resource cleanup, fewer redundant UI invalidations, and updated system guidance.
@@ -15,6 +16,11 @@ Naut is a local-first media collection manager for Windows. Start here if you ar
 - [Naut v0.0.11 release notes](releases/v0.0.11.md) — Banner and Spotlight playback, Figure first-load recovery, and resource scheduling.
 - [Naut v0.0.10 release notes](releases/v0.0.10.md) — first-run Vault safety, initial appearance and About release-date fixes.
 - [Naut v0.0.9 release notes](releases/v0.0.9.md) — changes since v0.0.8, update instructions, Vault compatibility and verification limits.
+- [Naut v0.0.8 release notes](releases/v0.0.8.md) — durable Import checkpoints and reduced duplicate transfer bookkeeping.
+- [Naut v0.0.7 release notes](releases/v0.0.7.md) — interface refinements, Vault recovery, 3D Figures and broader media preparation.
+- [Naut v0.0.6 release notes](releases/v0.0.6.md) — independent Banner stills, compact card controls and image fallback.
+- [Naut v0.0.5 release notes](releases/v0.0.5.md) — more responsive update progress and safer updater handoff.
+- [Naut v0.0.4 release notes](releases/v0.0.4.md) — media preparation completion and additional 3D model formats.
 
 - [Getting Started](getting-started.md) — download, extract, create or pick a Vault, and start using Naut.
 - [Import Media](import-media.md) — bring images, videos, folders, and supported 3D models into a Vault.

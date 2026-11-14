@@ -26,7 +26,9 @@ Public README pages, translations, guides, release notes and pack previews must 
 
 Use UTF-8 throughout. Do not substitute a bare `?` for punctuation or publish repeated `?` placeholders, damaged replacement characters, control bytes or mojibake. Legitimate questions, URL query syntax and code examples can retain their question marks. Keep relative links valid, preserve attribution, and display only shipped pack components in documentation artwork. Treat static compositions as illustrations, never as verified in-app screenshots.
 
-Run `pwsh ./scripts/verification/verify-documentation.ps1` after documentation edits; it also runs during `pwsh ./scripts/verify.ps1 -Scope Source`. The automated guard checks encoding, suspicious punctuation, links, versioned downloads and pack identity; feature accuracy still requires comparing documentation with implementation and release evidence.
+Run `pwsh ./scripts/verification/verify-documentation.ps1` after documentation edits; it also runs during `pwsh ./scripts/verify.ps1 -Scope Source` and is required before the canonical build and release. The guard checks encoding, suspicious punctuation, Markdown/HTML local references and anchors, versioned downloads, historical note coverage, the source notices contract and pack identity. Feature accuracy still requires comparison with implementation and release evidence.
+
+Documentation has four identities: **current** documents follow `ProductVersion`; **generated** notices and manifests follow the exact resolved package; **historical** release notes remain unchanged; **independent** optional packs follow their own manifest versions. The root `THIRD-PARTY-NOTICES.txt` is a version-neutral source reference, not a frozen runtime inventory. The package's `runtime/THIRD-PARTY-NOTICES.txt` and `runtime/LICENSES/` are the exact distribution authorities. Packaging verifies their contents, pinned hashes, license sources and corresponding source archives before any release can be published. Never maintain competing hand-edited runtime inventories, bypass failed checks, or change prior release artifacts just to synchronize documentation.
 
 ## Release notes
 

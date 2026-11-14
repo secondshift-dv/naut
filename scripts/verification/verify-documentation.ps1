@@ -19,8 +19,26 @@ $documents = @($tracked | Where-Object {
     $_ -match '^README(?:\.[A-Za-z-]+)?\.md$' -or
     $_ -match '^docs/(?!work/)(?!assets/).+\.(?:md|txt)$' -or
     $_ -match '^packs/(?:README\.md|[^/]+/README\.(?:md|txt))$' -or
-    $_ -in @('CONTRIBUTING.md','SECURITY.md','BRAND-POLICY.md','.github/PULL_REQUEST_TEMPLATE.md')
+    $_ -in @('CONTRIBUTING.md','SECURITY.md','BRAND-POLICY.md','.github/PULL_REQUEST_TEMPLATE.md','THIRD-PARTY-NOTICES.txt','.github/ISSUE_TEMPLATE/bug.yml')
 })
+
+function Test-MarkdownAnchor([string]$file, [string]$fragment) {
+    if (-not $fragment -or [IO.Path]::GetExtension($file) -ine '.md') { return $true }
+    $expected = [Uri]::UnescapeDataString($fragment).ToLowerInvariant()
+    $source = $utf8.GetString([IO.File]::ReadAllBytes($file))
+    if ($source -match ('(?i)<a\s+(?:[^>]*\s)?(?:id|name)=["'']' + [regex]::Escape($expected) + '["'']')) { return $true }
+    $seen = @{}
+    foreach ($line in ($source -split '\r?\n')) {
+        if ($line -notmatch '^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$') { continue }
+        $heading = $Matches[1] -replace '<[^>]+>', '' -replace '[*_~]', ''
+        $slug = ($heading.ToLowerInvariant() -replace '[^\p{L}\p{Nd}\s_-]', '' -replace '\s+', '-').Trim('-')
+        if (-not $slug) { continue }
+        if ($seen.ContainsKey($slug)) { $seen[$slug]++; $slug = "$slug-$($seen[$slug])" }
+        else { $seen[$slug] = 0 }
+        if ($slug -ceq $expected) { return $true }
+    }
+    return $false
+}
 
 foreach ($relative in $documents) {
     $content = Read-Document $relative
@@ -37,12 +55,16 @@ foreach ($relative in $documents) {
     }
     $directory = Split-Path -Parent (Join-Path $root ($relative.Replace('/', [IO.Path]::DirectorySeparatorChar)))
     foreach ($match in [regex]::Matches($content, '!\[[^\]]*\]\(([^)]+)\)|(?<!!)\[[^\]]+\]\(([^)]+)\)')) {
-        $target = if ($match.Groups[1].Success) { $match.Groups[1].Value } else { $match.Groups[2].Value }
-        $target = ($target -split '#', 2)[0]
-        if (-not $target -or $target -match '^(?:[a-z][a-z0-9+.-]*:|//|/|#)' ) { continue }
-        $resolved = Join-Path $directory ([Uri]::UnescapeDataString($target))
+        $value = if ($match.Groups[1].Success) { $match.Groups[1].Value } else { $match.Groups[2].Value }
+        if ($value -match '^(?:[a-z][a-z0-9+.-]*:|//|/)') { continue }
+        $parts = $value -split '#', 2
+        $target = ($parts[0] -split '\?', 2)[0]
+        $anchor = if ($parts.Count -gt 1) { $parts[1] } else { '' }
+        $resolved = if ($target) { Join-Path $directory ([Uri]::UnescapeDataString($target)) } else { Join-Path $root $relative }
         if (-not (Test-Path -LiteralPath $resolved)) {
-            [void]$issues.Add("$($relative): broken relative link '$target'")
+            [void]$issues.Add("$($relative): broken relative link '$value'")
+        } elseif (-not (Test-MarkdownAnchor -file $resolved -fragment $anchor)) {
+            [void]$issues.Add("$($relative): missing Markdown anchor '$value'")
         }
     }
 }
@@ -86,6 +108,88 @@ if (Test-Path -LiteralPath (Join-Path $root 'README.id.md')) {
     $index = Read-Document 'docs/README.md'
     if ($null -eq $index -or -not $index.Contains("[Naut v$version release notes](releases/v$version.md)")) {
         [void]$issues.Add("docs/README.md: current release must lead the release list (v$version)")
+    }
+}
+
+# The source notice is version-neutral; exact component inventory is packaged.
+$noticePath = Join-Path $root 'THIRD-PARTY-NOTICES.txt'
+if (-not (Test-Path -LiteralPath $noticePath -PathType Leaf)) {
+    [void]$issues.Add('THIRD-PARTY-NOTICES.txt: source compliance reference is missing')
+} else {
+    $notice = Read-Document 'THIRD-PARTY-NOTICES.txt'
+    if ($null -ne $notice) {
+        foreach ($marker in @(
+            'Third-Party Runtime Notices',
+            'runtime/THIRD-PARTY-NOTICES.txt',
+            'runtime/LICENSES/',
+            'scripts/packaging/package-win-x64.ps1',
+            'scripts/packaging/runtime-third-party.lock.json',
+            'scripts/packaging/ffmpeg/ffmpeg-runtime.lock.json',
+            'release-contract.json'
+        )) {
+            if (-not $notice.Contains($marker)) {
+                [void]$issues.Add("THIRD-PARTY-NOTICES.txt: missing authority '$marker'")
+            }
+        }
+        if ($notice -match '(?i)\bnaut\s+v\d+\.\d+\.\d+\b') {
+            [void]$issues.Add('THIRD-PARTY-NOTICES.txt: static source reference must not pin a product version')
+        }
+    }
+}
+
+# HTML references are also used by the localized GitHub README pages.
+foreach ($relative in $documents) {
+    $content = Read-Document $relative
+    if ($null -eq $content) { continue }
+    foreach ($link in [regex]::Matches($content, '(?i)\b(?:href|src|srcset)\s*=\s*["''](?<value>[^"'']+)["'']')) {
+        foreach ($target in ($link.Groups['value'].Value -split '\s*,\s*')) {
+            $candidate = ($target -split '\s+', 2)[0]
+            if ($candidate -match '^(?:[a-z][a-z0-9+.-]*:|//|/|#)' -or -not $candidate) { continue }
+            $pathOnly = ($candidate -split '[?#]', 2)[0]
+            if (-not $pathOnly) { continue }
+            $directory = Split-Path -Parent (Join-Path $root ($relative.Replace('/', [IO.Path]::DirectorySeparatorChar)))
+            try {
+                $resolved = Join-Path $directory ([Uri]::UnescapeDataString($pathOnly))
+                if (-not (Test-Path -LiteralPath $resolved)) {
+                    [void]$issues.Add("$($relative): broken HTML local reference '$candidate'")
+                } elseif ($candidate.Contains('#') -and
+                          -not (Test-MarkdownAnchor -file $resolved -fragment (($candidate -split '#', 2)[1]))) {
+                    [void]$issues.Add("$($relative): missing HTML-linked Markdown anchor '$candidate'")
+                }
+            } catch {
+                [void]$issues.Add("$($relative): invalid HTML local reference '$candidate'")
+            }
+        }
+    }
+}
+
+# Public issue templates must not suggest an old product version.
+$bugTemplatePath = Join-Path $root '.github/ISSUE_TEMPLATE/bug.yml'
+if (Test-Path -LiteralPath $bugTemplatePath -PathType Leaf) {
+    $bugTemplate = Read-Document '.github/ISSUE_TEMPLATE/bug.yml'
+    if ($null -ne $bugTemplate -and $bugTemplate -match '(?m)^\s*placeholder:\s*v?\d+\.\d+\.\d+\s*$') {
+        [void]$issues.Add('.github/ISSUE_TEMPLATE/bug.yml: version placeholder must be neutral')
+    }
+}
+
+$requirementsPath = Join-Path $root 'docs/system-requirements.md'
+if (Test-Path -LiteralPath $requirementsPath -PathType Leaf) {
+    $requirements = Read-Document 'docs/system-requirements.md'
+    if ($null -ne $requirements -and $requirements -notmatch ('(?m)^# Naut v' + [regex]::Escape($version) + ' System Requirements\s*$')) {
+        [void]$issues.Add("docs/system-requirements.md: title must match v$version")
+    }
+}
+
+# Public index covers every versioned note, while preserving historical contents.
+$indexPath = Join-Path $root 'docs/README.md'
+if (Test-Path -LiteralPath $indexPath -PathType Leaf) {
+    $index = Read-Document 'docs/README.md'
+    if ($null -ne $index) {
+        foreach ($releaseFile in @(Get-ChildItem -LiteralPath (Join-Path $root 'docs/releases') -Filter 'v*.md' -File)) {
+            if (-not $index.Contains("releases/$($releaseFile.Name)")) {
+                [void]$issues.Add("docs/README.md: missing historical note releases/$($releaseFile.Name)")
+            }
+        }
     }
 }
 

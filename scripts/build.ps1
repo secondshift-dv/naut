@@ -84,6 +84,9 @@ try {
     $runtimeIdentifier = [string]$identity.ProductRuntimeIdentifier
     $zipName = "naut-v$productVersion-$runtimeIdentifier.zip"
 
+    & (Join-Path $PSScriptRoot 'verification/verify-documentation.ps1')
+    if (-not $?) { throw 'Source documentation contract failed before build.' }
+
     & (Join-Path $PSScriptRoot 'verification/verify-localization.ps1')
     & (Join-Path $PSScriptRoot 'verification/verify-theme-contract.ps1')
 

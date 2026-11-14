@@ -146,6 +146,40 @@ foreach ($font in @($fontProof.fonts)) {
 $sourceProofHash = Get-Sha256Lower -Path (Join-Path $builtInSource 'provenance.json')
 Assert-Hash -Path (Join-Path $builtInRuntime 'provenance.json') -Expected $sourceProofHash -Label 'Built-in font provenance'
 
+# Runtime notices must describe the exact verified package, not a stale source copy.
+[xml]$props = Get-Content -LiteralPath (Join-Path $repoRoot 'Directory.Build.props') -Raw
+$productVersion = [string]$props.Project.PropertyGroup.ProductVersion
+$noticesPath = Join-Path $runtime 'THIRD-PARTY-NOTICES.txt'
+if (-not (Test-Path -LiteralPath $noticesPath -PathType Leaf)) {
+    throw "Packaged third-party notices are missing: $noticesPath"
+}
+$notices = [IO.File]::ReadAllText($noticesPath, [Text.UTF8Encoding]::new($false, $true))
+if (-not $notices.StartsWith("naut v$productVersion - Third-Party Runtime Notices", [StringComparison]::Ordinal)) {
+    throw "Packaged third-party notices do not match ProductVersion $productVersion."
+}
+foreach ($fragment in @(
+    'YuNet face detector model',
+    'SFace face recognition model',
+    'FFmpeg and ffprobe',
+    'OpenCvSharp native runtime',
+    'OpenCV videoio FFmpeg plugin',
+    'ICU native runtime',
+    'SkiaSharp, HarfBuzzSharp, and self-contained .NET runtime',
+    'Fonts',
+    'SharpAssimp and Assimp',
+    "NuGet package: $($lock.opencvFfmpeg.packageId) $($lock.opencvFfmpeg.packageVersion)",
+    "Corresponding-source SHA-256: $($lock.opencvFfmpeg.sourceCompanionSha256)",
+    "SHA-256: $($lock.opencvFfmpeg.sha256)",
+    "Package: SharpAssimp $($lock.sharpAssimp.packageVersion)",
+    "SHA-256: $($lock.sharpAssimp.binarySha256)",
+    'LICENSES/SharpAssimp-LICENSE.txt'
+)) {
+    if (-not $notices.Contains($fragment, [StringComparison]::Ordinal)) {
+        throw "Packaged third-party notices are missing pinned fact '$fragment'."
+    }
+}
+Write-Host 'RUNTIME_THIRD_PARTY_NOTICES=PASS'
+
 Write-Host 'RUNTIME_NATIVE_LICENSE_INVENTORY=PASS'
 Write-Host 'OPENCV_FFMPEG_CORRESPONDING_SOURCE=PASS'
 Write-Host 'UNO_FONTS_VERIFIED=38'

@@ -8,11 +8,11 @@ Upstream license text: https://github.com/polyformproject/polyform-licenses/blob
 
 Required Notice: Copyright 2026 Second Shift (@secondshift-dv), https://github.com/secondshift-dv/naut
 
-Naut brand use is governed separately by [BRAND-POLICY.md](../../BRAND-POLICY.md). Third-party materials retain their original licenses, copyright notices, attribution, modification disclosures and applicable source obligations. See [THIRD-PARTY-NOTICES.txt](../../THIRD-PARTY-NOTICES.txt) for the distribution inventory.
+Naut brand use is governed separately by [BRAND-POLICY.md](../../BRAND-POLICY.md). Third-party materials retain their original licenses, copyright notices, attribution, modification disclosures and applicable source obligations. See [THIRD-PARTY-NOTICES.txt](../../THIRD-PARTY-NOTICES.txt) for the source-side compliance reference. The exact distribution inventory and license copies are in each official ZIP under `runtime/THIRD-PARTY-NOTICES.txt` and `runtime/LICENSES/`.
 
 ## Face-model provenance
 
-The bundled face-analysis runtime uses exact pinned YuNet and SFace artifacts listed in [THIRD-PARTY-NOTICES.txt](../../THIRD-PARTY-NOTICES.txt):
+The bundled face-analysis runtime uses exact pinned YuNet and SFace artifacts documented in each package's generated `runtime/THIRD-PARTY-NOTICES.txt` (see the [source reference](../../THIRD-PARTY-NOTICES.txt)):
 
 - YuNet face detector model — **MIT**;
 - SFace face recognition model — **Apache-2.0**.
