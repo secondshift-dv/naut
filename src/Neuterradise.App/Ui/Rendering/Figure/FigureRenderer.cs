@@ -2,16 +2,10 @@ using System.Numerics;
 using System.Buffers.Binary;
 using System.Runtime.InteropServices;
 using System.Text;
+using Neuterradise.App.Media;
 using Neuterradise.App.Media.Model;
 
 namespace Neuterradise.App.Ui.Figure;
-
-public sealed record FigureCamera(
-    float Yaw = 0.25f,
-    float Pitch = 0.10f,
-    float DistanceScale = 1f,
-    float TargetOffsetX = 0f,
-    float TargetOffsetY = 0f);
 
 /// <summary>Shared D3D shaders and scene resources. The caller retains viewport, presentation, and device-loss policy.</summary>
 public sealed class FigureRenderer : IDisposable

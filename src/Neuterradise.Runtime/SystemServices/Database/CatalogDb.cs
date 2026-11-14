@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using Neuterradise.App.Media;
 using Neuterradise.App.SystemServices.Database.Reads;
 using Neuterradise.App.SystemServices.Database.Writes;
 using Neuterradise.App.SystemServices.Storage;
@@ -29,6 +30,7 @@ public sealed class CatalogDb
         ConnectionFactory = new CatalogConnectionFactory(paths);
         WriteCoordinator = new CatalogWriteCoordinator();
         MutationAdmission = new CatalogMutationAdmissionGate();
+        MediaViewStates = new MediaViewStates(this, _timeProvider);
         ImportUnitMutations = new ImportUnitMutationCoordinator();
         _schemaInitializer = new CatalogSchemaInitializer(ConnectionFactory, WriteCoordinator);
     }
@@ -40,6 +42,8 @@ public sealed class CatalogDb
     public CatalogWriteCoordinator WriteCoordinator { get; }
 
     public CatalogMutationAdmissionGate MutationAdmission { get; }
+
+    public MediaViewStates MediaViewStates { get; }
 
     public ImportUnitMutationCoordinator ImportUnitMutations { get; }
 

@@ -22,7 +22,6 @@ public sealed class InspectorPanel : IDisposable
     private readonly StackPanel _tab = UI.V(8);
     private readonly Grid _preview = new() { Height = 200 };
     private readonly VariableWrap _imageControls = UI.Wrap(4);
-    private readonly VariableWrap _modelControls = UI.Wrap(4);
     private readonly TextBlock _zoomText = UI.Text("100%", "caption");
     private string? _previewIdentity;
     private readonly TextBlock _title = UI.Text(null, "body-strong", maxLines: 1);
@@ -41,9 +40,6 @@ public sealed class InspectorPanel : IDisposable
         _imageControls.Children.Add(UI.IconButton("icon.action.add", UI.T("Inspector.ZoomIn", "Zoom in"), null, 28, _vm.ZoomInCommand));
         _imageControls.Children.Add(UI.Button(UI.T("Inspector.Fit", "Fit"), null, ButtonKind.Ghost, command: _vm.FitCommand));
         _imageControls.Children.Add(UI.Button(UI.T("Inspector.ActualSize", "Actual size"), null, ButtonKind.Ghost, command: _vm.ActualSizeCommand));
-
-        _modelControls.Children.Add(UI.Button(UI.T("Inspector.Rotate", "Rotate"), null, ButtonKind.Ghost, command: _vm.RotateCommand));
-        _modelControls.Children.Add(UI.Button(UI.T("Inspector.ResetCamera", "Reset camera"), null, ButtonKind.Ghost, command: _vm.ResetCameraCommand));
 
         var tabs = UI.Grid("auto", "*,*");
         tabs.ColumnSpacing = 4;
@@ -84,17 +80,13 @@ public sealed class InspectorPanel : IDisposable
 
         var previewFrame = UI.Surface(_preview, Material.Grounded, 10, 0);
         previewFrame.BorderBrush = ThemeRuntime.Current.Brush("borderSubtle");
-        var previewControls = new Grid();
         _imageControls.HorizontalAlignment = HorizontalAlignment.Center;
-        _modelControls.HorizontalAlignment = HorizontalAlignment.Center;
-        previewControls.Children.Add(_imageControls);
-        previewControls.Children.Add(_modelControls);
         View = new Border
         {
             Child = UI.Grid("auto,auto,auto,auto,auto,auto,*", "*",
                 header.Margin(12, 12, 12, 8).At(0),
                 previewFrame.Margin(12, 0, 12, 6).At(1),
-                previewControls.Margin(12, 0, 12, 6).At(2),
+                _imageControls.Margin(12, 0, 12, 6).At(2),
                 navigation.Margin(12, 0, 12, 8).At(3),
                 tabs.Margin(12, 0, 12, 8).At(4),
                 _deleteMedia.Margin(12, 0, 12, 8).At(5),
@@ -124,9 +116,6 @@ public sealed class InspectorPanel : IDisposable
             DetailLayout.Select(button, _vm.ActiveTab == name);
         }
         _zoomText.Text = _vm.ZoomText;
-        _imageControls.Visibility = _vm.MediaType == MediaType.Image ? Visibility.Visible : Visibility.Collapsed;
-        // Model previews are static thumbnails until a camera-capable renderer is available.
-        _modelControls.Visibility = Visibility.Collapsed;
 
         var previewIdentity = string.Join("|", _vm.MediaType, _vm.PreviewFilePath, _vm.PresentationPreviewPath, _vm.HasHoverFile);
         if (!string.Equals(_previewIdentity, previewIdentity, StringComparison.Ordinal))

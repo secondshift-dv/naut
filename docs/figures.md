@@ -8,6 +8,8 @@ A suitable model can be prepared into Naut's durable Figure representation and d
 
 The Figure viewer supports direct interaction such as **rotate, pan, and zoom** while Naut keeps camera behavior, framing, pedestal presentation, texture policy, and renderer behavior under the application engine. The live Figure blends transparently with the selected Profile Backdrop; a static thumbnail remains the fallback.
 
+On the Profile page, each model remembers its camera across visits and app restarts. A model shared by several Profiles keeps a separate camera in each. Use **Reset view** to save the default camera.
+
 Naut can reuse a verified prepared Figure on supported NTFS drives when file identity and journal evidence prove it unchanged. If that proof is unavailable or uncertain, Naut performs full validation instead; Deep Health always validates fully.
 
 Naut keeps a pending Figure first-load request alive when Profile layout changes briefly reattach its header. Visible Figure loading has priority over optional background prewarm, which yields during interaction, Import or memory pressure. Figure validation and the static-thumbnail fallback remain intact.

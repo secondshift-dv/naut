@@ -5,7 +5,6 @@ using Neuterradise.App.Home;
 using Neuterradise.App.Import;
 using Neuterradise.App.Import.Verification;
 using Neuterradise.App.Media;
-using Neuterradise.App.Media.Model;
 using Neuterradise.App.Profiles;
 using Neuterradise.App.Settings;
 using Neuterradise.App.SystemServices.Database;
@@ -27,7 +26,6 @@ public sealed class RouteViewModelFactory(
     CatalogDb? catalog = null,
     NavigationCoordinator? navigation = null,
     OverlayHostViewModel? overlay = null,
-    ModelPreviewAdapterRegistry? modelAdapters = null,
     AppConfigurationStore? configurationStore = null,
     ImportActivityService? importActivity = null,
     ImportFinalizer? importFinalizer = null,
@@ -41,7 +39,6 @@ public sealed class RouteViewModelFactory(
     private readonly JobCancellationOperations? _cancellation = cancellation;
     private readonly CatalogDb? _catalog = catalog;
     private readonly NavigationCoordinator? _navigation = navigation;
-    private readonly ModelPreviewAdapterRegistry? _modelAdapters = modelAdapters;
     private readonly MediaResourceAuthority? _mediaResources = mediaResources;
     private readonly ProfileRuntimeSnapshotCache? _profileSnapshots = profileSnapshots;
     private readonly AppConfigurationStore? _configurationStore = configurationStore;
@@ -103,7 +100,6 @@ public sealed class RouteViewModelFactory(
             _navigation,
             overlay: Overlay,
             initialOrigin: profile.Origin,
-            modelAdapters: _modelAdapters,
             initialInspectMediaId: profile.InspectMediaId,
             mediaResources: _mediaResources,
             runtimeSnapshots: _profileSnapshots),

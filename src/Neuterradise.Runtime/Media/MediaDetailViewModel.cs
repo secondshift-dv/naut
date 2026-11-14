@@ -5,7 +5,6 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using Neuterradise.App.Media.Model;
 using Neuterradise.App.Localization;
 using Neuterradise.App.Profiles;
 using Neuterradise.App.Shell;
@@ -40,12 +39,6 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
     private readonly ProfileAppearanceOperations? _appearanceOperations;
     private readonly MediaGridProvider? _mediaProvider;
 
-    /// <summary>
-    /// The model preview registry owned by the runtime composition root. When it is absent the model
-    /// surface reports that interactive preview is unavailable instead of creating a second registry.
-    /// </summary>
-    private readonly ModelPreviewAdapterRegistry? _modelAdapters;
-
     private MediaDetailReadModel? _detail;
     private bool? _favoriteOverride;
     private string _activeTab = "Info";
@@ -53,14 +46,11 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
     private Guid? _nextMediaId;
     private string? _actionFeedbackMessage;
 
-    private double _zoomLevel = 1.0;
-    private bool _isActualSize;
+    private InspectorImageViewState _imageView = new();
     private bool _showFaces;
     private double _volume = 1.0;
     private double _positionSeconds;
     private double _durationSeconds;
-    private double _rotationAngle;
-    private IModelInteractiveSession? _activeModelSession;
     private string? _presentationPreviewPath;
     private string? _previewUnavailableReason;
     private bool _peopleLoaded;
@@ -77,7 +67,6 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
         TrashCoordinator? trashCoordinator = null,
         ProfileAppearanceOperations? appearanceOperations = null,
         MediaGridProvider? mediaProvider = null,
-        ModelPreviewAdapterRegistry? modelAdapters = null,
         Action? closeInspector = null,
         Action<Guid>? retargetInspector = null,
         Action? mediaChanged = null)
@@ -88,7 +77,6 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
         _closeInspector = closeInspector;
         _retargetInspector = retargetInspector;
         _mediaChanged = mediaChanged;
-        _modelAdapters = modelAdapters;
 
         if (catalog is not null)
         {
@@ -147,12 +135,10 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
         });
         MoveToTrashCommand = new AsyncRelayCommand(() => MoveToTrashAsync(), () => CanMoveToTrash);
 
-        ZoomInCommand = new RelayCommand(_ => ZoomIn(), _ => ZoomLevel < 4.0);
-        ZoomOutCommand = new RelayCommand(_ => ZoomOut(), _ => ZoomLevel > 0.25);
+        ZoomInCommand = new RelayCommand(_ => ZoomIn(), _ => IsActualSize || ZoomLevel < 4.0);
+        ZoomOutCommand = new RelayCommand(_ => ZoomOut(), _ => IsActualSize || ZoomLevel > 0.25);
         FitCommand = new RelayCommand(_ => Fit());
         ActualSizeCommand = new RelayCommand(_ => ActualSize());
-        RotateCommand = new RelayCommand(_ => Rotate());
-        ResetCameraCommand = new RelayCommand(_ => ResetCamera());
         ToggleFavoriteCommand = new AsyncRelayCommand(ToggleFavoriteAsync);
 
         SelectTabCommand = new AsyncRelayCommand(
@@ -302,37 +288,12 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
     public string? ThumbnailPath => PreviewFilePath;
     public bool IsActivePreview => HasHoverFile;
     public string FormattedDuration => PositionText;
-    public bool HasActiveModelSession => _activeModelSession != null && !_activeModelSession.IsDisposed;
 
-    public double ZoomLevel
-    {
-        get => _zoomLevel;
-        set
-        {
-            var clamped = Math.Clamp(value, 0.25, 4.0);
-            if (Math.Abs(_zoomLevel - clamped) > 0.001)
-            {
-                _zoomLevel = clamped;
-                RaisePropertyChanged(nameof(ZoomLevel));
-                RaisePropertyChanged(nameof(ZoomText));
-            }
-        }
-    }
+    public double ZoomLevel => _imageView.Zoom;
 
     public string ZoomText => $"{(int)(ZoomLevel * 100)}%";
 
-    public bool IsActualSize
-    {
-        get => _isActualSize;
-        set
-        {
-            if (_isActualSize != value)
-            {
-                _isActualSize = value;
-                RaisePropertyChanged(nameof(IsActualSize));
-            }
-        }
-    }
+    public bool IsActualSize => _imageView.ActualSize;
 
     public bool ShowFaces
     {
@@ -399,19 +360,6 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
         }
     }
 
-    public double RotationAngle
-    {
-        get => _rotationAngle;
-        set
-        {
-            if (Math.Abs(_rotationAngle - value) > 0.1)
-            {
-                _rotationAngle = value % 360.0;
-                RaisePropertyChanged(nameof(RotationAngle));
-            }
-        }
-    }
-
     public bool CanSetCover => MediaType is MediaType.Image or MediaType.Video && HasPrimaryProfile && MediaStatus == MediaState.Active;
     public bool CanMoveToTrash => MediaStatus == MediaState.Active;
 
@@ -447,8 +395,6 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
     public ICommand ZoomOutCommand { get; }
     public ICommand FitCommand { get; }
     public ICommand ActualSizeCommand { get; }
-    public ICommand RotateCommand { get; }
-    public ICommand ResetCameraCommand { get; }
     public ICommand SelectTabCommand { get; }
 
     public ICommand ToggleFavoriteCommand { get; }
@@ -503,6 +449,14 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
             {
                 ShowRecoverableError("Media asset not found or is no longer active in the Vault.");
                 return;
+            }
+
+            if (_detail is null && model.MediaType == MediaType.Image && Origin is { } origin)
+            {
+                var imageView = await _catalog.MediaViewStates.ReadImageAsync(origin.ProfileId, MediaId, cancellationToken)
+                    .ConfigureAwait(true);
+                if (_isDisposed || cancellationToken.IsCancellationRequested) return;
+                if (_detail is null) SetImageView(imageView);
             }
 
             SetDetail(model);
@@ -602,7 +556,7 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
         RaisePropertyChanged(nameof(HasUnknownDependencies));
         RaisePropertyChanged(nameof(IsFullPreviewReady));
 
-        // Only rebuild preview sessions when content identity changed.
+        // Only rebuild preview resources when content identity changed.
         if (contentChanged)
         {
             _presentationPreviewPath = null;
@@ -620,10 +574,6 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
             }
             else if (model.MediaType == MediaType.Model)
             {
-                _activeModelSession?.Dispose();
-                _activeModelSession = null;
-                RaisePropertyChanged(nameof(ActiveModelSession));
-                RaisePropertyChanged(nameof(HasActiveModelSession));
                 RaisePropertyChanged(nameof(ThumbnailPath));
             }
 
@@ -637,8 +587,6 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
             RaisePropertyChanged(nameof(ThumbnailPath));
             RaisePropertyChanged(nameof(IsActivePreview));
             RaisePropertyChanged(nameof(FormattedDuration));
-            RaisePropertyChanged(nameof(ActiveModelSession));
-            RaisePropertyChanged(nameof(HasActiveModelSession));
         }
     }
 
@@ -752,24 +700,9 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
         NextMediaId = nextMediaId;
     }
 
-    /// <summary>Stops playback and asks the host to dismiss the inspector.</summary>
-    public void Close()
-    {
-        StopPreviewSessions();
-        _closeInspector?.Invoke();
-    }
+    public void Close() => _closeInspector?.Invoke();
 
-    private void StopPreviewSessions()
-    {
-        _activeModelSession?.Dispose();
-        _activeModelSession = null;
-    }
-
-    private void Retarget(Guid assetId)
-    {
-        StopPreviewSessions();
-        _retargetInspector?.Invoke(assetId);
-    }
+    private void Retarget(Guid assetId) => _retargetInspector?.Invoke(assetId);
 
     public Task NavigatePreviousAsync()
     {
@@ -1024,45 +957,35 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
         }
     }
 
-    public IModelInteractiveSession? ActiveModelSession
-    {
-        get => _activeModelSession;
-        set
-        {
-            if (!ReferenceEquals(_activeModelSession, value))
-            {
-                _activeModelSession?.Dispose();
-                _activeModelSession = value;
-                RaisePropertyChanged(nameof(ActiveModelSession));
-            }
-        }
-    }
-
     public void ZoomIn()
     {
-        ZoomLevel += 0.25;
-        _activeModelSession?.Zoom(1.25);
+        SaveImageView(new(Math.Min(ZoomLevel + 0.25, 4.0)));
     }
 
     public void ZoomOut()
     {
-        ZoomLevel -= 0.25;
-        _activeModelSession?.Zoom(0.8);
+        SaveImageView(new(Math.Max(ZoomLevel - 0.25, 0.25)));
     }
 
-    public void Fit() { ZoomLevel = 1.0; IsActualSize = false; }
-    public void ActualSize() { ZoomLevel = 1.0; IsActualSize = true; }
+    public void Fit() => SaveImageView(new());
+    public void ActualSize() => SaveImageView(new(ActualSize: true));
 
-    public void Rotate()
+    private void SaveImageView(InspectorImageViewState state)
     {
-        RotationAngle = (RotationAngle + 45.0) % 360.0;
-        _activeModelSession?.Rotate(45.0, 0.0);
+        if (_isDisposed || _detail?.MediaType != MediaType.Image || _imageView == state) return;
+        if (Origin is { } origin) _catalog?.MediaViewStates.SaveImage(origin.ProfileId, MediaId, state);
+        SetImageView(state);
     }
 
-    public void ResetCamera()
+    private void SetImageView(InspectorImageViewState state)
     {
-        RotationAngle = 0.0;
-        _activeModelSession?.ResetCamera();
+        if (_imageView == state) return;
+        _imageView = state;
+        RaisePropertyChanged(nameof(ZoomLevel));
+        RaisePropertyChanged(nameof(ZoomText));
+        RaisePropertyChanged(nameof(IsActualSize));
+        (ZoomInCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (ZoomOutCommand as RelayCommand)?.RaiseCanExecuteChanged();
     }
 
     private void OnCatalogInvalidated(object? sender, CatalogInvalidation invalidation)
@@ -1138,7 +1061,5 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
         {
             _catalog.WriteCoordinator.Invalidated -= OnCatalogInvalidated;
         }
-        _activeModelSession?.Dispose();
-        _activeModelSession = null;
     }
 }

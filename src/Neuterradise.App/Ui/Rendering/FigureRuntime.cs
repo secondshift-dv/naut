@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Uno.UI.NativeElementHosting;
+using Neuterradise.App.Media;
 using Neuterradise.App.Ui.Figure;
 using Neuterradise.App.SystemServices.Resources;
 using Neuterradise.App.SystemServices.Database;
@@ -508,7 +509,7 @@ public sealed class FigureRuntime : IDisposable
                 if (message == FigureNative.CaptureChanged) { viewport.CancelGesture(); return IntPtr.Zero; }
                 if (message == FigureNative.CancelMode) { viewport.EndGesture(); return IntPtr.Zero; }
                 if (message == FigureNative.LeftUp) { viewport.EndGesture(); return IntPtr.Zero; }
-                if (message == FigureNative.LeftDoubleClick) { viewport.SetCamera(new()); return IntPtr.Zero; }
+                if (message == FigureNative.LeftDoubleClick) { viewport.ResetCamera(); return IntPtr.Zero; }
             }
         }
         catch (Exception exception)
@@ -712,20 +713,22 @@ public sealed class FigureViewportLease : IDisposable
     {
         _runtime.EnsureThread();
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (!float.IsFinite(camera.Yaw) || !float.IsFinite(camera.Pitch) || !float.IsFinite(camera.DistanceScale)
-            || !float.IsFinite(camera.TargetOffsetX) || !float.IsFinite(camera.TargetOffsetY))
+        if (!camera.IsFinite)
             throw new ArgumentException("Figure camera values must be finite.", nameof(camera));
-        var next = camera with
-        {
-            Pitch = Math.Clamp(camera.Pitch, 0.02f, 1.2f),
-            DistanceScale = Math.Clamp(camera.DistanceScale, 0.35f, 3f),
-            TargetOffsetX = Math.Clamp(camera.TargetOffsetX, -1.5f, 1.5f),
-            TargetOffsetY = Math.Clamp(camera.TargetOffsetY, -1.5f, 1.5f),
-        };
+        var next = camera.Clamp();
         if (next == Camera) return;
         Camera = next;
         CameraChanged?.Invoke();
         RenderClear();
+    }
+
+    public void ResetCamera()
+    {
+        _runtime.EnsureThread();
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        FigureCamera defaults = new();
+        if (Camera == defaults) CameraChanged?.Invoke();
+        else SetCamera(defaults);
     }
 
     internal void BeginGesture(IntPtr position, bool pan)

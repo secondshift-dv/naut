@@ -843,7 +843,6 @@ public partial class App : Application
             catalog: context.Catalog,
             navigation: navigation,
             overlay: overlay,
-            modelAdapters: runtime.ModelAdapters,
             configurationStore: _configuration,
             importActivity: _importActivity,
             importFinalizer: _finalizer,

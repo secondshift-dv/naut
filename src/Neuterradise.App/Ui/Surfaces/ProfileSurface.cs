@@ -46,7 +46,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
     public ProfileSurface(AppServices services, ProfileDetailViewModel vm) : base(services)
     {
         _vm = vm;
-        _figureView = new ProfileFigureView(services);
+        _figureView = new ProfileFigureView(services, vm.ProfileId);
         _media = new MediaGridPanel(services, vm.MediaGrid, () => Context, ResolvePresentation, BringMediaIntoView);
         ProfileLayoutResolver.TryGetBuiltInPreset(ProfileLayoutResolver.FallbackPresetId, out _layout);
 

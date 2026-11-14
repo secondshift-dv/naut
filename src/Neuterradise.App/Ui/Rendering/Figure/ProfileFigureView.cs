@@ -13,6 +13,8 @@ public sealed class ProfileFigureView : Grid, IDisposable
 {
     private readonly FigureRuntime? _runtime;
     private readonly Window _window;
+    private readonly MediaViewStates? _viewStates;
+    private readonly Guid? _profileId;
     private readonly Grid _viewport = new();
     private readonly StackPanel _controls = UI.V(4);
     private readonly TextBlock _state = UI.WrappedText(string.Empty, "caption", "textSecondary");
@@ -21,6 +23,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
     private readonly ContentControl _host = new() { Visibility = Visibility.Collapsed };
     private FigureSource? _source;
     private FigureViewportLease? _lease;
+    private CancellationTokenSource? _cameraLoad;
     private CancellationTokenSource? _load;
     private CancellationTokenSource? _qualityLoad;
     private int _requestedLod = -1;
@@ -32,12 +35,16 @@ public sealed class ProfileFigureView : Grid, IDisposable
     private int _loadedLod = -1;
     private int _loadedTextureDimension;
 
-    public ProfileFigureView(AppServices services) : this(services.Figures, services.Window) { }
+    public ProfileFigureView(AppServices services, Guid? profileId = null)
+        : this(services.Figures, services.Window, services.Catalog.MediaViewStates, profileId) { }
 
-    public ProfileFigureView(FigureRuntime? runtime, Window window)
+    public ProfileFigureView(
+        FigureRuntime? runtime, Window window, MediaViewStates? viewStates = null, Guid? profileId = null)
     {
         _runtime = runtime;
         _window = window;
+        _viewStates = viewStates;
+        _profileId = profileId;
         RowDefinitions.Add(new() { Height = new GridLength(1, GridUnitType.Star) });
         RowDefinitions.Add(new() { Height = GridLength.Auto });
         _viewport.Children.Add(_thumbnail);
@@ -45,11 +52,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
         Children.Add(_viewport);
         _reset = UI.Button(
             UI.T("Figure.ResetView", "Reset view"),
-            () =>
-            {
-                _camera = new();
-                _lease?.SetCamera(_camera);
-            },
+            () => _lease?.ResetCamera(),
             ButtonKind.Ghost,
             "icon.action.restore");
         _reset.IsEnabled = false;
@@ -77,13 +80,45 @@ public sealed class ProfileFigureView : Grid, IDisposable
     public void SetSource(FigureSource? source)
     {
         if (Equals(_source, source)) return;
+        var mediaChanged = _source?.MediaId != source?.MediaId;
         Release();
         _source = source;
-        _camera = new();
+        if (mediaChanged)
+        {
+            _cameraLoad?.Cancel();
+            _cameraLoad = null;
+            _camera = new();
+        }
         _thumbnail.Source = source?.Thumbnail;
         Visibility = source is null ? Visibility.Collapsed : Visibility.Visible;
+        if (mediaChanged && source is not null && _viewStates is { } states && _profileId is { } profileId)
+        {
+            var request = new CancellationTokenSource();
+            _cameraLoad = request;
+            _ = RestoreCameraAsync(states, profileId, source.MediaId, request);
+        }
         UpdateControls();
         EnsureLive();
+    }
+
+    private async Task RestoreCameraAsync(
+        MediaViewStates states, Guid profileId, Guid mediaId, CancellationTokenSource request)
+    {
+        try
+        {
+            var camera = await states.ReadFigureAsync(profileId, mediaId, request.Token);
+            if (ReferenceEquals(_cameraLoad, request)) _camera = camera;
+        }
+        catch (OperationCanceledException) when (request.IsCancellationRequested) { }
+        finally
+        {
+            if (ReferenceEquals(_cameraLoad, request))
+            {
+                _cameraLoad = null;
+                EnsureLive();
+            }
+            request.Dispose();
+        }
     }
 
     public void SetActive(bool active)
@@ -164,7 +199,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
     private void EnsureLive()
     {
         if (_disposed || !_active || _occluded || !IsLoaded || !HasUsableViewport
-            || _load is not null || _lease is { IsDisposed: false }
+            || _cameraLoad is not null || _load is not null || _lease is { IsDisposed: false }
             || _source is not { RenderPath: not null, SourceSha256: not null } source
             || _runtime is not { IsLiveAllowed: true } runtime || runtime.Snapshot.IsDisposed
             || runtime.Snapshot.ActiveDeviceCount == 0) return;
@@ -225,6 +260,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
         catch (OperationCanceledException) when (request.IsCancellationRequested) { }
         catch (Exception exception)
         {
+            if (!ReferenceEquals(_load, request)) return;
             _lease?.Dispose();
             _lease = null;
             _host.Visibility = Visibility.Collapsed;
@@ -263,6 +299,8 @@ public sealed class ProfileFigureView : Grid, IDisposable
     {
         if (_lease is null) return;
         _camera = _lease.Camera;
+        if (_profileId is { } profileId && _source is { } source)
+            _viewStates?.SaveFigure(profileId, source.MediaId, _camera);
         EnsureQuality();
     }
 
@@ -317,11 +355,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
         catch (Exception exception)
         {
             Trace.TraceWarning("Figure quality swap kept the current live scene: {0}", exception.Message);
-            if (runtime.RecoverDeviceLoss(exception))
-            {
-                Release();
-                EnsureLive();
-            }
+            if (ReferenceEquals(_lease, lease)) runtime.RecoverDeviceLoss(exception);
         }
         finally
         {
@@ -374,7 +408,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
         // but remove it from the composition once the transparent live viewport is ready.
         _thumbnail.Visibility = IsLive ? Visibility.Collapsed : Visibility.Visible;
         _reset.IsEnabled = _lease is { IsDisposed: false, IsActive: true };
-        _state.Text = IsLive ? string.Empty : _load is not null
+        _state.Text = IsLive ? string.Empty : _load is not null || _cameraLoad is not null
             ? UI.T("Figure.Loading", "Loading 3D...")
             : UI.T("Figure.ThumbnailFallback", "Preview image - live 3D is unavailable");
         _state.Visibility = IsLive ? Visibility.Collapsed : Visibility.Visible;
@@ -384,6 +418,8 @@ public sealed class ProfileFigureView : Grid, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        _cameraLoad?.Cancel();
+        _cameraLoad = null;
         Release();
         Loaded -= OnLoaded;
         Unloaded -= OnUnloaded;

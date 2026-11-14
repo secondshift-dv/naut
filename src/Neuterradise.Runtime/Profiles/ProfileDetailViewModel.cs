@@ -90,7 +90,6 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
     private string? _editOverview;
     private bool _editIsFavorite;
     private MediaDetailViewModel? _inspector;
-    private readonly Neuterradise.App.Media.Model.ModelPreviewAdapterRegistry? _modelAdapters;
     private readonly OverlayHostViewModel? _overlay;
     private string _defaultLayoutPresetId = ProfileLayoutResolver.FallbackPresetId;
     private CoverAppearance? _coverAppearance;
@@ -126,14 +125,12 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
         string? defaultLayoutPresetId = null,
         OverlayHostViewModel? overlay = null,
         MediaOriginState? initialOrigin = null,
-        Neuterradise.App.Media.Model.ModelPreviewAdapterRegistry? modelAdapters = null,
         Guid? initialInspectMediaId = null,
         MediaResourceAuthority? mediaResources = null,
         ProfileRuntimeSnapshotCache? runtimeSnapshots = null)
     {
         ProfileId = profileId;
         _catalog = catalog;
-        _modelAdapters = modelAdapters;
         _navigation = navigation;
         _mediaResources = mediaResources;
         _runtimeSnapshots = runtimeSnapshots;
@@ -2650,7 +2647,6 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
             assetId,
             origin,
             _catalog,
-            modelAdapters: _modelAdapters,
             closeInspector: CloseInspector,
             retargetInspector: OpenInspector,
             mediaChanged: OnInspectedMediaChanged);

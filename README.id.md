@@ -10,7 +10,7 @@
 <p align="center">Koleksi media lokal untuk Windows — pengenalan wajah offline, Figure 3D interaktif, dan Vault portabel milikmu sendiri.</p>
 
 <p align="center">
-  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.20"><strong>Download Naut v0.0.20</strong></a>
+  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.21"><strong>Download Naut v0.0.21</strong></a>
   ·
   <a href="https://secondshift-dv.github.io/naut/"><strong>Lihat Live Demo</strong></a>
   ·
@@ -58,7 +58,7 @@ YuNet mendeteksi wajah yang relevan, SFace menghasilkan embedding, lalu Naut dap
 <td width="50%" valign="top">
 <a href="docs/figures.md"><img src="docs/assets/readme/feature-3d-figures.png" alt="Figure 3D interaktif" width="100%"></a><br>
 <strong>Figure 3D interaktif</strong><br>
-Model yang kompatibel dapat menjadi Figure interaktif dengan rotate, pan, zoom, framing yang dikelola Naut, dan batas tekstur runtime yang terkontrol.
+Figure interaktif mengingat rotasi, pan, dan zoom untuk setiap model dalam Profile.
 </td>
 </tr>
 <tr>
@@ -112,7 +112,7 @@ Paket aplikasi portabel dan Vault adalah batas yang terpisah. Import menyalin fi
 
 ## Mulai cepat
 
-1. Buka [unduhan resmi Naut v0.0.20](https://github.com/secondshift-dv/naut/releases/tag/v0.0.20), lalu pilih **`naut-v0.0.20-win-x64.zip`** pada bagian Assets.
+1. Buka [unduhan resmi Naut v0.0.21](https://github.com/secondshift-dv/naut/releases/tag/v0.0.21), lalu pilih **`naut-v0.0.21-win-x64.zip`** pada bagian Assets.
 2. Extract seluruh ZIP ke folder biasa.
 3. Jalankan `naut.exe`.
 4. Pilih **lokasi penyimpanan** Vault.
@@ -133,7 +133,7 @@ Pengalaman koleksi Naut normal sengaja dibuat lebih ringan daripada workload Fig
 | **Display** | 1280 × 720 | 1920 × 1080 atau lebih |
 | **Ruang app/update** | 3 GB | 3 GB+ pada SSD |
 
-Storage Vault terpisah dan bergantung pada ukuran koleksi. Lihat [Naut v0.0.20 System Requirements](docs/system-requirements.md) lengkap.
+Storage Vault terpisah dan bergantung pada ukuran koleksi. Lihat [Naut v0.0.21 System Requirements](docs/system-requirements.md) lengkap.
 
 ## Dokumentasi
 

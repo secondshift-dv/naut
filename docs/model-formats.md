@@ -2,6 +2,8 @@
 
 Naut prepares GLB, FBX, OBJ, STL and 3MF as interactive Profile Figures. Import a model into a Profile, wait for its Figure preparation to finish, then select it under Customize > 3D Figure. Figures support rotation, pan and zoom. They display a static scene; animation playback and rig editing are not supported. The imported original remains unchanged.
 
+On the Profile page, Naut restores the last camera for that Profile and model. **Reset view** saves the default camera.
+
 | Format | Preparation |
 | --- | --- |
 | GLB | Self-contained glTF 2.0 triangle geometry, supported materials and embedded textures use the existing direct preparation path. |

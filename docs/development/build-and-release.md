@@ -23,6 +23,8 @@ Naut v0.0.3 and later clients can reuse installed files only after byte-length a
 
 Canonical releases include the full ZIP, `update.json`, `update-signature.json`, `update-incremental.json`, all content-addressed file assets, `build-provenance.json`, and both corresponding-source archives.
 
+The public **Release (Manual)** workflow builds the selected commit in a read-only job. A dedicated publication job signs and publishes that payload, then removes the short-lived Actions artifact used to pass it between jobs.
+
 ## Dependency source releases
 
 FFmpeg/OpenCV support releases exist to satisfy reproducibility and corresponding-source obligations. They are support artifacts, not Naut application versions, and must remain marked as prereleases so the application's `releases/latest` feed resolves to the current Naut version.

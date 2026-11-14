@@ -1,6 +1,7 @@
 using System.IO;
 using System.Security.Cryptography;
 using Microsoft.Data.Sqlite;
+using Neuterradise.App.Media;
 using Neuterradise.App.Profiles;
 using Neuterradise.App.SystemServices.Database;
 using Neuterradise.App.SystemServices.Database.Writes;
@@ -886,6 +887,8 @@ public sealed class PurgeExecutor
             ("$id", id)).ConfigureAwait(false);
         await ExecuteAsync(transaction, "DELETE FROM storage_operations WHERE kind='MODEL_RENDER_VALIDATED' AND entity_type='MEDIA' AND entity_id=$id;",
             cancellationToken, ("$id", id)).ConfigureAwait(false);
+        await ExecuteAsync(transaction, "DELETE FROM settings WHERE key GLOB $pattern;", cancellationToken,
+            ("$pattern", MediaViewStates.MediaKeyPattern(assetId))).ConfigureAwait(false);
         await ExecuteAsync(transaction, "DELETE FROM media WHERE media_id = $id;", cancellationToken, ("$id", id)).ConfigureAwait(false);
     }
 
@@ -909,6 +912,8 @@ public sealed class PurgeExecutor
         await ExecuteAsync(transaction, "DELETE FROM storage_operations WHERE kind IN ('PROFILE_TEXT_SYNC','PROFILE_OVERVIEW_IMPORT') AND entity_id=$id;", cancellationToken, ("$id", id)).ConfigureAwait(false);
         await ExecuteAsync(transaction, "DELETE FROM settings WHERE key = $key;", cancellationToken,
             ("$key", ProfileMediaPreferences.FavoritesKey(profileId))).ConfigureAwait(false);
+        await ExecuteAsync(transaction, "DELETE FROM settings WHERE key GLOB $pattern;", cancellationToken,
+            ("$pattern", MediaViewStates.ProfileKeyPattern(profileId))).ConfigureAwait(false);
         await ExecuteAsync(transaction, "DELETE FROM profiles WHERE profile_id = $id;", cancellationToken, ("$id", id)).ConfigureAwait(false);
     }
 

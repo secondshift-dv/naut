@@ -39,6 +39,8 @@ This design lets Naut assist with organization without silently treating a model
 
 Profile media keeps its own metadata and can be browsed in the Profile media area. Opening an original media item uses the normal Windows application associated with that file type.
 
+The image Inspector remembers your zoom, Fit, or Actual size setting for each image in the Profile. Model previews in the Inspector are static. Open the Profile's [3D Figure](figures.md) to rotate, pan, or zoom a model.
+
 ## Editing, notes and removal
 
 Use **Edit details** for Profile identity fields. Managed NORMAL Profiles can mirror Overview and Private Note into readable UTF-8 files in the Vault. External changes are reviewed explicitly rather than silently overwriting Naut's catalog. Because these files are plaintext, protect the filesystem and Vault backup accordingly.
