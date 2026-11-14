@@ -6,5 +6,5 @@ namespace Neuterradise.App.Import.Verification;
 /// </summary>
 public static class ImportProfileCollisionPolicy
 {
-    public const double StrongSimilarityThreshold = 0.62;
+    public const double StrongSimilarityThreshold = 0.85;
 }

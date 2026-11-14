@@ -70,7 +70,8 @@ public sealed class ProfilingFaceAnalysisJobOperation : IFaceAnalysisJobOperatio
 
     public const string AnalysisVersion = "face-analysis-v1";
 
-    public const double SuggestionThreshold = 0.363;
+    public const double SuggestionThreshold = FaceSuggestionEvidenceV1.MinimumSimilarity;
+    private const double CandidateSearchThreshold = 0.363;
 
     public const int MaximumSuggestions = 5;
 
@@ -342,7 +343,7 @@ public sealed class ProfilingFaceAnalysisJobOperation : IFaceAnalysisJobOperatio
 
             suggestions.TryGetValue(face.DetectionKey, out var evidence);
 
-            var topCandidate = evidence?.Candidates.Count > 0 ? evidence.Candidates[0] : null;
+            var topCandidate = evidence?.GetRecommendation();
             var decisionState = topCandidate is null
                 ? FaceDecisionState.Unknown
                 : FaceDecisionState.Suggested;
@@ -491,7 +492,7 @@ public sealed class ProfilingFaceAnalysisJobOperation : IFaceAnalysisJobOperatio
                                 space.ModelId,
                                 space.ModelVersion,
                                 probe.Embedding ?? [],
-                                SuggestionThreshold,
+                                CandidateSearchThreshold,
                                 MaximumSuggestions)),
                         cancellationToken)
                     .ConfigureAwait(false);
@@ -502,7 +503,7 @@ public sealed class ProfilingFaceAnalysisJobOperation : IFaceAnalysisJobOperatio
 
                 var matched = matchResponse.DeserializePayload<MatchIdentityCandidatesResult>();
                 var ranked = (matched?.Candidates ?? [])
-                    .Where(candidate => candidate.Score >= SuggestionThreshold)
+                    .Where(candidate => candidate.Score >= CandidateSearchThreshold)
                     .OrderByDescending(static candidate => candidate.Score)
                     .ThenBy(static candidate => candidate.IdentityId.ToString("D"), StringComparer.Ordinal)
                     .Take(MaximumSuggestions)

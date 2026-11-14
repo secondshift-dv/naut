@@ -657,8 +657,8 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
                 updateFeedUrl = appConfig.Configuration.Updates.FeedUrl ?? string.Empty;
             }
 
-            var organization = await ReadOrganizationSnapshotAsync(cancellationToken).ConfigureAwait(false);
-            var systemMetrics = await ReadSystemMetricsSnapshotAsync(cancellationToken).ConfigureAwait(false);
+            var organization = await Task.Run(() => ReadOrganizationSnapshotAsync(cancellationToken), cancellationToken).ConfigureAwait(false);
+            var systemMetrics = await Task.Run(() => ReadSystemMetricsSnapshotAsync(cancellationToken), cancellationToken).ConfigureAwait(false);
 
             await UiDispatch.InvokeAsync(() =>
             {
@@ -898,7 +898,7 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
     public async Task LoadOrganizationAsync(CancellationToken cancellationToken = default)
     {
         if (_catalog is null) return;
-        var snapshot = await ReadOrganizationSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        var snapshot = await Task.Run(() => ReadOrganizationSnapshotAsync(cancellationToken), cancellationToken).ConfigureAwait(false);
         await UiDispatch.InvokeAsync(() =>
         {
             if (!_isDisposed && IsRouteActive) ApplyOrganizationSnapshot(snapshot);
@@ -1146,7 +1146,7 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
         if (_storageMetrics is null && _catalog is null) return;
         try
         {
-            var snapshot = await ReadSystemMetricsSnapshotAsync(cancellationToken).ConfigureAwait(false);
+            var snapshot = await Task.Run(() => ReadSystemMetricsSnapshotAsync(cancellationToken), cancellationToken).ConfigureAwait(false);
             await UiDispatch.InvokeAsync(() =>
             {
                 if (!_isDisposed && IsRouteActive) ApplySystemMetricsSnapshot(snapshot);

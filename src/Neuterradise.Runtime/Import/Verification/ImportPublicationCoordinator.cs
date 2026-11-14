@@ -1,6 +1,7 @@
 using Neuterradise.App.Localization;
 using Neuterradise.App.Design.ProfileLayouts;
 using Neuterradise.App.Faces;
+using Neuterradise.App.Import.Preparation;
 using Neuterradise.App.Media;
 using Neuterradise.App.Profiles;
 using Neuterradise.App.RelatedProfiles;
@@ -160,6 +161,8 @@ public sealed class ImportPublicationCoordinator
 
         if (model.State == ImportUnitState.ReadyForVerification)
         {
+            await new ImportMediaPreparationCoordinator(_catalog, _catalog.Paths, _timeProvider)
+                .ReconcilePersistedArtifactsAsync(unitId, cancellationToken).ConfigureAwait(false);
             var readiness = await _validator.ValidateCommitReadinessAsync(unitId, cancellationToken).ConfigureAwait(false);
             if (!readiness.IsReady)
             {

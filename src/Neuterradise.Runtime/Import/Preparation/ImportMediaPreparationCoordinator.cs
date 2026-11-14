@@ -63,12 +63,12 @@ public sealed class ImportMediaPreparationCoordinator
         CancellationToken cancellationToken = default,
         Guid? onlyMediaId = null)
     {
-        var unit = await _importReads.GetUnitSummaryAsync(unitId, cancellationToken).ConfigureAwait(false);
-        if (unit is null)
+        var checkpoint = await _importReads.GetCommitCheckpointAsync(unitId, cancellationToken).ConfigureAwait(false);
+        if (checkpoint is null)
         {
             return new MediaPreparationScheduleResult(unitId, 0, 0, false);
         }
-        var candidatePhase = !unit.LibraryCommitState.HasReachedDomainCommit();
+        var candidatePhase = !checkpoint.Value.HasReachedDomainCommit();
 
         // The durable timestamp is the human-facing Stage 2 boundary: permanent MediaAssets only
         // begin after the canonical original has crossed the domain-commit boundary. Candidate
@@ -78,8 +78,17 @@ public sealed class ImportMediaPreparationCoordinator
             await MarkPreparationStartedAsync(unitId, cancellationToken).ConfigureAwait(false);
         }
 
-        var items = await _importReads.GetUnitItemsUnboundedAsync(unitId, cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
+        IReadOnlyList<ImportItemSummary> items;
+        if (candidatePhase && onlyMediaId is { } candidateId)
+        {
+            var item = await _importReads.GetItemByCandidateMediaIdAsync(candidateId, cancellationToken)
+                .ConfigureAwait(false);
+            items = item?.UnitId == unitId ? [item] : [];
+        }
+        else
+        {
+            items = await _importReads.GetUnitItemsUnboundedAsync(unitId, cancellationToken).ConfigureAwait(false);
+        }
 
         int assetsScheduled = 0;
         int jobsScheduled = 0;
@@ -182,7 +191,10 @@ public sealed class ImportMediaPreparationCoordinator
             assetsScheduled++;
         }
 
-        // Evaluate readiness after scheduling.
+        // The transfer callback only seeds its own candidate. Unit readiness belongs to the finalizer.
+        if (candidatePhase && onlyMediaId.HasValue)
+            return new MediaPreparationScheduleResult(unitId, assetsScheduled, jobsScheduled, false);
+
         var readiness = await EvaluateReadinessAsync(unitId, cancellationToken).ConfigureAwait(false);
 
         return new MediaPreparationScheduleResult(unitId, assetsScheduled, jobsScheduled, readiness.AllRequiredTerminal);
@@ -197,9 +209,10 @@ public sealed class ImportMediaPreparationCoordinator
         CancellationToken cancellationToken = default)
     {
         var pendingBanners = await new ProfileBannerOperations(_catalog).EnsureInitialAsync(unitId, cancellationToken).ConfigureAwait(false);
-        await ReconcilePersistedArtifactsAsync(unitId, cancellationToken).ConfigureAwait(false);
         var summary = await _capabilityReads.GetUnitCapabilitySummaryAsync(unitId, cancellationToken)
             .ConfigureAwait(false);
+        if (summary.AllRequiredTerminal && pendingBanners.Count == 0)
+            await ReconcilePersistedArtifactsAsync(unitId, cancellationToken).ConfigureAwait(false);
         var failedMediaIds = await _capabilityReads.GetUnitFailedMediaIdsAsync(unitId, cancellationToken)
             .ConfigureAwait(false);
 
@@ -223,11 +236,6 @@ public sealed class ImportMediaPreparationCoordinator
         await using var mutationLease = await _catalog.ImportUnitMutations
             .EnterAsync(unitId, cancellationToken).ConfigureAwait(false);
 
-        await ReconcilePersistedArtifactsAsync(unitId, cancellationToken).ConfigureAwait(false);
-
-        var allRequiredSettled = await _capabilityReads
-            .AreAllRequiredCapabilitiesSettledAsync(unitId, cancellationToken)
-            .ConfigureAwait(false);
         var unit = await _importReads.GetUnitSummaryAsync(unitId, cancellationToken).ConfigureAwait(false);
         if (unit is null || !unit.LibraryCommitState.HasReachedDomainCommit()
             || unit.State is ImportUnitState.Cancelled or ImportUnitState.FailedTerminal
@@ -236,22 +244,25 @@ public sealed class ImportMediaPreparationCoordinator
             return false;
         }
 
-        if (!allRequiredSettled || (await new ProfileBannerOperations(_catalog).EnsureInitialAsync(unitId, cancellationToken).ConfigureAwait(false)).Count != 0)
+        if (unit.State == ImportUnitState.ReadyForVerification) return true;
+
+        if (!await _capabilityReads.AreAllRequiredCapabilitiesSettledAsync(unitId, cancellationToken).ConfigureAwait(false)
+            || (await new ProfileBannerOperations(_catalog).EnsureInitialAsync(unitId, cancellationToken).ConfigureAwait(false)).Count != 0)
         {
             return false;
         }
 
-        if (unit.State != ImportUnitState.ReadyForVerification)
-        {
-            await _importWrites
-                .UpdateUnitStateAsync(
-                    unitId,
-                    ImportUnitState.ReadyForVerification,
-                    expectedState: unit.State,
-                    expectedRowVersion: null,
-                    cancellationToken)
-                .ConfigureAwait(false);
-        }
+        // Validate durable artifacts once the unit is ready to enter Verify, rather than rehashing
+        // every finished derivative after every metadata, face or derivative completion.
+        await ReconcilePersistedArtifactsAsync(unitId, cancellationToken).ConfigureAwait(false);
+        await _importWrites
+            .UpdateUnitStateAsync(
+                unitId,
+                ImportUnitState.ReadyForVerification,
+                expectedState: unit.State,
+                expectedRowVersion: null,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         return true;
     }
@@ -260,7 +271,7 @@ public sealed class ImportMediaPreparationCoordinator
     /// Reconciles READY rows against the durable MediaAsset file and catalog record. Missing or
     /// changed bytes must not leave a required capability falsely ready.
     /// </summary>
-    private async Task ReconcilePersistedArtifactsAsync(Guid unitId, CancellationToken cancellationToken)
+    internal async Task ReconcilePersistedArtifactsAsync(Guid unitId, CancellationToken cancellationToken)
     {
         await using var connection = await _catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();

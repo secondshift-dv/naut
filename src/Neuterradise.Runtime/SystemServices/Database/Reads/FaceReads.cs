@@ -7,7 +7,6 @@ namespace Neuterradise.App.SystemServices.Database.Reads;
 public sealed class FaceReads
 {
 
-    public const int MaximumIdentityCandidates = 5;
 
     private readonly CatalogConnectionFactory _connectionFactory;
 
@@ -348,13 +347,9 @@ public sealed class FaceReads
             double? targetSimilarity = null;
             if (targetIdentities.Count > 0 && evidence is not null)
             {
-                foreach (var candidate in evidence.Candidates)
+                if (evidence.GetRecommendation() is { } candidate && targetIdentities.Contains(candidate.IdentityId))
                 {
-                    if (targetIdentities.Contains(candidate.IdentityId)
-                        && (targetSimilarity is null || candidate.Similarity > targetSimilarity))
-                    {
-                        targetSimilarity = candidate.Similarity;
-                    }
+                    targetSimilarity = candidate.Similarity;
                 }
             }
 
@@ -480,20 +475,20 @@ public sealed class FaceReads
         var sampledTimestamp = reader.IsDBNull(17) ? (long?)null : reader.GetInt64(17);
         var evidence = FaceSuggestionEvidenceV1.TryParse(reader.IsDBNull(18) ? null : reader.GetString(18));
 
-        var candidates = evidence is null
-            ? []
-            : evidence.Candidates
-                .Where(entry => entry.Similarity >= evidence.Threshold)
-                .OrderByDescending(static entry => entry.Similarity)
-                .ThenBy(static entry => entry.IdentityId.ToString("D"), StringComparer.Ordinal)
-                .Take(MaximumIdentityCandidates)
-                .Select((entry, index) => new FaceIdentityCandidate(
-                    entry.IdentityId,
-                    ProfileId: null,
-                    ProfileDisplayName: null,
-                    entry.Similarity,
-                    Rank: index + 1))
-                .ToArray();
+        var recommendation = evidence?.GetRecommendation();
+        FaceIdentityCandidate[] candidates = [];
+        if (decision == FaceDecisionState.Suggested && recommendation is not null
+            && recommendation.IdentityId == suggestedIdentityId)
+        {
+            candidates = [new(recommendation.IdentityId, null, null, recommendation.Similarity, 1)];
+        }
+        else
+        {
+            suggestedIdentityId = null;
+            suggestedProfileId = null;
+            suggestedProfileName = null;
+            if (decision == FaceDecisionState.Suggested) decision = FaceDecisionState.Unknown;
+        }
 
         if (decision != FaceDecisionState.Confirmed)
         {

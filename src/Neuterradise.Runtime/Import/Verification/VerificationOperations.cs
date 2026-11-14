@@ -587,8 +587,8 @@ public sealed class VerificationOperations
 
             var identityId = DbGuid.Parse(reader.GetString(3));
             var parsed = FaceSuggestionEvidenceV1.TryParse(reader.GetString(4));
-            var similarity = parsed?.Candidates.FirstOrDefault(candidate => candidate.IdentityId == identityId)?.Similarity;
-            if (similarity is null || similarity < ImportProfileCollisionPolicy.StrongSimilarityThreshold)
+            var recommendation = AutomaticMediaAssignmentPolicy.GetStrongFaceSuggestion(parsed);
+            if (recommendation?.IdentityId != identityId)
             {
                 continue;
             }
@@ -599,7 +599,7 @@ public sealed class VerificationOperations
                 reader.GetString(2),
                 DbGuid.Parse(reader.GetString(5)),
                 reader.GetString(6),
-                similarity.Value));
+                recommendation.Similarity));
         }
 
         var destinationId = destination.Kind == DestinationKind.ExistingNormal ? destination.ProfileId : null;
@@ -791,19 +791,19 @@ public sealed class VerificationOperations
         {
             var suggestion = FaceSuggestionEvidenceV1.TryParse(reader.IsDBNull(9) ? null : reader.GetString(9));
             var suggestedIdentityId = reader.IsDBNull(10) ? (Guid?)null : DbGuid.Parse(reader.GetString(10));
-            var similarity = suggestion?.Candidates
-                .FirstOrDefault(candidate => candidate.IdentityId == suggestedIdentityId)?.Similarity;
+            var recommendation = suggestion?.GetRecommendation();
+            var showSuggestion = recommendation is not null && recommendation.IdentityId == suggestedIdentityId;
             list.Add(new VerificationFaceCandidate(
                 DbGuid.Parse(reader.GetString(0)),
                 DbGuid.Parse(reader.GetString(1)),
                 DbGuid.Parse(reader.GetString(2)),
                 reader.GetString(3),
                 reader.GetInt64(4),
-                reader.IsDBNull(5) ? null : reader.GetString(5),
-                reader.IsDBNull(6) ? null : DbGuid.Parse(reader.GetString(6)),
+                !showSuggestion || reader.IsDBNull(5) ? null : reader.GetString(5),
+                !showSuggestion || reader.IsDBNull(6) ? null : DbGuid.Parse(reader.GetString(6)),
                 reader.IsDBNull(7) ? null : reader.GetDouble(7),
                 reader.GetString(8),
-                similarity));
+                showSuggestion ? recommendation!.Similarity : null));
         }
 
         return list;

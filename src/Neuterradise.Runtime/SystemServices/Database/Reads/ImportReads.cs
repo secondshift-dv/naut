@@ -65,6 +65,18 @@ public sealed class ImportReads
             DbTime.Parse(reader.GetInt64(5)));
     }
 
+    internal async Task<ImportCommitCheckpoint?> GetCommitCheckpointAsync(
+        Guid unitId, CancellationToken cancellationToken)
+    {
+        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken)
+            .ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT library_commit_state FROM import_units WHERE import_unit_id = $unitId;";
+        command.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
+        var state = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string;
+        return state is null ? null : DbEnum.ParseImportCommitCheckpointOrDefault(state);
+    }
+
     public async Task<ImportUnitSummary?> GetUnitSummaryAsync(
         Guid unitId,
         CancellationToken cancellationToken = default)

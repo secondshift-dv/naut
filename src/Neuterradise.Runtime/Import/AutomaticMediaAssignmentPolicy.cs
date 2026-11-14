@@ -11,16 +11,9 @@ namespace Neuterradise.App.Import;
 public sealed class AutomaticMediaAssignmentPolicy
 {
     public const double StrongFaceSimilarity = ImportProfileCollisionPolicy.StrongSimilarityThreshold;
-    public const double StrongFaceMargin = 0.08;
 
-    public static FaceSuggestionEntryV1? GetStrongFaceSuggestion(FaceSuggestionEvidenceV1? evidence)
-    {
-        var ordered = (evidence?.Candidates ?? []).OrderByDescending(candidate => candidate.Similarity)
-            .ThenBy(candidate => candidate.IdentityId).ToArray();
-        var top = ordered.FirstOrDefault();
-        return top is not null && double.IsFinite(top.Similarity) && top.Similarity >= StrongFaceSimilarity
-            && (ordered.Length == 1 || top.Similarity - ordered[1].Similarity >= StrongFaceMargin) ? top : null;
-    }
+    public static FaceSuggestionEntryV1? GetStrongFaceSuggestion(FaceSuggestionEvidenceV1? evidence) =>
+        evidence?.GetRecommendation() is { Similarity: >= StrongFaceSimilarity } recommendation ? recommendation : null;
 
     public ImportAssignmentDecision Resolve(
         Guid? explicitProfileId,

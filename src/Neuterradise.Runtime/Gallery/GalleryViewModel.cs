@@ -591,7 +591,7 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
 
         try
         {
-            var facets = await _catalog.GalleryReads.GetGalleryFacetsAsync();
+            var facets = await Task.Run(() => _catalog.GalleryReads.GetGalleryFacetsAsync());
             ApplyFacets(facets);
         }
         catch (Exception exception)
@@ -628,7 +628,7 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
 
         try
         {
-            var facets = await _catalog.GalleryReads.GetGalleryFacetsAsync().ConfigureAwait(true);
+            var facets = await Task.Run(() => _catalog.GalleryReads.GetGalleryFacetsAsync()).ConfigureAwait(true);
             ApplyFacets(facets);
         }
         catch (Exception exception)
@@ -681,8 +681,9 @@ public sealed class GalleryViewModel : ScreenStateViewModel, IDisposable
 
         try
         {
-            var page = await _catalog.GalleryReads
-                .GetGalleryPageAsync(BuildQuery(), token.CancellationToken);
+            var query = BuildQuery();
+            var page = await Task.Run(() => _catalog.GalleryReads
+                .GetGalleryPageAsync(query, token.CancellationToken), token.CancellationToken);
 
             if (!_queryGuard.IsCurrent(token))
             {

@@ -1,5 +1,7 @@
 # Face Intelligence
 
+Naut shows a face suggestion only when the similarity is high and the leading match has a clear margin over other candidates. An uncertain detection stays available for manual review. The same rule applies when previously saved suggestions are shown.
+
 Naut can use local face analysis to help connect applicable media with existing Profiles. The feature is designed as a **reviewable suggestion pipeline**, not as a silent identity decision.
 
 ## What happens during analysis

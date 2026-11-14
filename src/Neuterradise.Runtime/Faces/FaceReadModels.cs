@@ -26,6 +26,21 @@ public sealed record FaceIdentityCandidate(
 public sealed record FaceSuggestionEvidenceV1
 {
     public const int CurrentSchemaVersion = 1;
+    public const double MinimumSimilarity = 0.75;
+    public const double MinimumMargin = 0.10;
+
+    public FaceSuggestionEntryV1? GetRecommendation()
+    {
+        var ranked = (Candidates ?? [])
+            .Where(candidate => candidate.IdentityId != Guid.Empty && candidate.Similarity is >= -1 and <= 1)
+            .OrderByDescending(candidate => candidate.Similarity)
+            .ThenBy(candidate => candidate.IdentityId)
+            .ToArray();
+        if (ranked.Length == 0 || ranked[0].Similarity < MinimumSimilarity) return null;
+        var top = ranked[0];
+        var competitor = ranked.FirstOrDefault(candidate => candidate.IdentityId != top.IdentityId);
+        return competitor is null || top.Similarity - competitor.Similarity >= MinimumMargin ? top : null;
+    }
 
     [JsonPropertyName("schemaVersion")]
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;

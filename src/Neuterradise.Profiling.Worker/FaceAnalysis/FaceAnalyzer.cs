@@ -432,7 +432,7 @@ public sealed class FaceAnalyzer
 
 public static class VideoFaceClusterer
 {
-    public const double CosineThreshold = 0.4;
+    public const double CosineThreshold = 0.75;
 
     public static IReadOnlyList<DetectedFace> Cluster(
         IReadOnlyList<(long TimestampMs, DetectedFace Face)> detections,

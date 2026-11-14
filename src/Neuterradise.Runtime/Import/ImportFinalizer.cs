@@ -350,6 +350,14 @@ public sealed class ImportFinalizer : IAsyncDisposable
             return ImportFinalizeOutcome.Waiting;
         }
 
+        if (summary.LibraryCommitState.HasReachedDomainCommit()
+            && summary.State == ImportUnitState.Preparing
+            && await HasActiveDerivativePreparationAsync(unitId, cancellationToken).ConfigureAwait(false))
+            return ImportFinalizeOutcome.Waiting;
+
+        if (summary.State == ImportUnitState.ReadyForVerification && !draft.PublishWhenReady)
+            return ImportFinalizeOutcome.Waiting;
+
         if (model.CommitOperationId is null)
         {
             // Completed Candidate transfer bytes remain in staging until required preparation
@@ -360,6 +368,10 @@ public sealed class ImportFinalizer : IAsyncDisposable
             {
                 return ImportFinalizeOutcome.Waiting;
             }
+
+            if (await HasActiveCandidateIdentityPreparationAsync(unitId, cancellationToken)
+                    .ConfigureAwait(false))
+                return ImportFinalizeOutcome.Waiting;
 
             // Before commit, schedule only identity preparation. MediaAsset derivation is
             // intentionally unavailable until Profile/original authority is durable.
@@ -470,6 +482,25 @@ public sealed class ImportFinalizer : IAsyncDisposable
                   AND j.kind IN ('ExtractMetadata', 'FaceAnalysis')
                   AND j.owner_type = 'Media'
                   AND j.state NOT IN ('SUCCEEDED', 'FAILED_TERMINAL', 'CANCELLED')
+            );
+            """;
+        command.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
+        return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 1;
+    }
+
+    private async Task<bool> HasActiveDerivativePreparationAsync(Guid unitId, CancellationToken cancellationToken)
+    {
+        await using var connection = await _catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT EXISTS (
+                SELECT 1 FROM import_items i
+                JOIN media_capability_readiness capability
+                  ON capability.media_id = COALESCE(i.reused_media_id, i.candidate_media_id)
+                JOIN jobs j ON j.job_id = capability.job_id
+                WHERE i.import_unit_id = $unitId AND i.disposition IN ('INCLUDED', 'REUSED')
+                  AND capability.capability IN ('THUMBNAIL', 'HOVER', 'MODEL_RENDER')
+                  AND j.state IN ('PENDING', 'RUNNABLE', 'RUNNING')
             );
             """;
         command.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));

@@ -310,7 +310,8 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
     {
         try
         {
-            return HomeSectionLoad<T>.Succeeded(section, await load().ConfigureAwait(false));
+            // SQLite executes synchronously even through its async API. Keep reads off the UI dispatcher.
+            return HomeSectionLoad<T>.Succeeded(section, await Task.Run(load).ConfigureAwait(false));
         }
         catch (OperationCanceledException)
         {

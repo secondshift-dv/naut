@@ -509,9 +509,9 @@ public sealed class VerificationValidator
                 continue;
             }
             var identityId = DbGuid.Parse(reader.GetString(1));
-            var similarity = FaceSuggestionEvidenceV1.TryParse(reader.GetString(2))?.Candidates
-                .FirstOrDefault(candidate => candidate.IdentityId == identityId)?.Similarity;
-            if (similarity >= ImportProfileCollisionPolicy.StrongSimilarityThreshold)
+            var suggestion = AutomaticMediaAssignmentPolicy.GetStrongFaceSuggestion(
+                FaceSuggestionEvidenceV1.TryParse(reader.GetString(2)));
+            if (suggestion?.IdentityId == identityId)
             {
                 evidence.Add((DbGuid.Parse(reader.GetString(0)), DbGuid.Parse(reader.GetString(3))));
             }
