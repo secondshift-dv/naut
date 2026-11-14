@@ -4,6 +4,7 @@ Naut is a local-first media collection manager for Windows. Start here if you ar
 
 ## Using Naut
 
+- [Naut v0.0.20 release notes](releases/v0.0.20.md) — astronaut and nautilus identity and refreshed showcase visuals.
 - [Naut v0.0.19 release notes](releases/v0.0.19.md) — incremental update efficiency and stable component builds.
 - [Naut v0.0.18 release notes](releases/v0.0.18.md) — Profile media preferences, catalog refreshes, artwork loading, and long Poster titles.
 - [Naut v0.0.17 release notes](releases/v0.0.17.md) — individual presentation-file deletion, pack-managed boundaries, and recoverable Media Inspector deletion.

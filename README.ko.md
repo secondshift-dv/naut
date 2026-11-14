@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="src/Neuterradise.App/Assets/Brand/wordmark-lockup.png" alt="Naut" width="460">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="src/Neuterradise.App/Assets/Brand/wordmark-lockup-inverse.png">
+    <img src="src/Neuterradise.App/Assets/Brand/wordmark-lockup.png" alt="Naut" width="460">
+  </picture>
 </p>
 
 <p align="center"><strong>A Navigator for Your Things Worth Keeping</strong></p>
@@ -7,7 +10,7 @@
 <p align="center">Windows용 로컬 미디어 컬렉션 — 오프라인 얼굴 인식, 인터랙티브 3D Figure, 나만의 휴대용 Vault.</p>
 
 <p align="center">
-  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.19"><strong>Naut v0.0.19 다운로드</strong></a>
+  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.20"><strong>Naut v0.0.20 다운로드</strong></a>
   ·
   <a href="https://secondshift-dv.github.io/naut/"><strong>라이브 데모 보기</strong></a>
   ·
@@ -48,36 +51,36 @@ Naut는 Windows용 **local-first 미디어 컬렉션 관리자**입니다. 이�
 <table>
 <tr>
 <td width="50%" valign="top">
-<a href="docs/face-intelligence.md"><img src="docs/assets/readme/feature-face-intelligence.svg" alt="Face Intelligence" width="100%"></a><br>
+<a href="docs/face-intelligence.md"><img src="docs/assets/readme/feature-face-intelligence.png" alt="Face Intelligence" width="100%"></a><br>
 <strong>Face Intelligence</strong><br>
 YuNet이 적용 가능한 얼굴을 감지하고 SFace가 embedding을 생성합니다. 확인된 identity sample이 있으면 Naut가 로컬에서 Profile 후보를 제안할 수 있으며, 제안은 검토 가능한 상태로 유지됩니다.
 </td>
 <td width="50%" valign="top">
-<a href="docs/figures.md"><img src="docs/assets/readme/feature-3d-figures.svg" alt="인터랙티브 3D Figure" width="100%"></a><br>
+<a href="docs/figures.md"><img src="docs/assets/readme/feature-3d-figures.png" alt="인터랙티브 3D Figure" width="100%"></a><br>
 <strong>인터랙티브 3D Figure</strong><br>
 호환 모델을 회전, 이동, 확대/축소, Naut 관리 framing, 제한된 runtime texture 정책을 갖는 Figure로 사용할 수 있습니다.
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
-<a href="docs/import-media.md"><img src="docs/assets/readme/feature-smart-import.svg" alt="Smart Media Import" width="100%"></a><br>
+<a href="docs/import-media.md"><img src="docs/assets/readme/feature-smart-import.png" alt="Smart Media Import" width="100%"></a><br>
 <strong>Smart Media Import</strong><br>
 하나의 import path가 미디어 유형별로 필요한 작업만 수행합니다. metadata, thumbnail, 제한된 video presentation media, 필요한 경우 face analysis, 지원 모델의 Figure derivative를 준비합니다.
 </td>
 <td width="50%" valign="top">
-<a href="docs/customization.md"><img src="docs/assets/readme/feature-customization.svg" alt="원본을 건드리지 않는 표현" width="100%"></a><br>
+<a href="docs/customization.md"><img src="docs/assets/readme/feature-customization.png" alt="원본을 건드리지 않는 표현" width="100%"></a><br>
 <strong>원본을 건드리지 않는 표현</strong><br>
 Home, Gallery, Card, Profile, Cover, Banner, Frame, Backdrop, layout, effect, theme을 바꿔도 원본 미디어는 변경하지 않습니다.
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
-<a href="docs/languages.md"><img src="docs/assets/readme/feature-multilingual.svg" alt="8개 인터페이스 언어" width="100%"></a><br>
+<a href="docs/languages.md"><img src="docs/assets/readme/feature-multilingual.png" alt="8개 인터페이스 언어" width="100%"></a><br>
 <strong>8개 인터페이스 언어</strong><br>
 English, Bahasa Indonesia, 日本語, 한국어, 简体中文, Deutsch, Français, Español을 제공합니다. UI 언어 변경은 Vault나 미디어 metadata를 다시 쓰지 않습니다.
 </td>
 <td width="50%" valign="top">
-<a href="docs/vault.md"><img src="docs/assets/readme/feature-local-vault.svg" alt="포터블 로컬 Vault" width="100%"></a><br>
+<a href="docs/vault.md"><img src="docs/assets/readme/feature-local-vault.png" alt="포터블 로컬 Vault" width="100%"></a><br>
 <strong>포터블 로컬 Vault</strong><br>
 포터블 앱 패키지와 Vault는 분리된 경계입니다. Import는 파일을 Vault에 복사하고 원본 파일은 원래 위치에 남깁니다.
 </td>
@@ -105,9 +108,11 @@ English, Bahasa Indonesia, 日本語, 한국어, 简体中文, Deutsch, Françai
 </tr>
 </table>
 
+[이미지 출처](docs/development/licensing.md#documentation-artwork)
+
 ## 빠른 시작
 
-1. 공식 [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.19)에서 **Naut v0.0.19**을 다운로드합니다.
+1. 공식 [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.20)에서 **Naut v0.0.20**을 다운로드합니다.
 2. 전체 ZIP을 일반 폴더에 압축 해제합니다.
 3. `naut.exe`를 실행합니다.
 4. Vault를 보관할 위치를 선택합니다.
@@ -128,7 +133,7 @@ English, Bahasa Indonesia, 日本語, 한국어, 简体中文, Deutsch, Françai
 | **Display** | 1280 × 720 | 1920 × 1080 이상 |
 | **App/update 여유 공간** | 3 GB | SSD 3 GB+ |
 
-Vault 저장 공간은 별도이며 컬렉션 크기에 따라 달라집니다. [Naut v0.0.19 System Requirements](docs/system-requirements.md)를 참고하세요.
+Vault 저장 공간은 별도이며 컬렉션 크기에 따라 달라집니다. [Naut v0.0.20 System Requirements](docs/system-requirements.md)를 참고하세요.
 
 ## 문서
 

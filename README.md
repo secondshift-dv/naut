@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="src/Neuterradise.App/Assets/Brand/wordmark-lockup.png" alt="Naut" width="460">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="src/Neuterradise.App/Assets/Brand/wordmark-lockup-inverse.png">
+    <img src="src/Neuterradise.App/Assets/Brand/wordmark-lockup.png" alt="Naut" width="460">
+  </picture>
 </p>
 
 <p align="center"><strong>A Navigator for Your Things Worth Keeping</strong></p>
@@ -7,7 +10,7 @@
 <p align="center">Local-first media collections for Windows — offline face intelligence, interactive 3D Figures, and your own portable Vault.</p>
 
 <p align="center">
-  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.19"><strong>Download Naut v0.0.19</strong></a>
+  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.20"><strong>Download Naut v0.0.20</strong></a>
   ·
   <a href="https://secondshift-dv.github.io/naut/"><strong>View Live Demo</strong></a>
   ·
@@ -40,36 +43,36 @@ Naut is a **local-first media collection manager for Windows**. It turns images,
 <table>
 <tr>
 <td width="50%" valign="top">
-<a href="docs/face-intelligence.md"><img src="docs/assets/readme/feature-face-intelligence.svg" alt="Face intelligence" width="100%"></a><br>
+<a href="docs/face-intelligence.md"><img src="docs/assets/readme/feature-face-intelligence.png" alt="Face intelligence" width="100%"></a><br>
 <strong>Face intelligence</strong><br>
 YuNet detects applicable faces, SFace produces embeddings, and Naut can surface Profile candidates from confirmed identity samples. Processing stays local and suggestions remain reviewable.
 </td>
 <td width="50%" valign="top">
-<a href="docs/figures.md"><img src="docs/assets/readme/feature-3d-figures.svg" alt="Interactive 3D Figures" width="100%"></a><br>
+<a href="docs/figures.md"><img src="docs/assets/readme/feature-3d-figures.png" alt="Interactive 3D Figures" width="100%"></a><br>
 <strong>Interactive 3D Figures</strong><br>
 Compatible models can become interactive Figures with rotate, pan, zoom, Naut-managed framing, and a bounded runtime texture policy.
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
-<a href="docs/import-media.md"><img src="docs/assets/readme/feature-smart-import.svg" alt="Smart media import" width="100%"></a><br>
+<a href="docs/import-media.md"><img src="docs/assets/readme/feature-smart-import.png" alt="Smart media import" width="100%"></a><br>
 <strong>Smart media import</strong><br>
 The same import path prepares only what each media type needs: metadata, thumbnails, bounded video HOVER and Banner renditions, face analysis when applicable, and Figure derivatives for supported models.
 </td>
 <td width="50%" valign="top">
-<a href="docs/customization.md"><img src="docs/assets/readme/feature-customization.svg" alt="Presentation without destructive edits" width="100%"></a><br>
+<a href="docs/customization.md"><img src="docs/assets/readme/feature-customization.png" alt="Presentation without destructive edits" width="100%"></a><br>
 <strong>Presentation without destructive edits</strong><br>
 Customize Home, Gallery, Cards, Profiles, Covers, Banners, Frames, Backdrops, layouts, effects, and themes while leaving the original media intact.
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
-<a href="docs/languages.md"><img src="docs/assets/readme/feature-multilingual.svg" alt="8 interface languages" width="100%"></a><br>
+<a href="docs/languages.md"><img src="docs/assets/readme/feature-multilingual.png" alt="8 interface languages" width="100%"></a><br>
 <strong>8 interface languages</strong><br>
 Naut ships with English, Bahasa Indonesia, 日本語, 한국어, 简体中文, Deutsch, Français, and Español. Interface language does not rewrite your Vault or media metadata.
 </td>
 <td width="50%" valign="top">
-<a href="docs/vault.md"><img src="docs/assets/readme/feature-local-vault.svg" alt="Portable local Vault" width="100%"></a><br>
+<a href="docs/vault.md"><img src="docs/assets/readme/feature-local-vault.png" alt="Portable local Vault" width="100%"></a><br>
 <strong>Portable local Vault</strong><br>
 The portable app package and the Vault are separate boundaries. Imports copy files into the Vault while the source files remain where they were.
 </td>
@@ -84,13 +87,6 @@ The portable app package and the Vault are separate boundaries. Imports copy fil
 - **3D is additive, not mandatory.** Normal Naut use does not require a discrete GPU or a Figure.
 - **Portable application, durable collection.** Updating the app package does not replace the Vault.
 
-## What changed in v0.0.19
-
-- Unchanged launcher, updater, and worker files can be reused across releases.
-- The replacement helper is now compressed. The signed updater also fetches each required file identity once per update.
-
-See the [v0.0.19 release notes](docs/releases/v0.0.19.md) for update instructions and compatibility notes.
-
 ## See it in action
 
 <table>
@@ -104,9 +100,11 @@ See the [v0.0.19 release notes](docs/releases/v0.0.19.md) for update instruction
 </tr>
 </table>
 
+[Showcase image credits](docs/development/licensing.md#documentation-artwork)
+
 ## Quick Start
 
-1. Open the official [Naut v0.0.19 download](https://github.com/secondshift-dv/naut/releases/tag/v0.0.19) and choose **`naut-v0.0.19-win-x64.zip`** under Assets.
+1. Open the official [Naut v0.0.20 download](https://github.com/secondshift-dv/naut/releases/tag/v0.0.20) and choose **`naut-v0.0.20-win-x64.zip`** under Assets.
 2. Extract the complete ZIP to a normal folder.
 3. Run `naut.exe`.
 4. Choose **where to keep** your Vault.
@@ -127,7 +125,7 @@ Naut's normal collection experience is intentionally lighter than its optional F
 | **Display** | 1280 × 720 | 1920 × 1080 or higher |
 | **Free app/update space** | 3 GB | 3 GB+ on SSD |
 
-Vault storage is separate and depends on the size of your collection. See the full [Naut v0.0.19 System Requirements](docs/system-requirements.md).
+Vault storage is separate and depends on the size of your collection. See the full [Naut v0.0.20 System Requirements](docs/system-requirements.md).
 
 ## Optional pack collection
 

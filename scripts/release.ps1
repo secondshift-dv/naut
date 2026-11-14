@@ -330,7 +330,7 @@ try {
 
     # Legacy binaries are compiled from their immutable release tags and exercise the final
     # signed manifest, full ZIP and complete staging before any draft or publication is created.
-    git fetch origin tag v0.0.1 tag v0.0.2 --quiet
+    git fetch origin tag v0.0.1 tag v0.0.2 tag v0.0.18 --quiet
     if ($LASTEXITCODE -ne 0) { throw 'Exact legacy updater tags are required for publication.' }
     $verificationSigningEnvironment = $env:NEUTERRADISE_UPDATE_SIGNING_KEY_PEM
     try {

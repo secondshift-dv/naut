@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="src/Neuterradise.App/Assets/Brand/wordmark-lockup.png" alt="Naut" width="460">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="src/Neuterradise.App/Assets/Brand/wordmark-lockup-inverse.png">
+    <img src="src/Neuterradise.App/Assets/Brand/wordmark-lockup.png" alt="Naut" width="460">
+  </picture>
 </p>
 
 <p align="center"><strong>A Navigator for Your Things Worth Keeping</strong></p>
@@ -7,7 +10,7 @@
 <p align="center">Koleksi media lokal untuk Windows — pengenalan wajah offline, Figure 3D interaktif, dan Vault portabel milikmu sendiri.</p>
 
 <p align="center">
-  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.19"><strong>Download Naut v0.0.19</strong></a>
+  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.20"><strong>Download Naut v0.0.20</strong></a>
   ·
   <a href="https://secondshift-dv.github.io/naut/"><strong>Lihat Live Demo</strong></a>
   ·
@@ -48,36 +51,36 @@ lalu pilih komponennya dan simpan. Kode aplikasi tidak berubah.
 <table>
 <tr>
 <td width="50%" valign="top">
-<a href="docs/face-intelligence.md"><img src="docs/assets/readme/feature-face-intelligence.svg" alt="Face Intelligence" width="100%"></a><br>
+<a href="docs/face-intelligence.md"><img src="docs/assets/readme/feature-face-intelligence.png" alt="Face Intelligence" width="100%"></a><br>
 <strong>Face Intelligence</strong><br>
 YuNet mendeteksi wajah yang relevan, SFace menghasilkan embedding, lalu Naut dapat menampilkan kandidat Profile dari sampel identitas yang sudah dikonfirmasi. Pemrosesan tetap lokal dan saran tetap dapat ditinjau.
 </td>
 <td width="50%" valign="top">
-<a href="docs/figures.md"><img src="docs/assets/readme/feature-3d-figures.svg" alt="Figure 3D interaktif" width="100%"></a><br>
+<a href="docs/figures.md"><img src="docs/assets/readme/feature-3d-figures.png" alt="Figure 3D interaktif" width="100%"></a><br>
 <strong>Figure 3D interaktif</strong><br>
 Model yang kompatibel dapat menjadi Figure interaktif dengan rotate, pan, zoom, framing yang dikelola Naut, dan batas tekstur runtime yang terkontrol.
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
-<a href="docs/import-media.md"><img src="docs/assets/readme/feature-smart-import.svg" alt="Smart media import" width="100%"></a><br>
+<a href="docs/import-media.md"><img src="docs/assets/readme/feature-smart-import.png" alt="Smart media import" width="100%"></a><br>
 <strong>Smart media import</strong><br>
 Jalur import yang sama hanya menyiapkan kebutuhan tiap jenis media: metadata, thumbnail, media presentasi video yang dibatasi, analisis wajah bila relevan, dan derivative Figure untuk model yang didukung.
 </td>
 <td width="50%" valign="top">
-<a href="docs/customization.md"><img src="docs/assets/readme/feature-customization.svg" alt="Presentasi tanpa mengubah media asli" width="100%"></a><br>
+<a href="docs/customization.md"><img src="docs/assets/readme/feature-customization.png" alt="Presentasi tanpa mengubah media asli" width="100%"></a><br>
 <strong>Presentasi tanpa mengubah media asli</strong><br>
 Atur Home, Gallery, Card, Profile, Cover, Banner, Frame, Backdrop, layout, effect, dan theme tanpa memodifikasi file media asli.
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
-<a href="docs/languages.md"><img src="docs/assets/readme/feature-multilingual.svg" alt="8 bahasa antarmuka" width="100%"></a><br>
+<a href="docs/languages.md"><img src="docs/assets/readme/feature-multilingual.png" alt="8 bahasa antarmuka" width="100%"></a><br>
 <strong>8 bahasa antarmuka</strong><br>
 Naut menyediakan English, Bahasa Indonesia, 日本語, 한국어, 简体中文, Deutsch, Français, dan Español. Bahasa UI tidak menulis ulang Vault atau metadata media.
 </td>
 <td width="50%" valign="top">
-<a href="docs/vault.md"><img src="docs/assets/readme/feature-local-vault.svg" alt="Vault lokal dan portabel" width="100%"></a><br>
+<a href="docs/vault.md"><img src="docs/assets/readme/feature-local-vault.png" alt="Vault lokal dan portabel" width="100%"></a><br>
 <strong>Vault lokal dan portabel</strong><br>
 Paket aplikasi portabel dan Vault adalah batas yang terpisah. Import menyalin file ke Vault sementara file sumber tetap berada di lokasi asal.
 </td>
@@ -92,13 +95,6 @@ Paket aplikasi portabel dan Vault adalah batas yang terpisah. Import menyalin fi
 - **3D bersifat tambahan, bukan kewajiban.** Penggunaan Naut normal tidak membutuhkan discrete GPU atau Figure.
 - **Aplikasi portabel, koleksi durable.** Update paket aplikasi tidak mengganti Vault.
 
-## Baru di v0.0.19
-
-- Launcher, updater, dan worker yang isinya sama dapat digunakan kembali saat pembaruan.
-- Updater kini dikompresi. Setiap isi file yang dibutuhkan cukup diunduh satu kali per pembaruan.
-
-Lihat [catatan rilis v0.0.19](docs/releases/v0.0.19.md) untuk petunjuk pembaruan dan kompatibilitas.
-
 ## Lihat tampilannya
 
 <table>
@@ -112,9 +108,11 @@ Lihat [catatan rilis v0.0.19](docs/releases/v0.0.19.md) untuk petunjuk pembaruan
 </tr>
 </table>
 
+[Kredit gambar showcase](docs/development/licensing.md#documentation-artwork)
+
 ## Mulai cepat
 
-1. Buka [unduhan resmi Naut v0.0.19](https://github.com/secondshift-dv/naut/releases/tag/v0.0.19), lalu pilih **`naut-v0.0.19-win-x64.zip`** pada bagian Assets.
+1. Buka [unduhan resmi Naut v0.0.20](https://github.com/secondshift-dv/naut/releases/tag/v0.0.20), lalu pilih **`naut-v0.0.20-win-x64.zip`** pada bagian Assets.
 2. Extract seluruh ZIP ke folder biasa.
 3. Jalankan `naut.exe`.
 4. Pilih **lokasi penyimpanan** Vault.
@@ -135,7 +133,7 @@ Pengalaman koleksi Naut normal sengaja dibuat lebih ringan daripada workload Fig
 | **Display** | 1280 × 720 | 1920 × 1080 atau lebih |
 | **Ruang app/update** | 3 GB | 3 GB+ pada SSD |
 
-Storage Vault terpisah dan bergantung pada ukuran koleksi. Lihat [Naut v0.0.19 System Requirements](docs/system-requirements.md) lengkap.
+Storage Vault terpisah dan bergantung pada ukuran koleksi. Lihat [Naut v0.0.20 System Requirements](docs/system-requirements.md) lengkap.
 
 ## Dokumentasi
 

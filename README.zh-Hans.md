@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="src/Neuterradise.App/Assets/Brand/wordmark-lockup.png" alt="Naut" width="460">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="src/Neuterradise.App/Assets/Brand/wordmark-lockup-inverse.png">
+    <img src="src/Neuterradise.App/Assets/Brand/wordmark-lockup.png" alt="Naut" width="460">
+  </picture>
 </p>
 
 <p align="center"><strong>A Navigator for Your Things Worth Keeping</strong></p>
@@ -7,7 +10,7 @@
 <p align="center">面向 Windows 的本地媒体收藏 — 离线人脸识别、交互式 3D Figure，以及属于你的便携 Vault。</p>
 
 <p align="center">
-  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.19"><strong>下载 Naut v0.0.19</strong></a>
+  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.20"><strong>下载 Naut v0.0.20</strong></a>
   ·
   <a href="https://secondshift-dv.github.io/naut/"><strong>查看在线演示</strong></a>
   ·
@@ -48,36 +51,36 @@ Naut 是一款面向 Windows 的 **local-first 媒体收藏管理器**。它将�
 <table>
 <tr>
 <td width="50%" valign="top">
-<a href="docs/face-intelligence.md"><img src="docs/assets/readme/feature-face-intelligence.svg" alt="Face Intelligence" width="100%"></a><br>
+<a href="docs/face-intelligence.md"><img src="docs/assets/readme/feature-face-intelligence.png" alt="Face Intelligence" width="100%"></a><br>
 <strong>Face Intelligence</strong><br>
 YuNet 检测适用的人脸，SFace 生成 embedding；在已有已确认 identity sample 时，Naut 可以在本地给出 Profile 候选。候选仍需审阅，不会被当作静默的身份决定。
 </td>
 <td width="50%" valign="top">
-<a href="docs/figures.md"><img src="docs/assets/readme/feature-3d-figures.svg" alt="交互式 3D Figure" width="100%"></a><br>
+<a href="docs/figures.md"><img src="docs/assets/readme/feature-3d-figures.png" alt="交互式 3D Figure" width="100%"></a><br>
 <strong>交互式 3D Figure</strong><br>
 兼容模型可成为支持旋转、平移、缩放、Naut 管理 framing 和受控 runtime texture 上限的交互式 Figure。
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
-<a href="docs/import-media.md"><img src="docs/assets/readme/feature-smart-import.svg" alt="Smart Media Import" width="100%"></a><br>
+<a href="docs/import-media.md"><img src="docs/assets/readme/feature-smart-import.png" alt="Smart Media Import" width="100%"></a><br>
 <strong>Smart Media Import</strong><br>
 同一条 import path 只执行各类媒体真正需要的准备：metadata、thumbnail、受控 video presentation media、适用时的 face analysis，以及受支持模型的 Figure derivative。
 </td>
 <td width="50%" valign="top">
-<a href="docs/customization.md"><img src="docs/assets/readme/feature-customization.svg" alt="不破坏原文件的展示" width="100%"></a><br>
+<a href="docs/customization.md"><img src="docs/assets/readme/feature-customization.png" alt="不破坏原文件的展示" width="100%"></a><br>
 <strong>不破坏原文件的展示</strong><br>
 可调整 Home、Gallery、Card、Profile、Cover、Banner、Frame、Backdrop、layout、effect 和 theme，而不修改原始媒体。
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
-<a href="docs/languages.md"><img src="docs/assets/readme/feature-multilingual.svg" alt="8 种界面语言" width="100%"></a><br>
+<a href="docs/languages.md"><img src="docs/assets/readme/feature-multilingual.png" alt="8 种界面语言" width="100%"></a><br>
 <strong>8 种界面语言</strong><br>
 Naut 提供 English、Bahasa Indonesia、日本語、한국어、简体中文、Deutsch、Français 和 Español。切换界面语言不会重写 Vault 或媒体 metadata。
 </td>
 <td width="50%" valign="top">
-<a href="docs/vault.md"><img src="docs/assets/readme/feature-local-vault.svg" alt="可携带的本地 Vault" width="100%"></a><br>
+<a href="docs/vault.md"><img src="docs/assets/readme/feature-local-vault.png" alt="可携带的本地 Vault" width="100%"></a><br>
 <strong>可携带的本地 Vault</strong><br>
 便携应用包和 Vault 是独立边界。Import 会把文件复制进 Vault，源文件仍保留在原位置。
 </td>
@@ -105,9 +108,11 @@ Naut 提供 English、Bahasa Indonesia、日本語、한국어、简体中文、
 </tr>
 </table>
 
+[图片来源](docs/development/licensing.md#documentation-artwork)
+
 ## 快速开始
 
-1. 从官方 [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.19) 下载 **Naut v0.0.19**。
+1. 从官方 [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.20) 下载 **Naut v0.0.20**。
 2. 将完整 ZIP 解压到普通文件夹。
 3. 运行 `naut.exe`。
 4. 选择 Vault 的保存位置。
@@ -128,7 +133,7 @@ Naut 的普通收藏体验刻意保持轻量，可选 Figure workload 需要更�
 | **Display** | 1280 × 720 | 1920 × 1080 或更高 |
 | **App/update 可用空间** | 3 GB | SSD 上 3 GB+ |
 
-Vault 存储空间独立计算，取决于收藏规模。详见 [Naut v0.0.19 System Requirements](docs/system-requirements.md)。
+Vault 存储空间独立计算，取决于收藏规模。详见 [Naut v0.0.20 System Requirements](docs/system-requirements.md)。
 
 ## 文档
 

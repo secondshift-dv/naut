@@ -1,6 +1,6 @@
 <Project>
   <PropertyGroup>
-    <ProductVersion>0.0.19</ProductVersion>
+    <ProductVersion>0.0.20</ProductVersion>
     <ProductAssemblyVersion>0.0.10.0</ProductAssemblyVersion>
     <ProductRuntimeIdentifier>win-x64</ProductRuntimeIdentifier>
     <!-- Baseline for supporting binaries. Override Version when a component's release identity changes. -->

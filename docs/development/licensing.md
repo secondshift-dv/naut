@@ -21,6 +21,10 @@ Their upstream licenses and notices apply to those third-party runtime artifacts
 
 ## Documentation artwork
 
-Feature illustrations under `docs/assets/readme/` are Naut-authored vector artwork created for the public repository. They do not copy OpenCV Zoo demo images or use the OpenCV logo as Naut branding.
+The static README images include cropped Naut Interactive Showcase captures and selected artwork composed from those captures. The Gallery capture uses an additional sample set to demonstrate the card grid.
 
-This separation keeps README marketing artwork provenance independent from the third-party model/runtime licensing inventory.
+- The Interactive 3D Figures card and Profile screenshot show the [MS Gundam RX-78-2 with weapons](https://poly.pizza/m/fHalccv7ORh), by Tipatat Chennavasin, licensed under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). The Figure card uses a rotated, cropped viewer capture.
+- The Home, Profile and Gallery screenshots show cropped showcase derivatives of Melvin Loi’s [Gundam RX-78F00 photos](https://commons.wikimedia.org/wiki/File:Gundam_RX-78F00_(52973648960).jpg) ([second photo](https://commons.wikimedia.org/wiki/File:Gundam_RX-78F00_(52973698755).jpg)), licensed under [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/). The adapted photo regions remain under CC BY-SA 2.0.
+- The Gallery screenshot also shows a cropped [GUNDAM FACTORY YOKOHAMA photo](https://commons.wikimedia.org/wiki/File:GUNDAM_FACTORY_YOKOHAMA_(52985913940).jpg), by Dick Thomas Johnson, licensed under [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/).
+
+The Face Intelligence artwork is a Naut-authored diagram. It uses no OpenCV demo photography.

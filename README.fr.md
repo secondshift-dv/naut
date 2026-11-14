@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="src/Neuterradise.App/Assets/Brand/wordmark-lockup.png" alt="Naut" width="460">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="src/Neuterradise.App/Assets/Brand/wordmark-lockup-inverse.png">
+    <img src="src/Neuterradise.App/Assets/Brand/wordmark-lockup.png" alt="Naut" width="460">
+  </picture>
 </p>
 
 <p align="center"><strong>A Navigator for Your Things Worth Keeping</strong></p>
@@ -7,7 +10,7 @@
 <p align="center">Des collections multimédias locales pour Windows — reconnaissance faciale hors ligne, Figures 3D interactives et votre propre Vault portable.</p>
 
 <p align="center">
-  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.19"><strong>Télécharger Naut v0.0.19</strong></a>
+  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.20"><strong>Télécharger Naut v0.0.20</strong></a>
   ·
   <a href="https://secondshift-dv.github.io/naut/"><strong>Voir la démo</strong></a>
   ·
@@ -40,36 +43,36 @@ Naut est un **gestionnaire de collection multimédia local-first pour Windows**.
 <table>
 <tr>
 <td width="50%" valign="top">
-<a href="docs/face-intelligence.md"><img src="docs/assets/readme/feature-face-intelligence.svg" alt="Face Intelligence" width="100%"></a><br>
+<a href="docs/face-intelligence.md"><img src="docs/assets/readme/feature-face-intelligence.png" alt="Face Intelligence" width="100%"></a><br>
 <strong>Face Intelligence</strong><br>
 YuNet détecte les visages applicables, SFace produit des embeddings et Naut peut proposer des candidats de Profile à partir d'échantillons d'identité confirmés. Le traitement reste local et les suggestions restent vérifiables.
 </td>
 <td width="50%" valign="top">
-<a href="docs/figures.md"><img src="docs/assets/readme/feature-3d-figures.svg" alt="Figures 3D interactives" width="100%"></a><br>
+<a href="docs/figures.md"><img src="docs/assets/readme/feature-3d-figures.png" alt="Figures 3D interactives" width="100%"></a><br>
 <strong>Figures 3D interactives</strong><br>
 Les modèles compatibles peuvent devenir des Figures interactives avec rotation, déplacement, zoom, cadrage géré par Naut et limites de texture à l'exécution.
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
-<a href="docs/import-media.md"><img src="docs/assets/readme/feature-smart-import.svg" alt="Import média intelligent" width="100%"></a><br>
+<a href="docs/import-media.md"><img src="docs/assets/readme/feature-smart-import.png" alt="Import média intelligent" width="100%"></a><br>
 <strong>Import média intelligent</strong><br>
 Le même pipeline ne prépare que ce dont chaque type de média a besoin : métadonnées, miniatures, médias vidéo de présentation bornés, analyse faciale si applicable et dérivés Figure pour les modèles pris en charge.
 </td>
 <td width="50%" valign="top">
-<a href="docs/customization.md"><img src="docs/assets/readme/feature-customization.svg" alt="Présentation sans modifier les originaux" width="100%"></a><br>
+<a href="docs/customization.md"><img src="docs/assets/readme/feature-customization.png" alt="Présentation sans modifier les originaux" width="100%"></a><br>
 <strong>Présentation sans modifier les originaux</strong><br>
 Personnalisez Home, Gallery, Cards, Profiles, Covers, Banners, Frames, Backdrops, layouts, effets et themes sans modifier les fichiers originaux.
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
-<a href="docs/languages.md"><img src="docs/assets/readme/feature-multilingual.svg" alt="8 langues d'interface" width="100%"></a><br>
+<a href="docs/languages.md"><img src="docs/assets/readme/feature-multilingual.png" alt="8 langues d'interface" width="100%"></a><br>
 <strong>8 langues d'interface</strong><br>
 Naut fournit English, Bahasa Indonesia, 日本語, 한국어, 简体中文, Deutsch, Français et Español. La langue de l'interface ne réécrit ni le Vault ni les métadonnées.
 </td>
 <td width="50%" valign="top">
-<a href="docs/vault.md"><img src="docs/assets/readme/feature-local-vault.svg" alt="Vault local et portable" width="100%"></a><br>
+<a href="docs/vault.md"><img src="docs/assets/readme/feature-local-vault.png" alt="Vault local et portable" width="100%"></a><br>
 <strong>Vault local et portable</strong><br>
 Le paquet applicatif portable et le Vault sont séparés. L'import copie les fichiers dans le Vault et laisse les sources à leur emplacement d'origine.
 </td>
@@ -97,9 +100,11 @@ Le paquet applicatif portable et le Vault sont séparés. L'import copie les fic
 </tr>
 </table>
 
+[Crédits des images](docs/development/licensing.md#documentation-artwork)
+
 ## Démarrage rapide
 
-1. Téléchargez **Naut v0.0.19** depuis le [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.19) officiel.
+1. Téléchargez **Naut v0.0.20** depuis le [GitHub Release](https://github.com/secondshift-dv/naut/releases/tag/v0.0.20) officiel.
 2. Extrayez le ZIP complet dans un dossier normal.
 3. Lancez `naut.exe`.
 4. Choisissez où conserver le Vault.
@@ -120,7 +125,7 @@ L'expérience Naut normale est volontairement plus légère que la charge option
 | **Écran** | 1280 × 720 | 1920 × 1080 ou plus |
 | **Espace app/update** | 3 GB | 3 GB+ sur SSD |
 
-Le stockage du Vault est séparé et dépend de la collection. Voir [Naut v0.0.19 System Requirements](docs/system-requirements.md).
+Le stockage du Vault est séparé et dépend de la collection. Voir [Naut v0.0.20 System Requirements](docs/system-requirements.md).
 
 ## Collection de packs optionnels
 

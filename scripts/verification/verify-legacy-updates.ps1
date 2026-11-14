@@ -22,10 +22,14 @@ $sourceFiles=@(
     'src/Neuterradise.Runtime/SystemServices/Updates/UpdatePublisherSignature.cs',
     'src/Neuterradise.Runtime/SystemServices/Updates/UpdateUriPolicy.cs'
 )
-foreach ($version in @('0.0.1','0.0.2')) {
+foreach ($version in @('0.0.1','0.0.2','0.0.18')) {
     $probeRoot=Join-Path $repositoryRoot "out/legacy-updater-$version"
     New-Item -ItemType Directory -Path $probeRoot -Force | Out-Null
-    foreach ($file in $sourceFiles) {
+    $versionSources = $sourceFiles
+    if ([version]$version -ge [version]'0.0.18') {
+        $versionSources += 'src/Neuterradise.Runtime/SystemServices/Updates/UpdateProgress.cs'
+    }
+    foreach ($file in $versionSources) {
         $source=@(& git -C $LegacyRepository show "v${version}:$file")
         if ($LASTEXITCODE -ne 0) { throw "Exact legacy source is unavailable: v$version $file" }
         [IO.File]::WriteAllText((Join-Path $probeRoot ([IO.Path]::GetFileName($file))), ($source -join [Environment]::NewLine))
