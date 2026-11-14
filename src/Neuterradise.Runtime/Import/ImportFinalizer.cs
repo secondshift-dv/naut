@@ -491,6 +491,9 @@ public sealed class ImportFinalizer : IAsyncDisposable
                   AND j.kind IN ('ExtractMetadata', 'FaceAnalysis')
                   AND j.owner_type = 'Media'
                   AND j.state = 'FAILED_TERMINAL'
+                  -- Face analysis is optional when its decoder cannot read the media.
+                  -- Source integrity failures and required metadata still block commit.
+                  AND NOT (j.kind = 'FaceAnalysis' AND j.error_code IS 'FACE_INPUT_INVALID')
             );
             """;
         command.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));

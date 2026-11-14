@@ -28,10 +28,21 @@ public sealed class OpenCvFaceImageSource : IFaceImageSource
         if (mat is null || mat.Empty())
         {
             mat?.Dispose();
+            if (IsIcon(path)) return new OpenCvFaceImage(DecodeFrame(path, null));
             throw new FaceInputException($"Analyzed image could not be decoded: {path}.");
         }
 
         return new OpenCvFaceImage(mat);
+    }
+
+    private static bool IsIcon(string path)
+    {
+        // Candidate media are staged as original.partial, so the ICO directory header identifies them.
+        using var stream = File.OpenRead(path);
+        Span<byte> header = stackalloc byte[6];
+        return stream.ReadAtLeast(header, header.Length, false) == header.Length
+            && header[..4].SequenceEqual("\0\0\u0001\0"u8)
+            && (header[4] != 0 || header[5] != 0);
     }
 
     public IReadOnlyList<FaceFrameSample> LoadVideoSamples(string path, VideoSamplePlan plan)
