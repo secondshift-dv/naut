@@ -1127,6 +1127,10 @@
     <sys:String x:Key="Customize.ChooseProfileHint">Choose a Profile above to edit this for that Profile.</sys:String>
     <sys:String x:Key="Settings.Update.SectionTitle">Updates</sys:String>
     <sys:String x:Key="Settings.Update.FeedLabel">Update feed</sys:String>
+    <sys:String x:Key="Startup.MediaNaming.Progress">Updating media names… {0} of {1}</sys:String>
+    <sys:String x:Key="Startup.MediaNaming.Title">Media names could not be updated</sys:String>
+    <sys:String x:Key="Startup.MediaNaming.Message">Naut paused while updating your Vault’s media names.</sys:String>
+    <sys:String x:Key="Startup.MediaNaming.Next">Close apps using Vault files, then try again. If it keeps happening, open diagnostics for the affected media.</sys:String>
     <sys:String x:Key="Settings.Update.FeedPlaceholder">https://example.com/updates/update-manifest.json</sys:String>
     <sys:String x:Key="Settings.Update.SaveFeed">Save feed</sys:String>
     <sys:String x:Key="Settings.Update.Check">Check for updates</sys:String>

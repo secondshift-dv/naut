@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using Neuterradise.App.Media.Model;
 using Neuterradise.App.Profiles;
 using Neuterradise.App.SystemServices.Database;
 using Neuterradise.App.SystemServices.Database.Writes;
@@ -198,37 +199,35 @@ public sealed class MediaOperations
                 cancellationToken).ConfigureAwait(false);
             try
             {
-                var plan = _pathPlanner.AllocateMediaPlan(
-                    destination.ProfileId,
-                    destination.Label,
-                    new ProfileStorageToken(destination.StorageToken),
-                    asset.MediaId,
-                    new MediaStorageToken(asset.StorageToken),
-                    asset.MediaType,
-                    Path.GetExtension(asset.CurrentManagedFileName),
-                    candidate =>
-                    {
-                        var relative = candidate.ManagedFileRelativePath!.Replace('\\', '/');
-                        if (occupiedTargets.Contains(relative))
-                        {
-                            return true;
-                        }
-
-                        try
-                        {
-                            return File.Exists(_paths.ResolveVaultRelativePath(relative));
-                        }
-                        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
-                        {
-                            return true;
-                        }
-                    });
-
-                var targetFilePath = plan.ManagedFileRelativePath!;
-                targetRelativePath = targetFilePath[..targetFilePath.LastIndexOf('/')];
-                targetFileName = plan.ManagedFileName!;
+                var components = asset.MediaType == MediaType.Model
+                    ? await _catalog.MediaWrites.GetMediaComponentsAsync(asset.MediaId, cancellationToken).ConfigureAwait(false)
+                    : [];
+                var profileToken = new ProfileStorageToken(destination.StorageToken);
+                var mediaToken = new MediaStorageToken(asset.StorageToken);
+                if (components.Any(component => component.ComponentRole == ComponentRole.Dependency))
+                {
+                    var primary = components.First(component => component.ComponentRole == ComponentRole.Primary);
+                    var package = _pathPlanner.AllocateModelPackagePlan(destination.ProfileId, destination.Label,
+                        profileToken, asset.MediaId, mediaToken, primary.ComponentRelativePath,
+                        candidate => occupiedTargets.Any(path => path.StartsWith(
+                            candidate.PackageDirectoryRelativePath + "/", StringComparison.OrdinalIgnoreCase))
+                            || IsOccupied(candidate.PackageDirectoryRelativePath));
+                    targetRelativePath = package.PackageDirectoryRelativePath;
+                    targetFileName = package.PrimaryFileName;
+                }
+                else
+                {
+                    var plan = _pathPlanner.AllocateMediaPlan(destination.ProfileId, destination.Label,
+                        profileToken, asset.MediaId, mediaToken, asset.MediaType,
+                        Path.GetExtension(asset.CurrentManagedFileName),
+                        candidate => occupiedTargets.Contains(candidate.ManagedFileRelativePath!)
+                            || IsOccupied(candidate.ManagedFileRelativePath!));
+                    var targetFilePath = plan.ManagedFileRelativePath!;
+                    targetRelativePath = targetFilePath[..targetFilePath.LastIndexOf('/')];
+                    targetFileName = plan.ManagedFileName!;
+                }
             }
-            catch (ArgumentException)
+            catch (Exception exception) when (exception is ArgumentException or ManagedPathPlanningException)
             {
 
                 return OperationResult<ChangePrimaryProfileOutcome>.NeedsAttention(
@@ -851,6 +850,19 @@ public sealed class MediaOperations
             DbEnum.ParseManagedPathState(reader.GetString(11)),
             reader.IsDBNull(12) ? null : DbGuid.Parse(reader.GetString(12)),
             reader.IsDBNull(13) ? null : DbGuid.Parse(reader.GetString(13)));
+    }
+
+    private bool IsOccupied(string relativePath)
+    {
+        try
+        {
+            var path = _paths.ResolveVaultRelativePath(relativePath);
+            return File.Exists(path) || Directory.Exists(path);
+        }
+        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
+        {
+            return true;
+        }
     }
 
     private static async Task<DestinationProfile?> ReadDestinationProfileAsync(

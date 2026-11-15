@@ -1127,6 +1127,10 @@
     <sys:String x:Key="Customize.ChooseProfileHint">해당 Profile에 대해 이를 편집하려면 위에서 Profile을 선택하세요.</sys:String>
     <sys:String x:Key="Settings.Update.SectionTitle">업데이트</sys:String>
     <sys:String x:Key="Settings.Update.FeedLabel">피드 업데이트</sys:String>
+    <sys:String x:Key="Startup.MediaNaming.Progress">미디어 이름 업데이트 중… {1}개 중 {0}개</sys:String>
+    <sys:String x:Key="Startup.MediaNaming.Title">미디어 이름을 업데이트하지 못했습니다</sys:String>
+    <sys:String x:Key="Startup.MediaNaming.Message">Naut가 Vault의 미디어 이름 업데이트를 일시 중지했습니다.</sys:String>
+    <sys:String x:Key="Startup.MediaNaming.Next">Vault 파일을 사용 중인 앱을 닫고 다시 시도하세요. 문제가 계속되면 진단을 열어 영향을 받은 미디어를 확인하세요.</sys:String>
     <sys:String x:Key="Settings.Update.FeedPlaceholder">https://example.com/updates/update-manifest.json</sys:String>
     <sys:String x:Key="Settings.Update.SaveFeed">피드 저장</sys:String>
     <sys:String x:Key="Settings.Update.Check">업데이트 확인</sys:String>

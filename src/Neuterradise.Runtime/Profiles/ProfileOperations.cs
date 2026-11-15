@@ -1068,8 +1068,9 @@ public sealed class ProfileOperations
         foreach (var asset in ownedMedias)
         {
             string targetFilePath;
+            string targetDirectory;
             string targetFileName;
-            if (asset.MediaType == MediaType.Model && asset.DependencyStatus != MediaDependencyStatus.SelfContained)
+            if (asset.PrimaryPackageComponent is { } primaryComponent)
             {
                 var pkgPlan = _pathPlanner.AllocateModelPackagePlan(
                     profileId,
@@ -1077,7 +1078,7 @@ public sealed class ProfileOperations
                     profileToken,
                     asset.MediaId,
                     new MediaStorageToken(asset.StorageToken),
-                    asset.CurrentManagedFileName,
+                    primaryComponent,
                     candidate =>
                     {
                         var primary = candidate.PrimaryManagedRelativePath.Replace('\\', '/');
@@ -1102,6 +1103,7 @@ public sealed class ProfileOperations
                         }
                     });
                 targetFilePath = pkgPlan.PrimaryManagedRelativePath;
+                targetDirectory = pkgPlan.PackageDirectoryRelativePath;
                 targetFileName = pkgPlan.PrimaryFileName;
             }
             else
@@ -1137,6 +1139,7 @@ public sealed class ProfileOperations
                         }
                     });
                 targetFilePath = plan.ManagedFileRelativePath!;
+                targetDirectory = targetFilePath[..targetFilePath.LastIndexOf('/')];
                 targetFileName = plan.ManagedFileName!;
             }
 
@@ -1149,7 +1152,7 @@ public sealed class ProfileOperations
 
             assetPlans.Add(new OwnedMediaRenamePlan(
                 asset.MediaId,
-                targetFilePath[..targetFilePath.LastIndexOf('/')],
+                targetDirectory,
                 targetFileName,
                 asset.RowVersion));
         }
@@ -1296,7 +1299,11 @@ public sealed class ProfileOperations
             """
             SELECT a.media_id, a.media_storage_token, a.media_type,
                    a.current_managed_relative_path, a.current_managed_file_name, a.row_version,
-                   a.path_state, a.dependency_status
+                   a.path_state,
+                   (SELECT c.component_relative_path FROM media_components c
+                    WHERE c.media_id = a.media_id AND c.component_role = 'PRIMARY'
+                      AND EXISTS (SELECT 1 FROM media_components d
+                                  WHERE d.media_id = a.media_id AND d.component_role = 'DEPENDENCY'))
             FROM profile_media pa
             JOIN media a ON a.media_id = pa.media_id
             WHERE pa.profile_id = $profileId
@@ -1322,7 +1329,7 @@ public sealed class ProfileOperations
                 reader.GetString(4),
                 reader.GetInt64(5),
                 DbEnum.ParseManagedPathState(reader.GetString(6)),
-                reader.IsDBNull(7) ? MediaDependencyStatus.SelfContained : DbEnum.ParseMediaDependencyStatus(reader.GetString(7))));
+                reader.IsDBNull(7) ? null : reader.GetString(7)));
         }
 
         return media;
@@ -1519,7 +1526,7 @@ public sealed class ProfileOperations
         string CurrentManagedFileName,
         long RowVersion,
         ManagedPathState PathState,
-        MediaDependencyStatus DependencyStatus = MediaDependencyStatus.SelfContained)
+        string? PrimaryPackageComponent)
     {
         public string CurrentManagedFilePath =>
             $"{CurrentManagedRelativePath}/{CurrentManagedFileName}";

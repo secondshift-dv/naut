@@ -79,20 +79,10 @@ public sealed class ManagedPathPlanner
         var profilePlan = PlanProfile(profileId, displayLabel, profileStorageToken, profileIdSuffixLength);
         var normalizedExtension = _namePolicy.NormalizeExtension(extension);
         var mediaFolder = GetMediaFolder(mediaType);
-        var role = GetMediaRole(mediaType);
-        var suffix = $"__{role}__{IdSuffix(assetId, assetIdSuffixLength)}.{normalizedExtension}";
-        var safeName = FitHumanSegment(
-            _namePolicy.ToSafeProfileName(displayLabel),
-            suffix,
-            profilePlan.ProfileFolderRelativePath,
-            "Media",
-            mediaFolder);
-        var managedFileName = safeName + suffix;
-        var managedFilePath = CombineRelative(
-            profilePlan.ProfileFolderRelativePath,
-            "Media",
-            mediaFolder,
-            managedFileName);
+        var directory = CombineRelative(profilePlan.ProfileFolderRelativePath, "Media", mediaFolder);
+        var managedFileName = PlanMediaName(directory, displayLabel, assetId, mediaType,
+            "." + normalizedExtension, "", assetIdSuffixLength);
+        var managedFilePath = CombineRelative(directory, managedFileName);
         EnsureWithinBudget(managedFilePath);
 
         return profilePlan with
@@ -122,15 +112,50 @@ public sealed class ManagedPathPlanner
         Validate(assetStorageToken);
         ValidateSuffixLength(assetIdSuffixLength);
 
-        var suffix = $"__model__{IdSuffix(assetId, assetIdSuffixLength)}";
         var normalizedPrimary = NormalizeComponentPath(primaryRelativeComponentPath);
-        var safeName = FitHumanSegment(
-            _namePolicy.ToSafeProfileName(displayLabel), suffix + "/" + normalizedPrimary,
-            profile.ProfileFolderRelativePath, "Media", "Models");
-        var packageDirectory = CombineRelative(profile.ProfileFolderRelativePath, "Media", "Models", safeName + suffix);
+        var directory = CombineRelative(profile.ProfileFolderRelativePath, "Media", "Models");
+        var name = PlanMediaName(directory, displayLabel, assetId, MediaType.Model, "", "/" + normalizedPrimary,
+            assetIdSuffixLength);
+        var packageDirectory = CombineRelative(directory, name);
         var primary = CombineRelative(packageDirectory, normalizedPrimary);
         EnsureWithinBudget(primary);
         return new ManagedModelPackagePlan(assetId, packageDirectory, primary, Path.GetFileName(primaryRelativeComponentPath));
+    }
+
+    internal static bool HasLegacyMediaName(string name, Guid id, MediaType type, bool package)
+    {
+        var stem = package ? name : Path.GetFileNameWithoutExtension(name);
+        return AllowedSuffixLengths.Any(length =>
+            stem.EndsWith($"__{GetMediaRole(type)}__{IdSuffix(id, length)}", StringComparison.Ordinal));
+    }
+
+    internal IEnumerable<string> EnumerateMediaNames(
+        string directory, string label, Guid id, MediaType type, string extension,
+        IReadOnlyList<string>? packageComponents = null)
+    {
+        var tail = packageComponents is { Count: > 0 }
+            ? "/" + packageComponents.MaxBy(path => path.Length)
+            : "";
+        foreach (var length in AllowedSuffixLengths)
+        {
+            string name;
+            try
+            {
+                name = PlanMediaName(directory, label, id, type, extension, tail, length);
+            }
+            catch (ManagedPathPlanningException exception) when (exception.Code == PathTooLongCode)
+            {
+                yield break;
+            }
+            yield return name;
+        }
+    }
+
+    private string PlanMediaName(
+        string directory, string label, Guid id, MediaType type, string extension, string tail, int length)
+    {
+        var suffix = $"_{GetMediaRole(type)}_{IdSuffix(id, length)}{extension}";
+        return FitHumanSegment(_namePolicy.ToSafeProfileName(label), suffix + tail, directory) + suffix;
     }
 
     public string PlanMediaAsset(MediaStorageToken token, MediaAssetRole role)

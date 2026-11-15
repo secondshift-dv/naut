@@ -348,6 +348,7 @@ public sealed class LibraryHealthEvaluator
 
         var knownMediaIds = new HashSet<Guid>();
         var knownMediaFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var ownerFolders = profiles.ToDictionary(profile => profile.ProfileId, profile => profile.CurrentManagedRelativePath);
         var seenMediaTokens = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var asset in media)
@@ -555,7 +556,7 @@ public sealed class LibraryHealthEvaluator
                     asset.MediaType,
                     asset.Extension);
             }
-            catch (ArgumentException)
+            catch (Exception exception) when (exception is ArgumentException or ManagedPathPlanningException)
             {
                 findings.Add(new HealthFinding(
                     HealthFindingCode.StorageTokenPathMismatch,
@@ -570,13 +571,26 @@ public sealed class LibraryHealthEvaluator
             }
 
             var expectedFileName = assetPlan.ManagedFileName!;
+            var expectedRelative = assetPlan.ManagedFileRelativePath!;
+            var plannedDirectory = expectedRelative[..expectedRelative.LastIndexOf('/')];
+            var ownerFolder = ownerFolders.GetValueOrDefault(asset.OwnerProfileId.Value) ?? assetPlan.ProfileFolderRelativePath;
+            var ownerMediaDirectory = ownerFolder + plannedDirectory[assetPlan.ProfileFolderRelativePath.Length..];
+            if (asset.CurrentManagedFileName is { } storedName
+                && asset.CurrentManagedRelativePath is { } storedDirectory
+                && string.Equals(storedDirectory.Replace('\\', '/'), ownerMediaDirectory, StringComparison.OrdinalIgnoreCase)
+                && _pathPlanner.EnumerateMediaNames(ownerMediaDirectory, asset.OwnerDisplayName ?? "Profile",
+                    asset.MediaId, asset.MediaType, Path.GetExtension(expectedFileName))
+                    .Any(name => string.Equals(name, storedName, StringComparison.Ordinal)))
+            {
+                expectedFileName = storedName;
+                expectedRelative = $"{ownerMediaDirectory}/{storedName}";
+            }
             knownMediaFileNames.Add(expectedFileName);
-            var expectedRelative = NormalizeRelative(assetPlan.ManagedFileRelativePath!);
             string expectedFullPath;
             try
             {
                 expectedFullPath = _paths.ResolveVaultRelativePath(
-                    assetPlan.ManagedFileRelativePath!);
+                    expectedRelative);
             }
             catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
             {
@@ -1063,10 +1077,6 @@ public sealed class LibraryHealthEvaluator
                     assetId, null, null, $"MediaAsset file '{relativePath}' has the wrong SHA-256.", assetId.HasValue));
         }
     }
-
-    private static string NormalizeRelative(string relativePath) =>
-        relativePath.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar)
-                    .Replace('/', Path.DirectorySeparatorChar);
 
     private static string? ExtractProfileStorageTokenFromFolder(string folderName)
     {

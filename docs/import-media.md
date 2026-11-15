@@ -2,6 +2,8 @@
 
 Naut imports by **copying** media into the active Vault. Original files stay where they were.
 
+Managed copies use `ProfileName_type_ID.ext`. The type is `image`, `video`, or `model`. For a model with dependencies, the package directory uses `ProfileName_model_ID` and the files inside keep their original names and relative paths. Items in Trash use the current naming pattern when restored.
+
 ## Ways to import
 
 - Use **Import** to add files or folders and review the incoming items.

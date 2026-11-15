@@ -769,7 +769,7 @@ public sealed class PathReconciler
         return MoveDirectory(currentFolderPath, targetFolderPath);
     }
 
-    private static StorageOperationResult MoveDirectory(string source, string destination)
+    internal static StorageOperationResult MoveDirectory(string source, string destination)
     {
         try
         {
@@ -867,7 +867,7 @@ public sealed class PathReconciler
             : moved;
     }
 
-    private static StorageOperationResult MoveFile(string source, string destination)
+    internal static StorageOperationResult MoveFile(string source, string destination)
     {
         try
         {

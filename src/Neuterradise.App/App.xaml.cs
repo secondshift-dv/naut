@@ -249,13 +249,17 @@ public partial class App : Application
                 return;
             }
 
-            _window!.Content = StartupScreens.Splash(UI.T("Startup.Opening", "Opening your Vault…"));
+            _window!.Content = StartupScreens.Splash(UI.T("Startup.Opening", "Opening your Vault…"), out var status);
+            var namingProgress = new Progress<(int Processed, int Total)>(value =>
+                status.Text = string.Format(UI.T("Startup.MediaNaming.Progress", "Updating media names… {0} of {1}"),
+                    value.Processed, value.Total));
             _bootstrapper = AppBootstrapper.CreateProduction(resolution.VaultPaths, _appState!);
             var result = await _bootstrapper.BootstrapAsync(
                 onReady: ShowShellAsync,
                 prewarm: PrewarmAsync,
                 rollbackActivatedRuntime: RollbackActivatedStartupAsync,
-                cancellationToken: CancellationToken.None).ConfigureAwait(true);
+                cancellationToken: CancellationToken.None,
+                mediaNamingProgress: namingProgress).ConfigureAwait(true);
             if (result.IsReady)
             {
                 _context = result.Context;
@@ -1287,6 +1291,7 @@ public partial class App : Application
             "CONFIGURATION_UNREADABLE" => (UI.T("Startup.Config.Title", "Settings could not be read"), UI.T("Startup.Config.UnreadableMessage", "naut could not read its configuration. The original file was preserved for diagnostics. Reset settings to a safe default, then choose your Vault folder again."), UI.T("Startup.Config.UnreadableNext", "Reset settings safely to continue, or open diagnostics to inspect the preserved file."), true),
             "CONFIGURATION_ACCESS_DENIED" => (UI.T("Startup.Config.Title", "Settings could not be read"), UI.T("Startup.Config.Message", "naut could not read its configuration. The original file was kept."), UI.T("Startup.Config.Next", "Check folder permissions, then try again."), true),
             "STARTUP_ROLLBACK_UNSAFE" => (UI.T("Startup.Rollback.Title", "naut must close"), UI.T("Startup.Rollback.Message", "Startup stopped after the Vault was opened, and naut could not confirm a complete shutdown."), UI.T("Startup.Rollback.Next", "Close naut before trying again so the Vault remains safely locked to one app instance."), false),
+            "MEDIA_NAMING_MIGRATION_FAILED" => (UI.T("Startup.MediaNaming.Title", "Media names could not be updated"), UI.T("Startup.MediaNaming.Message", "Naut paused while updating your Vault’s media names."), UI.T("Startup.MediaNaming.Next", "Close apps using Vault files, then try again. If it keeps happening, open diagnostics for the affected media."), true),
             _ => (UI.T("Startup.Failed.Title", "naut could not start"), UI.T("Startup.Failed.Message", "Something prevented your Vault from opening. Nothing was changed."), UI.T("Startup.Failed.Next", "Try again. If it keeps happening, open diagnostics."), true),
         };
 

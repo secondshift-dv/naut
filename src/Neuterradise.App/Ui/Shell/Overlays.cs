@@ -353,14 +353,17 @@ public static class Pickers
 
 public static class StartupScreens
 {
-    public static FrameworkElement Splash(string status)
+    public static FrameworkElement Splash(string status) => Splash(status, out _);
+
+    public static FrameworkElement Splash(string status, out TextBlock statusText)
     {
         var theme = ThemeRuntime.Current;
         var root = new Grid { Background = theme.Brush("canvas") };
         root.Children.Add(new BackdropView { Plan = BackdropPlan.Still(), IsSurfaceActive = false });
+        statusText = UI.Text(status, "caption", "textSecondary", 2).Align(HorizontalAlignment.Center);
         root.Children.Add(UI.V(16,
             BrandAssets.Lockup(40, 12, animateMark: true).Align(HorizontalAlignment.Center),
-            UI.Text(status, "caption", "textSecondary", 2).Align(HorizontalAlignment.Center),
+            statusText,
             new ProgressBar { IsIndeterminate = true, Width = 128, Height = 3 }
                 .Align(HorizontalAlignment.Center)).Align(HorizontalAlignment.Center, VerticalAlignment.Center));
         return root;

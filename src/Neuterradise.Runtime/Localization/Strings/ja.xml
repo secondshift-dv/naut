@@ -1127,6 +1127,10 @@
     <sys:String x:Key="Customize.ChooseProfileHint">上で Profile を選択すると、その Profile の内容を編集できます。</sys:String>
     <sys:String x:Key="Settings.Update.SectionTitle">更新</sys:String>
     <sys:String x:Key="Settings.Update.FeedLabel">更新フィード</sys:String>
+    <sys:String x:Key="Startup.MediaNaming.Progress">メディア名を更新しています… {1} 件中 {0} 件</sys:String>
+    <sys:String x:Key="Startup.MediaNaming.Title">メディア名を更新できませんでした</sys:String>
+    <sys:String x:Key="Startup.MediaNaming.Message">Naut は Vault 内のメディア名の更新を一時停止しました。</sys:String>
+    <sys:String x:Key="Startup.MediaNaming.Next">Vault のファイルを使用しているアプリを閉じて、もう一度お試しください。問題が続く場合は、診断を開いて対象のメディアを確認してください。</sys:String>
     <sys:String x:Key="Settings.Update.FeedPlaceholder">https://example.com/updates/update-manifest.json</sys:String>
     <sys:String x:Key="Settings.Update.SaveFeed">フィードを保存</sys:String>
     <sys:String x:Key="Settings.Update.Check">更新を確認</sys:String>

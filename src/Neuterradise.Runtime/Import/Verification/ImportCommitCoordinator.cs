@@ -318,7 +318,16 @@ public sealed class ImportCommitCoordinator
 
             foreach (var item in included)
             {
-                await ActivateItemAsync(destinationProfileId, item, cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await ActivateItemAsync(destinationProfileId, state.DestinationDisplayLabel ?? "Profile",
+                        item, cancellationToken).ConfigureAwait(false);
+                }
+                catch (ManagedMediaNamingException exception)
+                {
+                    return CommitBlockedResult(unitId, state,
+                        [new VerificationBlocker(item.ItemId, "PLACEMENT_RETRYABLE", exception.Message)]);
+                }
                 await importWrites.AdvanceItemCleanupStateAsync(
                     item.ItemId, SourceCleanupState.LibraryCommitted, cancellationToken).ConfigureAwait(false);
                 await _catalog.MediaWrites.UpdateAllComponentsCleanupStateAsync(
@@ -1073,12 +1082,23 @@ public sealed class ImportCommitCoordinator
 
     private async Task ActivateItemAsync(
         Guid destinationProfileId,
+        string destinationLabel,
         ImportItemSummary item,
         CancellationToken cancellationToken)
     {
         var assetId = item.CandidateMediaId!.Value;
         var (sha256, byteLength, currentRel, currentName, targetRel, targetName) =
             await ReadPlacedMediaAsync(assetId, cancellationToken).ConfigureAwait(false);
+        var type = item.MediaType ?? MediaType.Image;
+        if (ManagedPathPlanner.HasLegacyMediaName(currentName, assetId, type, package: false)
+            || (type == MediaType.Model && ManagedPathPlanner.HasLegacyMediaName(
+                currentRel[(currentRel.LastIndexOf('/') + 1)..], assetId, type, package: true)))
+        {
+            await new ManagedMediaNamingMigration(_catalog).MigratePlacementAsync(assetId, type, destinationLabel,
+                cancellationToken).ConfigureAwait(false);
+            (sha256, byteLength, currentRel, currentName, targetRel, targetName) =
+                await ReadPlacedMediaAsync(assetId, cancellationToken).ConfigureAwait(false);
+        }
 
         await _catalog.MediaWrites.ActivateCandidateAsync(
             new CandidateActivationRequest(

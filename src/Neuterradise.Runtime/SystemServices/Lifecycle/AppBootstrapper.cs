@@ -52,7 +52,8 @@ public sealed class AppBootstrapper
         Func<BootstrapContext, CancellationToken, Task>? onReady = null,
         Func<BootstrapContext, CancellationToken, Task>? prewarm = null,
         Func<CancellationToken, Task>? rollbackActivatedRuntime = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<(int Processed, int Total)>? mediaNamingProgress = null)
     {
         if (Interlocked.Exchange(ref _started, 1) != 0)
         {
@@ -156,15 +157,24 @@ public sealed class AppBootstrapper
             CompleteStage(StartupStage.DbOpenedToSchemaReady);
 
             TransitionTo(StartupState.Recovering);
+            var naming = new ManagedMediaNamingMigration(catalog);
+            var namingComplete = await naming.IsCompleteAsync(cancellationToken).ConfigureAwait(true);
+            await Task.Run(() => naming.ResumeAsync(mediaNamingProgress, cancellationToken), cancellationToken)
+                .ConfigureAwait(true);
             var recovery = await new RecoveryCoordinator(catalog, _diagnostics).RecoverAsync(cancellationToken, includeMediaAssets: false)
                 .ConfigureAwait(true);
             if (recovery.HasFatal || recovery.BlocksWritableStartup)
             {
                 throw new RecoveryFailedException(recovery);
             }
+            var gate = new CriticalIntegrityGate(catalog, _diagnostics);
+            if (!namingComplete)
+            {
+                await Task.Run(() => naming.MigrateVaultAsync(initialization.Created, mediaNamingProgress, cancellationToken),
+                    cancellationToken).ConfigureAwait(true);
+            }
             CompleteStage(StartupStage.SchemaReadyToRecoveryComplete);
 
-            var gate = new CriticalIntegrityGate(catalog, _diagnostics);
             var gateResult = await gate.EvaluateAsync(cancellationToken).ConfigureAwait(true);
             if (!gateResult.Passed)
             {
@@ -311,6 +321,7 @@ public sealed class AppBootstrapper
                 OperationCanceledException => "STARTUP_CANCELLED",
                 CatalogSchemaException => "DATABASE_INITIALIZATION_FAILED",
                 RecoveryFailedException => "RECOVERY_FAILED",
+                    ManagedMediaNamingException => "MEDIA_NAMING_MIGRATION_FAILED",
                 CriticalIntegrityException => "CRITICAL_INTEGRITY_VIOLATION",
                 _ when CatalogDb.IsDatabaseFailure(ex) => "DATABASE_INITIALIZATION_FAILED",
                 UnauthorizedAccessException => "VAULT_ROOT_ACCESS_DENIED",

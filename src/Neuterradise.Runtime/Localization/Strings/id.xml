@@ -1127,6 +1127,10 @@
     <sys:String x:Key="Customize.ChooseProfileHint">Pilih Profile di atas untuk menyunting ini bagi Profile tersebut.</sys:String>
     <sys:String x:Key="Settings.Update.SectionTitle">Pembaruan</sys:String>
     <sys:String x:Key="Settings.Update.FeedLabel">Feed pembaruan</sys:String>
+    <sys:String x:Key="Startup.MediaNaming.Progress">Memperbarui nama media… {0} dari {1}</sys:String>
+    <sys:String x:Key="Startup.MediaNaming.Title">Nama media belum berhasil diperbarui</sys:String>
+    <sys:String x:Key="Startup.MediaNaming.Message">Naut menjeda pembaruan nama media di Vault Anda.</sys:String>
+    <sys:String x:Key="Startup.MediaNaming.Next">Tutup aplikasi yang sedang menggunakan file Vault, lalu coba lagi. Jika masalah berlanjut, buka diagnostik untuk melihat media yang terdampak.</sys:String>
     <sys:String x:Key="Settings.Update.FeedPlaceholder">https://example.com/updates/update-manifest.json</sys:String>
     <sys:String x:Key="Settings.Update.SaveFeed">Simpan feed</sys:String>
     <sys:String x:Key="Settings.Update.Check">Periksa pembaruan</sys:String>

@@ -1127,6 +1127,10 @@
     <sys:String x:Key="Customize.ChooseProfileHint">Elija un Profile arriba para editarlo para ese Profile.</sys:String>
     <sys:String x:Key="Settings.Update.SectionTitle">Actualizaciones</sys:String>
     <sys:String x:Key="Settings.Update.FeedLabel">Actualizar feed</sys:String>
+    <sys:String x:Key="Startup.MediaNaming.Progress">Actualizando nombres de medios… {0} de {1}</sys:String>
+    <sys:String x:Key="Startup.MediaNaming.Title">No se pudieron actualizar los nombres de medios</sys:String>
+    <sys:String x:Key="Startup.MediaNaming.Message">Naut pausó la actualización de los nombres de medios del Vault.</sys:String>
+    <sys:String x:Key="Startup.MediaNaming.Next">Cierra las aplicaciones que estén usando archivos del Vault y vuelve a intentarlo. Si el problema persiste, abre el diagnóstico para identificar los medios afectados.</sys:String>
     <sys:String x:Key="Settings.Update.FeedPlaceholder">https://example.com/updates/update-manifest.json</sys:String>
     <sys:String x:Key="Settings.Update.SaveFeed">Guardar feed</sys:String>
     <sys:String x:Key="Settings.Update.Check">Buscar actualizaciones</sys:String>

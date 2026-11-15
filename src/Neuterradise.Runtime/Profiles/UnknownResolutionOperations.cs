@@ -594,8 +594,7 @@ public sealed class UnknownResolutionOperations
             var currentFilePath = $"{asset.CurrentManagedRelativePath}/{asset.CurrentManagedFileName}"
                 .Replace('\\', '/');
 
-            if (asset.MediaType == MediaType.Model
-                && asset.DependencyStatus != MediaDependencyStatus.SelfContained)
+            if (asset.PrimaryPackageComponent is { } primaryComponent)
             {
                 var package = _pathPlanner.AllocateModelPackagePlan(
                     destinationProfileId,
@@ -603,7 +602,7 @@ public sealed class UnknownResolutionOperations
                     new ProfileStorageToken(destinationStorageToken),
                     asset.MediaId,
                     new MediaStorageToken(asset.StorageToken!),
-                    asset.CurrentManagedFileName!,
+                    primaryComponent,
                     candidate =>
                     {
                         var primary = candidate.PrimaryManagedRelativePath.Replace('\\', '/');
@@ -1447,7 +1446,10 @@ CompletePresentation:
                    (SELECT pa.profile_id
                     FROM profile_media pa
                     WHERE pa.media_id = a.media_id AND pa.relation_type = 'OWNER') AS owner_profile_id,
-                   a.dependency_status
+                   (SELECT c.component_relative_path FROM media_components c
+                    WHERE c.media_id = a.media_id AND c.component_role = 'PRIMARY'
+                      AND EXISTS (SELECT 1 FROM media_components d
+                                  WHERE d.media_id = a.media_id AND d.component_role = 'DEPENDENCY'))
             FROM media a
             WHERE a.media_id = $assetId;
             """);
@@ -1479,7 +1481,7 @@ CompletePresentation:
             reader.GetInt64(12),
             !reader.IsDBNull(13),
             reader.IsDBNull(14) ? null : DbGuid.Parse(reader.GetString(14)),
-            reader.IsDBNull(15) ? MediaDependencyStatus.SelfContained : DbEnum.ParseMediaDependencyStatus(reader.GetString(15)));
+            reader.IsDBNull(15) ? null : reader.GetString(15));
     }
 
     private static async Task<int> CountActiveOwnedMediasAsync(
@@ -1718,7 +1720,7 @@ CompletePresentation:
         long RowVersion,
         bool IsTrashed,
         Guid? CurrentOwnerProfileId,
-        MediaDependencyStatus DependencyStatus = MediaDependencyStatus.SelfContained);
+        string? PrimaryPackageComponent);
 }
 
 public sealed record AssignUnknownMediasToProfileRequest(
