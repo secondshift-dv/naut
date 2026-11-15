@@ -63,6 +63,10 @@ jobs:
         shell: pwsh
         run: ./scripts/build.ps1
 
+      - name: Verify update and release layout contracts
+        shell: pwsh
+        run: ./scripts/verify.ps1 -Scope ReleaseLayout
+
       - name: Upload build artifact
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_build_artifact }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

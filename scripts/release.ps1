@@ -198,6 +198,10 @@ try {
             throw 'ArtifactMode requires an exact 40-character -SourceHead.'
         }
         $head = $SourceHead.ToLowerInvariant()
+        $checkedOutHead = (git rev-parse HEAD).Trim()
+        if ($LASTEXITCODE -ne 0 -or $checkedOutHead -cne $head) {
+            throw 'Checked-out release source differs from the publication artifact source.'
+        }
     }
     else {
         $dirty = @(git status --porcelain)

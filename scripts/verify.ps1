@@ -3,14 +3,24 @@ param([ValidateSet('Source','Compile','Hygiene','Closure','WorkflowPolicy','Upda
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $repo=(Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+if ($RequireBuild -and $Scope -ne 'Closure') { throw '-RequireBuild is valid only with -Scope Closure.' }
 function Verify-PublicTree {
     $files=@(& git -C $repo ls-files --cached --others --exclude-standard)
     if ($LASTEXITCODE -ne 0) { throw 'Cannot inventory public tree' }
+    $localPath = '(?im)\b(?:[a-z]:[\\/]+Users[\\/]+(?!Public\b|Default\b|<)[\w.\p{L}-]+|/home/(?!runner\b|<)[\w.\p{L}-]+)[\\/]'
     foreach ($file in $files) {
-        if ($file -match '(^|/)(AGENTS\.md|ENGINEERING\.md|Naut\.Showcase|work|backup|Migration|bin|obj|dist|out|node_modules)(/|$)|\.(pem|pfx|p12|key|db|sqlite|bak)$') { throw "Excluded public file: $file" }
-        $bytes=[IO.File]::ReadAllBytes((Join-Path $repo $file))
+        if ($file -match '(^|/)(AGENTS\.md|ENGINEERING\.md|Naut\.Showcase|work|backup|Migration|bin|obj|dist|out|node_modules)(/|$)|\.(pem|pfx|p12|key|db|sqlite|bak)$') {
+            throw "Excluded public file: $file"
+        }
+        $bytes = [IO.File]::ReadAllBytes((Join-Path $repo $file))
         if ($bytes -contains 0) { continue }
-        if ([Text.Encoding]::UTF8.GetString($bytes) -match '-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----|\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{50,})\b') { throw "Secret candidate in $file; value suppressed" }
+        $content = [Text.Encoding]::UTF8.GetString($bytes)
+        if ($content -match '-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----|\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{50,})\b') {
+            throw "Secret candidate in $file; value suppressed"
+        }
+        if ($content -match $localPath) {
+            throw "Local account path in $file; value suppressed. Use an environment variable or a portable example."
+        }
     }
     $readmes=@('README.md','README.de.md','README.es.md','README.fr.md','README.id.md','README.ja.md','README.ko.md','README.zh-Hans.md')
     $userDocs=@(
@@ -65,13 +75,65 @@ function Verify-PublicTree {
     Write-Host 'PUBLIC_TREE=PASS'
 }
 function Verify-WorkflowPolicy {
-    foreach ($workflow in Get-ChildItem -LiteralPath (Join-Path $repo '.github/workflows') -File -Filter '*.yml') {
-        $text=Get-Content -LiteralPath $workflow.FullName -Raw
-        if ($text -match 'pull_request_target|permissions:\s*write-all') { throw "Unsafe public workflow: $($workflow.Name)" }
-        foreach ($line in $text -split '\r?\n') {
-            if ($line -match '^\s*uses:\s*([^\s]+)' -and $Matches[1] -notmatch '^\./|@[a-f0-9]{40}$') { throw "Unpinned action: $($workflow.Name)" }
+    $workflowRoot = Join-Path $repo '.github/workflows'
+    $workflows = @(Get-ChildItem -LiteralPath $workflowRoot -File | Where-Object { $_.Extension -in '.yml', '.yaml' })
+    foreach ($required in 'build.yml', 'verify.yml', 'packs.yml', 'release.yml') {
+        if ($required -notin $workflows.Name) { throw "Missing public workflow: $required" }
+    }
+    foreach ($workflow in $workflows) {
+        $lines = @(Get-Content -LiteralPath $workflow.FullName)
+        $content = $lines -join "`n"
+        $isRelease = $workflow.Name -ceq 'release.yml'
+        if ($content -match '(?m)^  (?:pull_request_target|workflow_run):|(?im)^[ \t]*permissions:[ \t]*[^\s#]') {
+            throw "Unexpected event or permissions syntax in $($workflow.Name)"
         }
-        if ($workflow.Name -ne 'release.yml' -and $text -match 'UPDATE_SIGNING_KEY|contents:\s*write|id-token:\s*write|attestations:\s*write') { throw "Unexpected publication privilege: $($workflow.Name)" }
+        if ($content -notmatch '(?m)^permissions:\r?\n  contents: read\s*$') {
+            throw "Explicit read-only default required in $($workflow.Name)"
+        }
+        $job = ''
+        $inJobs = $false
+        foreach ($line in $lines) {
+            if ($line -eq 'jobs:') { $inJobs = $true }
+            if ($inJobs -and $line -match '^  ([\w-]+):\s*$') { $job = $Matches[1] }
+            if ($line -match '^\s*(?:-\s+)?uses:\s*([^\s#]+)' -and $Matches[1] -notmatch '^(\./|.+@[a-fA-F0-9]{40}$)') {
+                throw "Unpinned action in $($workflow.Name)"
+            }
+            if ($line -match '^(\s+)([\w-]+):\s*["'']?write["'']?\s*(?:#.*)?$') {
+                if (-not ($isRelease -and $job -ceq 'publish' -and $Matches[1].Length -eq 6 -and $Matches[2] -in 'actions', 'contents')) {
+                    throw "Unexpected write permission in $($workflow.Name) job '$job'"
+                }
+            }
+            if ($line -match '\bsecrets\.' -and
+                -not ($isRelease -and $job -ceq 'publish' -and
+                    $line -match '^\s+(GH_TOKEN|NEUTERRADISE_UPDATE_SIGNING_KEY_PEM): \$\{\{ secrets\.\w+ \}\}\s*$' -and
+                    ($line -match 'GH_TOKEN: \$\{\{ secrets\.GITHUB_TOKEN \}\}' -or
+                     $line -match 'NEUTERRADISE_UPDATE_SIGNING_KEY_PEM: \$\{\{ secrets\.NEUTERRADISE_UPDATE_SIGNING_KEY_PEM \}\}'))) {
+                throw "Unexpected repository secret reference in $($workflow.Name) job '$job'"
+            }
+        }
+        switch ($workflow.Name) {
+            'verify.yml' {
+                if ($content -notmatch '(?m)^    name: source-verify\s*$' -or
+                    $content -notmatch '(?m)^  pull_request:\s*$' -or $content -notmatch '(?m)^  push:\s*$' -or
+                    $content -notmatch 'scripts/verify\.ps1 -Scope Source' -or $content -match 'scripts/(?:build|release)\.ps1') {
+                    throw 'Source Verify must keep its required check name and source-only push/PR validation.'
+                }
+            }
+            'packs.yml' {
+                if ($content -notmatch 'scripts/verify\.ps1 -Scope Packs' -or $content -match 'publish-packs|scripts/(?:build|release)\.ps1') {
+                    throw 'Optional Packs must validate packs without publishing.'
+                }
+            }
+            'release.yml' {
+                $events = [regex]::Match($content, '(?ms)^on:\n(.*?)(?=^\S)').Groups[1].Value
+                if (([regex]::Matches($events, '(?m)^  [\w-]+:').Value -join ',') -cne '  workflow_dispatch:' -or
+                    $content -notmatch "(?m)^    if: .+github\.ref == 'refs/heads/main'" -or
+                    $content -notmatch 'scripts/verify\.ps1 -Scope WorkflowPolicy' -or
+                    $content -notmatch '(?m)^    needs: build\s*$') {
+                    throw 'Release must be manual from main and publish only after the checked build.'
+                }
+            }
+        }
     }
     Write-Host 'PUBLIC_WORKFLOW_POLICY=PASS'
 }
@@ -80,7 +142,9 @@ if ($Scope -in @('Source','Hygiene','Closure')) { & (Join-Path $PSScriptRoot 've
 if ($Scope -in @('Source','WorkflowPolicy','Closure')) { Verify-WorkflowPolicy }
 if ($Scope -in @('Source','Compile')) { & (Join-Path $PSScriptRoot 'verification/verify-compile.ps1') -Offline:$Offline }
 if ($Scope -eq 'Updater') { & (Join-Path $PSScriptRoot 'verification/verify-updater.ps1') -Offline:$Offline }
-if ($Scope -eq 'ReleaseLayout') { & (Join-Path $PSScriptRoot 'verification/verify-release-layout.ps1') -Offline:$Offline }
+if ($Scope -eq 'ReleaseLayout') {
+    & (Join-Path $PSScriptRoot 'verification/verify-release-layout.ps1') -Offline:$Offline
+}
 if ($Scope -eq 'Closure') {
     if (@(& git -C $repo status --porcelain).Count) { throw 'Public worktree is not clean' }
     if ((& git -C $repo rev-parse HEAD).Trim() -ne (& git -C $repo rev-parse origin/main).Trim()) { throw 'Public main differs from origin/main' }

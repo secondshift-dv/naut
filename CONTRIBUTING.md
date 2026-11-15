@@ -22,7 +22,7 @@ Report security vulnerabilities privately using the repository's Security report
 
 ## Documentation integrity
 
-Public README pages, translations, guides, release notes and pack previews must describe the currently published version, not a development-only or retired definition. Keep the active download and versioned links aligned with `Directory.Build.props`; keep pack display names and counts aligned with `packs/catalog.json` and the shipped `pack.json`. Historical release notes remain archival and must not be rewritten to present them as current behavior.
+Public README pages, translations, guides, release notes and pack previews must describe the currently published version, not a development-only or retired definition. Keep the active download and versioned links aligned with `Directory.Build.props`; keep pack display names and counts aligned with `packs/catalog.json` and the shipped `pack.json`. Historical release notes describe the version they shipped with. Use fictional profiles and media filenames in examples, and preserve the original facts when removing personal details from archived documentation.
 
 Use UTF-8 throughout. Do not substitute a bare `?` for punctuation or publish repeated `?` placeholders, damaged replacement characters, control bytes or mojibake. Legitimate questions, URL query syntax and code examples can retain their question marks. Keep relative links valid, preserve attribution, and display only shipped pack components in documentation artwork. Treat static compositions as illustrations, never as verified in-app screenshots.
 

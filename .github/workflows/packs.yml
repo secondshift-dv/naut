@@ -2,13 +2,39 @@ name: Optional Packs
 on:
   pull_request:
     branches: [main]
-    paths: ['packs/**', 'scripts/verification/verify-packs.ps1', 'scripts/verification/diagnostics/CuratedPacksProbe.cs', 'scripts/utilities/package-packs.ps1', '.github/workflows/packs.yml']
+    paths:
+      - 'packs/**'
+      - 'src/Neuterradise.Runtime/Presentation/**'
+      - 'src/Neuterradise.Runtime/Neuterradise.Runtime.csproj'
+      - 'src/Neuterradise.Runtime/packages.lock.json'
+      - 'scripts/verify.ps1'
+      - 'scripts/verification/verify-packs.ps1'
+      - 'scripts/verification/diagnostics/CuratedPacksProbe.cs'
+      - 'scripts/utilities/package-packs.ps1'
+      - 'Directory.Build.props'
+      - 'global.json'
+      - '.github/workflows/packs.yml'
   push:
     branches: [main]
-    paths: ['packs/**', 'scripts/verification/verify-packs.ps1', 'scripts/verification/diagnostics/CuratedPacksProbe.cs', 'scripts/utilities/package-packs.ps1', '.github/workflows/packs.yml']
+    paths:
+      - 'packs/**'
+      - 'src/Neuterradise.Runtime/Presentation/**'
+      - 'src/Neuterradise.Runtime/Neuterradise.Runtime.csproj'
+      - 'src/Neuterradise.Runtime/packages.lock.json'
+      - 'scripts/verify.ps1'
+      - 'scripts/verification/verify-packs.ps1'
+      - 'scripts/verification/diagnostics/CuratedPacksProbe.cs'
+      - 'scripts/utilities/package-packs.ps1'
+      - 'Directory.Build.props'
+      - 'global.json'
+      - '.github/workflows/packs.yml'
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: optional-packs-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
 jobs:
   packs:
     runs-on: windows-latest

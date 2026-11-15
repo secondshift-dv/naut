@@ -13,6 +13,10 @@ pwsh ./scripts/build.ps1
 
 The canonical build writes the portable application and verified release inputs under `dist/`. The launcher and replacement helper are compressed self-contained executables. App and Runtime track `ProductVersion`. Supporting components use their own version metadata and omit the repository commit, which is recorded in build provenance.
 
+## GitHub Actions
+
+**Source Verify** runs on pushes and pull requests to `main`. It checks public hygiene, documentation, workflow policy and all shipped projects. **Build (Manual)** checks the canonical package, updater and release layout. Its Actions artifact is opt-in. **Optional Packs** checks pack sources and their presentation engine dependencies. It uploads generated packs only on manual runs.
+
 ## Release authority
 
 The public repository `secondshift-dv/naut` is the only official GitHub Release authority for Naut application releases. The private engineering repository `naut-dv` does not publish official application releases.
@@ -23,7 +27,7 @@ Naut v0.0.3 and later clients can reuse installed files only after byte-length a
 
 Canonical releases include the full ZIP, `update.json`, `update-signature.json`, `update-incremental.json`, all content-addressed file assets, `build-provenance.json`, and both corresponding-source archives.
 
-The public **Release (Manual)** workflow builds the selected commit in a read-only job. A dedicated publication job signs and publishes that payload, then removes the short-lived Actions artifact used to pass it between jobs.
+The public **Release (Manual)** workflow runs from `main`, one release run at a time. A read-only job builds the selected commit and hands off only publication files. A dedicated job signs and publishes the payload and removes the handoff after success. A failed publication retains the handoff for a retry until its one-day expiration.
 
 ## Dependency source releases
 
