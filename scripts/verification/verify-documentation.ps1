@@ -4,6 +4,7 @@ param([string]$RepositoryRoot = (Join-Path $PSScriptRoot '../..'))
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path -LiteralPath $RepositoryRoot).Path
+& (Join-Path $PSScriptRoot 'verify-privacy.ps1') -RepositoryRoot $root
 $utf8 = [Text.UTF8Encoding]::new($false, $true)
 $issues = [Collections.Generic.List[string]]::new()
 $tracked = @(& git -C $root ls-files)

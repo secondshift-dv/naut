@@ -7,7 +7,7 @@ The reviewed source of the release body is `docs/releases/v<ProductVersion>.md`.
 Required structure:
 
 - `# Naut vX.Y.Z`: the exact product version.
-- `## Highlights`: concise bullets describing actual additions, fixes, or changes and their practical effect. Include a before/after example when it makes a fix clearer.
+- `## Highlights`: concise bullets describing actual additions, fixes, or changes and their practical effect. Include a before/after example when it makes a fix clearer. For media filenames, use a fictional Profile such as `SampleProfile` with a synthetic ID. Leave real filenames, account paths and contact details out of the notes.
 - `## Download and update`: the version-specific Windows x64 ZIP link and clear instructions for new and existing users.
 - `## Notes`: relevant prerequisites, compatibility changes, limitations, or known issues. State when no additional requirements apply.
 
@@ -26,7 +26,7 @@ The documentation verifier checks the stable navigation and full ordered release
 Before releasing:
 
 1. Prepare and review the versioned notes alongside the product changes.
-2. Run `pwsh ./scripts/verification/verify-release-notes.ps1`. Check the claims against fresh verification evidence; the structural check does not prove their accuracy.
+2. Run `pwsh ./scripts/verification/verify-release-notes.ps1`. Check the claims against fresh verification evidence. Review examples and attachments for personal data before promotion.
 3. Use the canonical release workflow. Both draft creation and publication require valid notes; an existing draft receives the reviewed body again.
 4. Confirm the uploaded draft body matches the committed notes before publishing.
 

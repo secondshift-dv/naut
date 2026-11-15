@@ -30,6 +30,12 @@ Run `pwsh ./scripts/verification/verify-documentation.ps1` after documentation e
 
 Documentation has four identities: **current** documents follow `ProductVersion`; **generated** notices and manifests follow the exact resolved package; **historical** release notes remain unchanged; **independent** optional packs follow their own manifest versions. The root `THIRD-PARTY-NOTICES.txt` is a version-neutral source reference, not a frozen runtime inventory. The package's `runtime/THIRD-PARTY-NOTICES.txt` and `runtime/LICENSES/` are the exact distribution authorities. Packaging verifies their contents, pinned hashes, license sources and corresponding source archives before any release can be published. Never maintain competing hand-edited runtime inventories, bypass failed checks, or change prior release artifacts just to synchronize documentation.
 
+## Privacy in examples and evidence
+
+Use synthetic profiles, media filenames and contact details in docs, release notes and test fixtures. Use an environment variable in place of an account path. Keep Vault files, raw logs and generated archives out of source control. Before sharing screenshots or media fixtures, review the visible content and remove personal metadata. Keep required license attribution in the associated notices.
+
+Source Verify, canonical builds, release preparation and Optional Packs use the repository privacy check. It reports the rule and file without echoing matched values. Review free-form names, image content and new binary metadata before publication.
+
 ## Release notes
 
 Product releases require reviewed, versioned user-facing notes. Follow the [Release notes policy](docs/release-notes.md) and run `pwsh ./scripts/verification/verify-release-notes.ps1` before release preparation. A Full Changelog link alone is insufficient.

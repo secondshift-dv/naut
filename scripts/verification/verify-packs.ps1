@@ -3,6 +3,7 @@ param([switch]$Offline, [string]$OutputDirectory)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+& (Join-Path $PSScriptRoot 'verify-privacy.ps1') -RepositoryRoot $repositoryRoot
 $probeRoot = Join-Path $repositoryRoot 'out/curated-packs-check'
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $repositoryRoot 'out/pack-downloads' }
 New-Item -ItemType Directory -Path $probeRoot -Force | Out-Null

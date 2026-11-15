@@ -14,6 +14,7 @@ High-risk changes require maintainer review and are never auto-merged.
 
 - [ ] Relevant checks pass: Packs for pack-only work; Source for application changes
 - [ ] I added relevant validation for changed behavior
+- [ ] Examples and fixtures use synthetic data. Any screenshots and attachments were checked for personal details and metadata.
 - [ ] I did not include generated output, secrets, private data, or unknown-provenance assets
 - [ ] Third-party content or dependency changes include source, license, notices, and provenance as applicable
 

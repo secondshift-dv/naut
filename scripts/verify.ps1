@@ -7,19 +7,9 @@ if ($RequireBuild -and $Scope -ne 'Closure') { throw '-RequireBuild is valid onl
 function Verify-PublicTree {
     $files=@(& git -C $repo ls-files --cached --others --exclude-standard)
     if ($LASTEXITCODE -ne 0) { throw 'Cannot inventory public tree' }
-    $localPath = '(?im)\b(?:[a-z]:[\\/]+Users[\\/]+(?!Public\b|Default\b|<)[\w.\p{L}-]+|/home/(?!runner\b|<)[\w.\p{L}-]+)[\\/]'
     foreach ($file in $files) {
-        if ($file -match '(^|/)(AGENTS\.md|ENGINEERING\.md|Naut\.Showcase|work|backup|Migration|bin|obj|dist|out|node_modules)(/|$)|\.(pem|pfx|p12|key|db|sqlite|bak)$') {
+        if ($file -match '(^|/)(AGENTS\.md|ENGINEERING\.md|Naut\.Showcase|work|backup|Migration|bin|obj|dist|out|node_modules)(/|$)|\.bak$') {
             throw "Excluded public file: $file"
-        }
-        $bytes = [IO.File]::ReadAllBytes((Join-Path $repo $file))
-        if ($bytes -contains 0) { continue }
-        $content = [Text.Encoding]::UTF8.GetString($bytes)
-        if ($content -match '-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----|\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{50,})\b') {
-            throw "Secret candidate in $file; value suppressed"
-        }
-        if ($content -match $localPath) {
-            throw "Local account path in $file; value suppressed. Use an environment variable or a portable example."
         }
     }
     $readmes=@('README.md','README.de.md','README.es.md','README.fr.md','README.id.md','README.ja.md','README.ko.md','README.zh-Hans.md')
@@ -137,8 +127,8 @@ function Verify-WorkflowPolicy {
     }
     Write-Host 'PUBLIC_WORKFLOW_POLICY=PASS'
 }
-if ($Scope -in @('Source','Hygiene','Closure')) { Verify-PublicTree }
 if ($Scope -in @('Source','Hygiene','Closure')) { & (Join-Path $PSScriptRoot 'verification/verify-documentation.ps1') }
+if ($Scope -in @('Source','Hygiene','Closure')) { Verify-PublicTree }
 if ($Scope -in @('Source','WorkflowPolicy','Closure')) { Verify-WorkflowPolicy }
 if ($Scope -in @('Source','Compile')) { & (Join-Path $PSScriptRoot 'verification/verify-compile.ps1') -Offline:$Offline }
 if ($Scope -eq 'Updater') { & (Join-Path $PSScriptRoot 'verification/verify-updater.ps1') -Offline:$Offline }
