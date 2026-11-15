@@ -1185,7 +1185,7 @@
     <sys:String x:Key="Import.Intake.WithUnsupported">{0} media siap · {1} berkas tidak didukung dibiarkan apa adanya</sys:String>
     <sys:String x:Key="Import.Progress.Percent">{0}%</sys:String>
     <sys:String x:Key="Import.Stage.Checking">Menyiapkan media</sys:String>
-    <sys:String x:Key="Import.Stage.Stage1">Tahap 1 · {0}</sys:String>
+    <sys:String x:Key="Import.Stage.Stage1">Tahap 1 · {0} · {1}</sys:String>
     <sys:String x:Key="Import.Stage.Stage2">Tahap 2 · {0} · {1}</sys:String>
     <sys:String x:Key="Import.Stage.Done">Selesai</sys:String>
     <sys:String x:Key="Import.Stage.Reading">Mencari media</sys:String>

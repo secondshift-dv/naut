@@ -1,4 +1,4 @@
-# Naut v0.0.25 System Requirements
+# Naut v0.0.26 System Requirements
 
 These requirements describe the current Windows x64 implementation and build target. Figure / interactive 3D is an optional workload tier; Naut is intended to remain usable without high-end discrete GPU hardware.
 
@@ -38,6 +38,6 @@ Windows x64, the self-contained package, and Direct3D 11 Figure rendering are im
 
 ## Performance evidence and limits
 
-Naut v0.0.18 retains the existing hardware support tiers. Its query and allocation changes have no published end-to-end performance measurements. Naut v0.0.17 added direct deletion for individually imported presentation files and recoverable Media Inspector deletion. Naut v0.0.16 fixed video thumbnail recovery and Import error reporting. Naut v0.0.15 refined presentation effects, selection controls and Gallery search. Naut v0.0.14 previously reduced cache, scheduler and navigation overhead. The earlier v0.0.13 implementation reduces presentation allocation pressure without changing source-detail geometry, prepared media quality, Vault integrity, or FFmpeg output cadence. A deterministic 640×360 in-process frame test (120 frames) measured a median 0.650 ms through the prior Skia BMP decode kernel versus 0.256 ms through direct BGRA row transfer with reusable bitmaps. These results **do not** mean the complete app is 2.5 times faster.
+Historical frame-decoding measurements are recorded in the [v0.0.13 release notes](releases/v0.0.13.md). The measured timings cover an isolated 640 x 360 frame-decoding test.
 
 An isolated empty-Vault startup/idle sample ran on Windows 11 with AMD Ryzen 3 5300U (4 cores, 8 threads), Radeon integrated graphics and approximately 10 GiB RAM. The app working set was approximately 322–325 MiB in both before/after samples; there is no established general RAM reduction. There is not yet equivalent controlled evidence for a 2-core system, 8 GiB RAM, every Direct3D driver, large Vaults, high-resolution concurrent video/3D, or full Import under presentation pressure. These tiers are guidance, not a verified responsiveness promise. The application install root was approximately 0.63 GiB on the tested build, and update staging/rollback plus copied media require additional free space.

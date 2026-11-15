@@ -6,7 +6,7 @@ On the Profile page, Naut restores the last camera for that Profile and model. *
 
 | Format | Preparation |
 | --- | --- |
-| GLB | Self-contained glTF 2.0 triangle geometry, supported materials and embedded textures use the existing direct preparation path. |
+| GLB | Self-contained glTF 2.0 triangle geometry and supported materials use the direct preparation path. Textures are optional. Preparation reconstructs zero-length normals and tangents from geometry. |
 | FBX | Geometry and supported materials convert through the packaged worker. Embedded textures are supported; external textures that are not recorded package components fail with a diagnostic. |
 | OBJ | Keep relative MTL files and referenced PNG/JPEG textures beside the OBJ when importing. Missing dependencies prevent complete Figure preparation. |
 | STL | Triangle geometry converts to a Figure; STL usually carries no texture or material information. |
@@ -16,10 +16,10 @@ Conversion runs in a separate process with a two-minute deadline. It reads only 
 
 Existing supported models with missing Figure assets are queued once by normal startup recovery. Active and failed preparation receipts preserve the existing retry authority. For older schema-v1 Vaults, initialization atomically refreshes only the four recognized legacy GLB-only Figure trigger predicates. Tables and catalog rows are unchanged; unrecognized trigger definitions fail closed.
 
-Candidate import readiness uses metadata and identity capabilities available before confirmation. Thumbnail, Hover and ModelRender remain required according to their contracts after canonical domain commit. A terminal optional face-analysis failure does not keep the preparation spinner active. This phase distinction fixes MPG/MPEG imports that had already finished their candidate jobs but remained at Preparing media.
+Candidate import readiness uses metadata and identity capabilities available before confirmation. Thumbnail, Hover and ModelRender remain required according to their contracts after canonical domain commit. Candidate face analysis can inform automatic Profile assignment. An optional face decode failure can settle without blocking placement. Model or worker failures in face analysis can settle when a destination Profile has already been chosen. Required metadata and source integrity still gate placement.
 
 Intake recognition, metadata, thumbnail generation and native Figure support are separate capabilities. The intake list also recognizes glTF, DAE, PLY and Blender originals; admission alone does not promise a Figure or a preview. Optional external adapter capability is reported separately and is unavailable when its approved executable is absent. Incomplete component packages, unsupported geometry and corrupt files retain actionable diagnostics instead of being described as fully prepared. Image and video decoding likewise depends on the packaged decoder and readable content, not only the extension.
 
-Video Hover preparation uses an orientation-aware 1280-by-720 bounding box (720-by-1280 for portrait), never upscales the source, and keeps even dimensions, original aspect ratio, silence, a maximum six-second duration and bounded encoder threads. Existing valid derivatives remain reusable.
+Video Hover uses an orientation-aware 480p ceiling. Dedicated Banner renditions use a 900p ceiling. Preparation preserves aspect ratio, uses even dimensions, avoids upscaling, and produces silent renditions up to six seconds. Existing valid derivatives remain reusable.
 
 Inspector Info reports Figure preparation from the canonical ModelRender receipt and preparation job, independently of the metadata adapter. A converted FBX Figure is not labelled unsupported merely because its metadata used a fallback adapter. Missing video codec metadata remains unknown rather than being inferred as H.264.

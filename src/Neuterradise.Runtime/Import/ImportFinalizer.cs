@@ -380,7 +380,7 @@ public sealed class ImportFinalizer : IAsyncDisposable
             if (await HasActiveCandidateIdentityPreparationAsync(unitId, cancellationToken)
                     .ConfigureAwait(false))
                 return ImportFinalizeOutcome.Waiting;
-            if (await HasTerminalCandidateIdentityFailureAsync(unitId, cancellationToken)
+            if (await HasTerminalCandidateIdentityFailureAsync(unitId, draft.Destination.Kind, cancellationToken)
                     .ConfigureAwait(false))
             {
                 await MarkFailureAsync(
@@ -509,6 +509,7 @@ public sealed class ImportFinalizer : IAsyncDisposable
 
     private async Task<bool> HasTerminalCandidateIdentityFailureAsync(
         Guid unitId,
+        DestinationKind? destinationKind,
         CancellationToken cancellationToken)
     {
         await using var connection = await _catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
@@ -522,12 +523,17 @@ public sealed class ImportFinalizer : IAsyncDisposable
                   AND j.kind IN ('ExtractMetadata', 'FaceAnalysis')
                   AND j.owner_type = 'Media'
                   AND j.state = 'FAILED_TERMINAL'
-                  -- Face analysis is optional when its decoder cannot read the media.
-                  -- Source integrity failures and required metadata still block commit.
-                  AND NOT (j.kind = 'FaceAnalysis' AND j.error_code IS 'FACE_INPUT_INVALID')
+                  AND NOT (j.kind = 'FaceAnalysis' AND (
+                      j.error_code IS 'FACE_INPUT_INVALID' OR
+                      ($explicitDestination = 1 AND COALESCE(j.error_code, '') IN (
+                          'FACE_ANALYSIS_FAILED', 'FACE_MODELS_UNAVAILABLE', 'FACE_WORKER_TIMEOUT',
+                          'FACE_WORKER_DISCONNECTED', 'FACE_WORKER_UNAVAILABLE', 'FACE_WORKER_IO_FAILED'))
+                  ))
             );
             """;
         command.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
+        command.Parameters.AddWithValue("$explicitDestination",
+            destinationKind is DestinationKind.ExistingNormal or DestinationKind.NewNormal ? 1 : 0);
         return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 1;
     }
     private async Task ApplyAutomaticDestinationAsync(Guid unitId, CancellationToken cancellationToken)

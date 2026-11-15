@@ -736,12 +736,17 @@ public sealed class ImportActivityService : IAsyncDisposable
             && stage is ImportActivityStage.Reading
                 or ImportActivityStage.WaitingForProfile
                 or ImportActivityStage.Checking
-                or ImportActivityStage.Paused)
+                or ImportActivityStage.Paused
+                or ImportActivityStage.NeedsAttention)
         {
+            var end = stage is ImportActivityStage.Reading or ImportActivityStage.Checking
+                ? DateTimeOffset.UtcNow
+                : unit.UpdatedAtUtc;
             return SurfaceText.Format(
                 "Import.Stage.Stage1",
-                "Stage 1 · {0}",
-                DescribeStage(stage));
+                "Stage 1 · {0} · {1}",
+                DescribeStage(stage),
+                FormatElapsed(end - unit.CreatedAtUtc));
         }
 
         return DescribeStage(stage);

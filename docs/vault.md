@@ -18,7 +18,7 @@ You can later pick an existing compatible Vault or move the active Vault through
 
 Imports copy source files into the Vault. Original files outside the Vault are left in place.
 
-When an existing Vault first opens in v0.0.25, Naut shows progress while it renames its managed originals. Your Cover, Banner, Figure 3D, and Profile associations carry over. A larger collection can take longer on that first open. If a Vault file is in use, close the app using it and retry. If an original is missing, restore it to its recorded location from your Vault backup and retry.
+When you first open a Vault that still uses the older naming format, Naut shows progress while it renames its managed originals. Your Cover, Banner, Figure 3D, and Profile associations carry over. A larger collection can take longer on that first open. If a Vault file is in use, close the app using it and retry. If an original is missing, restore it to its recorded location from your Vault backup and retry.
 
 This is why the portable app package and the Vault can be handled separately: replacing or updating the application does not mean replacing the collection.
 

@@ -23,7 +23,7 @@ public sealed class YuNetFaceDetector : IFaceDetectorAdapter
 
     public const int LandmarkCount = 5;
 
-    private readonly string _modelPath;
+    private readonly byte[] _modelBytes;
     private readonly ConcurrentDictionary<(int Width, int Height), FaceDetectorYN> _detectors = new();
 
     string IFaceDetectorAdapter.ModelId => ModelId;
@@ -35,8 +35,7 @@ public sealed class YuNetFaceDetector : IFaceDetectorAdapter
     public YuNetFaceDetector(string modelPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(modelPath);
-        FaceModelValidator.ValidateOrThrow(modelPath, Sha256, "YuNet face detector");
-        _modelPath = Path.GetFullPath(modelPath);
+        _modelBytes = FaceModelValidator.ReadVerifiedBytes(modelPath, Sha256, "YuNet face detector");
     }
 
     public IReadOnlyList<FaceDetection> Detect(IFaceImage image)
@@ -49,15 +48,7 @@ public sealed class YuNetFaceDetector : IFaceDetectorAdapter
 
         var detector = _detectors.GetOrAdd(
             (openCvImage.Width, openCvImage.Height),
-            size => FaceDetectorYN.Create(
-                _modelPath,
-                string.Empty,
-                new Size(size.Width, size.Height),
-                ScoreThreshold,
-                NmsThreshold,
-                TopK,
-                OpenCvSharp.Dnn.Backend.OPENCV,
-                OpenCvSharp.Dnn.Target.CPU));
+            size => CreateDetector(new Size(size.Width, size.Height)));
 
         using var faces = new Mat();
         if (detector.Detect(openCvImage.Mat, faces) == 0 || faces.Rows == 0)
@@ -106,6 +97,19 @@ public sealed class YuNetFaceDetector : IFaceDetectorAdapter
         return detections;
     }
 
+    private FaceDetectorYN CreateDetector(Size size)
+    {
+        try
+        {
+            return FaceDetectorYN.Create("onnx", _modelBytes, [], size, ScoreThreshold,
+                NmsThreshold, TopK, OpenCvSharp.Dnn.Backend.OPENCV, OpenCvSharp.Dnn.Target.CPU);
+        }
+        catch (OpenCVException)
+        {
+            throw new FaceModelsUnavailableException("The verified YuNet model could not be loaded by OpenCV.");
+        }
+    }
+
     public void Dispose()
     {
         foreach (var detector in _detectors.Values)
@@ -139,19 +143,24 @@ public interface IFaceDetectorAdapter : IDisposable
 
 public static class FaceModelValidator
 {
-    public static void ValidateOrThrow(string modelPath, string expectedSha256, string logicalName)
+    public static void ValidateOrThrow(string modelPath, string expectedSha256, string logicalName) =>
+        ReadVerifiedBytes(modelPath, expectedSha256, logicalName);
+
+    internal static byte[] ReadVerifiedBytes(string modelPath, string expectedSha256, string logicalName)
     {
         if (!File.Exists(modelPath))
         {
             throw new FaceModelsUnavailableException($"{logicalName} model is missing: {modelPath}.");
         }
 
-        var actual = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(modelPath))).ToLowerInvariant();
+        var bytes = File.ReadAllBytes(modelPath);
+        var actual = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
         if (!string.Equals(actual, expectedSha256, StringComparison.OrdinalIgnoreCase))
         {
             throw new FaceModelsUnavailableException(
                 $"{logicalName} model at {modelPath} is checksum-invalid; expected {expectedSha256}, found {actual}.");
         }
+        return bytes;
     }
 }
 

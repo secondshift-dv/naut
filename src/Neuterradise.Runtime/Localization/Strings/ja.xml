@@ -1185,7 +1185,7 @@
     <sys:String x:Key="Import.Intake.WithUnsupported">{0} 件のメディアを準備完了 · 未対応の {1} ファイルはそのままです</sys:String>
     <sys:String x:Key="Import.Progress.Percent">{0}%</sys:String>
     <sys:String x:Key="Import.Stage.Checking">メディアの準備</sys:String>
-    <sys:String x:Key="Import.Stage.Stage1">ステージ 1 · {0}</sys:String>
+    <sys:String x:Key="Import.Stage.Stage1">ステージ 1 · {0} · {1}</sys:String>
     <sys:String x:Key="Import.Stage.Stage2">ステージ 2 · {0} · {1}</sys:String>
     <sys:String x:Key="Import.Stage.Done">完了</sys:String>
     <sys:String x:Key="Import.Stage.Reading">メディアを探す</sys:String>

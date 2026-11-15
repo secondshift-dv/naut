@@ -204,6 +204,8 @@ public sealed class ProfilingFaceAnalysisJobOperation : IFaceAnalysisJobOperatio
                 {
                     "CONTENT_MISMATCH" or "FACE_INPUT_INVALID" =>
                         JobFailureClassification.ContentMismatch,
+                    "FACE_MODELS_UNAVAILABLE" => JobFailureClassification.MissingRequiredToolOrModel,
+                    "FACE_ANALYSIS_FAILED" => JobFailureClassification.DeterministicInvalidInput,
                     _ when error?.IsFatal == true =>
                         JobFailureClassification.DeterministicInvalidInput,
                     _ => JobFailureClassification.WorkerDisconnected,

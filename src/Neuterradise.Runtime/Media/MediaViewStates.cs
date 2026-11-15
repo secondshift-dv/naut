@@ -37,7 +37,7 @@ public sealed class MediaViewStates
     private const string KeyPrefix = "media-view.v1.";
     private static readonly TimeSpan CoalesceInterval = TimeSpan.FromMilliseconds(300);
     private static readonly TimeSpan RetryInterval = TimeSpan.FromMilliseconds(200);
-    private const int MaximumAttempts = 3;
+    private static readonly TimeSpan MaximumRetryInterval = TimeSpan.FromSeconds(15);
     private readonly CatalogDb _catalog;
     private readonly TimeProvider _clock;
     private readonly object _gate = new();
@@ -87,17 +87,18 @@ public sealed class MediaViewStates
         try
         {
             using var admission = _catalog.MutationAdmission.Enter(nameof(MediaViewStates));
-            await using var lease = await _catalog.WriteCoordinator.EnterAsync(token).ConfigureAwait(false);
             lock (_gate)
             {
                 if (_pending.TryGetValue(key, out var state) || _writing.TryGetValue(key, out state))
                     return (T)state;
             }
 
+            await using var lease = await _catalog.WriteCoordinator.EnterAsync(token).ConfigureAwait(false);
             var json = await _catalog.SettingsReads.GetSettingValueAsync(key.Setting, token).ConfigureAwait(false);
             lock (_gate)
             {
-                if (_pending.TryGetValue(key, out var state)) return (T)state;
+                if (_pending.TryGetValue(key, out var state) || _writing.TryGetValue(key, out state))
+                    return (T)state;
             }
             return json is { Length: <= 512 } ? JsonSerializer.Deserialize<T>(json) : null;
         }
@@ -126,67 +127,95 @@ public sealed class MediaViewStates
         try
         {
             using var admission = _catalog.MutationAdmission.Enter(nameof(MediaViewStates));
+            var closed = _catalog.MutationAdmission.WhenClosed;
+            var delay = CoalesceInterval;
             while (true)
             {
-                await Task.Delay(CoalesceInterval, _clock).ConfigureAwait(false);
+                using (var delayCancellation = new CancellationTokenSource())
+                {
+                    var wait = Task.Delay(delay, _clock, delayCancellation.Token);
+                    if (await Task.WhenAny(wait, closed).ConfigureAwait(false) == closed)
+                        await delayCancellation.CancelAsync().ConfigureAwait(false);
+                }
+
                 lock (_gate)
                 {
                     _writing = _pending;
                     _pending = [];
                 }
 
-                var persisted = await PersistWithRetryAsync(_writing).ConfigureAwait(false);
-
+                var finalAttempt = closed.IsCompleted;
+                var persisted = await TryPersistBatchAsync(_writing, finalAttempt).ConfigureAwait(false);
                 lock (_gate)
                 {
-                    if (!persisted) _hasFailedWrites = true;
+                    if (!persisted)
+                    {
+                        if (finalAttempt)
+                        {
+                            _hasFailedWrites = true;
+                            _pending.Clear();
+                        }
+                        else
+                        {
+                            foreach (var (key, state) in _writing)
+                                _pending.TryAdd(key, state);
+                        }
+                    }
+
                     _writing.Clear();
-                    if (_pending.Count > 0) continue;
-                    _running = false;
-                    return;
+                    if (_pending.Count == 0)
+                    {
+                        _running = false;
+                        return;
+                    }
                 }
+
+                delay = persisted ? CoalesceInterval
+                    : delay == CoalesceInterval ? RetryInterval
+                    : TimeSpan.FromTicks(Math.Min(delay.Ticks * 2, MaximumRetryInterval.Ticks));
             }
         }
         catch (MutationAdmissionClosedException)
         {
             lock (_gate)
             {
+                _hasFailedWrites = _pending.Count > 0;
                 _pending.Clear();
                 _running = false;
             }
         }
     }
 
-    private async Task<bool> PersistWithRetryAsync(Dictionary<ViewKey, object> batch)
+    private async Task<bool> TryPersistBatchAsync(Dictionary<ViewKey, object> batch, bool finalAttempt)
     {
-        for (var attempt = 1; ; attempt++)
+        using var deadline = new CancellationTokenSource();
+        if (finalAttempt) deadline.CancelAfter(TimeSpan.FromSeconds(2));
+        try
         {
-            try
-            {
-                await PersistBatchAsync(batch).ConfigureAwait(false);
-                return true;
-            }
-            catch (Microsoft.Data.Sqlite.SqliteException exception) when (attempt < MaximumAttempts
-                && exception.SqliteErrorCode is 5 or 6 or 10)
-            {
-                // Release SQLite and the writer gate before waiting. The same admitted writer
-                // owns every attempt, so pending newer values cannot be overtaken.
-                await Task.Delay(RetryInterval, _clock).ConfigureAwait(false);
-            }
-            catch (Exception exception) when (CatalogDb.IsDatabaseFailure(exception))
-            {
-                Trace.TraceError("Media view preferences could not be saved after {0} attempt(s): {1}",
-                    attempt, exception.Message);
-                return false;
-            }
+            await PersistBatchAsync(batch, deadline.Token).ConfigureAwait(false);
+            return true;
+        }
+        catch (Exception exception) when (CatalogDb.IsDatabaseFailure(exception)
+            || exception is OperationCanceledException && deadline.IsCancellationRequested)
+        {
+            if (finalAttempt)
+                Trace.TraceWarning("Media view preferences could not be saved before the Vault closed: {0}",
+                    exception.GetType().Name);
+            return false;
         }
     }
 
-    private async Task PersistBatchAsync(Dictionary<ViewKey, object> batch)
+    private async Task PersistBatchAsync(Dictionary<ViewKey, object> batch, CancellationToken token)
     {
-        await using var lease = await _catalog.WriteCoordinator.EnterAsync().ConfigureAwait(false);
-        await using var connection = await _catalog.OpenConnectionAsync().ConfigureAwait(false);
+        await using var lease = await _catalog.WriteCoordinator.EnterAsync(token).ConfigureAwait(false);
+        await using var connection = await _catalog.OpenConnectionAsync(token).ConfigureAwait(false);
         connection.DefaultTimeout = 1;
+        // The native busy handler must yield before the managed command timeout can take effect.
+        await using (var busy = connection.CreateCommand())
+        {
+            busy.CommandText = "PRAGMA busy_timeout = 0;";
+            await busy.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+        }
         await using var transaction = CatalogTransaction.Begin(connection, _catalog.WriteCoordinator);
         await using var exists = transaction.CreateCommand("""
             SELECT EXISTS(SELECT 1 FROM profiles WHERE profile_id = $profile)
@@ -198,11 +227,11 @@ public sealed class MediaViewStates
         {
             profile.Value = DbGuid.Format(key.ProfileId);
             media.Value = DbGuid.Format(key.MediaId);
-            if (await exists.ExecuteScalarAsync().ConfigureAwait(false) is not 1L) continue;
+            if (await exists.ExecuteScalarAsync(token).ConfigureAwait(false) is not 1L) continue;
             await SettingsWrites.SetSettingInTransactionAsync(transaction, key.Setting,
-                JsonSerializer.Serialize(state), null, _clock.GetUtcNow(), CancellationToken.None).ConfigureAwait(false);
+                JsonSerializer.Serialize(state), null, _clock.GetUtcNow(), token).ConfigureAwait(false);
         }
-        await transaction.CommitAsync().ConfigureAwait(false);
+        await transaction.CommitAsync(token).ConfigureAwait(false);
     }
 
     private readonly record struct ViewKey(Guid ProfileId, Guid MediaId, bool Figure)

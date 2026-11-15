@@ -23,7 +23,7 @@ Video Banners can loop on the Profile surface when ready. Video hover presentati
 
 Each Profile can retain an ordered collection of Banner alternatives. Use **Add as Banner** in Customize to prepare an additional eligible video without replacing the active choice. Choosing an active Banner, framing and effects is a preview until **Save**; **Cancel** discards those preview changes. When a selected Banner rendition is unavailable or requires repair, Naut falls back to a still image without discarding the saved selection.
 
-A ready video Banner resumes after Profile/Customize header reflow. Import pressure alone reduces decorative presentation detail instead of automatically stopping a selected Profile Banner; inactive windows, Reduced Motion and memory pressure still use a static poster when appropriate.
+A ready video Banner resumes after Profile/Customize header reflow. Active imports defer optional prefetch and keep the current presentation quality. An inactive window, Reduced Motion or measured memory pressure can switch the Banner to its static poster.
 
 Changing Film, Glitter or Shimmer effects no longer tears down Banner playback. The 3D Figure occupies reserved space so Profile text and buttons do not overlap it, including with optional Profile packs. **Delete Profile always appears last**, below the Profile modules. Card rating stars and favorite hearts are filled, while Favorite Media is marked by a distinct outline Flame.
 

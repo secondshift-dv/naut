@@ -28,8 +28,8 @@ public sealed class SFaceEmbeddingExtractor : IFaceEmbeddingAdapter
     public SFaceEmbeddingExtractor(string modelPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(modelPath);
-        FaceModelValidator.ValidateOrThrow(modelPath, Sha256, "SFace face recognizer");
-        _recognizer = FaceRecognizerSF.Create(Path.GetFullPath(modelPath), string.Empty, OpenCvSharp.Dnn.Backend.OPENCV, OpenCvSharp.Dnn.Target.CPU);
+        var bytes = FaceModelValidator.ReadVerifiedBytes(modelPath, Sha256, "SFace face recognizer");
+        _recognizer = FaceRecognizerSF.Create("onnx", bytes, [], OpenCvSharp.Dnn.Backend.OPENCV, OpenCvSharp.Dnn.Target.CPU);
     }
 
     public IReadOnlyList<float> ExtractEmbedding(IFaceImage image, FaceDetection detection)

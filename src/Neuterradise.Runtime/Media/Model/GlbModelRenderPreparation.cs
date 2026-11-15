@@ -238,6 +238,7 @@ public sealed partial class GlbThumbnailPreviewAdapter
             for (var i = 0; i < p.Vertices.Length; i++)
             {
                 if ((i & 4095) == 0) ct.ThrowIfCancellationRequested();
+                var tangentMissingDirection = false;
                 foreach (var accessor in directionAccessors)
                 {
                     if (accessor is null) continue;
@@ -249,9 +250,10 @@ public sealed partial class GlbThumbnailPreviewAdapter
                             throw new InvalidDataException("GLB direction attribute is non-finite or outside its unit range.");
                         squared += value * value;
                     }
-                    if (squared < 1e-20f) throw new InvalidDataException("GLB direction attribute is zero.");
+                    tangentMissingDirection |= ReferenceEquals(accessor, tangent) && squared < 1e-20f;
                 }
-                if (tangent is not null && tangent.Float(i,3) is not (-1 or 1))
+                if (tangent is not null && tangent.Float(i,3) is not (-1 or 1)
+                    && !(tangentMissingDirection && tangent.Float(i,3) == 0))
                     throw new InvalidDataException("GLB tangent handedness must be -1 or 1.");
             }
             if (!Matrix4x4.Invert(p.Transform,out var inverse)) throw new InvalidDataException("GLB node transform is singular.");
@@ -284,8 +286,8 @@ public sealed partial class GlbThumbnailPreviewAdapter
                         index = vertices.Count;
                         if (index >= 4_000_000) throw new InvalidDataException("GLB tangent/flat-normal expansion exceeds the vertex budget.");
                         map.Add(key,index);
-                        var direction = normal is null ? Vector3.Zero : Unit(Vector3.TransformNormal(new(normal.Float(original,0),normal.Float(original,1),normal.Float(original,2)),normalMatrix),Vector3.UnitY);
-                        var frame = tangent is null ? Vector4.Zero : new Vector4(Unit(Vector3.TransformNormal(new(tangent.Float(original,0),tangent.Float(original,1),tangent.Float(original,2)),p.Transform),Vector3.UnitX),tangent.Float(original,3)*(mirrored?-1:1));
+                        var direction = normal is null ? Vector3.Zero : Unit(Vector3.TransformNormal(new(normal.Float(original,0),normal.Float(original,1),normal.Float(original,2)),normalMatrix),Vector3.Zero);
+                        var frame = tangent is null ? Vector4.Zero : new Vector4(Unit(Vector3.TransformNormal(new(tangent.Float(original,0),tangent.Float(original,1),tangent.Float(original,2)),p.Transform),Vector3.Zero),tangent.Float(original,3)*(mirrored?-1:1));
                         vertices.Add(new(p.Vertices[original],direction,p.Uv(original),frame));
                         tangentSums.Add(Vector3.Zero); bitangentSums.Add(Vector3.Zero); normalSums.Add(Vector3.Zero);
                     }
@@ -298,10 +300,12 @@ public sealed partial class GlbThumbnailPreviewAdapter
             }
             for (var i = 0; i < vertices.Count; i++)
             {
-                var v = vertices[i]; var nn = normal is null ? Unit(normalSums[i],Vector3.UnitY) : v.N;
-                var ss = tangent is null ? tangentSums[i] : new Vector3(v.T.X,v.T.Y,v.T.Z);
+                var v = vertices[i];
+                var nn = v.N == Vector3.Zero ? Unit(normalSums[i],Vector3.UnitY) : v.N;
+                var sourceTangent = new Vector3(v.T.X, v.T.Y, v.T.Z);
+                var ss = sourceTangent == Vector3.Zero ? tangentSums[i] : sourceTangent;
                 ss = Unit(ss-nn*Vector3.Dot(nn,ss),Unit(Vector3.Cross(Math.Abs(nn.Y)<0.9f?Vector3.UnitY:Vector3.UnitX,nn),Vector3.UnitX));
-                var sign = tangent is null ? (Vector3.Dot(Vector3.Cross(nn,ss),bitangentSums[i])<0?-1:1) : v.T.W;
+                var sign = sourceTangent == Vector3.Zero ? (Vector3.Dot(Vector3.Cross(nn,ss),bitangentSums[i])<0?-1:1) : v.T.W;
                 vertices[i] = v with {N=nn,T=new(ss,sign)};
             }
             return (vertices.ToArray(),indices);

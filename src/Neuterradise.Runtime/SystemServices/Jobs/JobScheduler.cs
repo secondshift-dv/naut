@@ -596,10 +596,6 @@ public sealed class JobScheduler : IAsyncDisposable
                 return;
             }
 
-            using var importPressure = record.Kind is "TransferOriginal" or "HashMedia"
-                or "ExtractMetadata" or "GenerateThumbnail" or "GenerateVideoMediaAssets" or "GenerateBanner" or "FaceAnalysis"
-                ? ResourceGovernor.Shared.EnterImportPressure()
-                : null;
             using var permit = await AcquirePermitAsync(record.Lane, cancellationToken).ConfigureAwait(false);
 
             var lease = await _leaseStore.TryClaimAsync(record, cancellationToken).ConfigureAwait(false);
@@ -632,7 +628,15 @@ public sealed class JobScheduler : IAsyncDisposable
                     return;
                 }
 
-                var result = await handler.ExecuteAsync(context, cancelSignal.Token).ConfigureAwait(false);
+                JobExecutionResult result;
+                using (record.Kind is "TransferOriginal" or "HashMedia" or "ExtractMetadata"
+                    or "GenerateThumbnail" or "GenerateVideoMediaAssets" or "GenerateBanner"
+                    or "GenerateModelMediaAssets" or "FaceAnalysis"
+                    ? ResourceGovernor.Shared.EnterImportPressure()
+                    : null)
+                {
+                    result = await handler.ExecuteAsync(context, cancelSignal.Token).ConfigureAwait(false);
+                }
                 if (result.IsSucceeded)
                 {
                     await FlushFinalProgressAsync(lease, jobId, CancellationToken.None).ConfigureAwait(false);
@@ -812,18 +816,19 @@ public sealed class JobScheduler : IAsyncDisposable
         if (resourceClass is not { } cls)
             return null;
 
-        await _heavyExecutionSlots.WaitAsync(cancellationToken).ConfigureAwait(false);
+        // Work throttled by its resource class must leave shared capacity available to other lanes.
+        var resourcePermit = await _governor.AcquireAsync(cls, cancellationToken).ConfigureAwait(false);
         try
         {
-            var resourcePermit = await _governor.AcquireAsync(cls, cancellationToken)
-                .ConfigureAwait(false);
-            return new HeavyExecutionPermit(resourcePermit, _heavyExecutionSlots);
+            await _heavyExecutionSlots.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
         catch
         {
-            _heavyExecutionSlots.Release();
+            resourcePermit.Dispose();
             throw;
         }
+
+        return new HeavyExecutionPermit(resourcePermit, _heavyExecutionSlots);
     }
 
     private sealed class HeavyExecutionPermit : IDisposable

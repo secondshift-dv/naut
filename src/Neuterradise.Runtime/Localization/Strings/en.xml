@@ -1185,7 +1185,7 @@
     <sys:String x:Key="Import.Intake.WithUnsupported">{0} media ready · {1} unsupported file(s) left untouched</sys:String>
     <sys:String x:Key="Import.Progress.Percent">{0}%</sys:String>
     <sys:String x:Key="Import.Stage.Checking">Preparing media</sys:String>
-    <sys:String x:Key="Import.Stage.Stage1">Stage 1 · {0}</sys:String>
+    <sys:String x:Key="Import.Stage.Stage1">Stage 1 · {0} · {1}</sys:String>
     <sys:String x:Key="Import.Stage.Stage2">Stage 2 · {0} · {1}</sys:String>
     <sys:String x:Key="Import.Stage.Done">Done</sys:String>
     <sys:String x:Key="Import.Stage.Reading">Finding media</sys:String>

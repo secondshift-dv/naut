@@ -1185,7 +1185,7 @@
     <sys:String x:Key="Import.Intake.WithUnsupported">Medios {0} listos · Los archivos no compatibles {1} no se modifican</sys:String>
     <sys:String x:Key="Import.Progress.Percent">{0}%</sys:String>
     <sys:String x:Key="Import.Stage.Checking">Preparando medios</sys:String>
-    <sys:String x:Key="Import.Stage.Stage1">Etapa 1 · {0}</sys:String>
+    <sys:String x:Key="Import.Stage.Stage1">Etapa 1 · {0} · {1}</sys:String>
     <sys:String x:Key="Import.Stage.Stage2">Etapa 2 · {0} · {1}</sys:String>
     <sys:String x:Key="Import.Stage.Done">hecho</sys:String>
     <sys:String x:Key="Import.Stage.Reading">Encontrar medios</sys:String>

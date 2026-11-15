@@ -12,6 +12,9 @@ public sealed class CatalogMutationAdmissionGate
     private bool _accepting = true;
     private int _active;
     private TaskCompletionSource _idle = CompletedSource();
+    private readonly TaskCompletionSource _closed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    internal Task WhenClosed => _closed.Task;
 
     public bool IsAccepting
     {
@@ -68,6 +71,7 @@ public sealed class CatalogMutationAdmissionGate
         lock (_gate)
         {
             _accepting = false;
+            _closed.TrySetResult();
             if (_active == 0)
             {
                 _idle.TrySetResult();

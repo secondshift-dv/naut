@@ -1185,7 +1185,7 @@
     <sys:String x:Key="Import.Intake.WithUnsupported">{0} 媒体就绪 · {1} 不受支持的文件保持不变</sys:String>
     <sys:String x:Key="Import.Progress.Percent">{0}%</sys:String>
     <sys:String x:Key="Import.Stage.Checking">准备媒体</sys:String>
-    <sys:String x:Key="Import.Stage.Stage1">阶段 1 · {0}</sys:String>
+    <sys:String x:Key="Import.Stage.Stage1">阶段 1 · {0} · {1}</sys:String>
     <sys:String x:Key="Import.Stage.Stage2">阶段 2 · {0} · {1}</sys:String>
     <sys:String x:Key="Import.Stage.Done">完成</sys:String>
     <sys:String x:Key="Import.Stage.Reading">寻找媒体</sys:String>

@@ -189,8 +189,8 @@ public sealed class ResourceGovernor : IDisposable
         get { lock (_sync) return _mode == InteractionMode.ForegroundIdle && !_memoryPressure && Volatile.Read(ref _importPressure) == 0; }
     }
 
-    // Import lowers decorative detail, but only memory pressure or an inactive/reduced-motion
-    // window suspends the selected Home/Profile video. Hover stays on its separate budget.
+    // Selected Home/Profile video keeps its own budget. Measured memory pressure,
+    // window activity and reduced motion control its eligibility.
     public bool IsPrimaryVideoAllowed
     {
         get { lock (_sync) return (_tier is PresentationTier.Full or PresentationTier.Reduced) && !_memoryPressure; }
@@ -300,12 +300,10 @@ public sealed class ResourceGovernor : IDisposable
 
     public IDisposable EnterImportPressure()
     {
-        Interlocked.Increment(ref _importPressure);
-        Update();
+        if (Interlocked.Increment(ref _importPressure) == 1) RaiseChanged();
         return new Scope(() =>
         {
-            Interlocked.Decrement(ref _importPressure);
-            Update();
+            if (Interlocked.Decrement(ref _importPressure) == 0) RaiseChanged();
         });
     }
 
@@ -595,7 +593,7 @@ public sealed class ResourceGovernor : IDisposable
                 ? PresentationTier.Fallback
                 : !_windowActive
                     ? PresentationTier.Fallback
-                    : _memoryPressure || Volatile.Read(ref _importPressure) > 0
+                    : _memoryPressure
                         ? PresentationTier.Reduced
                         : PresentationTier.Full;
 

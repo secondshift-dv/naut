@@ -1185,7 +1185,7 @@
     <sys:String x:Key="Import.Intake.WithUnsupported">{0} 미디어 준비 완료 · {1} 지원되지 않는 파일(들)이 그대로 남아 있습니다.</sys:String>
     <sys:String x:Key="Import.Progress.Percent">{0}%</sys:String>
     <sys:String x:Key="Import.Stage.Checking">미디어 준비</sys:String>
-    <sys:String x:Key="Import.Stage.Stage1">단계 1 · {0}</sys:String>
+    <sys:String x:Key="Import.Stage.Stage1">단계 1 · {0} · {1}</sys:String>
     <sys:String x:Key="Import.Stage.Stage2">단계 2 · {0} · {1}</sys:String>
     <sys:String x:Key="Import.Stage.Done">완료</sys:String>
     <sys:String x:Key="Import.Stage.Reading">미디어 찾기</sys:String>
