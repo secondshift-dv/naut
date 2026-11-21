@@ -1,6 +1,6 @@
-Voxel Playground 2.0.0
+Voxel Playground 2.1.0
 Legacy pack ID: naut.overworld-expedition.
-Author: Anas / Second Shift.
+Author: secondshift-dv.
 
 The shipped Meadow, Workshop and Piglet artwork was generated for this
 collection using OpenAI image generation on 2026-10-09, without image
@@ -8,7 +8,7 @@ references. Creative voxel/block worlds are an original visual theme,
 not assets from Minecraft, Roblox or any other game.
 
 Original definitions and artwork: Creative Commons Attribution 4.0;
-credit Anas / Second Shift and identify modifications.
+credit secondshift-dv and identify modifications.
 Silkscreen Regular: assets/silkscreen.ttf; licenses/silkscreen-OFL.txt
   https://github.com/googlefonts/silkscreen
 Inter: assets/inter.ttf; licenses/inter-OFL.txt
@@ -29,3 +29,5 @@ Production transparent PNG square portrait frame, original charming voxel Piglet
 
 The 320x180 Theme WebP thumbnail is a derivative of the original grassland
 illustration for Appearance. It is not a live application screenshot.
+
+Block Ring is original raster artwork with a round aperture. Retained backdrops were encoded as WebP and the Block Companion aperture was aligned.

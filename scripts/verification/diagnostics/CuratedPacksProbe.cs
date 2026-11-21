@@ -17,15 +17,30 @@ foreach (var entry in catalog.RootElement.GetProperty("packs").EnumerateArray())
     var slug = entry.GetProperty("slug").GetString()!;
     if (!PackValidator.IsValidId(slug) || slug.Contains('.') || !slugs.Add(slug)) throw new InvalidDataException("Invalid or duplicate slug.");
     var root = Path.Combine(repository, "packs", slug);
-    var manifestRead = PackManifestReader.Read(File.ReadAllText(Path.Combine(root, "pack.json")), slug);
+    var manifestPath = Path.Combine(root, "pack.json");
+    var manifestRead = PackManifestReader.Read(File.ReadAllText(manifestPath), slug);
     var manifest = manifestRead.Manifest ?? throw new InvalidDataException($"Invalid manifest: {slug}");
     var diagnostics = manifestRead.Diagnostics.Concat(PackValidator.Validate(manifest, root, false))
         .Concat(PresentationCompiler.ValidateDefinitions(manifest)).ToArray();
     foreach (var error in diagnostics.Where(d => d.IsError)) Console.Error.WriteLine(error);
     if (diagnostics.Any(d => d.IsError)) throw new InvalidDataException($"Pack validation failed: {slug}");
     if (!ids.Add(manifest.PackId) || manifest.PackId != entry.GetProperty("packId").GetString()
-        || manifest.Version != entry.GetProperty("version").GetString() || !Version.TryParse(manifest.Version, out _))
-        throw new InvalidDataException($"Catalog identity/version mismatch: {slug}");
+        || manifest.Version != entry.GetProperty("version").GetString() || !Version.TryParse(manifest.Version, out _)
+        || manifest.Name != entry.GetProperty("name").GetString()
+        || manifest.Author != entry.GetProperty("author").GetString())
+        throw new InvalidDataException($"Catalog metadata mismatch: {slug}");
+    var frames = manifest.Definitions.Where(d => d.Kind == DefinitionKinds.CoverFrame).ToArray();
+    var backdrops = manifest.Definitions.Where(d => d.Kind == DefinitionKinds.Backdrop).ToArray();
+    if (frames.Length < 2 || backdrops.Length < 2
+        || backdrops.Any(d => d.Tags.Any(tag => tag is "home-only" or "profile-only")))
+        throw new InvalidDataException($"Official packs require two or more frames and backdrops available on both surfaces: {slug}");
+    var frameAssets = frames.Select(frame =>
+    {
+        using var spec = JsonDocument.Parse(frame.SpecJson);
+        return spec.RootElement.GetProperty("overlayAsset").GetString();
+    }).ToArray();
+    if (frameAssets.Distinct(StringComparer.Ordinal).Count() != frames.Length)
+        throw new InvalidDataException($"Cover frames must use distinct artwork: {slug}");
     foreach (var required in new[] { "LICENSE.txt", "PROVENANCE.txt" })
         if (!File.Exists(Path.Combine(root, required)) || new FileInfo(Path.Combine(root, required)).Length == 0)
             throw new InvalidDataException($"Missing {required}: {slug}");
@@ -35,12 +50,21 @@ foreach (var entry in catalog.RootElement.GetProperty("packs").EnumerateArray())
     if (preview != "preview.png") throw new InvalidDataException("The collection preview must be preview.png.");
     using var bitmap = SKBitmap.Decode(Path.Combine(root, preview));
     if (bitmap is null || bitmap.Width > 4096 || bitmap.Height > 4096) throw new InvalidDataException($"Invalid preview: {slug}");
+    var guides = new[] { "README.md", "README.txt" }.Where(f => File.Exists(Path.Combine(root, f)));
+    var licenseDirectory = Path.Combine(root, "licenses");
+    var notices = Directory.Exists(licenseDirectory)
+        ? Directory.EnumerateFiles(licenseDirectory, "*.txt").Select(f => Path.GetRelativePath(root, f))
+        : Enumerable.Empty<string>();
+    var archivePaths = manifest.Assets.Select(asset => asset.Path)
+        .Concat(new[] { "pack.json", "LICENSE.txt", "PROVENANCE.txt" }).Concat(guides).Concat(notices)
+        .Select(path => path.Replace('\\', '/')).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal);
     var archive = Path.Combine(output, $"{slug}-{manifest.Version}.ntpack");
     using (var zip = new ZipArchive(File.Create(archive), ZipArchiveMode.Create))
     {
-        foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Order(StringComparer.Ordinal))
+        foreach (var path in archivePaths)
         {
-            var item = zip.CreateEntry(Path.GetRelativePath(root, file).Replace(Path.DirectorySeparatorChar, '/'), CompressionLevel.Optimal);
+            var file = Path.Combine(root, path);
+            var item = zip.CreateEntry(path, CompressionLevel.Optimal);
             item.LastWriteTime = new DateTimeOffset(1980, 1, 1, 0, 0, 0, TimeSpan.Zero);
             using var target = item.Open();
             if (Path.GetExtension(file) is ".json" or ".txt" or ".md")

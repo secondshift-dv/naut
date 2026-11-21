@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "packId": "naut.black-dossier",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "name": "Black Dossier",
-  "author": "Anas / Second Shift",
+  "author": "secondshift-dv",
   "description": "An independent black-architecture dossier set: restrained crimson, condensed evidence typography, banner-first identity, a gunmetal portrait seal and signal traces.",
   "license": "CC-BY-4.0 (original definitions/artwork); SIL-OFL-1.1 (fonts)",
   "minContractVersion": 1,
@@ -18,7 +18,7 @@
       "id": "frame-gunmetal",
       "kind": "Image",
       "path": "assets/frame-gunmetal.png",
-      "bytes": 20056
+      "bytes": 18723
     },
     {
       "id": "font-display",
@@ -43,6 +43,18 @@
       "kind": "Image",
       "path": "assets/theme-obsidian.webp",
       "bytes": 4420
+    },
+    {
+      "id": "backdrop-archive",
+      "kind": "Image",
+      "path": "assets/steel-archive.jpg",
+      "bytes": 66789
+    },
+    {
+      "id": "frame-redline",
+      "kind": "Image",
+      "path": "assets/frame-redline.png",
+      "bytes": 103912
     }
   ],
   "definitions": [
@@ -175,75 +187,73 @@
       "spec": {
         "hero": {
           "placement": "inset",
-          "heightFraction": 0.48,
-          "minHeight": 280,
-          "maxHeight": 520
+          "minHeight": 240,
+          "maxHeight": 390,
+          "heightFraction": 0.38
         },
         "rails": [
           {
-            "id": "statistics",
-            "style": "strip",
-            "maxItems": 4
-          },
-          {
-            "id": "recent",
-            "style": "tile",
-            "maxItems": 8
-          },
-          {
-            "id": "activity",
+            "id": "imports",
             "style": "compact",
-            "maxItems": 5
+            "maxItems": 3
           },
           {
             "id": "attention",
             "style": "compact",
-            "maxItems": 3
+            "maxItems": 4
+          },
+          {
+            "id": "activity",
+            "style": "compact",
+            "maxItems": 7
+          },
+          {
+            "id": "statistics",
+            "style": "strip",
+            "maxItems": 4
           }
         ],
         "surface": {
-          "type": "stack",
-          "spacing": 20,
+          "type": "columns",
+          "columns": [
+            "*",
+            "1.35*"
+          ],
+          "spacing": 18,
           "children": [
             {
-              "type": "semantic",
-              "id": "featured"
-            },
-            {
-              "type": "columns",
-              "columns": [
-                "2*",
-                "*"
-              ],
-              "spacing": 24,
+              "type": "stack",
+              "spacing": 12,
               "children": [
                 {
-                  "type": "stack",
-                  "spacing": 24,
-                  "children": [
-                    {
-                      "type": "semantic",
-                      "id": "statistics"
-                    },
-                    {
-                      "type": "semantic",
-                      "id": "recent"
-                    }
-                  ]
+                  "type": "semantic",
+                  "id": "local-navigation"
                 },
                 {
-                  "type": "stack",
-                  "spacing": 20,
-                  "children": [
-                    {
-                      "type": "semantic",
-                      "id": "activity"
-                    },
-                    {
-                      "type": "semantic",
-                      "id": "attention"
-                    }
-                  ]
+                  "type": "semantic",
+                  "id": "imports"
+                },
+                {
+                  "type": "semantic",
+                  "id": "attention"
+                },
+                {
+                  "type": "semantic",
+                  "id": "activity"
+                }
+              ]
+            },
+            {
+              "type": "stack",
+              "spacing": 12,
+              "children": [
+                {
+                  "type": "semantic",
+                  "id": "featured"
+                },
+                {
+                  "type": "semantic",
+                  "id": "statistics"
                 }
               ]
             }
@@ -624,6 +634,76 @@
         "maxAnimatedLayers": 2,
         "offscreenPolicy": "pause",
         "continuousAnimation": true
+      }
+    },
+    {
+      "id": "naut.black-dossier.backdrop-archive",
+      "kind": "backdrop",
+      "name": "Steel Evidence Archive",
+      "description": "Steel filing aisles and thin crimson edge light.",
+      "spec": {
+        "variants": {
+          "full": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "backdrop-archive",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FF08090B",
+                "opacity": 0.14
+              }
+            ]
+          },
+          "reduced": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "backdrop-archive",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FF08090B",
+                "opacity": 0.14
+              }
+            ]
+          },
+          "fallback": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "backdrop-archive",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FF08090B",
+                "opacity": 0.14
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "naut.black-dossier.frame-redline",
+      "kind": "cover-frame",
+      "name": "Redline Steel",
+      "description": "Circle Cover frame with its own transparent aperture.",
+      "spec": {
+        "family": "Minimal",
+        "category": "Ornate",
+        "shapes": [
+          "Circle"
+        ],
+        "overlayAsset": "frame-redline",
+        "coverInset": 0.115,
+        "scale": 1,
+        "tint": false,
+        "animated": false
       }
     }
   ]

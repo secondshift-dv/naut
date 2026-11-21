@@ -1,41 +1,64 @@
 # Official optional presentation packs
 
-The packs below contain independent definitions, not mandatory all-category bundles. Installation never changes user selections. The versions below are distributed as reviewed .ntpack archives through the independent optional-pack publishing channel.
+Install a pack from **Settings → Presentation → Packs / Advanced → Install from
+file**. Use **Replace** to upgrade a pack with the same ID. Installation adds
+choices. Pick and save Home, Profile and Card options in their Customize
+panels. Choose global themes, typography and controls in Settings → Appearance.
 
-The showcase images below are static compositions made from artwork retained in the 2.0.0 packs. They are not in-app screenshots and do not change the published archives.
+This collection targets Naut v0.0.26. Each pack offers two Cover Frames and two
+Backdrops. Select each backdrop in
+Home or Profile Customize and save them independently. The images below show
+the pack artwork and frame designs.
 
-## Black Dossier - 2.0.0 source
+## Black Dossier - 2.1.0 source
 
-![Black Dossier 2.0.0 architectural showcase](showcase/black-dossier.png)
+![Black Dossier backdrop artwork and Cover Frames](showcase/black-dossier.png)
 
-Nine distinct definitions: Obsidian Protocol Theme, Dossier Type, Operations Desk, Opening Brief, Dual Identity Card, Subject Dossier Profile, Obsidian Atrium Backdrop, Gunmetal Seal Frame, and Signal Trace Effect. The gallery and media-layout definitions were removed because the engine already offers their basic layout mechanisms.
+In Home Customize, choose **Operations Desk** and **Opening Brief**. Backdrops are **Obsidian Atrium** and
+**Steel Evidence Archive**. Frames are **Gunmetal Seal** and **Redline Steel**.
 
-[Download 2.0.0](https://secondshift-dv.github.io/naut/packs/black-dossier-2.0.0.ntpack) | [Source and setup](black-dossier/README.md) | [Provenance](black-dossier/PROVENANCE.txt) | [Previous 1.1.0 archive](https://secondshift-dv.github.io/naut/packs/black-dossier-1.1.0.ntpack)
+[Download 2.1.0](https://secondshift-dv.github.io/naut/packs/black-dossier-2.1.0.ntpack) | [Setup and components](black-dossier/README.md) | [2.0.0 archive](https://secondshift-dv.github.io/naut/packs/black-dossier-2.0.0.ntpack)
 
-## Nightfall Murim - 2.0.0 source
+## Nightfall Murim - 2.1.0 source
 
-![Nightfall Murim 2.0.0 themes, nightscape, and Cover Frame](showcase/nightfall-murim.png)
+![Nightfall Murim backdrop artwork and Cover Frames](showcase/nightfall-murim.png)
 
-An original nighttime martial-arts manhwa / jianghu atmosphere: sect halls, moonlight, restrained lantern-gold and jade, disciplined disciple records, scroll media and blade-aura motion. Eleven definitions: two Themes plus Home, Spotlight, Profile Card, Profile, Media, Backdrop, Effect, Cover Frame and Control Style. Overlapping typography, gallery, backdrop, frame and control alternatives have been removed.
+In Home Customize, choose **Sect Hall** and **Moonlit Duel**. Backdrops are **Moonlit Sect Court** and
+**Lantern Pass**. Frames are **Vermilion Phoenix Seal** and **Jade Lacquer Seal**.
 
-The historical folder slug celestial and technical pack ID neuterradise.celestial are preserved for upgrades, not used as the user-facing name.
+[Download 2.1.0](https://secondshift-dv.github.io/naut/packs/celestial-2.1.0.ntpack) | [Setup and components](celestial/README.txt) | [2.0.0 archive](https://secondshift-dv.github.io/naut/packs/celestial-2.0.0.ntpack)
 
-[Download 2.0.0](https://secondshift-dv.github.io/naut/packs/celestial-2.0.0.ntpack) | [Source/setup](celestial/README.txt) | [Manifest](celestial/pack.json) | [Provenance](celestial/PROVENANCE.txt) | [Previous 1.3.0 archive](https://secondshift-dv.github.io/naut/packs/celestial-1.3.0.ntpack)
+## Voxel Playground - 2.1.0 source
 
-## Voxel Playground - 2.0.0 source
+![Voxel Playground backdrop artwork and Cover Frames](showcase/voxel-playground.png)
 
-![Voxel Playground 2.0.0 retained backdrop and frame artwork](showcase/voxel-playground.png)
+In Home Customize, choose **Creative Hub** and **World Portal**. Backdrops are **Grassland Day** and
+**Workshop Evening**. Frames are **Block Companion** and **Block Ring**.
 
-An original voxel sandbox inspired by the building/exploring possibilities of Minecraft and Roblox without third-party game assets, brands or characters. Twelve definitions: a sky-and-grass Theme, pixel-heading Typography, block-built Controls, Home, Spotlight, Card, Profile, Media, two scope-specific Backdrops, Pixel Dust Effect, and one piglet Cover Frame. Repetitive layouts, effects and ornamental frames are removed.
+[Download 2.1.0](https://secondshift-dv.github.io/naut/packs/overworld-expedition-2.1.0.ntpack) | [Setup and components](overworld-expedition/README.md) | [2.0.0 archive](https://secondshift-dv.github.io/naut/packs/overworld-expedition-2.0.0.ntpack)
 
-The historical folder slug overworld-expedition and technical pack ID naut.overworld-expedition remain stable for upgrades.
+## Conceal - 2.1.0 source
 
-[Download 2.0.0](https://secondshift-dv.github.io/naut/packs/overworld-expedition-2.0.0.ntpack) | [Source/setup](overworld-expedition/README.md) | [Manifest](overworld-expedition/pack.json) | [Provenance](overworld-expedition/PROVENANCE.txt) | [Previous 1.1.0 archive](https://secondshift-dv.github.io/naut/packs/overworld-expedition-1.1.0.ntpack)
+![Conceal backdrop artwork and Cover Frames](showcase/conceal.png)
 
-## Installation and fallback
+In Home Customize, choose **Tracing Index** and **Under Glass**. Backdrops are **Tracing Sheets** and
+**Smoked Glass**. Frames are **Folded Tracing** and **Tracing Ring**.
 
-Install a folder or published archive through Settings > Presentation > Packs / Advanced. Choose global Theme, Typography and Controls in Settings > Appearance. Choose Home/Profile-scoped components in their Customize panels, and Profile Card / Card Effect in Customize Card. Save the selection; the Presentation Library is for browsing, not selecting.
+[Download 2.1.0](https://secondshift-dv.github.io/naut/packs/conceal-2.1.0.ntpack) | [Setup and components](conceal/README.md)
 
-Surviving definition IDs are unchanged. When a previously selected definition was removed, Naut uses its established built-in fallback, without changing Vault media.
+## Upgrading
 
-[Installation and updates](../docs/pack-collection.md) | [Contribute a pack](../docs/contributing-packs.md)
+Existing IDs continue to resolve when the component is present in the new
+archive. Retired selections use Naut's built-in fallback. Conceal retires
+Wide Keepsake; install Voxel Playground for the wide World Keepsake Card.
+
+Earlier archives remain available for [Black Dossier 1.1.0](https://secondshift-dv.github.io/naut/packs/black-dossier-1.1.0.ntpack),
+[Nightfall Murim 1.3.0](https://secondshift-dv.github.io/naut/packs/celestial-1.3.0.ntpack),
+and [Voxel Playground 1.1.0](https://secondshift-dv.github.io/naut/packs/overworld-expedition-1.1.0.ntpack).
+
+Original pack artwork and definitions by **secondshift-dv**, CC BY 4.0.
+Bundled assets retain their notices.
+
+[Checksums](https://secondshift-dv.github.io/naut/packs/checksums.json) ·
+[Installation and updates](../docs/pack-collection.md) ·
+[Contribute a pack](../docs/contributing-packs.md)

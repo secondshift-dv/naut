@@ -4,14 +4,14 @@
     {
       "slug": "celestial",
       "packId": "neuterradise.celestial",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "name": "Nightfall Murim",
-      "author": "Anas / Second Shift",
+      "author": "secondshift-dv",
       "preview": "preview.png"
     },
     {
-      "version": "2.0.0",
-      "author": "Anas / Second Shift",
+      "version": "2.1.0",
+      "author": "secondshift-dv",
       "name": "Voxel Playground",
       "packId": "naut.overworld-expedition",
       "preview": "preview.png",
@@ -20,9 +20,17 @@
     {
       "slug": "black-dossier",
       "packId": "naut.black-dossier",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "name": "Black Dossier",
-      "author": "Anas / Second Shift",
+      "author": "secondshift-dv",
+      "preview": "preview.png"
+    },
+    {
+      "slug": "conceal",
+      "packId": "conceal",
+      "version": "2.1.0",
+      "name": "Conceal",
+      "author": "secondshift-dv",
       "preview": "preview.png"
     }
   ]

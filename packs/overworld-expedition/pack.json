@@ -1,28 +1,28 @@
 {
   "schemaVersion": 1,
   "packId": "naut.overworld-expedition",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "name": "Voxel Playground",
-  "author": "Anas / Second Shift",
+  "author": "secondshift-dv",
   "description": "An original playful voxel sandbox: creative worlds, grassland and workshop scenery, square controls, collectible block-companions and sparse pixel particles. Inspired by block-building game aesthetics without game assets or logos.",
   "license": "CC-BY-4.0 (original definitions/artwork); SIL-OFL-1.1 (fonts)",
   "minContractVersion": 1,
   "assets": [
     {
       "kind": "Image",
-      "bytes": 2128771,
-      "path": "assets/backdrop-meadow.png",
+      "bytes": 266316,
+      "path": "assets/backdrop-meadow.webp",
       "id": "backdrop-meadow"
     },
     {
       "kind": "Image",
-      "bytes": 1885309,
-      "path": "assets/backdrop-workshop.png",
+      "bytes": 223008,
+      "path": "assets/backdrop-workshop.webp",
       "id": "backdrop-workshop"
     },
     {
       "kind": "Image",
-      "bytes": 1157206,
+      "bytes": 1004240,
       "path": "assets/frame-piglet.png",
       "id": "frame-piglet"
     },
@@ -49,6 +49,12 @@
       "kind": "Image",
       "path": "assets/theme-field-notes.webp",
       "bytes": 16478
+    },
+    {
+      "id": "frame-block-ring",
+      "kind": "Image",
+      "path": "assets/frame-block-ring.png",
+      "bytes": 49155
     }
   ],
   "definitions": [
@@ -255,30 +261,25 @@
       "spec": {
         "hero": {
           "placement": "split",
-          "heightFraction": 0.34,
           "minHeight": 200,
-          "maxHeight": 340
+          "maxHeight": 320,
+          "heightFraction": 0.32
         },
         "rails": [
-          {
-            "id": "statistics",
-            "style": "strip",
-            "maxItems": 4
-          },
           {
             "id": "recent",
             "style": "tile",
             "maxItems": 8
           },
           {
-            "id": "activity",
-            "style": "compact",
-            "maxItems": 5
+            "id": "statistics",
+            "style": "strip",
+            "maxItems": 4
           },
           {
-            "id": "attention",
+            "id": "activity",
             "style": "compact",
-            "maxItems": 3
+            "maxItems": 4
           }
         ],
         "surface": {
@@ -287,11 +288,15 @@
           "children": [
             {
               "type": "semantic",
-              "id": "featured"
+              "id": "local-navigation"
             },
             {
               "type": "semantic",
               "id": "recent"
+            },
+            {
+              "type": "semantic",
+              "id": "featured"
             },
             {
               "type": "columns",
@@ -299,25 +304,15 @@
                 "*",
                 "*"
               ],
-              "spacing": 12,
+              "spacing": 18,
               "children": [
                 {
                   "type": "semantic",
                   "id": "statistics"
                 },
                 {
-                  "type": "stack",
-                  "spacing": 12,
-                  "children": [
-                    {
-                      "type": "semantic",
-                      "id": "activity"
-                    },
-                    {
-                      "type": "semantic",
-                      "id": "attention"
-                    }
-                  ]
+                  "type": "semantic",
+                  "id": "activity"
                 }
               ]
             }
@@ -348,7 +343,7 @@
       "description": "A collectible voxel-world token: framed identity above a softly animated Banner on hover.",
       "previewAccent": "#FF476338",
       "spec": {
-        "aspect": 0.7,
+        "aspect": 2.15,
         "hover": "banner",
         "frame": "full",
         "composition": {
@@ -369,12 +364,12 @@
               "stretch": "uniform-to-fill"
             },
             {
-              "spacing": 6,
-              "padding": 12,
+              "spacing": 2,
+              "padding": 2,
               "children": [
                 {
                   "hAlign": "center",
-                  "size": 144,
+                  "size": 40,
                   "type": "frame"
                 },
                 {
@@ -383,7 +378,7 @@
                   "type": "text",
                   "slot": "profile.identity.name",
                   "role": "card-title",
-                  "maxLines": 2
+                  "maxLines": 1
                 },
                 {
                   "visibleWhen": "profile.identity.category",
@@ -393,13 +388,6 @@
                   "slot": "profile.identity.category",
                   "role": "micro",
                   "maxLines": 1
-                },
-                {
-                  "hAlign": "center",
-                  "style": "outline",
-                  "visibleWhen": "profile.identity.rating",
-                  "slot": "profile.identity.rating",
-                  "type": "badge"
                 }
               ],
               "vAlign": "center",
@@ -413,9 +401,19 @@
               "hAlign": "right",
               "margin": 8,
               "vAlign": "top"
+            },
+            {
+              "hAlign": "left",
+              "style": "outline",
+              "visibleWhen": "profile.identity.rating",
+              "slot": "profile.identity.rating",
+              "type": "badge",
+              "vAlign": "top",
+              "margin": 6
             }
           ]
-        }
+        },
+        "art": "cover-over-banner"
       }
     },
     {
@@ -605,10 +603,7 @@
             ]
           }
         }
-      },
-      "tags": [
-        "home-only"
-      ]
+      }
     },
     {
       "id": "naut.overworld-expedition.backdrop-workshop",
@@ -661,10 +656,7 @@
             ]
           }
         }
-      },
-      "tags": [
-        "profile-only"
-      ]
+      }
     },
     {
       "id": "naut.overworld-expedition.effect-meadow-drift",
@@ -750,6 +742,24 @@
         "animated": false,
         "tint": false,
         "scale": 1
+      }
+    },
+    {
+      "id": "naut.overworld-expedition.frame-block-ring",
+      "kind": "cover-frame",
+      "name": "Block Ring",
+      "description": "Circle Cover frame with its own transparent aperture.",
+      "spec": {
+        "family": "Minimal",
+        "category": "Ornate",
+        "shapes": [
+          "Circle"
+        ],
+        "overlayAsset": "frame-block-ring",
+        "coverInset": 0.145,
+        "scale": 1,
+        "tint": false,
+        "animated": false
       }
     }
   ]

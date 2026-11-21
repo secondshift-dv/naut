@@ -1,25 +1,29 @@
-# Black Dossier - source 2.0.0
+# Black Dossier 2.1.0
 
-Black architectural evidence archive: condensed white headings, angular surfaces, thin gunmetal framing and controlled crimson signals. Nine independent definitions:
+Operations Desk places shortcuts, current imports, attention and activity first on narrow Home. Dual Identity keeps Cover and Banner separate. Cover-only Profiles leave the Banner area empty; an available still or prepared hover clip occupies it.
 
-| Category | Definition |
+| Component | Name |
 | --- | --- |
 | Theme | Obsidian Protocol |
 | Typography | Dossier Type |
 | Home | Operations Desk |
 | Spotlight | Opening Brief |
-| Profile Card | Dual Identity |
+| Card | Dual Identity |
 | Profile | Subject Dossier |
 | Backdrop | Obsidian Atrium |
-| Cover Frame | Gunmetal Seal |
+| Frame | Gunmetal Seal |
 | Effect | Signal Trace |
+| Backdrop | Steel Evidence Archive |
+| Frame | Redline Steel |
 
-**Removed:** Dossier Wall gallery and Evidence Grid media layout. Both reused existing virtualized grid/tile mechanisms without enough structural variation. Choose the built-in Gallery and Media alternatives instead. Surviving definition IDs are unchanged; removed user selections use the existing built-in fallback.
+Install in **Settings → Presentation → Packs / Advanced → Install from file**.
+For upgrades, select **Replace** when prompted. Installation adds choices. In
+Home Customize, select **Operations Desk** and **Opening Brief**, then save.
+Both **Obsidian Atrium** and **Steel Evidence Archive** are available in Home and Profile Customize. Save
+each surface separately. Choose a frame in Profile Customize and a Card in
+Customize Card. Themes, typography and controls are in Settings → Appearance.
 
-Obsidian Protocol has much harder corners, stronger chrome and flatter surfaces than Naut's built-in Obsidian. Dual Identity keeps a separate Banner still and plays the prepared Banner on permitted hover without substituting Cover. Subject Dossier presents media before context; Delete stays in the app-owned footer. Signal Trace uses a grid, silver lines and a crimson sweep with bounded reduced and static fallbacks.
+[Download 2.1.0](https://secondshift-dv.github.io/naut/packs/black-dossier-2.1.0.ntpack) | [2.0.0 archive](https://secondshift-dv.github.io/naut/packs/black-dossier-2.0.0.ntpack)
 
-Install from Settings > Presentation > Packs / Advanced, then choose Theme and Typography in Appearance, Home in Home Customize, and Profile/Frame/Backdrop/Effect in Profile Customize. Card is selected in Customize Card. Save independently.
-
-[Download 2.0.0](https://secondshift-dv.github.io/naut/packs/black-dossier-2.0.0.ntpack). [Earlier 1.1.0 archive](https://secondshift-dv.github.io/naut/packs/black-dossier-1.1.0.ntpack).
-
-Original artwork and definitions: CC BY 4.0; bundled fonts have separate SIL OFL notices. See [PROVENANCE.txt](PROVENANCE.txt) and [LICENSE.txt](LICENSE.txt).
+Original work by **secondshift-dv**, CC BY 4.0. See [license](LICENSE.txt) and
+[provenance](PROVENANCE.txt) for the scope and bundled notices.

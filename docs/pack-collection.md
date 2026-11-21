@@ -13,7 +13,8 @@ They use the existing Presentation Pack contract and contain data/art only.
 4. Select Theme, Typography and Control Style in Settings → Appearance. Choose
    Home and Profile components in their Customize panels, and Profile Card
    through Customize Card. The Presentation Library is for browsing only.
-   Save changes to commit each preview.
+   Save changes to commit each preview. Home and Profile can save different
+   Backdrops from the same pack.
 
 To use the source folder instead, choose Install from folder… and select the
 directory containing `pack.json`, for example `packs/celestial/` in a checkout.

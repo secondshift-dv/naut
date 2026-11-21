@@ -17,6 +17,10 @@ Create `packs/<slug>/` containing:
 - `README.txt` or `README.md`: installation and recommended component combinations;
 - `preview.png`: a readable preview with no private Profile media.
 
+Keep catalog previews and collection showcase images in source. Canonical
+archives include manifest-declared assets, including theme artwork, and pack
+documentation and license notices. They exclude preview and showcase images.
+
 Add a matching entry to `packs/catalog.json` and a card to `packs/README.md`.
 Use a unique lowercase slug and a namespaced id such as `yourname.night-garden`;
 definition ids begin with that id plus a dot. Keep ids stable during updates,
@@ -41,6 +45,8 @@ pwsh ./scripts/verify.ps1 -Scope Packs
 
 This validates catalog/manifest identity, assets, the real Naut compiler,
 archive installation, resolved plans, replacement, restart loading and export.
+Official entries require at least two distinct Cover Frame artworks and two
+Backdrops available in both Home and Profile Customize.
 The GitHub pack check uses read-only permissions on fork PRs. It does not publish
 downloads. Do not commit `.ntpack`/ZIP output, build artifacts or local Vault data.
 

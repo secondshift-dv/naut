@@ -1,32 +1,31 @@
-# Voxel Playground - source 2.0.0
+# Voxel Playground 2.1.0
 
-An original voxel sandbox inspired by Minecraft/Roblox-style creative worlds and builders, but not using their artwork, trademarks, source files or characters. The collection emphasizes grassy/sky surfaces, square blocks, tactile stud-like controls, pixel headings and one friendly animal ornament.
+Creative Hub puts shortcuts and recent worlds above World Portal. World Keepsake keeps its existing ID and uses a wider 2.15:1 crop with centered Cover and name. A ready clip plays on hover. Grassland Day and Workshop Evening retain their IDs and are selectable in both places.
 
-The legacy folder slug overworld-expedition and technical pack ID naut.overworld-expedition are intentionally preserved to upgrade old installations.
+| Component | Name |
+| --- | --- |
+| Theme | Builder's Daylight |
+| Typography | Pixel Headings |
+| Controls | Studwork Controls |
+| Home | Creative Hub |
+| Spotlight | World Portal |
+| Card | World Keepsake |
+| Profile | Builder's Workshop |
+| Media | Build Tiles |
+| Backdrop | Grassland Day |
+| Backdrop | Workshop Evening |
+| Effect | Pixel Dust |
+| Frame | Block Companion |
+| Frame | Block Ring |
 
-## Independent components (12)
+Install in **Settings → Presentation → Packs / Advanced → Install from file**.
+For upgrades, select **Replace** when prompted. Installation adds choices. In
+Home Customize, select **Creative Hub** and **World Portal**, then save.
+Both **Grassland Day** and **Workshop Evening** are available in Home and Profile Customize. Save
+each surface separately. Choose a frame in Profile Customize and a Card in
+Customize Card. Themes, typography and controls are in Settings → Appearance.
 
-| Category | Definition | Purpose |
-| --- | --- | --- |
-| Theme | Builder's Daylight | Sky canvas, green focus and strong squared edges |
-| Typography | Pixel Headings | Silkscreen for titles, Inter for readable body |
-| Control Style | Studwork Controls | Beveled blocks, inset fields, crisp chips and sliders |
-| Home | Creative Hub | Featured world, recent worlds and activity |
-| Spotlight | World Portal | Distinct quiet split feature |
-| Profile Card | World Keepsake | Framed identity and independent Banner hover |
-| Profile | Builder's Workshop | Split Banner on wide screens, contained on narrow, then media/context |
-| Media | Build Tiles | Square double-border media and metadata below |
-| Home Backdrop | Grassland Day | Original voxel meadow (home-only) |
-| Profile Backdrop | Workshop Evening | Original block workshop (profile-only) |
-| Effect | Pixel Dust | Sparse square-edged particles with tier fallbacks |
-| Cover Frame | Block Companion | Square original piglet frame with a transparent center |
+[Download 2.1.0](https://secondshift-dv.github.io/naut/packs/overworld-expedition-2.1.0.ntpack) | [2.0.0 archive](https://secondshift-dv.github.io/naut/packs/overworld-expedition-2.0.0.ntpack)
 
-Builder's Workshop uses a distinctive Split Banner geometry instead of the old
-compact-hero alias which resolved to Dossier and hid the Profile Banner.
-The destructive Delete action remains app-owned and below all sections.
-
-**Removed from 1.1.0:** Trophy Shelves, Forest Hideaway, Golden Dust, Moss Bunny and Bee Meadow. These relied on duplicate virtualized grids, static-image shells, particle recipes or square frame mechanisms. Deleted selection IDs use Naut's built-in fallback. Other technical IDs remain stable.
-
-Install via Settings > Presentation > Packs / Advanced. Theme, Typography and Controls are selected in Settings > Appearance. Choose Home and Profile components in their Customize panels, and the Card through Customize Card. Save each choice independently.
-
-[Download 2.0.0](https://secondshift-dv.github.io/naut/packs/overworld-expedition-2.0.0.ntpack). [Earlier 1.1.0 archive](https://secondshift-dv.github.io/naut/packs/overworld-expedition-1.1.0.ntpack). Content is CC BY 4.0; bundled fonts remain SIL OFL. See [PROVENANCE.txt](PROVENANCE.txt).
+Original work by **secondshift-dv**, CC BY 4.0. See [license](LICENSE.txt) and
+[provenance](PROVENANCE.txt) for the scope and bundled notices.

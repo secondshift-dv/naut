@@ -1,8 +1,8 @@
-Black Dossier 2.0.0
-Author: Anas / Second Shift.
+Black Dossier 2.1.0
+Author: secondshift-dv.
 Original architectural artwork: AI-assisted image created specifically for this pack on 2026-10-09. No third-party game assets, logos or reference imagery are included. Prompt describes a neutral black concrete atrium, quiet left area, white slit lights on the right and a thin crimson architectural accent.
-Gunmetal Seal: original mathematically symmetric raster frame constructed for this pack; transparent 80% central portrait opening. Preview is a composed asset board, not an application screenshot.
-Definitions and original artwork: CC BY 4.0, attribution Anas / Second Shift.
+Gunmetal Seal: original mathematically symmetric raster frame constructed for this pack; transparent 80% central portrait opening.
+Definitions and original artwork: CC BY 4.0, attribution secondshift-dv.
 Inter: assets/inter.ttf; licenses/inter-OFL.txt.
 Naut Instrument Condensed: renamed modified IBM Plex face inherited from Celestial; assets/instrument-condensed.ttf; licenses/ibmplexsanscondensed-OFL.txt.
 Noto Sans Mono: assets/notosansmono.ttf; licenses/notosansmono-OFL.txt.
@@ -11,3 +11,7 @@ Fonts retain SIL OFL 1.1 and notices. No game branding, personal media, executab
 Theme artwork thumbnails: resized, downsampled 320 x 180 WebP derivatives
 of the included original artwork for Settings > Appearance. No new sources
 or third-party assets were introduced.
+
+Redline Steel and Steel Evidence Archive are original raster illustrations. Gunmetal Seal has a matched square aperture.
+
+Redline Steel and Steel Evidence Archive are original raster illustrations. Gunmetal Seal has a matched square aperture.

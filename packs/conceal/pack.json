@@ -1,0 +1,591 @@
+{
+  "schemaVersion": 1,
+  "packId": "conceal",
+  "version": "2.1.0",
+  "name": "Conceal",
+  "description": "Tracing-paper presentation with a compact index, veiled identity and two backdrop moods.",
+  "minContractVersion": 1,
+  "assets": [
+    {
+      "id": "backdrop-paper",
+      "kind": "Image",
+      "path": "assets/tracing-sheets.jpg",
+      "bytes": 67749
+    },
+    {
+      "id": "backdrop-glass",
+      "kind": "Image",
+      "path": "assets/smoked-glass.jpg",
+      "bytes": 77303
+    },
+    {
+      "id": "frame-folded",
+      "kind": "Image",
+      "path": "assets/frame-folded.png",
+      "bytes": 6422
+    },
+    {
+      "id": "frame-ring",
+      "kind": "Image",
+      "path": "assets/frame-ring.png",
+      "bytes": 71148
+    },
+    {
+      "id": "theme-tracing",
+      "kind": "Image",
+      "path": "assets/theme-tracing.webp",
+      "bytes": 2070
+    }
+  ],
+  "definitions": [
+    {
+      "id": "conceal.card",
+      "kind": "profile-card",
+      "name": "Veiled Identity",
+      "description": "A wide Identity card with blurred Banner and Cover at rest. Hover reveals both images and the Profile details.",
+      "previewAccent": "#FFAB522E",
+      "spec": {
+        "aspect": 2.15,
+        "art": "cover-over-banner",
+        "density": "detailed",
+        "hover": "spotlight",
+        "frame": "none",
+        "composition": {
+          "type": "grid",
+          "rows": [
+            "1.35*",
+            "*"
+          ],
+          "columns": [
+            "*"
+          ],
+          "children": [
+            {
+              "type": "shape",
+              "fill": "token:surface2"
+            },
+            {
+              "type": "image",
+              "slot": "profile.identity.banner",
+              "stretch": "uniform-to-fill",
+              "ambient": true,
+              "fallback": "none"
+            },
+            {
+              "type": "scrim",
+              "direction": "to-bottom",
+              "from": "#22DDCBB7",
+              "to": "#60BC9B7C"
+            },
+            {
+              "type": "shape",
+              "fill": "token:surface1",
+              "row": 1
+            },
+            {
+              "type": "shape",
+              "fill": "token:borderDefault",
+              "row": 1,
+              "height": 1,
+              "vAlign": "top"
+            },
+            {
+              "type": "grid",
+              "columns": [
+                "32",
+                "*"
+              ],
+              "margin": [
+                8,
+                2
+              ],
+              "vAlign": "center",
+              "spacing": 6,
+              "children": [
+                {
+                  "type": "overlay",
+                  "vAlign": "center",
+                  "height": 30,
+                  "width": 30,
+                  "children": [
+                    {
+                      "type": "shape",
+                      "fill": "token:surface3",
+                      "cornerRadius": 2,
+                      "stroke": "token:borderDefault",
+                      "strokeThickness": 1
+                    },
+                    {
+                      "type": "image",
+                      "slot": "profile.identity.cover",
+                      "stretch": "uniform-to-fill",
+                      "ambient": true,
+                      "width": 30,
+                      "height": 30,
+                      "hAlign": "left",
+                      "vAlign": "center",
+                      "cornerRadius": 2,
+                      "shape": "cover-shape",
+                      "fallback": "none"
+                    },
+                    {
+                      "type": "stack",
+                      "spacing": 0,
+                      "children": [
+                        {
+                          "type": "image",
+                          "slot": "profile.identity.cover",
+                          "stretch": "uniform-to-fill",
+                          "width": 30,
+                          "height": 30,
+                          "hAlign": "left",
+                          "vAlign": "center",
+                          "cornerRadius": 2,
+                          "shape": "cover-shape",
+                          "fallback": "none"
+                        }
+                      ],
+                      "opacity": 0,
+                      "vAlign": "center"
+                    }
+                  ],
+                  "hAlign": "left"
+                },
+                {
+                  "type": "stack",
+                  "column": 1,
+                  "spacing": 0,
+                  "children": [
+                    {
+                      "type": "text",
+                      "slot": "profile.identity.name",
+                      "role": "card-title",
+                      "maxLines": 1,
+                      "color": "token:textPrimary"
+                    },
+                    {
+                      "type": "text",
+                      "slot": "profile.identity.category",
+                      "role": "micro",
+                      "maxLines": 1,
+                      "color": "token:textSecondary",
+                      "visibleWhen": "profile.identity.category"
+                    },
+                    {
+                      "type": "stack",
+                      "orientation": "horizontal",
+                      "spacing": 4,
+                      "children": [
+                        {
+                          "type": "badge",
+                          "slot": "profile.identity.rating",
+                          "style": "text",
+                          "visibleWhen": "profile.identity.rating"
+                        },
+                        {
+                          "type": "text",
+                          "slot": "profile.statistics.media-count",
+                          "role": "badge",
+                          "maxLines": 1,
+                          "color": "token:textSecondary"
+                        },
+                        {
+                          "type": "badge",
+                          "slot": "profile.identity.favorite",
+                          "style": "text",
+                          "visibleWhen": "profile.identity.favorite"
+                        }
+                      ]
+                    }
+                  ],
+                  "opacity": 0,
+                  "vAlign": "center"
+                }
+              ],
+              "row": 1
+            },
+            {
+              "type": "image",
+              "slot": "profile.identity.banner",
+              "stretch": "uniform-to-fill",
+              "opacity": 0,
+              "fallback": "none"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "conceal.backdrop-paper",
+      "kind": "backdrop",
+      "name": "Tracing Sheets",
+      "description": "Warm translucent sheets overlap at the edges.",
+      "spec": {
+        "variants": {
+          "full": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "backdrop-paper",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FFD5B79F",
+                "opacity": 0.1
+              }
+            ]
+          },
+          "reduced": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "backdrop-paper",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FFD5B79F",
+                "opacity": 0.1
+              }
+            ]
+          },
+          "fallback": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "backdrop-paper",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FFD5B79F",
+                "opacity": 0.1
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "conceal.backdrop-glass",
+      "kind": "backdrop",
+      "name": "Smoked Glass",
+      "description": "Soft shapes sit behind charcoal glass.",
+      "spec": {
+        "variants": {
+          "full": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "backdrop-glass",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FF212023",
+                "opacity": 0.12
+              }
+            ]
+          },
+          "reduced": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "backdrop-glass",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FF212023",
+                "opacity": 0.12
+              }
+            ]
+          },
+          "fallback": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "backdrop-glass",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FF212023",
+                "opacity": 0.12
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "conceal.frame-folded",
+      "kind": "cover-frame",
+      "name": "Folded Tracing",
+      "description": "Square Cover frame with its own transparent aperture.",
+      "spec": {
+        "family": "Minimal",
+        "category": "Ornate",
+        "shapes": [
+          "Square"
+        ],
+        "overlayAsset": "frame-folded",
+        "coverInset": 0.12,
+        "scale": 1,
+        "tint": false,
+        "animated": false
+      }
+    },
+    {
+      "id": "conceal.frame-ring",
+      "kind": "cover-frame",
+      "name": "Tracing Ring",
+      "description": "Circle Cover frame with its own transparent aperture.",
+      "spec": {
+        "family": "Minimal",
+        "category": "Ornate",
+        "shapes": [
+          "Circle"
+        ],
+        "overlayAsset": "frame-ring",
+        "coverInset": 0.075,
+        "scale": 1,
+        "tint": false,
+        "animated": false
+      }
+    },
+    {
+      "id": "conceal.theme",
+      "kind": "theme",
+      "name": "Tracing Paper",
+      "description": "Warm paper tones, ink lettering and quiet edges.",
+      "spec": {
+        "theme": {
+          "schemaVersion": 1,
+          "id": "conceal",
+          "name": "Tracing Paper",
+          "isDark": false,
+          "colors": {
+            "surfaceOverlay": "#F3F4E9DA",
+            "surfaceElevated": "#FFFFF7EA",
+            "warning": "#FF81531C",
+            "surfaceSelected": "#FFF3DACB",
+            "accent": "#FF98452C",
+            "borderSelected": "#FF98452C",
+            "surface2": "#FFF0E3D3",
+            "surface3": "#FFE7D5C1",
+            "success": "#FF386356",
+            "surfaceHover": "#FFEAD4C0",
+            "surfacePressed": "#FFE0C3AA",
+            "textPrimary": "#FF302820",
+            "focus": "#FF8E432C",
+            "accentSecondary": "#FF775647",
+            "selectionHover": "#FFE2B79A",
+            "info": "#FF52667D",
+            "dangerHover": "#FFAA4641",
+            "borderSubtle": "#FFD6C0AC",
+            "canvas": "#FFF0E5D8",
+            "selection": "#FFE6C5AE",
+            "surface1": "#FFFCF4E9",
+            "borderDefault": "#FFB99C84",
+            "textSecondary": "#FF574437",
+            "borderStrong": "#FF8C6D57",
+            "danger": "#FF9F3A35",
+            "accentPressed": "#FF743422",
+            "borderInteractive": "#FF98452C",
+            "textLink": "#FF803B26",
+            "textMuted": "#FF6E5545",
+            "accentHover": "#FFAA5335",
+            "textOnAccent": "#FFFFFFFF",
+            "textInverse": "#FFFFF4E7",
+            "textDisabled": "#FF806A5A"
+          },
+          "typography": {
+            "displayFamily": "Georgia",
+            "headingFamily": "Georgia",
+            "bodyFamily": "Segoe UI",
+            "monoFamily": "Consolas"
+          },
+          "shape": {
+            "xs": 0,
+            "sm": 0,
+            "md": 2,
+            "lg": 3,
+            "xl": 4
+          },
+          "motion": {
+            "slowMs": 320,
+            "fastMs": 120,
+            "normalMs": 200,
+            "cinematicMs": 600
+          },
+          "background": {
+            "kind": "RadialGlow"
+          },
+          "morphology": {
+            "motionIntensity": 0.2,
+            "focusTreatment": "Ring",
+            "glowStrength": 0,
+            "borderWeight": 1.6,
+            "elevationStrength": 0.15,
+            "cardPersonality": "Framed",
+            "chromeTreatment": "Flush",
+            "panelOpacity": 1,
+            "navigationRadiusScale": 0.16,
+            "navigationTreatment": "StrongBorder"
+          }
+        },
+        "artwork": "theme-tracing"
+      }
+    },
+    {
+      "id": "conceal.home",
+      "kind": "home-layout",
+      "name": "Tracing Index",
+      "description": "Shortcuts, statistics and activity lead into a compact Spotlight.",
+      "spec": {
+        "hero": {
+          "placement": "inset",
+          "minHeight": 180,
+          "maxHeight": 280,
+          "heightFraction": 0.25
+        },
+        "rails": [
+          {
+            "id": "statistics",
+            "style": "strip",
+            "maxItems": 4
+          },
+          {
+            "id": "activity",
+            "style": "compact",
+            "maxItems": 4
+          }
+        ],
+        "surface": {
+          "type": "stack",
+          "spacing": 8,
+          "children": [
+            {
+              "type": "semantic",
+              "id": "local-navigation"
+            },
+            {
+              "type": "semantic",
+              "id": "statistics"
+            },
+            {
+              "type": "semantic",
+              "id": "activity"
+            },
+            {
+              "type": "semantic",
+              "id": "featured"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "conceal.spotlight",
+      "kind": "spotlight-style",
+      "name": "Under Glass",
+      "description": "A compact still feature without Cover or Overview.",
+      "spec": {
+        "composition": "snapshot",
+        "motion": "still",
+        "rotationSeconds": 30,
+        "showCover": false,
+        "showOverview": false,
+        "pagination": "counter",
+        "scrimStrength": 0.65
+      }
+    },
+    {
+      "id": "conceal.profile",
+      "kind": "profile-layout",
+      "name": "Tracing Folio",
+      "description": "A contained identity and context above the media collection.",
+      "spec": {
+        "preset": "portrait",
+        "surface": {
+          "type": "stack",
+          "spacing": 12,
+          "children": [
+            {
+              "type": "semantic",
+              "id": "identity"
+            },
+            {
+              "type": "semantic",
+              "id": "overview"
+            },
+            {
+              "type": "columns",
+              "columns": [
+                "*",
+                "*"
+              ],
+              "spacing": 18,
+              "children": [
+                {
+                  "type": "semantic",
+                  "id": "related"
+                },
+                {
+                  "type": "semantic",
+                  "id": "faces"
+                }
+              ]
+            },
+            {
+              "type": "semantic",
+              "id": "review"
+            },
+            {
+              "type": "semantic",
+              "id": "media"
+            },
+            {
+              "type": "semantic",
+              "id": "actions"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "conceal.media",
+      "kind": "profile-media-layout",
+      "name": "Tracing Sheets Grid",
+      "description": "Compact contact-sheet tiles and understated captions.",
+      "spec": {
+        "layoutId": "editorial",
+        "cardWidth": 180,
+        "aspect": 1,
+        "mediaWidthFraction": 1,
+        "fit": "fill",
+        "metadataPlacement": "below",
+        "metadataFields": [
+          "name",
+          "dimensions",
+          "duration",
+          "favorite"
+        ],
+        "metadataLines": 2,
+        "frameStyle": "hairline",
+        "frameRadius": 2,
+        "frameThickness": 1,
+        "frameColor": "token:borderDefault",
+        "selectedFrameColor": "token:accent",
+        "frameGlow": 0,
+        "hoverStyle": "lift",
+        "showTypeBadge": false,
+        "browse": "editorial"
+      }
+    }
+  ],
+  "license": "CC-BY-4.0",
+  "author": "secondshift-dv"
+}

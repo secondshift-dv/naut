@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "packId": "neuterradise.celestial",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "name": "Nightfall Murim",
-  "author": "Anas",
+  "author": "secondshift-dv",
   "description": "Nighttime murim / jianghu: moonlit sect halls, disciplined martial identity, jade and plum ink, a phoenix seal and restrained blade-aura motion. Original fantasy artwork; no licensed manhwa material.",
-  "license": "CC-BY-4.0 (original definitions/artwork); SIL-OFL-1.1 (fonts)",
+  "license": "CC-BY-4.0",
   "minContractVersion": 1,
   "assets": [
     {
@@ -18,7 +18,7 @@
       "id": "frame-imperial-phoenix",
       "kind": "Image",
       "path": "assets/frame-imperial-phoenix.png",
-      "bytes": 2423254
+      "bytes": 454104
     },
     {
       "id": "theme-violet",
@@ -31,6 +31,18 @@
       "kind": "Image",
       "path": "assets/theme-azure.webp",
       "bytes": 6264
+    },
+    {
+      "id": "backdrop-lantern-pass",
+      "kind": "Image",
+      "path": "assets/lantern-pass.jpg",
+      "bytes": 30489
+    },
+    {
+      "id": "frame-jade-lacquer",
+      "kind": "Image",
+      "path": "assets/frame-jade-lacquer.png",
+      "bytes": 15172
     }
   ],
   "definitions": [
@@ -233,30 +245,25 @@
       "spec": {
         "hero": {
           "placement": "inset",
-          "heightFraction": 0.34,
-          "minHeight": 200,
-          "maxHeight": 360
+          "minHeight": 285,
+          "maxHeight": 470,
+          "heightFraction": 0.45
         },
         "rails": [
           {
-            "id": "statistics",
-            "style": "strip",
-            "maxItems": 4
-          },
-          {
             "id": "recent",
-            "style": "tile",
+            "style": "poster",
             "maxItems": 8
           },
           {
             "id": "activity",
             "style": "compact",
-            "maxItems": 5
+            "maxItems": 4
           },
           {
-            "id": "attention",
-            "style": "compact",
-            "maxItems": 3
+            "id": "statistics",
+            "style": "strip",
+            "maxItems": 4
           }
         ],
         "surface": {
@@ -269,33 +276,23 @@
             },
             {
               "type": "semantic",
-              "id": "statistics"
+              "id": "recent"
             },
             {
               "type": "columns",
               "columns": [
-                "2*",
+                "1.5*",
                 "*"
               ],
-              "spacing": 16,
+              "spacing": 18,
               "children": [
                 {
                   "type": "semantic",
-                  "id": "recent"
+                  "id": "activity"
                 },
                 {
-                  "type": "stack",
-                  "spacing": 12,
-                  "children": [
-                    {
-                      "type": "semantic",
-                      "id": "activity"
-                    },
-                    {
-                      "type": "semantic",
-                      "id": "attention"
-                    }
-                  ]
+                  "type": "semantic",
+                  "id": "statistics"
                 }
               ]
             }
@@ -479,7 +476,7 @@
         "frameColor": "token:borderDefault",
         "selectedFrameColor": "token:accent",
         "frameGlow": 0.12,
-        "hoverStyle": "spotlight",
+        "hoverStyle": "lift",
         "showTypeBadge": false
       }
     },
@@ -624,7 +621,7 @@
       "description": "Centered featured disciple against moonlit imagery, without verbose biography.",
       "previewAccent": "#FFA78BFA",
       "spec": {
-        "composition": "centered-poster",
+        "composition": "storefront",
         "motion": "still",
         "rotationSeconds": 22,
         "showCover": true,
@@ -717,6 +714,76 @@
             "thumbHeight": 22
           }
         }
+      }
+    },
+    {
+      "id": "neuterradise.celestial.backdrop-lantern-pass",
+      "kind": "backdrop",
+      "name": "Lantern Pass",
+      "description": "Warm lights trace a mountain path at dusk.",
+      "spec": {
+        "variants": {
+          "full": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "backdrop-lantern-pass",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FF09121B",
+                "opacity": 0.16
+              }
+            ]
+          },
+          "reduced": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "backdrop-lantern-pass",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FF09121B",
+                "opacity": 0.16
+              }
+            ]
+          },
+          "fallback": {
+            "layers": [
+              {
+                "kind": "image",
+                "asset": "backdrop-lantern-pass",
+                "opacity": 1
+              },
+              {
+                "kind": "scrim",
+                "color": "#FF09121B",
+                "opacity": 0.16
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "neuterradise.celestial.frame-jade-lacquer",
+      "kind": "cover-frame",
+      "name": "Jade Lacquer Seal",
+      "description": "Square Cover frame with its own transparent aperture.",
+      "spec": {
+        "family": "Royal",
+        "category": "Ornate",
+        "shapes": [
+          "Square"
+        ],
+        "overlayAsset": "frame-jade-lacquer",
+        "coverInset": 0.135,
+        "scale": 1,
+        "tint": false,
+        "animated": false
       }
     }
   ]
