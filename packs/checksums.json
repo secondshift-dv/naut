@@ -4,26 +4,34 @@
     {
       "slug": "celestial",
       "packId": "neuterradise.celestial",
-      "version": "2.0.0",
-      "file": "celestial-2.0.0.ntpack",
-      "sha256": "9126099ca746d9c8a22e0444808de875da808270149c75993680e84758254469",
-      "bytes": 3765879
+      "version": "2.1.0",
+      "file": "celestial-2.1.0.ntpack",
+      "sha256": "0bbec829928a04432863eeffc6aed3fb18dd577e845b34eb2d14cef9d9eace4c",
+      "bytes": 1281460
     },
     {
       "slug": "overworld-expedition",
       "packId": "naut.overworld-expedition",
-      "version": "2.0.0",
-      "file": "overworld-expedition-2.0.0.ntpack",
-      "sha256": "193f31aa0874e2f4e5bfd64718f63865d8d3a42af93716ded0b4fe1d29934086",
-      "bytes": 7182850
+      "version": "2.1.0",
+      "file": "overworld-expedition-2.1.0.ntpack",
+      "sha256": "036e44615871fdecff9223c031c8364243ccb0171520a73d72db9fde04e10cd2",
+      "bytes": 1960263
     },
     {
       "slug": "black-dossier",
       "packId": "naut.black-dossier",
-      "version": "2.0.0",
-      "file": "black-dossier-2.0.0.ntpack",
-      "sha256": "c5295df5a7472bdf0abb61d745823f0f461d48f4f95d17a40074106c48a2b5e8",
-      "bytes": 1890561
+      "version": "2.1.0",
+      "file": "black-dossier-2.1.0.ntpack",
+      "sha256": "1cc8fe4f6c2f259bb260cfa7d4dd4ce8f462e21d9c1b2a81a5567b27a88bab67",
+      "bytes": 846751
+    },
+    {
+      "slug": "conceal",
+      "packId": "conceal",
+      "version": "2.1.0",
+      "file": "conceal-2.1.0.ntpack",
+      "sha256": "e808bf9b653085f1e95f9741d7b7d3a1f5c7c887d1eaa29b3a9c4d742e74ba6b",
+      "bytes": 222880
     }
   ]
 }
