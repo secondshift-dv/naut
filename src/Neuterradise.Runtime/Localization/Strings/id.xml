@@ -2137,6 +2137,11 @@
     <sys:String x:Key="Inspector.Figure.Dependencies">Komponen yang diperlukan tidak tersedia</sys:String>
     <sys:String x:Key="Inspector.Figure.Unsupported">Tidak didukung untuk format ini</sys:String>
     <sys:String x:Key="Profile.AddMediaStarted">Media sedang ditambahkan di latar belakang.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Imported">{0} · {1}: Ringkasan hasil impor menunggu peninjauan di Profil ini.</sys:String>
+    <sys:String x:Key="Health.ProfileText.ExternalChange">{0} · {1}: File diubah di luar Naut. Tinjau perubahannya di Profil ini.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Missing">{0} · {1}: File hilang. Buka Profil ini untuk memulihkan teks dari katalog.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Invalid">{0} · {1}: Naut tidak dapat membaca atau memvalidasi file dengan aman. Periksa file sebelum mencoba lagi.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Conflict">{0} · {1}: Isi file berbeda dari teks di katalog. Buka Profil ini untuk meninjau perubahannya.</sys:String>
     <sys:String x:Key="Profile.TextFiles.Review">Tinjau perubahan file teks</sys:String>
     <sys:String x:Key="Profile.TextFiles.Failed">File teks belum dapat diselesaikan.</sys:String>
     <sys:String x:Key="Profile.TextFiles.Invalid">File teks tidak terbaca, tidak valid, atau tidak aman. Periksa file sebelum mencoba lagi.</sys:String>

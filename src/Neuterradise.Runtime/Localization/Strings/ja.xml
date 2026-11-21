@@ -2137,6 +2137,11 @@
     <sys:String x:Key="Inspector.Figure.Dependencies">必要なコンポーネントがありません</sys:String>
     <sys:String x:Key="Inspector.Figure.Unsupported">この形式は未対応</sys:String>
     <sys:String x:Key="Profile.AddMediaStarted">バックグラウンドでメディアを追加しています。</sys:String>
+    <sys:String x:Key="Health.ProfileText.Imported">{0} · {1}：インポートされた概要が、このプロフィールで確認を待っています。</sys:String>
+    <sys:String x:Key="Health.ProfileText.ExternalChange">{0} · {1}：ファイルが Naut の外部で変更されました。このプロフィールで変更内容を確認してください。</sys:String>
+    <sys:String x:Key="Health.ProfileText.Missing">{0} · {1}：ファイルが見つかりません。このプロフィールを開いてカタログのテキストを復元してください。</sys:String>
+    <sys:String x:Key="Health.ProfileText.Invalid">{0} · {1}：Naut はファイルを安全に読み込むか検証することができませんでした。再試行する前にファイルを確認してください。</sys:String>
+    <sys:String x:Key="Health.ProfileText.Conflict">{0} · {1}：ファイルとカタログのテキストが異なります。このプロフィールを開いて変更内容を確認してください。</sys:String>
     <sys:String x:Key="Profile.TextFiles.Review">変更されたテキストを確認</sys:String>
     <sys:String x:Key="Profile.TextFiles.Failed">テキストファイルを解決できませんでした。</sys:String>
     <sys:String x:Key="Profile.TextFiles.Invalid">テキストファイルを読み取れないか、無効または安全ではありません。ファイルを確認してください。</sys:String>

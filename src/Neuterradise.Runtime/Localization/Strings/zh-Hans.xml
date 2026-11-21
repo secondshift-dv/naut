@@ -2137,6 +2137,11 @@
     <sys:String x:Key="Inspector.Figure.Dependencies">所需组件不可用</sys:String>
     <sys:String x:Key="Inspector.Figure.Unsupported">不支持此格式</sys:String>
     <sys:String x:Key="Profile.AddMediaStarted">正在后台添加媒体。</sys:String>
+    <sys:String x:Key="Health.ProfileText.Imported">{0} · {1}：导入的概览正在此个人资料中等待审核。</sys:String>
+    <sys:String x:Key="Health.ProfileText.ExternalChange">{0} · {1}：文件已在 Naut 外部被修改。请在此个人资料中查看更改。</sys:String>
+    <sys:String x:Key="Health.ProfileText.Missing">{0} · {1}：文件缺失。请打开此个人资料以恢复目录中的文本。</sys:String>
+    <sys:String x:Key="Health.ProfileText.Invalid">{0} · {1}：Naut 无法安全读取或验证文件。请检查文件后重试。</sys:String>
+    <sys:String x:Key="Health.ProfileText.Conflict">{0} · {1}：文件和目录中的文本不同。请打开此个人资料查看更改。</sys:String>
     <sys:String x:Key="Profile.TextFiles.Review">查看已更改的文本文件</sys:String>
     <sys:String x:Key="Profile.TextFiles.Failed">无法协调文本文件。</sys:String>
     <sys:String x:Key="Profile.TextFiles.Invalid">文本文件无法读取、无效或不安全。请先检查文件。</sys:String>

@@ -2137,6 +2137,11 @@
     <sys:String x:Key="Inspector.Figure.Dependencies">Composants nécessaires indisponibles</sys:String>
     <sys:String x:Key="Inspector.Figure.Unsupported">Non prise en charge pour ce format</sys:String>
     <sys:String x:Key="Profile.AddMediaStarted">Ajout des médias en arrière-plan.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Imported">{0} · {1} : Une présentation importée est en attente de vérification dans ce profil.</sys:String>
+    <sys:String x:Key="Health.ProfileText.ExternalChange">{0} · {1} : Le fichier a été modifié en dehors de Naut. Examinez la modification dans ce profil.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Missing">{0} · {1} : Le fichier est introuvable. Ouvrez ce profil pour restaurer le texte du catalogue.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Invalid">{0} · {1} : Naut n’a pas pu lire ou valider le fichier en toute sécurité. Vérifiez le fichier avant de réessayer.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Conflict">{0} · {1} : Le fichier et le catalogue contiennent des textes différents. Ouvrez ce profil pour examiner la modification.</sys:String>
     <sys:String x:Key="Profile.TextFiles.Review">Examiner les fichiers texte modifiés</sys:String>
     <sys:String x:Key="Profile.TextFiles.Failed">Les fichiers texte n’ont pas pu être rapprochés.</sys:String>
     <sys:String x:Key="Profile.TextFiles.Invalid">Un fichier texte est illisible, invalide ou non sécurisé. Vérifiez-le avant de réessayer.</sys:String>

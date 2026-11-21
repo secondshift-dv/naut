@@ -884,6 +884,12 @@ public sealed class SettingsSurface : Surface
                 foreach (var finding in group.Findings)
                 {
                     var actions = UI.Wrap(4);
+                    if (finding.ProfileId is { } profileId
+                        && finding.Code.StartsWith(HealthFindingCode.ProfileTextPrefix, StringComparison.Ordinal))
+                    {
+                        actions.Children.Add(UI.Button(UI.T("Home.OpenProfile", "Open Profile"),
+                            () => Services.Navigation.Navigate(new ProfileRoute(profileId)), ButtonKind.Ghost));
+                    }
                     foreach (var action in finding.ImportActions ?? [])
                     {
                         var label = action switch

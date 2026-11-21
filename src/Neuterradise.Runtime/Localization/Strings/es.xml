@@ -2137,6 +2137,11 @@
     <sys:String x:Key="Inspector.Figure.Dependencies">Faltan componentes necesarios</sys:String>
     <sys:String x:Key="Inspector.Figure.Unsupported">No compatible con este formato</sys:String>
     <sys:String x:Key="Profile.AddMediaStarted">Añadiendo contenido en segundo plano.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Imported">{0} · {1}: Hay un resumen importado pendiente de revisión en este perfil.</sys:String>
+    <sys:String x:Key="Health.ProfileText.ExternalChange">{0} · {1}: El archivo cambió fuera de Naut. Revisa el cambio en este perfil.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Missing">{0} · {1}: Falta el archivo. Abre este perfil para restaurar el texto del catálogo.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Invalid">{0} · {1}: Naut no pudo leer o validar el archivo de forma segura. Revísalo antes de volver a intentarlo.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Conflict">{0} · {1}: El archivo y el catálogo contienen textos distintos. Abre este perfil para revisar el cambio.</sys:String>
     <sys:String x:Key="Profile.TextFiles.Review">Revisar archivos de texto modificados</sys:String>
     <sys:String x:Key="Profile.TextFiles.Failed">No se pudieron conciliar los archivos de texto.</sys:String>
     <sys:String x:Key="Profile.TextFiles.Invalid">Un archivo de texto no se puede leer, no es válido o no es seguro. Revíselo antes de reintentar.</sys:String>

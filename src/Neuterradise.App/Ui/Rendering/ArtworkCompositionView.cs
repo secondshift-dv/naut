@@ -21,6 +21,7 @@ internal sealed class ArtworkCompositionView : Grid
     private readonly Grid _sourceHost = new();
     private readonly List<Storyboard> _motion = [];
     private readonly ArtworkPlan _plan;
+    private ContainerVisual? _maskHost;
     private CompositionVisualSurface? _source;
     private SpriteVisual? _sprite;
     private LoadedImageSurface? _mask;
@@ -77,12 +78,9 @@ internal sealed class ArtworkCompositionView : Grid
             ResourceGovernor.Shared.Changed -= OnMotionChanged;
             ReducedMotionAuthority.Changed -= OnMotionChanged;
             UpdateMotion();
-            if (_sprite is not null)
-            {
-                ElementCompositionPreview.SetElementChildVisual(_output, null!);
-                _sprite = null;
-                _source = null;
-            }
+            if (_sprite is { } sprite) _maskHost?.Children.Remove(sprite);
+            _sprite = null;
+            _source = null;
             var mask = _mask;
             _mask = null;
             if (_maskCompleted) mask?.Dispose();
@@ -114,9 +112,16 @@ internal sealed class ArtworkCompositionView : Grid
             {
                 _maskCompleted = true;
                 if (args.Status != LoadedImageSourceLoadStatus.Success) return;
+                if (_maskHost is null)
+                {
+                    // Uno Skia cannot clear an element child visual by assigning null.
+                    _maskHost = compositor.CreateContainerVisual();
+                    ElementCompositionPreview.SetElementChildVisual(_output, _maskHost);
+                }
+                _maskHost.Children.InsertAtTop(sprite);
+                _maskHost.Size = sprite.Size;
                 // Clip only the parent so the Skia visual surface can still paint the original layers.
                 _sourceHost.Clip = new RectangleGeometry { Rect = new Rect(-2, -2, 1, 1) };
-                ElementCompositionPreview.SetElementChildVisual(_output, sprite);
             }
             else sender.Dispose();
         };
@@ -154,6 +159,7 @@ internal sealed class ArtworkCompositionView : Grid
         // The pinned Uno Skia visual surface uses X for both source clip dimensions.
         _source.SourceSize = new Vector2(Math.Max(size.X, size.Y));
         _sprite.Size = size;
+        if (_maskHost is not null) _maskHost.Size = size;
     }
 
     public void SetActive(bool active)

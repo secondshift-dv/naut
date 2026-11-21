@@ -2137,6 +2137,11 @@
     <sys:String x:Key="Inspector.Figure.Dependencies">필수 구성 요소 없음</sys:String>
     <sys:String x:Key="Inspector.Figure.Unsupported">이 형식은 지원되지 않음</sys:String>
     <sys:String x:Key="Profile.AddMediaStarted">백그라운드에서 미디어를 추가하고 있습니다.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Imported">{0} · {1}: 가져온 개요가 이 프로필에서 검토를 기다리고 있습니다.</sys:String>
+    <sys:String x:Key="Health.ProfileText.ExternalChange">{0} · {1}: Naut 외부에서 파일을 변경했습니다. 이 프로필에서 변경 내용을 검토하세요.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Missing">{0} · {1}: 파일이 없습니다. 이 프로필을 열어 카탈로그의 텍스트를 복원하세요.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Invalid">{0} · {1}: Naut에서 파일을 안전하게 읽거나 검증하지 못했습니다. 다시 시도하기 전에 파일을 확인하세요.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Conflict">{0} · {1}: 파일과 카탈로그의 텍스트가 다릅니다. 이 프로필을 열어 변경 내용을 검토하세요.</sys:String>
     <sys:String x:Key="Profile.TextFiles.Review">변경된 텍스트 파일 검토</sys:String>
     <sys:String x:Key="Profile.TextFiles.Failed">텍스트 파일을 조정하지 못했습니다.</sys:String>
     <sys:String x:Key="Profile.TextFiles.Invalid">텍스트 파일을 읽을 수 없거나 유효하지 않거나 안전하지 않습니다. 파일을 확인하세요.</sys:String>

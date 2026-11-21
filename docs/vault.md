@@ -34,6 +34,10 @@ Naut v0.0.9 atomically advances recognized Catalog v1/v2 Vaults to schema v3, pr
 
 Managed NORMAL Profiles can mirror Overview and Private Note into UTF-8 text files inside the Vault. These files are **plaintext**; anyone with filesystem access can read them. If edited outside Naut, the application asks how to resolve the conflict before adopting or replacing the content. Keep the entire Vault together when backing it up or moving it.
 
+## Review Profile text findings
+
+Run **Check Vault** in **Settings → Vault → Vault Health** to identify the Profile and file associated with each text finding. **Open Profile** takes you to that Profile, where **Review changed text files** lets you inspect the file, restore catalog text, or review a pending imported overview as appropriate.
+
 ## Backups
 
 For a simple offline backup, close Naut first and copy the entire Vault folder as one unit. Keep the internal structure intact rather than copying selected database or derivative files individually.

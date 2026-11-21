@@ -2137,6 +2137,11 @@
     <sys:String x:Key="Inspector.Figure.Dependencies">Required components unavailable</sys:String>
     <sys:String x:Key="Inspector.Figure.Unsupported">Not supported for this format</sys:String>
     <sys:String x:Key="Profile.AddMediaStarted">Adding media in the background.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Imported">{0} · {1}: An imported overview is waiting for review on this Profile.</sys:String>
+    <sys:String x:Key="Health.ProfileText.ExternalChange">{0} · {1}: The file changed outside Naut. Review the change on this Profile.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Missing">{0} · {1}: The file is missing. Open this Profile to restore the catalog text.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Invalid">{0} · {1}: Naut could not safely read or validate the file. Check it before retrying.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Conflict">{0} · {1}: The file and the catalog contain different text. Open this Profile to review the change.</sys:String>
     <sys:String x:Key="Profile.TextFiles.Review">Review changed text files</sys:String>
     <sys:String x:Key="Profile.TextFiles.Failed">Text files could not be resolved.</sys:String>
     <sys:String x:Key="Profile.TextFiles.Invalid">A text file is unreadable, invalid or unsafe. Check the file before retrying.</sys:String>

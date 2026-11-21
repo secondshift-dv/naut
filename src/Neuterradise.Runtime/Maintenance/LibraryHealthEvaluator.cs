@@ -43,6 +43,24 @@ public sealed class LibraryHealthEvaluator
         return result.Findings;
     }
 
+    private static string DescribeProfileTextFinding(ProfileTextInspection text, string profileName)
+    {
+        var (key, message) = (text.ImportOfferId.HasValue, text.State) switch
+        {
+            (true, _) => ("Health.ProfileText.Imported",
+                "{0} · {1}: An imported overview is waiting for review on this Profile."),
+            (_, ProfileTextState.ExternalChange) => ("Health.ProfileText.ExternalChange",
+                "{0} · {1}: The file changed outside Naut. Review the change on this Profile."),
+            (_, ProfileTextState.Missing) => ("Health.ProfileText.Missing",
+                "{0} · {1}: The file is missing. Open this Profile to restore the catalog text."),
+            (_, ProfileTextState.Invalid) => ("Health.ProfileText.Invalid",
+                "{0} · {1}: Naut could not safely read or validate the file. Check it before retrying."),
+            _ => ("Health.ProfileText.Conflict",
+                "{0} · {1}: The file and the catalog contain different text. Open this Profile to review the change."),
+        };
+        return SurfaceText.Format(key, message, profileName, text.FileName);
+    }
+
     public async Task<HealthScanResult> RunScanAsync(
         HealthScanOptions? options = null,
         IProgress<HealthScanProgress>? progress = null,
@@ -118,10 +136,16 @@ public sealed class LibraryHealthEvaluator
 
             foreach (var text in await new ProfileTextFiles(_catalog).InspectAsync(profile.ProfileId,
                          cancellationToken, synchronize: false).ConfigureAwait(false))
-                if (text.State != ProfileTextState.Current)
-                    findings.Add(new HealthFinding("PROFILE_TEXT_" + text.State.ToString().ToUpperInvariant(),
-                        HealthSeverity.Warning, profile.ProfileId, null, null, null,
-                        $"{text.FileName}: {text.State}. Open the Profile to review or restore its text file.", false));
+            {
+                if (text.State == ProfileTextState.Current) continue;
+                var profileName = string.IsNullOrWhiteSpace(profile.DisplayName)
+                    ? profile.ProfileId.ToString("D")
+                    : profile.DisplayName;
+                findings.Add(new HealthFinding(
+                    HealthFindingCode.ProfileTextPrefix + text.State.ToString().ToUpperInvariant(),
+                    HealthSeverity.Warning, profile.ProfileId, null, null, null,
+                    DescribeProfileTextFinding(text, profileName), RepairAvailable: false));
+            }
 
             knownProfileIds.Add(profile.ProfileId);
             if (!string.IsNullOrWhiteSpace(profile.StorageToken))

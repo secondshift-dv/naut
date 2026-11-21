@@ -2137,6 +2137,11 @@
     <sys:String x:Key="Inspector.Figure.Dependencies">Erforderliche Komponenten fehlen</sys:String>
     <sys:String x:Key="Inspector.Figure.Unsupported">Für dieses Format nicht unterstützt</sys:String>
     <sys:String x:Key="Profile.AddMediaStarted">Medien werden im Hintergrund hinzugefügt.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Imported">{0} · {1}: Eine importierte Übersicht wartet in diesem Profil auf Prüfung.</sys:String>
+    <sys:String x:Key="Health.ProfileText.ExternalChange">{0} · {1}: Die Datei wurde außerhalb von Naut geändert. Prüfen Sie die Änderung in diesem Profil.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Missing">{0} · {1}: Die Datei fehlt. Öffnen Sie dieses Profil, um den Katalogtext wiederherzustellen.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Invalid">{0} · {1}: Naut konnte die Datei nicht sicher lesen oder prüfen. Überprüfen Sie sie vor einem erneuten Versuch.</sys:String>
+    <sys:String x:Key="Health.ProfileText.Conflict">{0} · {1}: Datei und Katalog enthalten unterschiedlichen Text. Öffnen Sie dieses Profil, um die Änderung zu prüfen.</sys:String>
     <sys:String x:Key="Profile.TextFiles.Review">Geänderte Textdateien prüfen</sys:String>
     <sys:String x:Key="Profile.TextFiles.Failed">Textdateien konnten nicht abgeglichen werden.</sys:String>
     <sys:String x:Key="Profile.TextFiles.Invalid">Eine Textdatei ist unlesbar, ungültig oder unsicher. Prüfen Sie die Datei vor dem nächsten Versuch.</sys:String>
