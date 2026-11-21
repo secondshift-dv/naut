@@ -1,24 +1,24 @@
 {
   "schemaVersion": 1,
   "packId": "naut.black-dossier",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "name": "Black Dossier",
   "author": "secondshift-dv",
-  "description": "An independent black-architecture dossier set: restrained crimson, condensed evidence typography, banner-first identity, a gunmetal portrait seal and signal traces.",
+  "description": "Briefing and evidence in a cold architectural setting.",
   "license": "CC-BY-4.0 (original definitions/artwork); SIL-OFL-1.1 (fonts)",
-  "minContractVersion": 1,
+  "minContractVersion": 3,
   "assets": [
     {
       "id": "backdrop-atrium",
       "kind": "Image",
       "path": "assets/atrium.jpg",
-      "bytes": 228918
+      "bytes": 51240
     },
     {
       "id": "frame-gunmetal",
       "kind": "Image",
-      "path": "assets/frame-gunmetal.png",
-      "bytes": 18723
+      "path": "assets/frame-gunmetal.webp",
+      "bytes": 27782
     },
     {
       "id": "font-display",
@@ -42,19 +42,43 @@
       "id": "theme-obsidian",
       "kind": "Image",
       "path": "assets/theme-obsidian.webp",
-      "bytes": 4420
+      "bytes": 9060
     },
     {
       "id": "backdrop-archive",
       "kind": "Image",
       "path": "assets/steel-archive.jpg",
-      "bytes": 66789
+      "bytes": 39837
     },
     {
       "id": "frame-redline",
       "kind": "Image",
-      "path": "assets/frame-redline.png",
-      "bytes": 103912
+      "path": "assets/frame-redline.webp",
+      "bytes": 40734
+    },
+    {
+      "id": "spotlight-mask",
+      "kind": "Image",
+      "path": "assets/spotlight-mask.png",
+      "bytes": 3880
+    },
+    {
+      "id": "spotlight-edge",
+      "kind": "Image",
+      "path": "assets/spotlight-edge.png",
+      "bytes": 8990
+    },
+    {
+      "id": "banner-mask",
+      "kind": "Image",
+      "path": "assets/banner-mask.png",
+      "bytes": 4602
+    },
+    {
+      "id": "banner-edge",
+      "kind": "Image",
+      "path": "assets/banner-edge.png",
+      "bytes": 8990
     }
   ],
   "definitions": [
@@ -71,24 +95,24 @@
           "name": "Black Dossier",
           "isDark": true,
           "colors": {
-            "canvas": "#FF08090B",
-            "surface1": "#FF111215",
-            "surface2": "#FF191B1F",
-            "surface3": "#FF24262B",
-            "surfaceElevated": "#FF1D1F24",
+            "canvas": "#FF101419",
+            "surface1": "#FF191F25",
+            "surface2": "#FF202831",
+            "surface3": "#FF29333C",
+            "surfaceElevated": "#FF202831",
             "surfaceOverlay": "#EE131418",
-            "surfaceHover": "#FF292C32",
+            "surfaceHover": "#FF29333C",
             "surfacePressed": "#FF33363D",
             "surfaceSelected": "#FF382027",
-            "accent": "#FFB72739",
+            "accent": "#FFD54848",
             "accentHover": "#FFD4394C",
             "accentPressed": "#FF942031",
-            "accentSecondary": "#FFD5D8DE",
-            "textPrimary": "#FFF2F3F5",
-            "textSecondary": "#FFC2C5CB",
+            "accentSecondary": "#FF91ADB8",
+            "textPrimary": "#FFF0F3F5",
+            "textSecondary": "#FFB8C4CA",
             "textMuted": "#FF989DA7",
             "textDisabled": "#FF737986",
-            "textOnAccent": "#FFFFFFFF",
+            "textOnAccent": "#FF111318",
             "textInverse": "#FF08090B",
             "textLink": "#FFF0B0B7",
             "borderSubtle": "#FF30333A",
@@ -182,7 +206,7 @@
       "id": "naut.black-dossier.home",
       "kind": "home-layout",
       "name": "Operations Desk",
-      "description": "Large inset brief and a responsive operations board pairing statistics, recent finds and activity.",
+      "description": "Attention and imports lead the Operations Desk. The separate reconnaissance image, subject and pagination stay grouped on the right on wide layouts.",
       "previewAccent": "#FFB72739",
       "spec": {
         "hero": {
@@ -214,50 +238,79 @@
           }
         ],
         "surface": {
-          "type": "columns",
+          "type": "grid",
           "columns": [
-            "*",
-            "1.35*"
+            "3*",
+            "7*"
           ],
-          "spacing": 18,
+          "rows": [
+            "auto",
+            "auto"
+          ],
+          "spacing": 22,
           "children": [
             {
               "type": "stack",
-              "spacing": 12,
+              "spacing": 14,
               "children": [
-                {
-                  "type": "semantic",
-                  "id": "local-navigation"
-                },
-                {
-                  "type": "semantic",
-                  "id": "imports"
-                },
                 {
                   "type": "semantic",
                   "id": "attention"
                 },
                 {
                   "type": "semantic",
-                  "id": "activity"
-                }
-              ]
-            },
-            {
-              "type": "stack",
-              "spacing": 12,
-              "children": [
+                  "id": "imports"
+                },
                 {
-                  "type": "semantic",
-                  "id": "featured"
+                  "type": "divider"
                 },
                 {
                   "type": "semantic",
-                  "id": "statistics"
+                  "id": "activity"
                 }
-              ]
+              ],
+              "rowSpan": 2
+            },
+            {
+              "type": "semantic",
+              "id": "featured",
+              "column": 1
+            },
+            {
+              "type": "semantic",
+              "id": "statistics",
+              "row": 1,
+              "column": 1
             }
-          ]
+          ],
+          "modular": true,
+          "narrow": {
+            "type": "stack",
+            "spacing": 14,
+            "children": [
+              {
+                "type": "semantic",
+                "id": "attention"
+              },
+              {
+                "type": "semantic",
+                "id": "imports"
+              },
+              {
+                "type": "semantic",
+                "id": "featured"
+              },
+              {
+                "type": "semantic",
+                "id": "statistics"
+              },
+              {
+                "type": "semantic",
+                "id": "activity"
+              }
+            ]
+          },
+          "breakpoint": 940
         }
       }
     },
@@ -265,16 +318,94 @@
       "id": "naut.black-dossier.spotlight",
       "kind": "spotlight-style",
       "name": "Opening Brief",
-      "description": "A cinematic left-aligned feature, framed Cover, readable overview and restrained still motion.",
+      "description": "An angled surveillance crop holds the artwork. The subject and controls occupy their own briefing column, or move below the artwork in a narrow window.",
       "previewAccent": "#FFB72739",
       "spec": {
         "composition": "cinematic-left",
-        "motion": "still",
+        "motion": "ken-burns",
         "rotationSeconds": 30,
         "showCover": true,
         "showOverview": true,
         "pagination": "counter-rail",
-        "scrimStrength": 0.78
+        "scrimStrength": 0.4,
+        "surface": {
+          "type": "grid",
+          "columns": [
+            "5*",
+            "3*"
+          ],
+          "rows": [
+            "auto",
+            "auto"
+          ],
+          "spacing": 14,
+          "children": [
+            {
+              "type": "semantic",
+              "id": "artwork",
+              "height": 270,
+              "rowSpan": 2
+            },
+            {
+              "type": "semantic",
+              "id": "identity",
+              "column": 1
+            },
+            {
+              "type": "semantic",
+              "id": "pagination",
+              "column": 1,
+              "row": 1
+            }
+          ],
+          "modular": true,
+          "narrow": {
+            "type": "stack",
+            "spacing": 8,
+            "children": [
+              {
+                "type": "semantic",
+                "id": "artwork",
+                "height": 204
+              },
+              {
+                "type": "semantic",
+                "id": "identity"
+              },
+              {
+                "type": "semantic",
+                "id": "pagination"
+              }
+            ]
+          },
+          "breakpoint": 515
+        },
+        "artwork": {
+          "mask": "spotlight-mask",
+          "breakpoint": 440,
+          "layers": [
+            {
+              "type": "artwork"
+            },
+            {
+              "type": "scrim"
+            },
+            {
+              "type": "image",
+              "asset": "spotlight-edge",
+              "placement": {
+                "order": 2
+              },
+              "narrow": {
+                "width": 0.98,
+                "height": 0.97,
+                "horizontal": "center",
+                "vertical": "center",
+                "order": 2
+              }
+            }
+          ]
+        }
       }
     },
     {
@@ -405,55 +536,162 @@
       "id": "naut.black-dossier.profile",
       "kind": "profile-layout",
       "name": "Subject Dossier",
-      "description": "Banner-led identity, media and optional Recent Media, then context, review and Delete.",
+      "description": "The dossier puts identity, overview and related records beside a clipped Banner and an independent Figure. Media and review form the evidence section below.",
       "previewAccent": "#FFB72739",
       "spec": {
         "preset": "cinematic",
         "surface": {
-          "type": "stack",
-          "spacing": 20,
+          "type": "grid",
+          "columns": [
+            "3*",
+            "4*"
+          ],
+          "rows": [
+            "auto",
+            "auto",
+            "auto",
+            "auto",
+            "auto"
+          ],
+          "spacing": 18,
           "children": [
             {
-              "type": "semantic",
-              "id": "identity"
-            },
-            {
-              "type": "semantic",
-              "id": "media"
-            },
-            {
-              "type": "semantic",
-              "id": "recent-media"
-            },
-            {
-              "type": "semantic",
-              "id": "overview"
-            },
-            {
-              "type": "columns",
-              "columns": [
-                "*",
-                "*"
-              ],
-              "spacing": 20,
+              "type": "stack",
+              "spacing": 13,
               "children": [
                 {
                   "type": "semantic",
-                  "id": "related"
+                  "id": "identity"
+                },
+                {
+                  "type": "divider"
                 },
                 {
                   "type": "semantic",
-                  "id": "faces"
+                  "id": "overview"
+                },
+                {
+                  "type": "semantic",
+                  "id": "related"
                 }
-              ]
+              ],
+              "rowSpan": 2
             },
             {
               "type": "semantic",
-              "id": "review"
+              "id": "banner",
+              "column": 1,
+              "height": 218
             },
             {
               "type": "semantic",
-              "id": "actions"
+              "id": "figure",
+              "column": 1,
+              "row": 1,
+              "height": 310
+            },
+            {
+              "type": "semantic",
+              "id": "recent-media",
+              "row": 2,
+              "columnSpan": 2
+            },
+            {
+              "type": "semantic",
+              "id": "media",
+              "row": 3,
+              "columnSpan": 2
+            },
+            {
+              "type": "stack",
+              "spacing": 14,
+              "children": [
+                {
+                  "type": "semantic",
+                  "id": "faces"
+                },
+                {
+                  "type": "semantic",
+                  "id": "review"
+                }
+              ],
+              "row": 4,
+              "columnSpan": 2
+            }
+          ],
+          "modular": true,
+          "narrow": {
+            "type": "stack",
+            "spacing": 14,
+            "children": [
+              {
+                "type": "semantic",
+                "id": "identity"
+              },
+              {
+                "type": "semantic",
+                "id": "banner",
+                "height": 156
+              },
+              {
+                "type": "semantic",
+                "id": "overview"
+              },
+              {
+                "type": "semantic",
+                "id": "related"
+              },
+              {
+                "type": "semantic",
+                "id": "figure",
+                "height": 240
+              },
+              {
+                "type": "semantic",
+                "id": "recent-media"
+              },
+              {
+                "type": "semantic",
+                "id": "media"
+              },
+              {
+                "type": "semantic",
+                "id": "faces"
+              },
+              {
+                "type": "semantic",
+                "id": "review"
+              }
+            ]
+          },
+          "breakpoint": 840
+        },
+        "bannerArtwork": {
+          "mask": "banner-mask",
+          "breakpoint": 440,
+          "layers": [
+            {
+              "type": "artwork"
+            },
+            {
+              "type": "scrim"
+            },
+            {
+              "type": "effect"
+            },
+            {
+              "type": "image",
+              "asset": "banner-edge",
+              "placement": {
+                "order": 3
+              },
+              "narrow": {
+                "width": 0.98,
+                "height": 0.97,
+                "horizontal": "center",
+                "vertical": "center",
+                "order": 3
+              }
             }
           ]
         }
@@ -477,7 +715,7 @@
               {
                 "kind": "scrim",
                 "color": "#FF08090B",
-                "opacity": 0.18
+                "opacity": 0.44
               }
             ]
           },
@@ -491,7 +729,7 @@
               {
                 "kind": "scrim",
                 "color": "#FF08090B",
-                "opacity": 0.18
+                "opacity": 0.44
               }
             ]
           },
@@ -505,7 +743,7 @@
               {
                 "kind": "scrim",
                 "color": "#FF08090B",
-                "opacity": 0.18
+                "opacity": 0.44
               }
             ]
           }
@@ -525,7 +763,7 @@
           "Square"
         ],
         "overlayAsset": "frame-gunmetal",
-        "coverInset": 0.1,
+        "coverInset": 0.156,
         "scale": 1,
         "tint": false,
         "animated": false
@@ -542,7 +780,8 @@
         "targets": [
           "effect.home",
           "effect.profile",
-          "effect.card"
+          "effect.card",
+          "effect.profile.banner"
         ],
         "interactionOnly": false,
         "variants": {
@@ -653,7 +892,7 @@
               {
                 "kind": "scrim",
                 "color": "#FF08090B",
-                "opacity": 0.14
+                "opacity": 0.44
               }
             ]
           },
@@ -667,7 +906,7 @@
               {
                 "kind": "scrim",
                 "color": "#FF08090B",
-                "opacity": 0.14
+                "opacity": 0.44
               }
             ]
           },
@@ -681,7 +920,7 @@
               {
                 "kind": "scrim",
                 "color": "#FF08090B",
-                "opacity": 0.14
+                "opacity": 0.44
               }
             ]
           }
@@ -700,7 +939,7 @@
           "Circle"
         ],
         "overlayAsset": "frame-redline",
-        "coverInset": 0.115,
+        "coverInset": 0.163,
         "scale": 1,
         "tint": false,
         "animated": false

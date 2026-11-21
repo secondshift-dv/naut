@@ -1,7 +1,14 @@
-Conceal 2.1.0
+Conceal 3.0.0
+Pack ID: conceal.
 Credit: secondshift-dv.
-Veiled Identity adapts the published-for-review Conceal 2.0.0 composition.
-The tracing sheets, charcoal glass, square folds and circular ring are original
-raster illustrations made for this pack. The theme thumbnail is a derivative
-of Tracing Sheets. The artwork showcase uses only pack assets.
-Original artwork and definitions are CC BY 4.0. No font files are bundled.
+
+Backdrops and Cover Frame artwork: original AI-assisted illustrations
+prepared for this collection. Pack artwork has no third-party assets,
+characters or logos. Openings and exterior alpha were extracted and aligned
+to the renderer’s square or circular Cover aperture. Theme artwork and the
+source preview are compositions or derivatives of the included illustrations.
+Spotlight and Banner masks and decorative overlays are original artwork.
+
+Original artwork and definitions are CC BY 4.0; see LICENSE.txt.
+
+Veiled Identity adapts the Conceal 2.0.0 composition.

@@ -5,6 +5,9 @@ Packs can customize themes, fonts, controls, Home, Gallery, Profile Cards,
 Profiles, media layouts, spotlight presentation, frames, backdrops and effects.
 They use the existing Presentation Pack contract and contain data/art only.
 
+The official 3.0.0 collection uses Presentation Contract 3 and requires Naut
+v0.0.29 or later. The collection page links each earlier 2.1.0 download.
+
 ## Install and choose
 
 1. Download a `.ntpack` from the collection page.

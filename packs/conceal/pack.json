@@ -1,40 +1,64 @@
 {
   "schemaVersion": 1,
   "packId": "conceal",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "name": "Conceal",
-  "description": "Tracing-paper presentation with a compact index, veiled identity and two backdrop moods.",
-  "minContractVersion": 1,
+  "description": "A quiet index with deliberately limited information at rest.",
+  "minContractVersion": 3,
   "assets": [
     {
       "id": "backdrop-paper",
       "kind": "Image",
       "path": "assets/tracing-sheets.jpg",
-      "bytes": 67749
+      "bytes": 43810
     },
     {
       "id": "backdrop-glass",
       "kind": "Image",
       "path": "assets/smoked-glass.jpg",
-      "bytes": 77303
+      "bytes": 24556
     },
     {
       "id": "frame-folded",
       "kind": "Image",
-      "path": "assets/frame-folded.png",
-      "bytes": 6422
+      "path": "assets/frame-folded.webp",
+      "bytes": 23544
     },
     {
       "id": "frame-ring",
       "kind": "Image",
-      "path": "assets/frame-ring.png",
-      "bytes": 71148
+      "path": "assets/frame-ring.webp",
+      "bytes": 24254
     },
     {
       "id": "theme-tracing",
       "kind": "Image",
       "path": "assets/theme-tracing.webp",
-      "bytes": 2070
+      "bytes": 5552
+    },
+    {
+      "id": "spotlight-mask",
+      "kind": "Image",
+      "path": "assets/spotlight-mask.png",
+      "bytes": 4301
+    },
+    {
+      "id": "spotlight-edge",
+      "kind": "Image",
+      "path": "assets/spotlight-edge.png",
+      "bytes": 5662
+    },
+    {
+      "id": "banner-mask",
+      "kind": "Image",
+      "path": "assets/banner-mask.png",
+      "bytes": 4894
+    },
+    {
+      "id": "banner-edge",
+      "kind": "Image",
+      "path": "assets/banner-edge.png",
+      "bytes": 5662
     }
   ],
   "definitions": [
@@ -232,7 +256,7 @@
               {
                 "kind": "scrim",
                 "color": "#FFD5B79F",
-                "opacity": 0.1
+                "opacity": 0.18
               }
             ]
           },
@@ -246,7 +270,7 @@
               {
                 "kind": "scrim",
                 "color": "#FFD5B79F",
-                "opacity": 0.1
+                "opacity": 0.18
               }
             ]
           },
@@ -260,7 +284,7 @@
               {
                 "kind": "scrim",
                 "color": "#FFD5B79F",
-                "opacity": 0.1
+                "opacity": 0.18
               }
             ]
           }
@@ -284,7 +308,7 @@
               {
                 "kind": "scrim",
                 "color": "#FF212023",
-                "opacity": 0.12
+                "opacity": 0.18
               }
             ]
           },
@@ -298,7 +322,7 @@
               {
                 "kind": "scrim",
                 "color": "#FF212023",
-                "opacity": 0.12
+                "opacity": 0.18
               }
             ]
           },
@@ -312,7 +336,7 @@
               {
                 "kind": "scrim",
                 "color": "#FF212023",
-                "opacity": 0.12
+                "opacity": 0.18
               }
             ]
           }
@@ -349,7 +373,7 @@
           "Circle"
         ],
         "overlayAsset": "frame-ring",
-        "coverInset": 0.075,
+        "coverInset": 0.104,
         "scale": 1,
         "tint": false,
         "animated": false
@@ -368,28 +392,28 @@
           "isDark": false,
           "colors": {
             "surfaceOverlay": "#F3F4E9DA",
-            "surfaceElevated": "#FFFFF7EA",
+            "surfaceElevated": "#FFEDE8DE",
             "warning": "#FF81531C",
             "surfaceSelected": "#FFF3DACB",
-            "accent": "#FF98452C",
+            "accent": "#FF6B5449",
             "borderSelected": "#FF98452C",
-            "surface2": "#FFF0E3D3",
-            "surface3": "#FFE7D5C1",
+            "surface2": "#FFEDE8DE",
+            "surface3": "#FFDDD6C9",
             "success": "#FF386356",
-            "surfaceHover": "#FFEAD4C0",
+            "surfaceHover": "#FFDDD6C9",
             "surfacePressed": "#FFE0C3AA",
-            "textPrimary": "#FF302820",
+            "textPrimary": "#FF2D2B27",
             "focus": "#FF8E432C",
-            "accentSecondary": "#FF775647",
+            "accentSecondary": "#FF605C58",
             "selectionHover": "#FFE2B79A",
             "info": "#FF52667D",
             "dangerHover": "#FFAA4641",
             "borderSubtle": "#FFD6C0AC",
-            "canvas": "#FFF0E5D8",
+            "canvas": "#FFEAE6DC",
             "selection": "#FFE6C5AE",
-            "surface1": "#FFFCF4E9",
+            "surface1": "#FFF5F1E9",
             "borderDefault": "#FFB99C84",
-            "textSecondary": "#FF574437",
+            "textSecondary": "#FF514D45",
             "borderStrong": "#FF8C6D57",
             "danger": "#FF9F3A35",
             "accentPressed": "#FF743422",
@@ -443,7 +467,7 @@
       "id": "conceal.home",
       "kind": "home-layout",
       "name": "Tracing Index",
-      "description": "Shortcuts, statistics and activity lead into a compact Spotlight.",
+      "description": "Tracing Index presents a short summary and activity first. The artwork is secondary and the Spotlight omits Cover and Overview.",
       "spec": {
         "hero": {
           "placement": "inset",
@@ -465,12 +489,8 @@
         ],
         "surface": {
           "type": "stack",
-          "spacing": 8,
+          "spacing": 14,
           "children": [
-            {
-              "type": "semantic",
-              "id": "local-navigation"
-            },
             {
               "type": "semantic",
               "id": "statistics"
@@ -480,10 +500,33 @@
               "id": "activity"
             },
             {
+              "type": "divider"
+            },
+            {
               "type": "semantic",
               "id": "featured"
             }
-          ]
+          ],
+          "modular": true,
+          "narrow": {
+            "type": "stack",
+            "spacing": 9,
+            "children": [
+              {
+                "type": "semantic",
+                "id": "statistics"
+              },
+              {
+                "type": "semantic",
+                "id": "activity"
+              },
+              {
+                "type": "semantic",
+                "id": "featured"
+              }
+            ]
+          },
+          "breakpoint": 700
         }
       }
     },
@@ -491,7 +534,7 @@
       "id": "conceal.spotlight",
       "kind": "spotlight-style",
       "name": "Under Glass",
-      "description": "A compact still feature without Cover or Overview.",
+      "description": "An aperture cut into a folded pane exposes a small artwork strip beside a compact identity. Identity, artwork and page controls have independent placement.",
       "spec": {
         "composition": "snapshot",
         "motion": "still",
@@ -499,19 +542,18 @@
         "showCover": false,
         "showOverview": false,
         "pagination": "counter",
-        "scrimStrength": 0.65
-      }
-    },
-    {
-      "id": "conceal.profile",
-      "kind": "profile-layout",
-      "name": "Tracing Folio",
-      "description": "A contained identity and context above the media collection.",
-      "spec": {
-        "preset": "portrait",
+        "scrimStrength": 0.5,
         "surface": {
-          "type": "stack",
-          "spacing": 12,
+          "type": "grid",
+          "columns": [
+            "2*",
+            "5*",
+            "1*"
+          ],
+          "rows": [
+            "auto"
+          ],
+          "spacing": 10,
           "children": [
             {
               "type": "semantic",
@@ -519,29 +561,96 @@
             },
             {
               "type": "semantic",
-              "id": "overview"
-            },
-            {
-              "type": "columns",
-              "columns": [
-                "*",
-                "*"
-              ],
-              "spacing": 18,
-              "children": [
-                {
-                  "type": "semantic",
-                  "id": "related"
-                },
-                {
-                  "type": "semantic",
-                  "id": "faces"
-                }
-              ]
+              "id": "artwork",
+              "column": 1,
+              "height": 114
             },
             {
               "type": "semantic",
-              "id": "review"
+              "id": "pagination",
+              "column": 2
+            }
+          ],
+          "modular": true,
+          "narrow": {
+            "type": "stack",
+            "spacing": 5,
+            "children": [
+              {
+                "type": "semantic",
+                "id": "identity"
+              },
+              {
+                "type": "semantic",
+                "id": "artwork",
+                "height": 93
+              },
+              {
+                "type": "semantic",
+                "id": "pagination"
+              }
+            ]
+          },
+          "breakpoint": 700
+        },
+        "artwork": {
+          "mask": "spotlight-mask",
+          "breakpoint": 440,
+          "layers": [
+            {
+              "type": "artwork"
+            },
+            {
+              "type": "scrim"
+            },
+            {
+              "type": "image",
+              "asset": "spotlight-edge",
+              "placement": {
+                "order": 2
+              },
+              "narrow": {
+                "width": 0.98,
+                "height": 0.97,
+                "horizontal": "center",
+                "vertical": "center",
+                "order": 2
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "conceal.profile",
+      "kind": "profile-layout",
+      "name": "Tracing Folio",
+      "description": "The folio puts identity above a narrow Banner and overview. The media index follows, with Figure and review farther down the page.",
+      "spec": {
+        "preset": "portrait",
+        "surface": {
+          "type": "stack",
+          "spacing": 11,
+          "children": [
+            {
+              "type": "semantic",
+              "id": "identity"
+            },
+            {
+              "type": "semantic",
+              "id": "banner",
+              "height": 136
+            },
+            {
+              "type": "divider"
+            },
+            {
+              "type": "semantic",
+              "id": "overview"
+            },
+            {
+              "type": "semantic",
+              "id": "recent-media"
             },
             {
               "type": "semantic",
@@ -549,7 +658,95 @@
             },
             {
               "type": "semantic",
-              "id": "actions"
+              "id": "figure",
+              "height": 250
+            },
+            {
+              "type": "semantic",
+              "id": "related"
+            },
+            {
+              "type": "semantic",
+              "id": "faces"
+            },
+            {
+              "type": "semantic",
+              "id": "review"
+            }
+          ],
+          "modular": true,
+          "narrow": {
+            "type": "stack",
+            "spacing": 8,
+            "children": [
+              {
+                "type": "semantic",
+                "id": "identity"
+              },
+              {
+                "type": "semantic",
+                "id": "banner",
+                "height": 104
+              },
+              {
+                "type": "semantic",
+                "id": "overview"
+              },
+              {
+                "type": "semantic",
+                "id": "recent-media"
+              },
+              {
+                "type": "semantic",
+                "id": "media"
+              },
+              {
+                "type": "semantic",
+                "id": "figure",
+                "height": 240
+              },
+              {
+                "type": "semantic",
+                "id": "related"
+              },
+              {
+                "type": "semantic",
+                "id": "faces"
+              },
+              {
+                "type": "semantic",
+                "id": "review"
+              }
+            ]
+          },
+          "breakpoint": 690
+        },
+        "bannerArtwork": {
+          "mask": "banner-mask",
+          "breakpoint": 440,
+          "layers": [
+            {
+              "type": "artwork"
+            },
+            {
+              "type": "scrim"
+            },
+            {
+              "type": "effect"
+            },
+            {
+              "type": "image",
+              "asset": "banner-edge",
+              "placement": {
+                "order": 3
+              },
+              "narrow": {
+                "width": 0.98,
+                "height": 0.97,
+                "horizontal": "center",
+                "vertical": "center",
+                "order": 3
+              }
             }
           ]
         }

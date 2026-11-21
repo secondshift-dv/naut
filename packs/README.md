@@ -1,64 +1,60 @@
 # Official optional presentation packs
 
-Install a pack from **Settings → Presentation → Packs / Advanced → Install from
-file**. Use **Replace** to upgrade a pack with the same ID. Installation adds
-choices. Pick and save Home, Profile and Card options in their Customize
-panels. Choose global themes, typography and controls in Settings → Appearance.
+The 3.0.0 collection requires **Naut v0.0.29 or later** (Presentation Contract 3).
+Use the 2.1.0 archive links below for older Naut versions that support the Contract 1 collection.
 
-This collection targets Naut v0.0.26. Each pack offers two Cover Frames and two
-Backdrops. Select each backdrop in
-Home or Profile Customize and save them independently. The images below show
-the pack artwork and frame designs.
+In **Settings → Presentation → Packs / Advanced**, install the downloaded file.
+Choose **Replace** when updating a pack with the same ID. In Home and Profile Customize,
+choose and save layouts, Backdrops and Effects independently. Pick Cover Frames in Profile
+Customize and Card layouts in Customize Card. Themes, Typography and Controls are in Appearance.
 
-## Black Dossier - 2.1.0 source
+## Black Dossier - 3.0.0 source
 
-![Black Dossier backdrop artwork and Cover Frames](showcase/black-dossier.png)
+![Black Dossier backdrop and Cover Frame artwork composition](showcase/black-dossier.png)
 
-In Home Customize, choose **Operations Desk** and **Opening Brief**. Backdrops are **Obsidian Atrium** and
-**Steel Evidence Archive**. Frames are **Gunmetal Seal** and **Redline Steel**.
+Attention and imports lead the Operations Desk. The separate reconnaissance image, subject and pagination stay grouped on the right on wide layouts.
+The dossier puts identity, overview and related records beside a clipped Banner and an independent Figure. Media and review form the evidence section below.
 
-[Download 2.1.0](https://secondshift-dv.github.io/naut/packs/black-dossier-2.1.0.ntpack) | [Setup and components](black-dossier/README.md) | [2.0.0 archive](https://secondshift-dv.github.io/naut/packs/black-dossier-2.0.0.ntpack)
+[Download 3.0.0](https://secondshift-dv.github.io/naut/packs/black-dossier-3.0.0.ntpack) · [Components and setup](black-dossier/README.md) · [2.1.0 archive](https://secondshift-dv.github.io/naut/packs/black-dossier-2.1.0.ntpack)
 
-## Nightfall Murim - 2.1.0 source
+## Nightfall Murim - 3.0.0 source
 
-![Nightfall Murim backdrop artwork and Cover Frames](showcase/nightfall-murim.png)
+![Nightfall Murim backdrop and Cover Frame artwork composition](showcase/nightfall-murim.png)
 
-In Home Customize, choose **Sect Hall** and **Moonlit Duel**. Backdrops are **Moonlit Sect Court** and
-**Lantern Pass**. Frames are **Vermilion Phoenix Seal** and **Jade Lacquer Seal**.
+Sect Hall reads top to bottom as an opening scene, a row of disciple portraits, and the record of recent activity.
+A wide ink-cut Banner opens the chronicle. Identity and overview pair with an independent Figure, followed by media and related records.
 
-[Download 2.1.0](https://secondshift-dv.github.io/naut/packs/celestial-2.1.0.ntpack) | [Setup and components](celestial/README.txt) | [2.0.0 archive](https://secondshift-dv.github.io/naut/packs/celestial-2.0.0.ntpack)
+[Download 3.0.0](https://secondshift-dv.github.io/naut/packs/celestial-3.0.0.ntpack) · [Components and setup](celestial/README.txt) · [2.1.0 archive](https://secondshift-dv.github.io/naut/packs/celestial-2.1.0.ntpack)
 
-## Voxel Playground - 2.1.0 source
+## Voxel Playground - 3.0.0 source
 
-![Voxel Playground backdrop artwork and Cover Frames](showcase/voxel-playground.png)
+![Voxel Playground backdrop and Cover Frame artwork composition](showcase/voxel-playground.png)
 
-In Home Customize, choose **Creative Hub** and **World Portal**. Backdrops are **Grassland Day** and
-**Workshop Evening**. Frames are **Block Companion** and **Block Ring**.
+Creative Hub puts the projects you can resume first. Below, World Portal sits beside the activity and statistics panels, with a stacked arrangement in a narrow window.
+The Figure is the main work surface on wide layouts, with the project identity and a compact Banner alongside it. Media follows as a shelf of builds.
 
-[Download 2.1.0](https://secondshift-dv.github.io/naut/packs/overworld-expedition-2.1.0.ntpack) | [Setup and components](overworld-expedition/README.md) | [2.0.0 archive](https://secondshift-dv.github.io/naut/packs/overworld-expedition-2.0.0.ntpack)
+[Download 3.0.0](https://secondshift-dv.github.io/naut/packs/overworld-expedition-3.0.0.ntpack) · [Components and setup](overworld-expedition/README.md) · [2.1.0 archive](https://secondshift-dv.github.io/naut/packs/overworld-expedition-2.1.0.ntpack)
 
-## Conceal - 2.1.0 source
+## Conceal - 3.0.0 source
 
-![Conceal backdrop artwork and Cover Frames](showcase/conceal.png)
+![Conceal backdrop and Cover Frame artwork composition](showcase/conceal.png)
 
-In Home Customize, choose **Tracing Index** and **Under Glass**. Backdrops are **Tracing Sheets** and
-**Smoked Glass**. Frames are **Folded Tracing** and **Tracing Ring**.
+Tracing Index presents a short summary and activity first. The artwork is secondary and the Spotlight omits Cover and Overview.
+The folio puts identity above a narrow Banner and overview. The media index follows, with Figure and review farther down the page.
 
-[Download 2.1.0](https://secondshift-dv.github.io/naut/packs/conceal-2.1.0.ntpack) | [Setup and components](conceal/README.md)
+[Download 3.0.0](https://secondshift-dv.github.io/naut/packs/conceal-3.0.0.ntpack) · [Components and setup](conceal/README.md) · [2.1.0 archive](https://secondshift-dv.github.io/naut/packs/conceal-2.1.0.ntpack)
 
-## Upgrading
+## Compatibility and attribution
 
-Existing IDs continue to resolve when the component is present in the new
-archive. Retired selections use Naut's built-in fallback. Conceal retires
-Wide Keepsake; install Voxel Playground for the wide World Keepsake Card.
+All four packs keep their existing pack IDs and component IDs from 2.1.0.
+Both Backdrops in each pack are offered in Home and Profile, with independent saved choices.
+The images above are artwork compositions.
 
-Earlier archives remain available for [Black Dossier 1.1.0](https://secondshift-dv.github.io/naut/packs/black-dossier-1.1.0.ntpack),
-[Nightfall Murim 1.3.0](https://secondshift-dv.github.io/naut/packs/celestial-1.3.0.ntpack),
-and [Voxel Playground 1.1.0](https://secondshift-dv.github.io/naut/packs/overworld-expedition-1.1.0.ntpack).
+Earlier archives remain available for [Black Dossier 2.0.0](https://secondshift-dv.github.io/naut/packs/black-dossier-2.0.0.ntpack),
+[Nightfall Murim 2.0.0](https://secondshift-dv.github.io/naut/packs/celestial-2.0.0.ntpack),
+and [Voxel Playground 2.0.0](https://secondshift-dv.github.io/naut/packs/overworld-expedition-2.0.0.ntpack).
 
-Original pack artwork and definitions by **secondshift-dv**, CC BY 4.0.
-Bundled assets retain their notices.
+Original artwork and definitions by **secondshift-dv**, CC BY 4.0. Bundled fonts retain their SIL OFL notices.
 
 [Checksums](https://secondshift-dv.github.io/naut/packs/checksums.json) ·
-[Installation and updates](../docs/pack-collection.md) ·
-[Contribute a pack](../docs/contributing-packs.md)
+[Installation and updates](../docs/pack-collection.md) · [Contribute a pack](../docs/contributing-packs.md)

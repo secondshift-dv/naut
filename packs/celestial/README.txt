@@ -1,6 +1,14 @@
-# Nightfall Murim 2.1.0
+# Nightfall Murim 3.0.0
 
-Sect Hall puts centered Spotlight first, followed by poster tiles, activity and statistics. Martial Scrolls uses the native lift treatment. The slug celestial and pack ID neuterradise.celestial stay stable.
+Requires Naut v0.0.29 or later (Presentation Contract 3).
+
+Sect Hall reads top to bottom as an opening scene, a row of disciple portraits, and the record of recent activity.
+
+The diagonal opening panel separates the image from its caption and page controls. A small decorative moon seal turns independently of the artwork when full motion is available.
+
+A wide ink-cut Banner opens the chronicle. Identity and overview pair with an independent Figure, followed by media and related records.
+
+Martial Scrolls uses native lift on hover. The download slug remains `celestial` and the pack ID remains `neuterradise.celestial`.
 
 | Component | Name |
 | --- | --- |
@@ -18,14 +26,13 @@ Sect Hall puts centered Spotlight first, followed by poster tiles, activity and 
 | Backdrop | Lantern Pass |
 | Frame | Jade Lacquer Seal |
 
-Install in **Settings → Presentation → Packs / Advanced → Install from file**.
-For upgrades, select **Replace** when prompted. Installation adds choices. In
-Home Customize, select **Sect Hall** and **Moonlit Duel**, then save.
-Both **Moonlit Sect Court** and **Lantern Pass** are available in Home and Profile Customize. Save
-each surface separately. Choose a frame in Profile Customize and a Card in
-Customize Card. Themes, typography and controls are in Settings → Appearance.
+Install from **Settings → Presentation → Packs / Advanced → Install from file**.
+Select **Replace** when upgrading and keep saved choices by using the same pack ID.
+Select **Sect Hall** and **Moonlit Duel** in Home Customize, then save.
+Select **Disciple Chronicle** under Profile Customize. Choose a Cover Frame and Backdrop there, or a Card in Customize Card, then save.
+Both Backdrops can be selected and saved independently in Home and Profile Customize.
+Choose available Themes, Typography and Controls in **Settings → Appearance**.
 
-[Download 2.1.0](https://secondshift-dv.github.io/naut/packs/celestial-2.1.0.ntpack) | [2.0.0 archive](https://secondshift-dv.github.io/naut/packs/celestial-2.0.0.ntpack)
+[Download 3.0.0](https://secondshift-dv.github.io/naut/packs/celestial-3.0.0.ntpack) · [2.1.0 archive](https://secondshift-dv.github.io/naut/packs/celestial-2.1.0.ntpack)
 
-Original work by **secondshift-dv**, CC BY 4.0. See [license](LICENSE.txt) and
-[provenance](PROVENANCE.txt) for the scope and bundled notices.
+Original work by **secondshift-dv**, CC BY 4.0. See [license](LICENSE.txt) and [provenance](PROVENANCE.txt).

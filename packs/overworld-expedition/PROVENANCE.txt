@@ -1,33 +1,17 @@
-Voxel Playground 2.1.0
-Legacy pack ID: naut.overworld-expedition.
-Author: secondshift-dv.
+Voxel Playground 3.0.0
+Pack ID: naut.overworld-expedition.
+Credit: secondshift-dv.
 
-The shipped Meadow, Workshop and Piglet artwork was generated for this
-collection using OpenAI image generation on 2026-10-09, without image
-references. Creative voxel/block worlds are an original visual theme,
-not assets from Minecraft, Roblox or any other game.
+Backdrops and Cover Frame artwork: original AI-assisted illustrations
+prepared for this collection. Pack artwork has no third-party assets,
+characters or logos. Openings and exterior alpha were extracted and aligned
+to the renderer’s square or circular Cover aperture. Theme artwork and the
+source preview are compositions or derivatives of the included illustrations.
+Spotlight and Banner masks and decorative overlays are original artwork.
 
-Original definitions and artwork: Creative Commons Attribution 4.0;
-credit secondshift-dv and identify modifications.
-Silkscreen Regular: assets/silkscreen.ttf; licenses/silkscreen-OFL.txt
-  https://github.com/googlefonts/silkscreen
-Inter: assets/inter.ttf; licenses/inter-OFL.txt
-Noto Sans Mono: assets/notosansmono.ttf; licenses/notosansmono-OFL.txt
-All fonts retain SIL OFL 1.1. No executable code, game logos, plugins,
-scripts or personal media are included.
+Original artwork and definitions are CC BY 4.0; see LICENSE.txt.
 
-Original generation prompts for retained source artwork:
-
-meadow:
-Create a production-ready wide 16:9 desktop background image for a Naut customization pack named Overworld Expedition. Original polished voxel illustration, cheerful block-shaped meadow morning. Warm creamy blue sky, distant terraced grassy hills, a few square-leaf trees at far left and right, tiny pale daisies and warm yellow flowers along lower outer edges. Soft morning light, moss green, earth brown, sandstone cream. Composition: central 65 percent is quiet low-detail open sky and softly blurred distant grass, suitable behind UI panels. Decor concentrated at outer edges, no big central subjects, no text, no logos, no UI, no buildings or recognizable game characters. Crisp charming cuboid geometry with soft ambient light, carefully crafted game-world diorama aesthetic. Full landscape artwork, no border, opaque background.
-
-workshop:
-Wide 16:9 production desktop backdrop, original polished voxel diorama Cozy Workshop. Warm cuboid timber room, plants, little lantern and crafting tools at far outer edges, sandstone wall with a very broad quiet central area for interface panels, soft amber evening lighting, charming wooden block geometry. No people, no game logos, no text, no UI or inventory slots, no central objects. Opaque full landscape.
-
-piglet:
-Production transparent PNG square portrait frame, original charming voxel Piglet Patch. A substantial square creamy sandstone and pale timber border, pink little flowers at edges, one cute tiny cuboid pink pig perched at lower left corner. Border occupies outer 15 percent of image, large completely transparent square central portrait aperture occupying middle 70 percent. Transparent exterior also, no background, no portrait, no text, no shadow filling opening. Frame nearly fills canvas with only 3 percent exterior margin. Crisp cuboid crafted geometry with soft lighting, adorable polished collectible ornament, straight-on symmetrical square aperture.
-
-The 320x180 Theme WebP thumbnail is a derivative of the original grassland
-illustration for Appearance. It is not a live application screenshot.
-
-Block Ring is original raster artwork with a round aperture. Retained backdrops were encoded as WebP and the Block Companion aperture was aligned.
+Bundled font notices (SIL Open Font License 1.1):
+Silkscreen Regular: assets/silkscreen.ttf; licenses/silkscreen-OFL.txt.
+Inter: assets/inter.ttf; licenses/inter-OFL.txt.
+Noto Sans Mono: assets/notosansmono.ttf; licenses/notosansmono-OFL.txt.

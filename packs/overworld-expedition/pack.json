@@ -1,29 +1,29 @@
 {
   "schemaVersion": 1,
   "packId": "naut.overworld-expedition",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "name": "Voxel Playground",
   "author": "secondshift-dv",
-  "description": "An original playful voxel sandbox: creative worlds, grassland and workshop scenery, square controls, collectible block-companions and sparse pixel particles. Inspired by block-building game aesthetics without game assets or logos.",
+  "description": "Explore, return to the workshop, and keep building.",
   "license": "CC-BY-4.0 (original definitions/artwork); SIL-OFL-1.1 (fonts)",
-  "minContractVersion": 1,
+  "minContractVersion": 3,
   "assets": [
     {
       "kind": "Image",
-      "bytes": 266316,
+      "bytes": 90088,
       "path": "assets/backdrop-meadow.webp",
       "id": "backdrop-meadow"
     },
     {
       "kind": "Image",
-      "bytes": 223008,
+      "bytes": 56046,
       "path": "assets/backdrop-workshop.webp",
       "id": "backdrop-workshop"
     },
     {
       "kind": "Image",
-      "bytes": 1004240,
-      "path": "assets/frame-piglet.png",
+      "bytes": 52772,
+      "path": "assets/frame-piglet.webp",
       "id": "frame-piglet"
     },
     {
@@ -48,13 +48,37 @@
       "id": "theme-field-notes",
       "kind": "Image",
       "path": "assets/theme-field-notes.webp",
-      "bytes": 16478
+      "bytes": 26522
     },
     {
       "id": "frame-block-ring",
       "kind": "Image",
-      "path": "assets/frame-block-ring.png",
-      "bytes": 49155
+      "path": "assets/frame-block-ring.webp",
+      "bytes": 50450
+    },
+    {
+      "id": "spotlight-mask",
+      "kind": "Image",
+      "path": "assets/spotlight-mask.png",
+      "bytes": 2860
+    },
+    {
+      "id": "spotlight-edge",
+      "kind": "Image",
+      "path": "assets/spotlight-edge.png",
+      "bytes": 3782
+    },
+    {
+      "id": "banner-mask",
+      "kind": "Image",
+      "path": "assets/banner-mask.png",
+      "bytes": 2678
+    },
+    {
+      "id": "banner-edge",
+      "kind": "Image",
+      "path": "assets/banner-edge.png",
+      "bytes": 3782
     }
   ],
   "definitions": [
@@ -72,28 +96,28 @@
           "isDark": false,
           "colors": {
             "surfaceOverlay": "#F2EAF6FF",
-            "surfaceElevated": "#FFFDFCF2",
+            "surfaceElevated": "#FFEADEC3",
             "warning": "#FF805812",
             "surfaceSelected": "#FFBDE3BF",
-            "accent": "#FF287B4C",
+            "accent": "#FF5A713D",
             "borderSelected": "#FF287B4C",
-            "surface2": "#FFE3EFD6",
-            "surface3": "#FFCBDEBE",
+            "surface2": "#FFEADEC3",
+            "surface3": "#FFDBCBAB",
             "success": "#FF315D29",
-            "surfaceHover": "#FFD4EAC6",
+            "surfaceHover": "#FFDBCBAB",
             "surfacePressed": "#FFBED9AD",
-            "textPrimary": "#FF223C30",
+            "textPrimary": "#FF2D301E",
             "focus": "#FF245F9C",
-            "accentSecondary": "#FF327FB8",
+            "accentSecondary": "#FF775427",
             "selectionHover": "#FFCDE8CE",
             "info": "#FF255B72",
             "dangerHover": "#FF7B2423",
             "borderSubtle": "#FFB7B99C",
-            "canvas": "#FFEAF6FF",
+            "canvas": "#FFEEE5D1",
             "selection": "#FFBDE3BF",
-            "surface1": "#FFF7FAEB",
+            "surface1": "#FFF7EFD9",
             "borderDefault": "#FF739479",
-            "textSecondary": "#FF3A5746",
+            "textSecondary": "#FF4A5233",
             "borderStrong": "#FF416B4B",
             "danger": "#FF9B3430",
             "accentPressed": "#FF175134",
@@ -101,7 +125,7 @@
             "textLink": "#FF24699A",
             "textMuted": "#FF526D5A",
             "accentHover": "#FF1C6940",
-            "textOnAccent": "#FFFFF9EA",
+            "textOnAccent": "#FFFFFFFF",
             "textInverse": "#FFF9F4E8",
             "textDisabled": "#FF7B7F6D"
           },
@@ -256,7 +280,7 @@
       "id": "naut.overworld-expedition.home-base-camp",
       "kind": "home-layout",
       "name": "Creative Hub",
-      "description": "Feature a world and its recent builds above the session record and activity counters.",
+      "description": "Creative Hub puts the projects you can resume first. Below, World Portal sits beside the activity and statistics panels, with a stacked arrangement in a narrow window.",
       "previewAccent": "#FF476338",
       "spec": {
         "hero": {
@@ -284,39 +308,70 @@
         ],
         "surface": {
           "type": "stack",
-          "spacing": 12,
+          "spacing": 20,
           "children": [
-            {
-              "type": "semantic",
-              "id": "local-navigation"
-            },
             {
               "type": "semantic",
               "id": "recent"
             },
             {
-              "type": "semantic",
-              "id": "featured"
+              "type": "divider"
             },
             {
-              "type": "columns",
+              "type": "grid",
               "columns": [
-                "*",
-                "*"
+                "4*",
+                "1*"
               ],
-              "spacing": 18,
+              "rows": [
+                "auto",
+                "auto"
+              ],
+              "spacing": 19,
               "children": [
                 {
                   "type": "semantic",
-                  "id": "statistics"
+                  "id": "featured",
+                  "rowSpan": 2
                 },
                 {
                   "type": "semantic",
-                  "id": "activity"
+                  "id": "statistics",
+                  "column": 1
+                },
+                {
+                  "type": "semantic",
+                  "id": "activity",
+                  "row": 1,
+                  "column": 1
                 }
               ]
             }
-          ]
+          ],
+          "modular": true,
+          "narrow": {
+            "type": "stack",
+            "spacing": 15,
+            "children": [
+              {
+                "type": "semantic",
+                "id": "recent"
+              },
+              {
+                "type": "semantic",
+                "id": "featured"
+              },
+              {
+                "type": "semantic",
+                "id": "statistics"
+              },
+              {
+                "type": "semantic",
+                "id": "activity"
+              }
+            ]
+          },
+          "breakpoint": 970
         }
       }
     },
@@ -324,16 +379,93 @@
       "id": "naut.overworld-expedition.spotlight-trailhead",
       "kind": "spotlight-style",
       "name": "World Portal",
-      "description": "A quiet split portal for one featured world, separate from the Dashboard spotlight composition.",
+      "description": "The stepped portal puts its caption before the artwork, with the image and pagination able to reflow separately on narrow Home.",
       "previewAccent": "#FF476338",
       "spec": {
         "showCover": true,
         "showOverview": false,
-        "scrimStrength": 0.7,
-        "motion": "still",
+        "scrimStrength": 0.30,
+        "motion": "ken-burns",
         "pagination": "counter",
         "rotationSeconds": 24,
-        "composition": "split-glass"
+        "composition": "split-glass",
+        "surface": {
+          "type": "grid",
+          "columns": [
+            "3*",
+            "5*"
+          ],
+          "rows": [
+            "auto",
+            "auto"
+          ],
+          "spacing": 11,
+          "children": [
+            {
+              "type": "semantic",
+              "id": "identity"
+            },
+            {
+              "type": "semantic",
+              "id": "pagination",
+              "row": 1
+            },
+            {
+              "type": "semantic",
+              "id": "artwork",
+              "height": 265,
+              "column": 1,
+              "rowSpan": 2
+            }
+          ],
+          "modular": true,
+          "narrow": {
+            "type": "stack",
+            "spacing": 6,
+            "children": [
+              {
+                "type": "semantic",
+                "id": "identity"
+              },
+              {
+                "type": "semantic",
+                "id": "artwork",
+                "height": 198
+              },
+              {
+                "type": "semantic",
+                "id": "pagination"
+              }
+            ]
+          },
+          "breakpoint": 560
+        },
+        "artwork": {
+          "mask": "spotlight-mask",
+          "breakpoint": 440,
+          "layers": [
+            {
+              "type": "artwork"
+            },
+            {
+              "type": "scrim"
+            },
+            {
+              "type": "image",
+              "asset": "spotlight-edge",
+              "placement": {
+                "order": 2
+              },
+              "narrow": {
+                "width": 0.98,
+                "height": 0.97,
+                "horizontal": "center",
+                "vertical": "center",
+                "order": 2
+              }
+            }
+          ]
+        }
       }
     },
     {
@@ -420,56 +552,125 @@
       "id": "naut.overworld-expedition.profile-collection-lodge",
       "kind": "profile-layout",
       "name": "Builder's Workshop",
-      "description": "Split world Banner and builder identity on wide screens, with contained Banner on narrow screens, recent builds and media before context.",
+      "description": "The Figure is the main work surface on wide layouts, with the project identity and a compact Banner alongside it. Media follows as a shelf of builds.",
       "previewAccent": "#FF476338",
       "spec": {
         "surface": {
-          "spacing": 12,
+          "type": "grid",
+          "columns": [
+            "5*",
+            "3*"
+          ],
+          "rows": [
+            "auto",
+            "auto",
+            "auto",
+            "auto",
+            "auto"
+          ],
+          "spacing": 19,
           "children": [
             {
-              "id": "identity",
-              "type": "semantic"
+              "type": "semantic",
+              "id": "figure",
+              "height": 408,
+              "rowSpan": 2
             },
             {
               "type": "semantic",
-              "id": "recent-media"
+              "id": "identity",
+              "column": 1
             },
             {
+              "type": "semantic",
+              "id": "banner",
+              "column": 1,
+              "row": 1,
+              "height": 196
+            },
+            {
+              "type": "semantic",
+              "id": "recent-media",
+              "row": 2,
+              "columnSpan": 2
+            },
+            {
+              "type": "semantic",
               "id": "media",
-              "type": "semantic"
+              "row": 3,
+              "columnSpan": 2
             },
             {
-              "id": "overview",
-              "type": "semantic"
-            },
-            {
-              "spacing": 12,
+              "type": "stack",
+              "spacing": 14,
               "children": [
                 {
-                  "id": "related",
-                  "type": "semantic"
+                  "type": "semantic",
+                  "id": "overview"
                 },
                 {
-                  "id": "faces",
-                  "type": "semantic"
+                  "type": "semantic",
+                  "id": "related"
+                },
+                {
+                  "type": "semantic",
+                  "id": "faces"
+                },
+                {
+                  "type": "semantic",
+                  "id": "review"
                 }
               ],
-              "columns": [
-                "*",
-                "*"
-              ],
-              "type": "columns"
-            },
-            {
-              "id": "review",
-              "type": "semantic"
-            },
-            {
-              "id": "actions",
-              "type": "semantic"
+              "row": 4,
+              "columnSpan": 2
             }
           ],
-          "type": "stack"
+          "modular": true,
+          "narrow": {
+            "type": "stack",
+            "spacing": 15,
+            "children": [
+              {
+                "type": "semantic",
+                "id": "identity"
+              },
+              {
+                "type": "semantic",
+                "id": "figure",
+                "height": 306
+              },
+              {
+                "type": "semantic",
+                "id": "banner",
+                "height": 158
+              },
+              {
+                "type": "semantic",
+                "id": "recent-media"
+              },
+              {
+                "type": "semantic",
+                "id": "media"
+              },
+              {
+                "type": "semantic",
+                "id": "overview"
+              },
+              {
+                "type": "semantic",
+                "id": "related"
+              },
+              {
+                "type": "semantic",
+                "id": "faces"
+              },
+              {
+                "type": "semantic",
+                "id": "review"
+              }
+            ]
+          },
+          "breakpoint": 865
         },
         "layout": {
           "schemaVersion": 1,
@@ -516,6 +717,35 @@
               "order": 4,
               "visible": true,
               "width": "Full"
+            }
+          ]
+        },
+        "bannerArtwork": {
+          "mask": "banner-mask",
+          "breakpoint": 440,
+          "layers": [
+            {
+              "type": "artwork"
+            },
+            {
+              "type": "scrim"
+            },
+            {
+              "type": "effect"
+            },
+            {
+              "type": "image",
+              "asset": "banner-edge",
+              "placement": {
+                "order": 3
+              },
+              "narrow": {
+                "width": 0.98,
+                "height": 0.97,
+                "horizontal": "center",
+                "vertical": "center",
+                "order": 3
+              }
             }
           ]
         }
@@ -568,7 +798,7 @@
                 "asset": "backdrop-meadow"
               },
               {
-                "opacity": 0.22,
+                "opacity": 0.26,
                 "kind": "scrim",
                 "color": "#FFF4EBD8"
               }
@@ -582,7 +812,7 @@
                 "asset": "backdrop-meadow"
               },
               {
-                "opacity": 0.22,
+                "opacity": 0.26,
                 "kind": "scrim",
                 "color": "#FFF4EBD8"
               }
@@ -596,7 +826,7 @@
                 "asset": "backdrop-meadow"
               },
               {
-                "opacity": 0.22,
+                "opacity": 0.26,
                 "kind": "scrim",
                 "color": "#FFF4EBD8"
               }
@@ -621,7 +851,7 @@
                 "asset": "backdrop-workshop"
               },
               {
-                "opacity": 0.22,
+                "opacity": 0.26,
                 "kind": "scrim",
                 "color": "#FFF4EBD8"
               }
@@ -635,7 +865,7 @@
                 "asset": "backdrop-workshop"
               },
               {
-                "opacity": 0.22,
+                "opacity": 0.26,
                 "kind": "scrim",
                 "color": "#FFF4EBD8"
               }
@@ -649,7 +879,7 @@
                 "asset": "backdrop-workshop"
               },
               {
-                "opacity": 0.22,
+                "opacity": 0.26,
                 "kind": "scrim",
                 "color": "#FFF4EBD8"
               }
@@ -668,7 +898,8 @@
         "channel": "particles",
         "targets": [
           "effect.home",
-          "effect.profile"
+          "effect.profile",
+          "effect.profile.banner"
         ],
         "variants": {
           "full": {
@@ -738,7 +969,7 @@
         ],
         "overlayAsset": "frame-piglet",
         "category": "Ornate",
-        "coverInset": 0.17,
+        "coverInset": 0.182,
         "animated": false,
         "tint": false,
         "scale": 1
@@ -756,7 +987,7 @@
           "Circle"
         ],
         "overlayAsset": "frame-block-ring",
-        "coverInset": 0.145,
+        "coverInset": 0.184,
         "scale": 1,
         "tint": false,
         "animated": false

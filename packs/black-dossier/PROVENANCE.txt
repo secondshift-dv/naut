@@ -1,17 +1,18 @@
-Black Dossier 2.1.0
-Author: secondshift-dv.
-Original architectural artwork: AI-assisted image created specifically for this pack on 2026-10-09. No third-party game assets, logos or reference imagery are included. Prompt describes a neutral black concrete atrium, quiet left area, white slit lights on the right and a thin crimson architectural accent.
-Gunmetal Seal: original mathematically symmetric raster frame constructed for this pack; transparent 80% central portrait opening.
-Definitions and original artwork: CC BY 4.0, attribution secondshift-dv.
+Black Dossier 3.0.0
+Pack ID: naut.black-dossier.
+Credit: secondshift-dv.
+
+Backdrops and Cover Frame artwork: original AI-assisted illustrations
+prepared for this collection. Pack artwork has no third-party assets,
+characters or logos. Openings and exterior alpha were extracted and aligned
+to the renderer’s square or circular Cover aperture. Theme artwork and the
+source preview are compositions or derivatives of the included illustrations.
+Spotlight and Banner masks and decorative overlays are original artwork.
+
+Original artwork and definitions are CC BY 4.0; see LICENSE.txt.
+
+Bundled font notices (SIL Open Font License 1.1):
 Inter: assets/inter.ttf; licenses/inter-OFL.txt.
-Naut Instrument Condensed: renamed modified IBM Plex face inherited from Celestial; assets/instrument-condensed.ttf; licenses/ibmplexsanscondensed-OFL.txt.
+Naut Instrument Condensed: renamed modified IBM Plex Sans Condensed;
+  assets/instrument-condensed.ttf; licenses/ibmplexsanscondensed-OFL.txt.
 Noto Sans Mono: assets/notosansmono.ttf; licenses/notosansmono-OFL.txt.
-Fonts retain SIL OFL 1.1 and notices. No game branding, personal media, executable code or plugins are distributed.
-
-Theme artwork thumbnails: resized, downsampled 320 x 180 WebP derivatives
-of the included original artwork for Settings > Appearance. No new sources
-or third-party assets were introduced.
-
-Redline Steel and Steel Evidence Archive are original raster illustrations. Gunmetal Seal has a matched square aperture.
-
-Redline Steel and Steel Evidence Archive are original raster illustrations. Gunmetal Seal has a matched square aperture.
