@@ -126,6 +126,7 @@
     <sys:String x:Key="Import.Destination.Current">当前Profile</sys:String>
     <sys:String x:Key="ImportWizard.AlreadyInLibrary">{0} 已在您的 Vault 中</sys:String>
     <sys:String x:Key="ImportWizard.ChooseProfile.Indicator">目的地</sys:String>
+    <sys:String x:Key="ImportWizard.ChooseProfile.Again">已保存的目标不存在或不可用。请选择个人资料以继续。</sys:String>
     <sys:String x:Key="ImportWizard.ChooseProfile.Title">选择Profile</sys:String>
     <sys:String x:Key="ImportWizard.DuplicateName">名为“{0}”的 profile 已存在。添加到其中，或继续创建第二个同名的 profile。</sys:String>
     <sys:String x:Key="ImportWizard.ExistingNote">添加到 {0}。它们的名称、类别、标签、评级和概述保持不变。</sys:String>
@@ -146,7 +147,7 @@
     <sys:String x:Key="ImportWizard.Transfer.Copy">您的文件将被复制到您的 Vault 中。原件完全保留在原处。</sys:String>
     <sys:String x:Key="ImportWizard.Unsupported">不支持 {0}（保持不变）</sys:String>
     <sys:String x:Key="ImportWizard.Verify.Indicator">Profile 详细信息和导入决策</sys:String>
-    <sys:String x:Key="ImportWizard.Verify.Title">验证</sys:String>
+    <sys:String x:Key="ImportWizard.Verify.Title">审核</sys:String>
     <sys:String x:Key="Overlay.Cancel">取消</sys:String>
     <sys:String x:Key="Overlay.Confirm">确认</sys:String>
     <sys:String x:Key="Overlay.DestructiveWarning">这将是 {0}。它无法撤消。</sys:String>
@@ -1205,6 +1206,7 @@
     <sys:String x:Key="Inspector.Duration">持续时间</sys:String>
     <sys:String x:Key="Inspector.Favorite">最爱</sys:String>
     <sys:String x:Key="Inspector.FileName">文件名</sys:String>
+    <sys:String x:Key="Inspector.SourceFileName">源文件名</sys:String>
     <sys:String x:Key="Inspector.Fit">适合</sys:String>
     <sys:String x:Key="Inspector.Format">格式</sys:String>
     <sys:String x:Key="Inspector.LoadingPeople">正在加载人物…</sys:String>
@@ -1642,7 +1644,7 @@
     <sys:String x:Key="Profile.Rename.Failed">Profile 无法重命名。</sys:String>
     <sys:String x:Key="Profile.Rename.NameUpdated">名称已更新。</sys:String>
     <sys:String x:Key="Profile.Rename.NeedsAttention">文件夹重命名需要注意。</sys:String>
-    <sys:String x:Key="Profile.Rename.Pending">正在重命名文件...（核对待定）</sys:String>
+    <sys:String x:Key="Profile.Rename.Pending">名称已保存。Vault 中的文件正在后台重命名。</sys:String>
     <sys:String x:Key="Profile.Rename.Success">Profile 更名成功。</sys:String>
     <sys:String x:Key="Profile.Unknown.AssignFailed">无法分配媒体。</sys:String>
     <sys:String x:Key="Profile.Unknown.Assigned">将 {0} 项目分配给 Profile。</sys:String>
@@ -2010,6 +2012,7 @@
     <sys:String x:Key="Figure.Control.Zoom">缩放 · Ctrl + 滚轮</sys:String>
     <sys:String x:Key="Figure.Loading">正在加载3D...</sys:String>
     <sys:String x:Key="Figure.ResetView">重置视图</sys:String>
+    <sys:String x:Key="Figure.Controls">操作</sys:String>
     <sys:String x:Key="Figure.ThumbnailFallback">预览图像 - 实时3D不可用</sys:String>
     <sys:String x:Key="Home.Empty.LocalNote">导入喜爱的内容，开始建立收藏。原始文件保持不变，副本存入 Vault。</sys:String>
     <sys:String x:Key="Import.Eta.Preparing">正在准备剩余媒体...</sys:String>

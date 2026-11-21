@@ -84,6 +84,39 @@ public sealed partial class CustomizationCenter
         RenderAll();
     }
 
+    private void OnSubjectMediaInvalidated(object? sender, CatalogInvalidation invalidation)
+    {
+        if (invalidation.DomainKind != CatalogInvalidationDomain.Media) return;
+        UiDispatch.Run(() =>
+        {
+            if (_closed || _subject is not { } subject) return;
+            var ids = invalidation.EntityIds;
+            if (ids.Count == 0 || subject.MediaItems.Any(item => ids.Contains(item.MediaId))
+                || subject.FigureCandidates.Any(item => ids.Contains(item.MediaId))
+                || subject.CoverCandidates.Any(item => ids.Contains(item.MediaId))
+                || subject.BannerCandidates.Any(item => ids.Contains(item.MediaId)))
+                _subjectMediaRefresh?.Signal();
+        });
+    }
+
+    private async Task RefreshSubjectMediaAsync(Guid profileId, CancellationToken token)
+    {
+        if (_closed || _subject is not { } current) return;
+        var generation = ++_subjectGeneration;
+        var refreshed = await LoadSubjectSnapshotAsync(profileId, generation).ConfigureAwait(true);
+        if (refreshed is null || _closed || token.IsCancellationRequested || generation != _subjectGeneration) return;
+
+        _subject = current with
+        {
+            MediaItems = refreshed.MediaItems,
+            PreviewMediaCard = refreshed.PreviewMediaCard,
+            CoverCandidates = refreshed.CoverCandidates,
+            BannerCandidates = refreshed.BannerCandidates,
+            FigureCandidates = refreshed.FigureCandidates,
+        };
+        RenderAll();
+    }
+
     private async Task<CustomizationSubjectSnapshot?> LoadSubjectSnapshotAsync(Guid profileId, int generation)
     {
         CancelSubjectLoad();
@@ -160,7 +193,7 @@ public sealed partial class CustomizationCenter
                     previewItem.DurationMs,
                     false,
                     previewItem.IsFavorite,
-                    previewItem.OriginalFileName ?? previewItem.ManagedFileName,
+                    previewItem.ManagedFileName ?? previewItem.OriginalFileName,
                     previewThumbnail.State == MediaAssetResourceState.Ready ? previewThumbnail.PhysicalPath : null,
                     previewHoverPath));
             }

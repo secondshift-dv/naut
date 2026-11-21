@@ -1,10 +1,12 @@
 using System.Net;
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Neuterradise.App.Import.Intake;
 using Neuterradise.App.Media;
 using Neuterradise.App.SystemServices.Storage;
+using Neuterradise.App.SystemServices.Database;
 using Neuterradise.App.SystemServices.Updates;
 using Neuterradise.Release.Contracts;
 using Neuterradise.Updater;
@@ -13,6 +15,57 @@ static void Require(bool value, string message) { if (!value) throw new InvalidO
 static string Hash(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
 var root = Path.GetFullPath(args[0]);
 Directory.CreateDirectory(root);
+if (args.Length > 1 && args[1] == "--replace-package")
+{
+    var baselineZip = args[2];
+    var distribution = args[3];
+    var manifestBytes = await File.ReadAllBytesAsync(Path.Combine(distribution, "update.json"));
+    var signed = args.Contains("--require-signature", StringComparer.Ordinal);
+    if (signed)
+    {
+        var signature = await File.ReadAllBytesAsync(Path.Combine(distribution, "update-signature.json"));
+        Require(new UpdatePublisherSignatureVerifier().Verify(manifestBytes, signature).Verified,
+            "Published update signature failed verification.");
+    }
+    var target = UpdateManifest.Parse(Encoding.UTF8.GetString(manifestBytes));
+    var zip = Path.Combine(distribution, $"naut-v{target.ProductVersion}-{target.RuntimeIdentifier}.zip");
+    await using var zipStream = File.OpenRead(zip);
+    var zipHash = Convert.ToHexStringLower(await SHA256.HashDataAsync(zipStream));
+    Require(zipStream.Length == target.PayloadByteLength && zipHash == target.PayloadSha256, "ZIP differs from its update manifest.");
+
+    var installation = new InstallPaths(Path.Combine(root, "baseline"));
+    ZipFile.ExtractToDirectory(baselineZip, installation.Root);
+    var before = ReadInstalledVersion(installation.Root);
+    Require(Version.Parse(before) < Version.Parse(target.ProductVersion), "Baseline is not older than the candidate.");
+
+    var vault = new VaultPaths(Path.Combine(root, "vault"));
+    vault.EnsureStructuralDirectories();
+    var catalog = new CatalogDb(vault);
+    await catalog.InitializeAsync();
+    await catalog.ProfileWrites.CreateNormalProfileAsync(Guid.NewGuid(), Guid.NewGuid(), "Updater fixture");
+    await File.WriteAllBytesAsync(Path.Combine(vault.ProfilesPath, "synthetic-media.bin"), [13, 21, 34]);
+    Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+    var vaultBefore = ReadVaultInventory(vault.Root);
+
+    var appState = new AppStatePaths(Path.Combine(root, "state"));
+    var operation = Guid.NewGuid();
+    var stager = new UpdatePackageStager(appState, new UpdatePackageValidator(installation));
+    var staging = await stager.ExtractAndValidateAsync(zip, operation, target);
+    Require(staging.IsAccepted, "Package staging failed: " + staging.SafeError);
+    var toolsRoot = appState.GetUpdateToolsPath(operation);
+    Directory.CreateDirectory(toolsRoot);
+    var handoffFile = Path.Combine(toolsRoot, "handoff.json");
+    var officialHandoff = new UpdateHandoff(operation, Path.Combine(appState.UpdateStagingPath, operation.ToString("D")),
+        installation.Root, target, vault.Root, DateTimeOffset.UtcNow.AddMinutes(5));
+    var encoded = JsonSerializer.SerializeToUtf8Bytes(officialHandoff, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+    await File.WriteAllBytesAsync(handoffFile, encoded);
+    var replacement = await ReplacementEngine.ExecuteAsync(handoffFile, Hash(encoded), target.ComputeAuthoritySha256(), null, launchApp: false);
+    Require(replacement.Success && ReadInstalledVersion(installation.Root) == target.ProductVersion,
+        "Headless replacement did not install the target version: " + replacement);
+    Require(vaultBefore.SequenceEqual(ReadVaultInventory(vault.Root)), "Headless replacement changed Vault data.");
+    Console.WriteLine($"PACKAGED_UPGRADE_{before}_TO_{target.ProductVersion}=PASS;ZIP_SHA256={zipHash};SIGNED={signed}");
+    return;
+}
 if (args.Length > 1)
 {
     var context = new System.Runtime.Loader.AssemblyLoadContext("packaged", true);
@@ -199,6 +252,25 @@ var restored = await new UpdateStartupRecovery(state, install, vaultRoot).Reconc
 Require(restored.CanContinue && !restored.ReplacementInstalled && File.Exists(Path.Combine(installRoot,"runtime/obsolete.dll")), "Interrupted replacement backup recovery failed");
 Require(File.ReadAllText(Path.Combine(vaultRoot,"sentinel"))=="protected", "Recovery touched Vault");
 Console.WriteLine("PLANNER_STAGING_DOWNLOAD_FALLBACK_PROGRESS_REPLACEMENT_ISOLATION_MPG_MPEG=PASS");
+
+static string ReadInstalledVersion(string installation)
+{
+    var manifest = UpdateReleaseManifest.Parse(File.ReadAllText(Path.Combine(installation, "release-manifest.json")));
+    var context = new System.Runtime.Loader.AssemblyLoadContext("installed-version", true);
+    try
+    {
+        using var runtimeBytes = new MemoryStream(File.ReadAllBytes(Path.Combine(installation, "runtime", "Neuterradise.Runtime.dll")));
+        var runtime = context.LoadFromStream(runtimeBytes);
+        var embedded = runtime.GetType("Neuterradise.App.SystemServices.ProductIdentity")?.GetProperty("Version")?.GetValue(null) as string;
+        Require(embedded == manifest.ProductVersion, "Embedded install version differs from release manifest.");
+        return manifest.ProductVersion;
+    }
+    finally { context.Unload(); }
+}
+
+static KeyValuePair<string, string>[] ReadVaultInventory(string root) =>
+    Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Order(StringComparer.Ordinal)
+        .Select(path => KeyValuePair.Create(Path.GetRelativePath(root, path), Hash(File.ReadAllBytes(path)))).ToArray();
 
 sealed class Recorder : IProgress<UpdateProgress>
 {

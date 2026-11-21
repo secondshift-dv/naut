@@ -126,6 +126,7 @@
     <sys:String x:Key="Import.Destination.Current">aktuell Profile</sys:String>
     <sys:String x:Key="ImportWizard.AlreadyInLibrary">{0} bereits in Ihrem Vault</sys:String>
     <sys:String x:Key="ImportWizard.ChooseProfile.Indicator">Ziel</sys:String>
+    <sys:String x:Key="ImportWizard.ChooseProfile.Again">Das gespeicherte Ziel fehlt oder ist nicht verfügbar. Wähle ein Profil, um fortzufahren.</sys:String>
     <sys:String x:Key="ImportWizard.ChooseProfile.Title">Wählen Sie Profile</sys:String>
     <sys:String x:Key="ImportWizard.DuplicateName">Ein profile mit dem Namen „{0}“ ist bereits vorhanden. Fügen Sie es hinzu oder erstellen Sie weiterhin ein zweites profile mit demselben Namen.</sys:String>
     <sys:String x:Key="ImportWizard.ExistingNote">Hinzufügen zu {0}. Ihr Name, ihre Kategorie, ihre Tags, ihre Bewertung und ihre Übersicht bleiben unverändert.</sys:String>
@@ -1205,6 +1206,7 @@
     <sys:String x:Key="Inspector.Duration">Dauer</sys:String>
     <sys:String x:Key="Inspector.Favorite">Favorit</sys:String>
     <sys:String x:Key="Inspector.FileName">Dateiname</sys:String>
+    <sys:String x:Key="Inspector.SourceFileName">Ursprünglicher Dateiname</sys:String>
     <sys:String x:Key="Inspector.Fit">Passt</sys:String>
     <sys:String x:Key="Inspector.Format">Formatieren</sys:String>
     <sys:String x:Key="Inspector.LoadingPeople">Es werden Leute geladen…</sys:String>
@@ -1642,7 +1644,7 @@
     <sys:String x:Key="Profile.Rename.Failed">Der Profile konnte nicht umbenannt werden.</sys:String>
     <sys:String x:Key="Profile.Rename.NameUpdated">Name aktualisiert.</sys:String>
     <sys:String x:Key="Profile.Rename.NeedsAttention">Das Umbenennen von Ordnern erfordert Aufmerksamkeit.</sys:String>
-    <sys:String x:Key="Profile.Rename.Pending">Dateien werden umbenannt... (Abgleich steht aus)</sys:String>
+    <sys:String x:Key="Profile.Rename.Pending">Name gespeichert. Die Dateien im Vault werden im Hintergrund umbenannt.</sys:String>
     <sys:String x:Key="Profile.Rename.Success">Profile erfolgreich umbenannt.</sys:String>
     <sys:String x:Key="Profile.Unknown.AssignFailed">Die Medien konnten nicht zugeordnet werden.</sys:String>
     <sys:String x:Key="Profile.Unknown.Assigned">{0}-Elemente wurden Profile zugewiesen.</sys:String>
@@ -2010,6 +2012,7 @@
     <sys:String x:Key="Figure.Control.Zoom">Zoom · Strg + Mausrad</sys:String>
     <sys:String x:Key="Figure.Loading">3D wird geladen...</sys:String>
     <sys:String x:Key="Figure.ResetView">Ansicht zurücksetzen</sys:String>
+    <sys:String x:Key="Figure.Controls">Steuerung</sys:String>
     <sys:String x:Key="Figure.ThumbnailFallback">Vorschaubild - Live-3D ist nicht verfügbar</sys:String>
     <sys:String x:Key="Home.Empty.LocalNote">Importieren Sie Favoriten für Ihre Sammlung. Originale bleiben unverändert; Kopien kommen in den Vault.</sys:String>
     <sys:String x:Key="Import.Eta.Preparing">Verbleibende Medien werden vorbereitet...</sys:String>

@@ -23,12 +23,6 @@ public enum ImportWizardStep
     Details = 2,
 }
 
-public enum ImportWizardMode
-{
-    ChooseProfile,
-    Verify,
-}
-
 public enum ImportDestinationChoice
 {
     New,
@@ -183,7 +177,6 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
     private long _hintGeneration;
 
     private ImportWizardStep _step = ImportWizardStep.Profile;
-    private ImportWizardMode _mode = ImportWizardMode.ChooseProfile;
     private ImportDestinationChoice _choice = ImportDestinationChoice.New;
     private string _newProfileName = string.Empty;
     private ProfileLookupItemViewModel? _duplicateNameProfile;
@@ -211,6 +204,10 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
     private bool _hasPreparationPending;
     private bool _isImporting;
     private bool _importRequested;
+    private bool _publishWhenReady;
+    private bool _initialized;
+    private VerificationDestinationDraft? _lockedDestination;
+    private string? _invalidConfirmedDraftJson;
     private string? _errorMessage;
     private bool _disposed;
 
@@ -222,7 +219,6 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         Action<ImportWizardViewModel>? close = null,
         Action<Guid>? imported = null,
         ImportIntakeSummary? intakeSummary = null,
-        ImportWizardMode mode = ImportWizardMode.ChooseProfile,
         DerivedImageLoader? images = null,
         TimeProvider? timeProvider = null)
     {
@@ -235,8 +231,6 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         _close = close;
         _imported = imported;
         _intakeSummary = intakeSummary;
-        _mode = mode;
-        _step = mode == ImportWizardMode.Verify ? ImportWizardStep.Details : ImportWizardStep.Profile;
         _images = images ?? DerivedImageLoader.Shared;
         _mediaAssets = catalog is null ? null : new MediaAssetResourceAuthority(catalog);
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -336,15 +330,17 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
     public ICommand RetryPreparationCommand { get; }
     public ICommand CreateCategoryCommand { get; }
 
-    public bool IsChooseProfileMode => _mode == ImportWizardMode.ChooseProfile;
+    public bool IsInitialized => _initialized;
 
-    public bool IsVerifyMode => _mode == ImportWizardMode.Verify;
+    public bool IsChooseProfileMode => _step == ImportWizardStep.Profile;
+
+    public bool IsVerifyMode => _step == ImportWizardStep.Details;
 
     // ---------------------------------------------------------------- steps
 
     public string StepTitle => IsChooseProfileMode
         ? SurfaceText.Get("ImportWizard.ChooseProfile.Title", "Choose Profile")
-        : SurfaceText.Get("ImportWizard.Verify.Title", "Verify");
+        : SurfaceText.Get("ImportWizard.Verify.Title", "Review");
 
     public string StepIndicator => IsChooseProfileMode
         ? SurfaceText.Get("ImportWizard.ChooseProfile.Indicator", "Destination")
@@ -832,12 +828,15 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
     }
 
     public bool HasError => !string.IsNullOrWhiteSpace(_errorMessage);
-    public bool CanContinue => IsChooseProfileMode && IsProfileChoiceComplete && !_isImporting && _finalizer is not null;
-    public bool CanImport => IsVerifyMode && !IsPreparing && IsProfileChoiceComplete && !HasProblems && _admittedCount > 0 && !_isImporting && _publication is not null;
+    public bool CanContinue => _initialized && IsChooseProfileMode && IsProfileChoiceComplete && !_isImporting && _finalizer is not null;
+    public bool CanImport => _initialized && IsVerifyMode && !IsPreparing
+        && (_lockedDestination is not null || IsProfileChoiceComplete)
+        && !HasProblems && _admittedCount > 0 && !_isImporting && _publication is not null;
 
     public bool IsProfileChoiceComplete => _choice switch
     {
-        ImportDestinationChoice.New => !string.IsNullOrWhiteSpace(_newProfileName) && _newProfileName.Trim().Length <= MaximumNameLength,
+        ImportDestinationChoice.New => _newProfileName.Trim().Length <= MaximumNameLength
+            && ProfileRules.TryValidateDisplayName(_newProfileName, out _, out _),
         ImportDestinationChoice.Existing => _selectedExistingProfile is not null,
         _ => false,
     };
@@ -853,12 +852,39 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
 
         var token = _lifetime.Token;
         var model = await _operations.LoadVerificationReadModelAsync(UnitId, token).ConfigureAwait(true);
+        VerificationDraftV1? draft = null;
         if (model is not null)
         {
-            RestoreDraft(VerificationDraftV1.FromJson(model.VerificationDraftJson, _timeProvider.GetUtcNow().ToUnixTimeMilliseconds()));
+            draft = VerificationDraftV1.FromJson(model.VerificationDraftJson, _timeProvider.GetUtcNow().ToUnixTimeMilliseconds());
+            RestoreDraft(draft);
+            if (model.CommitOperationId is not null || model.LibraryCommitState.HasReachedDomainCommit())
+            {
+                _lockedDestination = draft.Destination with
+                {
+                    Kind = model.DestinationKind is { } kind ? DbEnum.ParseDestinationKind(kind) : draft.Destination.Kind,
+                    ProfileId = model.DestinationProfileId ?? draft.Destination.ProfileId,
+                };
+            }
         }
 
         await LoadOrganizationAsync(token).ConfigureAwait(true);
+        var confirmed = model?.VerificationStep >= (int)ImportWizardStep.Details && _importRequested;
+        var canReview = _lockedDestination is not null || (confirmed && IsProfileChoiceComplete);
+        _step = canReview ? ImportWizardStep.Details : ImportWizardStep.Profile;
+        if (!canReview)
+        {
+            if (draft?.Destination.Kind is not null && !IsProfileChoiceComplete)
+            {
+                ErrorMessage = SurfaceText.Get("ImportWizard.ChooseProfile.Again", "The saved destination is missing or unavailable. Choose a Profile to continue.");
+                if (_importRequested)
+                    _invalidConfirmedDraftJson = model!.VerificationDraftJson;
+            }
+            _importRequested = false;
+            _publishWhenReady = false;
+        }
+        _initialized = true;
+        RaisePropertyChanged(string.Empty);
+        RaiseValidity();
         await RefreshHintsAsync(token).ConfigureAwait(true);
         if (_choice == ImportDestinationChoice.Existing)
         {
@@ -870,11 +896,12 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
     private void RestoreDraft(VerificationDraftV1 draft)
     {
         _importRequested = draft.IsImportRequested;
+        _publishWhenReady = draft.PublishWhenReady;
         switch (draft.Destination.Kind)
         {
-            case DestinationKind.ExistingNormal when draft.Destination.ProfileId is { } profileId:
+            case DestinationKind.ExistingNormal:
                 _choice = ImportDestinationChoice.Existing;
-                _pendingExistingProfileId = profileId;
+                _pendingExistingProfileId = draft.Destination.ProfileId;
                 break;
             case DestinationKind.NewNormal when draft.Destination.NewProfile is { } profile:
                 _choice = ImportDestinationChoice.New;
@@ -953,10 +980,10 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         {
             try
             {
-                var profile = await _catalog!.ProfileReads.GetDetailAsync(existingId, token).ConfigureAwait(true);
-                if (profile is not null && !string.IsNullOrWhiteSpace(profile.DisplayName))
+                var profileName = await _operations!.ReadActiveDestinationNameAsync(existingId, token).ConfigureAwait(true);
+                if (profileName is not null)
                 {
-                    UseExistingProfile(existingId, profile.DisplayName);
+                    UseExistingProfile(existingId, profileName);
                 }
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
@@ -1650,43 +1677,17 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         RaiseValidity();
     }
 
-    private void ScheduleDraftSave() => _draftSaveCoalescer?.Signal();
-
-    private async Task PersistAutosaveDraftAsync(CancellationToken cancellationToken)
+    private void ScheduleDraftSave()
     {
-        if (_operations is null || _disposed || _isImporting)
-        {
-            return;
-        }
-
-        VerificationDraftV1? draft = null;
-        await UiDispatch.InvokeAsync(() =>
-        {
-            if (!_disposed && !_isImporting)
-            {
-                draft = BuildDraft();
-            }
-        }).ConfigureAwait(false);
-
-        if (draft is not null)
-        {
-            await PersistDraftAsync(draft, cancellationToken).ConfigureAwait(false);
-        }
+        if (_initialized) _draftSaveCoalescer?.Signal();
     }
 
-    private async Task PersistCurrentDraftAsync()
-    {
-        if (_operations is null)
-        {
-            return;
-        }
+    private Task PersistAutosaveDraftAsync(CancellationToken cancellationToken) =>
+        PersistDraftAsync(cancellationToken);
 
-        await PersistDraftAsync(BuildDraft(), _lifetime.Token).ConfigureAwait(true);
-    }
+    private Task PersistCurrentDraftAsync() => PersistDraftAsync(_lifetime.Token);
 
-    private async Task PersistDraftAsync(
-        VerificationDraftV1 draft,
-        CancellationToken cancellationToken)
+    private async Task PersistDraftAsync(CancellationToken cancellationToken)
     {
         if (_operations is null)
         {
@@ -1705,8 +1706,34 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
                 return;
             }
 
+            var persisted = VerificationDraftV1.FromJson(
+                model.VerificationDraftJson, _timeProvider.GetUtcNow().ToUnixTimeMilliseconds());
+            VerificationDraftV1? draft = null;
+            bool clearInvalidConfirmation = false;
+            await UiDispatch.InvokeAsync(() =>
+            {
+                if (_initialized && !_disposed && !_isImporting)
+                {
+                    clearInvalidConfirmation = _invalidConfirmedDraftJson == model.VerificationDraftJson
+                        && model.CommitOperationId is null && !model.LibraryCommitState.HasReachedDomainCommit();
+                    if (IsChooseProfileMode && persisted.IsImportRequested && !clearInvalidConfirmation)
+                        return;
+                    draft = BuildDraft();
+                }
+            }).ConfigureAwait(false);
+
+            if (draft is null) return;
+
             try
             {
+                // The version predates the UI snapshot. A retry takes a fresh snapshot and
+                // preserves durable confirmation/publication intent written by another path.
+                draft = draft with
+                {
+                    CurrentStep = clearInvalidConfirmation ? draft.CurrentStep : Math.Max(model.VerificationStep, draft.CurrentStep),
+                    ImportRequested = !clearInvalidConfirmation && persisted.IsImportRequested,
+                    PublishWhenReady = !clearInvalidConfirmation && persisted.PublishWhenReady,
+                };
                 await _operations
                     .UpdateDraftAsync(UnitId, draft, model.RowVersion, cancellationToken)
                     .ConfigureAwait(false);
@@ -1723,14 +1750,18 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         if (!CanContinue || _finalizer is null) return;
         IsImporting = true;
         ErrorMessage = null;
-        var previousStep = _step;
-        _step = ImportWizardStep.Details;
         try
         {
+            if (_selectedExistingProfile is { } selected && _choice == ImportDestinationChoice.Existing
+                && await _operations!.ReadActiveDestinationNameAsync(selected.ProfileId, _lifetime.Token).ConfigureAwait(true) is null)
+            {
+                SelectedExistingProfile = null;
+                ErrorMessage = SurfaceText.Get("ImportWizard.ChooseProfile.Again", "The saved destination is missing or unavailable. Choose a Profile to continue.");
+                return;
+            }
             var accepted = await _finalizer.RequestImportAsync(UnitId, BuildDraft(), _lifetime.Token).ConfigureAwait(true);
             if (!accepted)
             {
-                _step = previousStep;
                 ErrorMessage = SurfaceText.Get("ImportWizard.Gone", "This import is no longer available.");
                 return;
             }
@@ -1798,7 +1829,9 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         return new VerificationDraftV1(
             SchemaVersion: VerificationDraftV1.CurrentSchemaVersion,
             CurrentStep: (int)_step,
-            Destination: destination,
+            Destination: _lockedDestination is { Kind: DestinationKind.NewNormal } lockedNew
+                ? lockedNew with { NewProfile = newProfile ?? lockedNew.NewProfile }
+                : _lockedDestination ?? destination,
             Appearance: appearance,
             FaceDecisions: _faceDecisions,
             UpdatedAtMs: _timeProvider.GetUtcNow().ToUnixTimeMilliseconds(),
@@ -1806,7 +1839,8 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
             AttentionItemIds: _attentionItemIds,
             DuplicateDecisions: [.. _duplicateDecisions],
             ProfileCollisionDecisions: [.. _collisionDecisions],
-            ImportRequested: _importRequested);
+            ImportRequested: _importRequested,
+            PublishWhenReady: _publishWhenReady);
     }
 
     public async Task ImportAsync()

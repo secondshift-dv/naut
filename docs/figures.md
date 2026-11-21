@@ -6,9 +6,9 @@ A compatible 3D model can become an optional interactive **Figure** inside a Pro
 
 A suitable model can be prepared into Naut's durable Figure representation and displayed in the Profile identity region.
 
-The Figure viewer supports direct interaction such as **rotate, pan, and zoom** while Naut keeps camera behavior, framing, pedestal presentation, texture policy, and renderer behavior under the application engine. The live Figure blends transparently with the selected Profile Backdrop; a static thumbnail remains the fallback.
+The Figure viewer supports direct interaction such as **rotate, pan, and zoom** while Naut keeps camera behavior, framing, pedestal presentation, texture policy, and renderer behavior under the application engine. The live Figure blends transparently with the selected Profile Backdrop and uses bundled studio lighting for model illumination and reflections. A static thumbnail remains available when the live renderer is unavailable.
 
-On the Profile page, each model remembers its camera across visits and app restarts. A model shared by several Profiles keeps a separate camera in each. Use **Reset view** to save the default camera.
+On the Profile page, each model remembers its camera across visits and app restarts. A model shared by several Profiles keeps a separate camera in each. Use **Controls** below the viewport for gesture help and **Reset view** to restore the default camera. The camera stays where you left it when you close the help.
 
 Naut can reuse a verified prepared Figure on supported NTFS drives when file identity and journal evidence prove it unchanged. If that proof is unavailable or uncertain, Naut performs full validation instead; Deep Health always validates fully.
 

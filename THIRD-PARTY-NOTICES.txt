@@ -14,6 +14,7 @@ Source authorities:
 - scripts/packaging/runtime-third-party.lock.json — native runtime and licenses.
 - scripts/packaging/ffmpeg/ffmpeg-runtime.lock.json — FFmpeg build and sources.
 - src/Neuterradise.App/Assets/Presentation/BuiltIn/Fonts/provenance.json — fonts.
+- Poly Haven Studio Small 08 - CC0-1.0 HDRI. The source and filtered Figure resource are pinned by runtime-third-party.lock.json.
 - release-contract.json — required packaged notice and runtime members.
 
 For notices applicable to an installed or downloaded Naut version, use the copy

@@ -44,6 +44,7 @@
     <Content Update="Assets\Brand\**\*" CopyToOutputDirectory="PreserveNewest" />
     <Content Update="Assets\Flags\**\*" CopyToOutputDirectory="PreserveNewest" />
     <Content Update="Assets\Presentation\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <EmbeddedResource Include="Assets\Figure\StudioSmall08.rgba16f" LogicalName="Naut.Figure.StudioSmall08" />
   </ItemGroup>
 
   <!--

@@ -716,6 +716,18 @@ public sealed class VerificationOperations
         return new PagedItemsResult(items, totalCount, offset, limit);
     }
 
+    internal async Task<string?> ReadActiveDestinationNameAsync(Guid profileId, CancellationToken cancellationToken)
+    {
+        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT display_name FROM profiles
+            WHERE profile_id = $id AND kind = 'NORMAL' AND visibility = 'PUBLISHED' AND trashed_at_ms IS NULL;
+            """;
+        command.Parameters.AddWithValue("$id", DbGuid.Format(profileId));
+        return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string;
+    }
+
     public async Task<IReadOnlyList<ProfileLookupResult>> SearchProfilesAsync(
         string? query = null,
         int limit = 50,

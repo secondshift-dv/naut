@@ -664,6 +664,11 @@ public sealed class ImportSurface : Surface
             _wizardRenderBag = new Disposables();
             body.Children.Clear();
             footer.Children.Clear();
+            if (!wizard.IsInitialized)
+            {
+                footer.Children.Add(UI.Button(UI.T("Import.Close", "Close"), null, ButtonKind.Ghost, command: wizard.CloseCommand));
+                return;
+            }
             var preparation = UI.Text(string.Empty, "caption");
             var mediaSummary = UI.Text(string.Empty, "body-muted", maxLines: 2);
             body.Children.Add(preparation);
@@ -703,7 +708,7 @@ public sealed class ImportSurface : Surface
             error.Text = wizard.ErrorMessage ?? string.Empty;
             error.Visibility = wizard.HasError ? Visibility.Visible : Visibility.Collapsed;
         }, nameof(ImportWizardViewModel.StepIndicator), nameof(ImportWizardViewModel.StepTitle), nameof(ImportWizardViewModel.ErrorMessage), nameof(ImportWizardViewModel.HasError)));
-        _wizardBag.Add(Observe.Props(wizard, Render, nameof(ImportWizardViewModel.Choice)));
+        _wizardBag.Add(Observe.Props(wizard, Render, nameof(ImportWizardViewModel.IsInitialized), nameof(ImportWizardViewModel.Choice)));
     }
 
     private static void BuildProfileStep(ImportWizardViewModel wizard, StackPanel body, Disposables lifetime)

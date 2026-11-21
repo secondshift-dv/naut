@@ -374,12 +374,18 @@ public sealed class ImportActivityService : IAsyncDisposable
             && (progress?.UnusableItemCount ?? 0) == 0;
         var setAside = (draft?.AttentionItemIds?.Count ?? 0) + (progress?.UnusableItemCount ?? 0);
         var attentionCount = setAside + unit.CleanupFailedCount;
-        var profileChosen = draft?.Destination.Kind is not null || requested;
+        var destinationValid = draft?.Destination.Kind switch
+        {
+            DestinationKind.NewNormal => Profiles.ProfileRules.TryValidateDisplayName(
+                draft.Destination.NewProfile?.DisplayName, out _, out _),
+            DestinationKind.ExistingNormal => unit.DestinationProfileId is not null
+                && progress?.DestinationDisplayName is not null,
+            DestinationKind.SystemUnknown => true,
+            _ => false,
+        };
+        var profileChosen = unit.LibraryCommitState.HasReachedDomainCommit() || (requested && destinationValid);
         var publicationAttention = !committed && draft?.PublishWhenReady == true
             && unit.State == ImportUnitState.ReadyForVerification && attentionCount > 0;
-
-        var candidateReadyForReview = !requested && !unit.LibraryCommitState.HasReachedDomainCommit()
-            && unit.State == ImportUnitState.Preparing && admitted > 0 && prepared >= admitted;
 
         ImportActivityStage stage;
         if (cancelled)
@@ -410,7 +416,7 @@ public sealed class ImportActivityService : IAsyncDisposable
         {
             stage = ImportActivityStage.WaitingForProfile;
         }
-        else if (unit.State == ImportUnitState.ReadyForVerification || candidateReadyForReview)
+        else if (unit.State == ImportUnitState.ReadyForVerification)
         {
             stage = ImportActivityStage.ReadyToVerify;
         }
@@ -424,7 +430,7 @@ public sealed class ImportActivityService : IAsyncDisposable
         }
 
         var operationalStage = unit.State == ImportUnitState.Committing ? ImportActivityStage.Saving
-            : unit.State == ImportUnitState.ReadyForVerification || candidateReadyForReview ? ImportActivityStage.ReadyToVerify
+            : unit.State == ImportUnitState.ReadyForVerification ? ImportActivityStage.ReadyToVerify
             : profileChosen ? ImportActivityStage.Checking
             : unit.State == ImportUnitState.Intake ? ImportActivityStage.Reading : ImportActivityStage.WaitingForProfile;
         var timelineStage = stage is ImportActivityStage.Paused or ImportActivityStage.Cancelled or ImportActivityStage.NeedsAttention
@@ -497,7 +503,9 @@ public sealed class ImportActivityService : IAsyncDisposable
             IsTerminal: isTerminal,
             NeedsAttention: needsAttention,
             CanContinue: stage is ImportActivityStage.WaitingForProfile or ImportActivityStage.ReadyToVerify
-                || hasPreparationFailure || publicationAttention,
+                || hasPreparationFailure || publicationAttention
+                || (stage == ImportActivityStage.NeedsAttention && !profileChosen
+                    && !committed && !cancelled && unit.State != ImportUnitState.FailedTerminal),
             CanRetry: unit.State == ImportUnitState.FailedRetryable,
             // FAILED_TERMINAL exposes one decisive action: Clear. Clear internally performs the
             // ordered cancellation/rollback before hiding history, so a second Cancel button would
@@ -899,7 +907,7 @@ public sealed class ImportActivityService : IAsyncDisposable
 
     private void OnCatalogInvalidated(object? sender, CatalogInvalidation invalidation)
     {
-        if (string.Equals(invalidation.DomainKind, CatalogInvalidationDomain.Import, StringComparison.Ordinal))
+        if (invalidation.DomainKind is CatalogInvalidationDomain.Import or CatalogInvalidationDomain.Profile)
         {
             RequestRefresh();
         }

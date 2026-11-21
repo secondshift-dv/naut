@@ -9,7 +9,7 @@ Managed copies use `ProfileName_type_ID.ext`. The type is `image`, `video`, or `
 - Use **Import** to add files or folders and review the incoming items.
 - Use **Add media** from a Profile to import directly for that Profile.
 
-Both paths use the same media preparation pipeline; Profile-scoped import simply skips the step of choosing a destination Profile.
+Both paths use the same media preparation pipeline. Profile-scoped import uses that Profile as its destination. For a regular import, confirm the destination, then return to Review when preparation is ready and select **Add to Vault**.
 
 ## Type-specific preparation
 
@@ -26,6 +26,8 @@ A duplicate with identical content can reuse compatible preparation that already
 The import review can suggest presentation media, but **Cover and Banner can always be changed later**.
 
 ## Imports, recovery and supported containers
+
+After reopening Naut, select **Continue** in Import Activity to restore the saved choices. If the destination is missing or unavailable, select a Profile again before Review. Once Vault placement locks the destination, the batch follows its saved recovery steps.
 
 Import Activity shows elapsed time during **Stage 1 – Preparing media** and Stage 2. The clock stops while preparation is paused or waiting for a retry.
 

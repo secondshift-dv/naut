@@ -108,11 +108,7 @@ public sealed class ImportViewModel : ScreenStateViewModel, IDisposable
         {
             if (ResolveUnit(parameter) is { } unit)
             {
-                var mode = unit.Stage == ImportActivityStage.ReadyToVerify
-                    || (unit.NeedsAttention && unit.CanContinue)
-                    ? ImportWizardMode.Verify
-                    : ImportWizardMode.ChooseProfile;
-                OpenWizard(unit.UnitId, unit.SourceDisplayName, intakeSummary: null, mode: mode);
+                OpenWizard(unit.UnitId, unit.SourceDisplayName, intakeSummary: null);
             }
         });
 
@@ -484,8 +480,7 @@ public sealed class ImportViewModel : ScreenStateViewModel, IDisposable
     public ImportWizardViewModel OpenWizard(
         Guid unitId,
         string sourceDisplayName,
-        ImportIntakeSummary? intakeSummary,
-        ImportWizardMode mode = ImportWizardMode.ChooseProfile)
+        ImportIntakeSummary? intakeSummary)
     {
         CloseWizard(Wizard);
 
@@ -496,8 +491,7 @@ public sealed class ImportViewModel : ScreenStateViewModel, IDisposable
             _finalizer,
             close: CloseWizard,
             imported: OnWizardImported,
-            intakeSummary: intakeSummary,
-            mode: mode);
+            intakeSummary: intakeSummary);
         Wizard = wizard;
         TaskObserver.Observe(wizard.InitializeAsync(), "Import overlay", exception => IntakeStatusMessage = OperationExecution.SafeMessage(exception));
         return wizard;

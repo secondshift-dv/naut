@@ -19,6 +19,10 @@ The bundled face-analysis runtime uses exact pinned YuNet and SFace artifacts do
 
 Their upstream licenses and notices apply to those third-party runtime artifacts. Naut does not claim those models as Naut-owned source.
 
+## Figure studio lighting
+
+The packaged Figure lighting uses a filtered version of [Poly Haven Studio Small 08](https://polyhaven.com/a/studio_small_08) under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). The canonical package records the source and filtered resource hashes in its runtime notices.
+
 ## Documentation artwork
 
 The static README images include cropped Naut Interactive Showcase captures and selected artwork composed from those captures. The Gallery capture uses an additional sample set to demonstrate the card grid.

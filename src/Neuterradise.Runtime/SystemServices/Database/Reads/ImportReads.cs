@@ -698,6 +698,8 @@ public sealed class ImportReads
             FROM import_units u
             LEFT JOIN import_items i ON i.import_unit_id = u.import_unit_id
             LEFT JOIN profiles p ON p.profile_id = u.destination_profile_id
+                AND (u.commit_operation_id IS NOT NULL OR u.destination_kind <> 'EXISTING_NORMAL'
+                     OR (p.kind = 'NORMAL' AND p.visibility = 'PUBLISHED' AND p.trashed_at_ms IS NULL))
             WHERE u.import_unit_id IN ({string.Join(",", names)})
             GROUP BY u.import_unit_id;
             """;

@@ -778,21 +778,22 @@ public sealed class MediaDetailViewModel : ScreenStateViewModel, IDisposable
         }
 
         var effectiveToken = cancellationToken.CanBeCanceled ? cancellationToken : RouteCancellationToken;
-        var location = await _mediaOperations.ResolveCurrentLocationAsync(MediaId, effectiveToken);
-        if (location.IsCancelled)
+        OperationResult result;
+        if (copyPath)
         {
-            return;
+            var location = await _mediaOperations.ResolveCurrentLocationAsync(MediaId, effectiveToken);
+            if (location.IsCancelled) return;
+            if (!location.IsSuccess || location.Value is null)
+            {
+                ShowRecoverableError(location.UserMessage ?? failureMessage);
+                return;
+            }
+            result = await _mediaOperations.CopyCurrentPathAsync(location.Value, effectiveToken).ConfigureAwait(true);
         }
-
-        if (!location.IsSuccess || location.Value is null)
+        else
         {
-            ShowRecoverableError(location.UserMessage ?? failureMessage);
-            return;
+            result = await _mediaOperations.CopyCurrentFilenameAsync(MediaId, effectiveToken).ConfigureAwait(true);
         }
-
-        var result = copyPath
-            ? await _mediaOperations.CopyCurrentPathAsync(location.Value, effectiveToken).ConfigureAwait(true)
-            : await _mediaOperations.CopyCurrentFilenameAsync(location.Value, effectiveToken).ConfigureAwait(true);
 
         if (!IsRouteActive || effectiveToken.IsCancellationRequested)
         {

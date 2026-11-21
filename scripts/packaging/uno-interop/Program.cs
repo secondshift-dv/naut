@@ -18,6 +18,11 @@ if (string.Equals(original, patched, StringComparison.OrdinalIgnoreCase))
 {
     throw new InvalidOperationException("Never mutate the upstream assembly or NuGet cache.");
 }
+if (Path.GetFileName(original) == "Uno.UI.dll")
+{
+    UnicodePatch.Apply(original, patched);
+    return;
+}
 if (!string.Equals(Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(original))),
     upstreamHash, StringComparison.OrdinalIgnoreCase))
 {

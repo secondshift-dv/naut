@@ -1302,7 +1302,7 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
                 item.DurationMs,
                 item.PathState == ManagedPathState.NeedsAttention,
                 item.IsFavorite,
-                item.OriginalFileName,
+                item.ManagedFileName ?? item.OriginalFileName,
                 thumbnailPath,
                 hoverPath));
             count++;
@@ -1445,9 +1445,12 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
         PathState = folder.PathState;
         _currentManagedRelativePath = folder.CurrentManagedRelativePath;
         IsRenaming = folder.PathState == ManagedPathState.Pending;
-        RenameStatusMessage = IsRenaming
-            ? "Renaming files... (reconciliation pending)"
-            : null;
+        RenameStatusMessage = folder.PathState switch
+        {
+            ManagedPathState.Pending => SurfaceText.Get("Profile.Rename.Pending", "Name saved. Vault files are being renamed in the background."),
+            ManagedPathState.NeedsAttention => SurfaceText.Get("Profile.Rename.NeedsAttention", "Folder renaming needs attention."),
+            _ => null,
+        };
     }
 
     private bool UsesInitialMediaQuery() =>
@@ -2157,44 +2160,46 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
             cancellationToken).ConfigureAwait(true);
     }
 
-    public async Task RenameAsync(string newDisplayName, CancellationToken cancellationToken = default)
+    public async Task<bool> RenameAsync(string newDisplayName, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(newDisplayName))
+        if (!ProfileRules.TryValidateDisplayName(newDisplayName, out var normalized, out var failure))
         {
-            RenameStatusMessage = "Display name cannot be empty.";
-            return;
+            RenameStatusMessage = failure;
+            return false;
         }
 
         if (_profileOperations is null)
         {
-            DisplayName = newDisplayName.Trim();
+            DisplayName = normalized;
             RenameStatusMessage = "Name updated.";
-            return;
+            return true;
         }
 
         try
         {
-            var request = new RenameProfileRequest(ProfileId, RowVersion, newDisplayName);
-            var result = await _profileOperations.RenameProfileAsync(request, cancellationToken).ConfigureAwait(true);
+            var request = new RenameProfileRequest(ProfileId, RowVersion, normalized);
+            var result = await Task.Run(
+                () => _profileOperations.RenameProfileAsync(request, cancellationToken),
+                cancellationToken).ConfigureAwait(true);
             if (result.IsSuccess && result.Value is { } outcome)
             {
                 DisplayName = outcome.DisplayName;
                 RowVersion = outcome.RowVersion;
                 PathState = outcome.PathState;
+                IsRenaming = outcome.PathState == ManagedPathState.Pending;
                 if (outcome.PathState == ManagedPathState.Pending)
                 {
-                    IsRenaming = true;
-                    RenameStatusMessage = "Renaming files... (reconciliation pending)";
+                    RenameStatusMessage = SurfaceText.Get("Profile.Rename.Pending", "Name saved. Vault files are being renamed in the background.");
                 }
                 else if (outcome.PathState == ManagedPathState.NeedsAttention)
                 {
-                    RenameStatusMessage = "Folder renaming needs attention.";
+                    RenameStatusMessage = SurfaceText.Get("Profile.Rename.NeedsAttention", "Folder renaming needs attention.");
                 }
                 else
                 {
-                    IsRenaming = false;
                     RenameStatusMessage = "Profile renamed successfully.";
                 }
+                return true;
             }
             else
             {
@@ -2205,6 +2210,7 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
         {
             RenameStatusMessage = OperationExecution.SafeMessage(ex);
         }
+        return false;
     }
 
     public async Task EnsureMetadataVocabularyLoadedAsync(CancellationToken cancellationToken = default)
@@ -2347,6 +2353,13 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
 
     public async Task SaveMetadataAsync(CancellationToken cancellationToken = default)
     {
+        var trimmedName = EditDisplayName?.Trim() ?? string.Empty;
+        if (!ProfileRules.TryValidateDisplayName(trimmedName, out _, out var nameFailure))
+        {
+            FolderStatusMessage = nameFailure;
+            return;
+        }
+
         try
         {
             await CommitPendingProfileTagsForSaveAsync().ConfigureAwait(true);
@@ -2361,7 +2374,6 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
             return;
         }
 
-        var trimmedName = EditDisplayName?.Trim() ?? string.Empty;
         var stagedAssignments = EditTags.DistinctBy(static tag => tag.TagId, StringComparer.Ordinal).ToList();
         var parsedTags = stagedAssignments.Select(static tag => tag.TagId).ToList();
         var stagedTagNames = stagedAssignments.Select(static tag => tag.DisplayName).ToList();
@@ -2408,9 +2420,11 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
 
         try
         {
-            if (!string.IsNullOrWhiteSpace(trimmedName) && !string.Equals(trimmedName, DisplayName, StringComparison.Ordinal))
+            if (!string.Equals(trimmedName, DisplayName, StringComparison.Ordinal)
+                && !await RenameAsync(trimmedName, cancellationToken).ConfigureAwait(true))
             {
-                await RenameAsync(trimmedName, cancellationToken).ConfigureAwait(true);
+                FolderStatusMessage = RenameStatusMessage;
+                return;
             }
 
             var request = new UpdateProfileMetadataRequest(
@@ -2422,7 +2436,9 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
                 IsFavorite: EditIsFavorite,
                 Overview: string.IsNullOrWhiteSpace(EditOverview) ? null : EditOverview.Trim(),
                 Notes: Notes);
-            var result = await _profileOperations.UpdateProfileMetadataAsync(request, cancellationToken).ConfigureAwait(true);
+            var result = await Task.Run(
+                () => _profileOperations.UpdateProfileMetadataAsync(request, cancellationToken),
+                cancellationToken).ConfigureAwait(true);
             if (result.IsSuccess && result.Value is { } outcome)
             {
                 RowVersion = outcome.RowVersion;
@@ -2438,7 +2454,8 @@ public sealed class ProfileDetailViewModel : ScreenStateViewModel, IDisposable
                 IsFavorite = request.IsFavorite;
                 Overview = request.Overview;
                 Notes = request.Notes;
-                FolderStatusMessage = "Profile metadata updated.";
+                FolderStatusMessage = PathState is ManagedPathState.Pending or ManagedPathState.NeedsAttention
+                    ? null : "Profile metadata updated.";
 
                 if (_presentationModel is not null)
                 {
@@ -2827,7 +2844,7 @@ public sealed class ProfileMediaItemViewModel : ObservableObject
     public ProfileMediaRelation RelationType => Model.RelationType;
     public string? ManagedRelativePath => Model.ManagedRelativePath;
     public string? ManagedFileName => Model.ManagedFileName;
-    public string? DisplayFileName => Model.OriginalFileName ?? Model.ManagedFileName;
+    public string? DisplayFileName => Model.ManagedFileName ?? Model.OriginalFileName;
     public DateTimeOffset CreatedAtUtc => Model.CreatedAtUtc;
     public int? PixelWidth => Model.PixelWidth;
     public string? ContentFingerprint => Model.ContentFingerprint;

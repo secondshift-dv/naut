@@ -57,7 +57,7 @@ public sealed class MediaGridProvider
                 row.DurationMs,
                 HasAttention: row.PathState != ManagedPathState.None,
                 IsFavorite: row.IsFavorite,
-                DisplayFileName: row.OriginalFileName,
+                DisplayFileName: row.ManagedFileName ?? row.OriginalFileName,
                 AddedToLibraryAtUtc: row.AddedToLibraryAtUtc));
         }
 

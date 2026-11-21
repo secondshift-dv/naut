@@ -17,11 +17,12 @@ public sealed class FigureRenderer : IDisposable
     private GpuScene? _scene;
     private bool _disposed;
     private GpuMesh? _pedestal, _accentRim, _contactShadow;
+    private GpuTexture? _studioRadiance, _studioDiffuse;
     private readonly byte[] _constantBytes = new byte[Marshal.SizeOf<ShaderConstants>()];
     private readonly int?[] _materialTextureIds = new int?[5];
     private readonly IntPtr[] _materialViews = new IntPtr[5];
     private readonly IntPtr[] _materialSamplers = new IntPtr[5];
-    private readonly IntPtr[] _emptyMaterialBindings = new IntPtr[5];
+    private readonly IntPtr[] _emptyMaterialBindings = new IntPtr[7];
     private readonly float[] _blendFactor = [1, 1, 1, 1];
     private Vector3 _stageAccent = new(0.27f, 0.36f, 0.70f);
 
@@ -40,6 +41,7 @@ public sealed class FigureRenderer : IDisposable
     public int TextureCount => _scene?.Textures.Count ?? 0;
     public long UploadedBytes => _scene?.Bytes ?? 0;
     public long DrawCount { get; private set; }
+    public bool HasStudioEnvironment => _studioRadiance is not null && _studioDiffuse is not null;
     public int StageTriangleCount => ((_pedestal?.IndexCount ?? 0) + (_accentRim?.IndexCount ?? 0) + (_contactShadow?.IndexCount ?? 0)) / 3;
 
     public void ClearScene()
@@ -163,6 +165,11 @@ public sealed class FigureRenderer : IDisposable
             FigureNative.Method<FigureD3D.SetArray>(_context, 7)(_context, 0, 1, [_constants]);
             FigureNative.Method<FigureD3D.SetArray>(_context, 16)(_context, 0, 1, [_constants]);
             DrawStage(viewProjection, eye, stageRadius, reduced);
+            if (_studioRadiance is { } studioRadiance && _studioDiffuse is { } studioDiffuse)
+            {
+                FigureNative.Method<FigureD3D.SetArray>(_context, 8)(_context, 5, 2, [studioRadiance.View, studioDiffuse.View]);
+                FigureNative.Method<FigureD3D.SetArray>(_context, 10)(_context, 5, 1, [studioRadiance.Sampler]);
+            }
             var opaque = scene.Meshes.Where(mesh => scene.Header.Materials[mesh.Material].AlphaMode != "BLEND");
             var transparent = scene.Meshes.Where(mesh => scene.Header.Materials[mesh.Material].AlphaMode == "BLEND")
                 .OrderByDescending(mesh => Vector3.DistanceSquared(eye, Vector3.Transform(mesh.Center, world)));
@@ -200,7 +207,7 @@ public sealed class FigureRenderer : IDisposable
                     Extra = new(views[4] == IntPtr.Zero ? 0 : 1, material.AlphaMode == "MASK" ? 1 : blend ? 2 : 0,
                         material.AlphaCutoff, material.DoubleSided ? 1 : 0),
                     Eye = new(eye, 0),
-                    Policy = new(reduced ? 1 : 0, 0, 0, 0),
+                    Policy = new(reduced ? 1 : 0, HasStudioEnvironment ? 1 : 0, 0, 0),
                 };
                 UpdateConstants(constants);
                 FigureNative.Method<FigureD3D.SetVertexBuffers>(_context, 18)(_context, 0, 1, [mesh.Vertices], [48], [0]);
@@ -213,8 +220,8 @@ public sealed class FigureRenderer : IDisposable
         {
             // Swapchain resize must not retain a back-buffer reference through the shared context.
             FigureNative.Method<FigureD3D.SetTargets>(_context, 33)(_context, 0, [], IntPtr.Zero);
-            FigureNative.Method<FigureD3D.SetArray>(_context, 8)(_context, 0, 5, _emptyMaterialBindings);
-            FigureNative.Method<FigureD3D.SetArray>(_context, 10)(_context, 0, 5, _emptyMaterialBindings);
+            FigureNative.Method<FigureD3D.SetArray>(_context, 8)(_context, 0, 7, _emptyMaterialBindings);
+            FigureNative.Method<FigureD3D.SetArray>(_context, 10)(_context, 0, 6, _emptyMaterialBindings);
             FigureNative.Method<FigureD3D.SetVertexBuffers>(_context, 18)(_context, 0, 1, [IntPtr.Zero], [48], [0]);
             FigureNative.Method<FigureD3D.SetIndexBuffer>(_context, 19)(_context, IntPtr.Zero, 42, 0);
         }
@@ -294,6 +301,7 @@ public sealed class FigureRenderer : IDisposable
         _pedestal = CreateStageMesh(FigureStageGeometry.Pedestal());
         _accentRim = CreateStageMesh(FigureStageGeometry.AccentRim());
         _contactShadow = CreateStageMesh(FigureStageGeometry.ContactShadow());
+        LoadStudioEnvironment();
     }
 
     private GpuMesh CreateStageMesh(FigureStageMesh geometry)
@@ -389,30 +397,79 @@ public sealed class FigureRenderer : IDisposable
 
     private void CreateTexture(FigureTextureData texture, GpuTexture gpu)
     {
+        var sampler = new FigureD3D.SamplerDescription
+        {
+            Filter = Filter(texture.Descriptor), AddressU = Address(texture.Descriptor.WrapS), AddressV = Address(texture.Descriptor.WrapT),
+            AddressW = 3, MaxAnisotropy = 1, Comparison = 1, MinLod = 0,
+            MaxLod = texture.Descriptor.MinFilter is 9728 or 9729 ? 0 : float.MaxValue,
+        };
+        CreateTexture(texture.Mips, texture.Descriptor.Width, texture.Descriptor.Height,
+            texture.Descriptor.Srgb ? 29u : 28u, 4, sampler, gpu);
+    }
+
+    private void LoadStudioEnvironment()
+    {
+        var radiance = new GpuTexture();
+        var diffuse = new GpuTexture();
+        try
+        {
+            using var stream = typeof(FigureRenderer).Assembly.GetManifestResourceStream("Naut.Figure.StudioSmall08")
+                ?? throw new InvalidDataException("Studio environment is missing.");
+            const int width = 256, height = 128, mipCount = 5, diffuseWidth = 32, diffuseHeight = 16;
+            const int rgba16fBytes = 8;
+            const uint rgba16f = 10;
+            var levels = new byte[mipCount][];
+            for (var mip = 0; mip < levels.Length; mip++)
+                levels[mip] = ReadLevel(width >> mip, height >> mip);
+            var irradiance = ReadLevel(diffuseWidth, diffuseHeight);
+            if (stream.ReadByte() != -1)
+                throw new InvalidDataException("Studio environment has trailing data.");
+            var sampler = new FigureD3D.SamplerDescription
+            {
+                Filter = 0x15, AddressU = 1, AddressV = 3, AddressW = 3,
+                MaxAnisotropy = 1, Comparison = 1, MaxLod = mipCount - 1,
+            };
+            CreateTexture(levels, width, height, rgba16f, rgba16fBytes, sampler, radiance);
+            CreateTexture([irradiance], diffuseWidth, diffuseHeight, rgba16f, rgba16fBytes, sampler, diffuse);
+            _studioRadiance = radiance;
+            _studioDiffuse = diffuse;
+
+            byte[] ReadLevel(int w, int h)
+            {
+                var bytes = new byte[w * h * rgba16fBytes];
+                stream.ReadExactly(bytes);
+                return bytes;
+            }
+        }
+        catch (Exception exception) when (exception is InvalidDataException or IOException or COMException)
+        {
+            radiance.Dispose();
+            diffuse.Dispose();
+            System.Diagnostics.Trace.TraceWarning("Figure studio lighting unavailable: {0}", exception.Message);
+        }
+    }
+
+    private void CreateTexture(byte[][] mips, int width, int height, uint format, uint pixelSize,
+        FigureD3D.SamplerDescription sampler, GpuTexture gpu)
+    {
         var pins = new List<GCHandle>();
         try
         {
-            var data = new FigureD3D.Subresource[texture.Mips.Length];
+            var data = new FigureD3D.Subresource[mips.Length];
             for (var mip = 0; mip < data.Length; mip++)
             {
-                var pin = GCHandle.Alloc(texture.Mips[mip], GCHandleType.Pinned);
+                var pin = GCHandle.Alloc(mips[mip], GCHandleType.Pinned);
                 pins.Add(pin);
-                data[mip] = new() { Data = pin.AddrOfPinnedObject(), Pitch = (uint)Math.Max(1, texture.Descriptor.Width >> mip) * 4 };
+                data[mip] = new() { Data = pin.AddrOfPinnedObject(), Pitch = (uint)Math.Max(1, width >> mip) * pixelSize };
             }
             var desc = new FigureD3D.TextureDescription
             {
-                Width = (uint)texture.Descriptor.Width, Height = (uint)texture.Descriptor.Height,
-                MipLevels = (uint)data.Length, ArraySize = 1, Format = texture.Descriptor.Srgb ? 29u : 28u,
+                Width = (uint)width, Height = (uint)height,
+                MipLevels = (uint)data.Length, ArraySize = 1, Format = format,
                 SampleCount = 1, Usage = 1, BindFlags = 8,
             };
             FigureNative.Check(FigureNative.Method<FigureD3D.CreateTexture>(_device, 5)(_device, ref desc, data, out gpu.Texture));
             FigureNative.Check(FigureNative.Method<FigureD3D.CreateView>(_device, 7)(_device, gpu.Texture, IntPtr.Zero, out gpu.View));
-            var sampler = new FigureD3D.SamplerDescription
-            {
-                Filter = Filter(texture.Descriptor), AddressU = Address(texture.Descriptor.WrapS), AddressV = Address(texture.Descriptor.WrapT),
-                AddressW = 3, MaxAnisotropy = 1, Comparison = 1, MinLod = 0,
-                MaxLod = texture.Descriptor.MinFilter is 9728 or 9729 ? 0 : float.MaxValue,
-            };
             FigureNative.Check(FigureNative.Method<FigureD3D.CreateSampler>(_device, 23)(_device, ref sampler, out gpu.Sampler));
         }
         finally { foreach (var pin in pins) pin.Free(); }
@@ -472,6 +529,8 @@ public sealed class FigureRenderer : IDisposable
         FigureNative.Release(ref _alphaBlend); FigureNative.Release(ref _blendDepth); FigureNative.Release(ref _opaqueDepth);
         FigureNative.Release(ref _cullNone); FigureNative.Release(ref _cullBack); FigureNative.Release(ref _constants);
         FigureNative.Release(ref _layout); FigureNative.Release(ref _pixelShader); FigureNative.Release(ref _vertexShader);
+        _studioRadiance?.Dispose();
+        _studioDiffuse?.Dispose();
         FigureNative.Release(ref _context); FigureNative.Release(ref _device);
     }
 
@@ -504,8 +563,10 @@ public sealed class FigureRenderer : IDisposable
         };
         Texture2D baseMap : register(t0); Texture2D mrMap : register(t1); Texture2D normalMap : register(t2);
         Texture2D occlusionMap : register(t3); Texture2D emissiveMap : register(t4);
+        Texture2D studioRadiance : register(t5); Texture2D studioDiffuse : register(t6);
         SamplerState baseSampler : register(s0); SamplerState mrSampler : register(s1); SamplerState normalSampler : register(s2);
         SamplerState occlusionSampler : register(s3); SamplerState emissiveSampler : register(s4);
+        SamplerState studioSampler : register(s5);
         struct Input { float3 position : POSITION; float3 normal : NORMAL; float2 uv : TEXCOORD0; float4 tangent : TANGENT; };
         struct Interpolated { float4 position : SV_POSITION; float3 worldPosition : TEXCOORD0; float3 normal : TEXCOORD1;
             float2 uv : TEXCOORD2; float4 tangent : TEXCOORD3; };
@@ -548,6 +609,10 @@ public sealed class FigureRenderer : IDisposable
             float a004 = min(r.x*r.x,exp2(-9.28*nv))*r.x+r.y;
             return float2(-1.04,1.04)*a004+r.zw;
         }
+        float2 StudioUV(float3 direction) {
+            return float2(atan2(direction.z,direction.x)/6.28318531+0.5,
+                acos(clamp(direction.y,-1,1))/3.14159265);
+        }
         float3 ToneMap(float3 color) {
             return saturate(color*(2.51*color+0.03)/(color*(2.43*color+0.59)+0.14));
         }
@@ -577,16 +642,26 @@ public sealed class FigureRenderer : IDisposable
             float3 emissive = emissiveFactor.xyz; if (extra.x > 0.5) emissive *= emissiveMap.Sample(emissiveSampler,input.uv).rgb;
             metallic = saturate(metallic); roughness = clamp(roughness,0.045,1);
             float3 v = normalize(eye.xyz-input.worldPosition);
-            float3 color = DirectLight(base.rgb,metallic,roughness,n,v,normalize(float3(-0.45,0.78,0.8)),float3(3.4,3.1,2.8));
-            if (policy.x < 0.5) {
-                color += DirectLight(base.rgb,metallic,roughness,n,v,normalize(float3(0.7,0.3,0.3)),float3(0.75,0.92,1.15));
-                color += DirectLight(base.rgb,metallic,roughness,n,v,normalize(float3(-0.4,0.55,-0.7)),float3(1.05,1.15,1.35));
-            }
             float nv = saturate(dot(n,v)); float3 f0 = lerp(float3(0.04,0.04,0.04),base.rgb,metallic);
             float3 ambientFresnel = f0+(max(float3(1-roughness,1-roughness,1-roughness),f0)-f0)*pow(1-nv,5);
-            float3 diffuseIrradiance = lerp(float3(0.12,0.10,0.12),float3(0.38,0.42,0.50),saturate(n.y*0.5+0.5));
+            float3 reflection = reflect(-v,n);
+            float3 color = 0;
+            float3 diffuseIrradiance;
+            float3 specularRadiance;
+            if (policy.y > 0.5) {
+                diffuseIrradiance = studioDiffuse.SampleLevel(studioSampler,StudioUV(n),0).rgb;
+                specularRadiance = studioRadiance.SampleLevel(studioSampler,StudioUV(reflection),roughness*4).rgb;
+            } else {
+                color = DirectLight(base.rgb,metallic,roughness,n,v,normalize(float3(-0.45,0.78,0.8)),float3(3.4,3.1,2.8));
+                if (policy.x < 0.5) {
+                    color += DirectLight(base.rgb,metallic,roughness,n,v,normalize(float3(0.7,0.3,0.3)),float3(0.75,0.92,1.15));
+                    color += DirectLight(base.rgb,metallic,roughness,n,v,normalize(float3(-0.4,0.55,-0.7)),float3(1.05,1.15,1.35));
+                }
+                diffuseIrradiance = lerp(float3(0.12,0.10,0.12),float3(0.38,0.42,0.50),saturate(n.y*0.5+0.5));
+                specularRadiance = StudioEnvironment(reflection,roughness);
+            }
             float2 integratedBRDF = EnvironmentBRDF(roughness,nv);
-            float3 specularIBL = StudioEnvironment(reflect(-v,n),roughness)*(f0*integratedBRDF.x+integratedBRDF.y);
+            float3 specularIBL = specularRadiance*(f0*integratedBRDF.x+integratedBRDF.y);
             color += ((1-ambientFresnel)*(1-metallic)*base.rgb*diffuseIrradiance+specularIBL)*ao;
             color += emissive;
             color = ToneMap(color);

@@ -725,7 +725,7 @@ public sealed class MediaWrites
         await using var lease = await _writeCoordinator.EnterAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken)
             .ConfigureAwait(false);
-        await using var transaction = CatalogTransaction.Begin(connection);
+        await using var transaction = CatalogTransaction.Begin(connection, _writeCoordinator);
 
         int advanced;
         await using (var update = transaction.CreateCommand(
@@ -776,6 +776,7 @@ public sealed class MediaWrites
             await complete.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        transaction.QueueInvalidation(CatalogInvalidationDomain.Media, assetId);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         return true;
     }

@@ -728,12 +728,15 @@ public sealed class MediaOperations
         return CopyToClipboardAsync(location.AbsoluteFilePath, cancellationToken);
     }
 
-    public Task<OperationResult> CopyCurrentFilenameAsync(
-        MediaCurrentLocation location,
+    public async Task<OperationResult> CopyCurrentFilenameAsync(
+        Guid mediaId,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(location);
-        return CopyToClipboardAsync(location.CurrentManagedFileName, cancellationToken);
+        var media = await _catalog.MediaReads.GetMediaDetailAsync(mediaId, cancellationToken, includeRelations: false)
+            .ConfigureAwait(false);
+        return media is null
+            ? OperationResult.NotFound(OperationErrorCode.MediaNotFound, "That media item no longer exists.")
+            : await CopyToClipboardAsync(media.FileName, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<OperationResult> CopyToClipboardAsync(string text, CancellationToken cancellationToken)

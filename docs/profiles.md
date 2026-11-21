@@ -37,13 +37,13 @@ This design lets Naut assist with organization without silently treating a model
 
 ## Media
 
-Profile media keeps its own metadata and can be browsed in the Profile media area. Opening an original media item uses the normal Windows application associated with that file type.
+Media Grid and the Profile media pickers show the current Vault filename, falling back to the source filename when a managed name is unavailable. Inspector keeps the source filename in Info. Copy filename uses the displayed name, and Show in folder opens the recorded Vault location. Opening an original uses the associated Windows application.
 
 The image Inspector remembers your zoom, Fit, or Actual size setting for each image in the Profile. Model previews in the Inspector are static. Open the Profile's [3D Figure](figures.md) to rotate, pan, or zoom a model.
 
 ## Editing, notes and removal
 
-Use **Edit details** for Profile identity fields. Managed NORMAL Profiles can mirror Overview and Private Note into readable UTF-8 files in the Vault. External changes are reviewed explicitly rather than silently overwriting Naut's catalog. Because these files are plaintext, protect the filesystem and Vault backup accordingly.
+Use **Edit details** for Profile identity fields. Names can include emoji. A rejected name leaves your edits open with the reason. After an accepted rename, Naut updates managed filenames and any model package folder in the background. Managed NORMAL Profiles can mirror Overview and Private Note into readable UTF-8 files in the Vault. External changes are reviewed explicitly rather than silently overwriting Naut's catalog. Because these files are plaintext, protect the filesystem and Vault backup accordingly.
 
 Deleting a Profile creates a recoverable **30-day Group Trash** entry for the Profile and its exclusively owned media. Media still used by another active Profile remains accessible; restoring a group preserves later decisions affecting shared media. Permanent deletion cannot be undone.
 

@@ -62,6 +62,15 @@
     "licenseSha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b",
     "noticesSha256": "6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21"
   },
+  "figureStudio": {
+    "sourceUrl": "https://polyhaven.com/a/studio_small_08",
+    "sourceFile": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_08_1k.hdr",
+    "sourceSha256": "f6a989f89432eb4eee3191364a9c1ceed195c4ec3544173a3c04fd96cb91d0ba",
+    "license": "CC0-1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "resourceFile": "src/Neuterradise.App/Assets/Figure/StudioSmall08.rgba16f",
+    "resourceSha256": "8d35b0401aa37510ab17496198b2df5920f72dd0c0ee6d220eb84d18d85ee4c1"
+  },
   "unoFonts": {
     "licenseFile": "Uno-Fonts-Apache-2.0.txt",
     "licenseSha256": "7afed34064d93afd447bb2ef72398f68789792e302b0792d1bcc3217b204f88e",

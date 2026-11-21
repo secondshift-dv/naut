@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([switch]$Offline, [string]$PackageRoot)
+param([switch]$Offline, [string]$PackageRoot, [string]$BaselineZip, [string]$DistributionRoot, [switch]$RequireSignature)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
@@ -35,6 +35,13 @@ if ($Offline) {
 & dotnet @buildArguments
 if ($LASTEXITCODE -ne 0) { throw 'Updater probe compile failed.' }
 $arguments = @('run', '--project', (Join-Path $probeRoot 'check.csproj'), '-c', 'Release', '-r', 'win-x64', '--no-build', '--no-restore', '--', (Join-Path $probeRoot ('fixtures-' + [Guid]::NewGuid().ToString('N'))))
-if ($PackageRoot) { $arguments += $PackageRoot }
+if ($BaselineZip -or $DistributionRoot -or $RequireSignature) {
+    if (!$BaselineZip -or !$DistributionRoot -or $PackageRoot) {
+        throw 'Package replacement verification requires BaselineZip and DistributionRoot.'
+    }
+    $arguments += @('--replace-package', (Resolve-Path -LiteralPath $BaselineZip).Path, (Resolve-Path -LiteralPath $DistributionRoot).Path)
+    if ($RequireSignature) { $arguments += '--require-signature' }
+}
+elseif ($PackageRoot) { $arguments += $PackageRoot }
 & dotnet @arguments
 if ($LASTEXITCODE -ne 0) { throw 'Updater verification failed.' }

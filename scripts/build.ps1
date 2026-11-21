@@ -208,6 +208,8 @@ try {
         (Join-Path $RepositoryRoot 'scripts/packaging/uno-interop/Apply-UnoUiAutomationPatch.ps1'),
         (Join-Path $RepositoryRoot 'scripts/packaging/uno-interop/UnoInteropPatch.csproj'),
         (Join-Path $RepositoryRoot 'scripts/packaging/uno-interop/Program.cs'),
+        (Join-Path $RepositoryRoot 'scripts/packaging/uno-interop/UnicodePatch.cs'),
+        (Join-Path $RepositoryRoot 'src/Neuterradise.App/Assets/Figure/StudioSmall08.rgba16f'),
         (Join-Path $RepositoryRoot 'scripts/packaging/uno-interop/packages.lock.json'),
         (Join-Path $RepositoryRoot 'scripts/packaging/ffmpeg-policy.ps1'),
         (Join-Path $RepositoryRoot 'scripts/packaging/ffmpeg/ffmpeg-runtime.lock.json'),

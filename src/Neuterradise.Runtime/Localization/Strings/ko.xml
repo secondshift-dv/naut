@@ -126,6 +126,7 @@
     <sys:String x:Key="Import.Destination.Current">현재 Profile</sys:String>
     <sys:String x:Key="ImportWizard.AlreadyInLibrary">{0}는 이미 Vault에 있습니다.</sys:String>
     <sys:String x:Key="ImportWizard.ChooseProfile.Indicator">목적지</sys:String>
+    <sys:String x:Key="ImportWizard.ChooseProfile.Again">저장된 대상이 없거나 사용할 수 없습니다. 계속하려면 프로필을 선택하세요.</sys:String>
     <sys:String x:Key="ImportWizard.ChooseProfile.Title">Profile을 선택하세요</sys:String>
     <sys:String x:Key="ImportWizard.DuplicateName">이름이 "{0}"인 profile가 이미 존재합니다. 여기에 추가하거나 동일한 이름으로 두 번째 profile를 계속 생성하세요.</sys:String>
     <sys:String x:Key="ImportWizard.ExistingNote">{0}에 추가. 이름, 카테고리, 태그, 평가 및 개요는 그대로 유지됩니다.</sys:String>
@@ -146,7 +147,7 @@
     <sys:String x:Key="ImportWizard.Transfer.Copy">파일이 Vault에 복사됩니다. 원본은 원래 위치에 그대로 유지됩니다.</sys:String>
     <sys:String x:Key="ImportWizard.Unsupported">{0}는 지원되지 않음(손대지 않은 상태로 유지)</sys:String>
     <sys:String x:Key="ImportWizard.Verify.Indicator">Profile 세부정보 및 가져오기 결정</sys:String>
-    <sys:String x:Key="ImportWizard.Verify.Title">확인</sys:String>
+    <sys:String x:Key="ImportWizard.Verify.Title">검토</sys:String>
     <sys:String x:Key="Overlay.Cancel">취소</sys:String>
     <sys:String x:Key="Overlay.Confirm">확인</sys:String>
     <sys:String x:Key="Overlay.DestructiveWarning">이것은 {0}입니다. 이 작업은 취소할 수 없습니다.</sys:String>
@@ -1205,6 +1206,7 @@
     <sys:String x:Key="Inspector.Duration">기간</sys:String>
     <sys:String x:Key="Inspector.Favorite">즐겨찾기</sys:String>
     <sys:String x:Key="Inspector.FileName">파일 이름</sys:String>
+    <sys:String x:Key="Inspector.SourceFileName">원본 파일 이름</sys:String>
     <sys:String x:Key="Inspector.Fit">핏</sys:String>
     <sys:String x:Key="Inspector.Format">형식</sys:String>
     <sys:String x:Key="Inspector.LoadingPeople">사용자 로드 중…</sys:String>
@@ -1642,7 +1644,7 @@
     <sys:String x:Key="Profile.Rename.Failed">Profile의 이름을 바꿀 수 없습니다.</sys:String>
     <sys:String x:Key="Profile.Rename.NameUpdated">이름이 업데이트되었습니다.</sys:String>
     <sys:String x:Key="Profile.Rename.NeedsAttention">폴더 이름 변경에는 주의가 필요합니다.</sys:String>
-    <sys:String x:Key="Profile.Rename.Pending">파일 이름을 바꾸는 중...(조정 보류 중)</sys:String>
+    <sys:String x:Key="Profile.Rename.Pending">이름을 저장했습니다. Vault의 파일 이름을 백그라운드에서 변경하고 있습니다.</sys:String>
     <sys:String x:Key="Profile.Rename.Success">Profile 이름이 성공적으로 변경되었습니다.</sys:String>
     <sys:String x:Key="Profile.Unknown.AssignFailed">미디어를 할당할 수 없습니다.</sys:String>
     <sys:String x:Key="Profile.Unknown.Assigned">{0} 항목을 Profile에 할당했습니다.</sys:String>
@@ -2010,6 +2012,7 @@
     <sys:String x:Key="Figure.Control.Zoom">확대/축소 · Ctrl + 휠</sys:String>
     <sys:String x:Key="Figure.Loading">3D 불러오는 중...</sys:String>
     <sys:String x:Key="Figure.ResetView">보기 초기화</sys:String>
+    <sys:String x:Key="Figure.Controls">조작법</sys:String>
     <sys:String x:Key="Figure.ThumbnailFallback">미리보기 이미지 - 실시간 3D를 사용할 수 없습니다</sys:String>
     <sys:String x:Key="Home.Empty.LocalNote">즐겨찾는 파일을 가져와 컬렉션을 시작하세요. 원본은 그대로 두고 복사본을 Vault에 저장합니다.</sys:String>
     <sys:String x:Key="Import.Eta.Preparing">남은 미디어 준비 중...</sys:String>

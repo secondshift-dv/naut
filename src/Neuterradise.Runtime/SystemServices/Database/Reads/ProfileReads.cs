@@ -383,7 +383,7 @@ public sealed class ProfileReads
         await using var connection = await _connectionFactory.OpenConnectionAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT m.media_id, coalesce(m.original_file_name,m.current_managed_file_name,''), coalesce(m.byte_length,0),
+            SELECT m.media_id, coalesce(m.current_managed_file_name,m.original_file_name,''), coalesce(m.byte_length,0),
                    thumb.relative_path, render.relative_path, render.state, render.contract_version,
                    m.sha256, coalesce(m.current_managed_file_name,m.original_file_name,''), m.dependency_status
             FROM media m JOIN profiles p ON p.profile_id = $profile

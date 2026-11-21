@@ -19,6 +19,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
     private readonly StackPanel _controls = UI.V(4);
     private readonly TextBlock _state = UI.WrappedText(string.Empty, "caption", "textSecondary");
     private readonly Button _reset;
+    private readonly Flyout _controlsHelp;
     private readonly SkImageView _thumbnail = new();
     private readonly ContentControl _host = new() { Visibility = Visibility.Collapsed };
     private FigureSource? _source;
@@ -30,6 +31,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
     private int _requestedTextureDimension;
     private bool _active;
     private bool _occluded;
+    private bool _controlsOpen;
     private bool _disposed;
     private FigureCamera _camera = new();
     private int _loadedLod = -1;
@@ -56,13 +58,21 @@ public sealed class ProfileFigureView : Grid, IDisposable
             ButtonKind.Ghost,
             "icon.action.restore");
         _reset.IsEnabled = false;
-        var gestureHelp = new Neuterradise.App.Ui.VariableWrap(
-            6,
-            UI.Badge(UI.T("Figure.Control.Rotate", "Rotate · drag")),
-            UI.Badge(UI.T("Figure.Control.Pan", "Pan · Shift + drag")),
-            UI.Badge(UI.T("Figure.Control.Zoom", "Zoom · Ctrl + wheel")),
-            _reset);
-        _controls.Children.Add(gestureHelp);
+        _controlsHelp = new Flyout
+        {
+            Placement = Microsoft.UI.Xaml.Controls.Primitives.FlyoutPlacementMode.Top,
+            Content = UI.V(4,
+                UI.WrappedText(UI.T("Figure.Control.Rotate", "Rotate · drag"), "caption"),
+                UI.WrappedText(UI.T("Figure.Control.Pan", "Pan · Shift + drag"), "caption"),
+                UI.WrappedText(UI.T("Figure.Control.Zoom", "Zoom · Ctrl + wheel"), "caption")),
+        };
+        _controlsHelp.Opening += (_, _) => SetControlsOpen(true);
+        _controlsHelp.Closed += (_, _) => SetControlsOpen(false);
+        var controls = UI.Button(UI.T("Figure.Controls", "Controls"), null, ButtonKind.Ghost);
+        controls.Flyout = _controlsHelp;
+        _controls.Children.Add(UI.Grid("auto", "*,*",
+            controls.Align(HorizontalAlignment.Left).At(0, 0),
+            _reset.Align(HorizontalAlignment.Right).At(0, 1)));
         _controls.Children.Add(_state);
         _controls.Margin = new Thickness(0, 6, 0, 0);
         Grid.SetRow(_controls, 1);
@@ -132,7 +142,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
 
         if (_lease is { IsDisposed: false } lease)
         {
-            lease.SetActive(!_occluded && IsLoaded && HasUsableViewport);
+            lease.SetActive(!IsOccluded && IsLoaded && HasUsableViewport);
             UpdateControls();
             if (lease.IsActive) EnsureQuality();
             return;
@@ -145,18 +155,30 @@ public sealed class ProfileFigureView : Grid, IDisposable
     {
         if (_occluded == occluded) return;
         _occluded = occluded;
+        ApplyOcclusion();
+    }
 
+    private bool IsOccluded => _occluded || _controlsOpen;
+
+    private void SetControlsOpen(bool open)
+    {
+        _controlsOpen = open;
+        ApplyOcclusion();
+    }
+
+    private void ApplyOcclusion()
+    {
         // XAML dialogs/customization can cover native HWND airspace only when the child HWND is
         // hidden. Keep the lease, swapchain, scene, and camera resident so closing an in-Profile
         // overlay is an instant resume rather than a release/recreate/load cycle.
         if (_lease is { IsDisposed: false } lease)
         {
-            lease.SetActive(!occluded && _active && IsLoaded && HasUsableViewport);
+            lease.SetActive(!IsOccluded && _active && IsLoaded && HasUsableViewport);
             UpdateControls();
             return;
         }
 
-        if (!occluded) EnsureLive();
+        if (!IsOccluded) EnsureLive();
     }
 
     private bool HasUsableViewport => ActualWidth >= 200 && _viewport.ActualHeight >= 180;
@@ -165,7 +187,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
     {
         if (_lease is { IsDisposed: false } lease)
         {
-            lease.SetActive(_active && !_occluded && HasUsableViewport);
+            lease.SetActive(_active && !IsOccluded && HasUsableViewport);
             UpdateControls();
             return;
         }
@@ -174,6 +196,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
 
     private void OnUnloaded(object sender, RoutedEventArgs args)
     {
+        if (_controlsOpen) _controlsHelp.Hide();
         // Header reflow can unload this host before the first scene finishes validating.
         // Retain both the active lease and any pending load across transient reparenting;
         // route suspension and Dispose remain the authorities that cancel and release.
@@ -189,7 +212,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
     {
         if (_lease is { IsDisposed: false } lease)
         {
-            lease.SetActive(_active && !_occluded && IsLoaded && HasUsableViewport);
+            lease.SetActive(_active && !IsOccluded && IsLoaded && HasUsableViewport);
             UpdateControls();
             return;
         }
@@ -198,7 +221,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
 
     private void EnsureLive()
     {
-        if (_disposed || !_active || _occluded || !IsLoaded || !HasUsableViewport
+        if (_disposed || !_active || IsOccluded || !IsLoaded || !HasUsableViewport
             || _cameraLoad is not null || _load is not null || _lease is { IsDisposed: false }
             || _source is not { RenderPath: not null, SourceSha256: not null } source
             || _runtime is not { IsLiveAllowed: true } runtime || runtime.Snapshot.IsDisposed
@@ -246,7 +269,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
             var (lod, textureDimension) = DesiredQuality(runtime);
             var scene = await runtime.LoadSceneAsync(source.RenderPath!, source.SourceSha256!, lod, textureDimension, request.Token);
             request.Token.ThrowIfCancellationRequested();
-            if (_disposed || !_active || _occluded || !IsLoaded || !ReferenceEquals(_load, request)) return;
+            if (_disposed || !_active || IsOccluded || !IsLoaded || !ReferenceEquals(_load, request)) return;
             _host.Visibility = Visibility.Visible;
             _lease = runtime.Attach(_host, WindowChrome.GetNativeHandle(_window));
             _lease.SetCamera(_camera);
@@ -306,7 +329,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
 
     private void EnsureQuality()
     {
-        if (_disposed || !_active || _occluded || !IsLoaded || !HasUsableViewport || _load is not null
+        if (_disposed || !_active || IsOccluded || !IsLoaded || !HasUsableViewport || _load is not null
             || _lease is not { IsDisposed: false } lease
             || _source is not { RenderPath: not null, SourceSha256: not null } source
             || _runtime is not { IsLiveAllowed: true } runtime || runtime.Snapshot.IsDisposed) return;
@@ -340,7 +363,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
             var scene = await runtime.LoadSceneAsync(
                 source.RenderPath!, source.SourceSha256!, lod, textureDimension, request.Token);
             request.Token.ThrowIfCancellationRequested();
-            if (_disposed || !_active || _occluded || !IsLoaded
+            if (_disposed || !_active || IsOccluded || !IsLoaded
                 || !ReferenceEquals(_qualityLoad, request)
                 || !ReferenceEquals(_lease, lease) || lease.IsDisposed
                 || !Equals(_source, source)) return;

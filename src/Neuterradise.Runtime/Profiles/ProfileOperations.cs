@@ -1145,7 +1145,7 @@ public sealed class ProfileOperations
 
             reservedMediaPaths.Add(targetFilePath.Replace('\\', '/'));
 
-            if (string.Equals(targetFilePath, asset.CurrentManagedFilePath, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(targetFilePath, asset.CurrentManagedFilePath, StringComparison.Ordinal))
             {
                 continue;
             }

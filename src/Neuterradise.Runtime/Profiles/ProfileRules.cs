@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Buffers;
+using System.Text;
 
 namespace Neuterradise.App.Profiles;
 
@@ -41,6 +43,16 @@ public static class ProfileRules
         }
 
         var trimmed = displayName.Trim();
+
+        for (var remaining = trimmed.AsSpan(); !remaining.IsEmpty; )
+        {
+            if (Rune.DecodeFromUtf16(remaining, out _, out int length) != OperationStatus.Done)
+            {
+                failure = "A Profile name contains an incomplete Unicode character.";
+                return false;
+            }
+            remaining = remaining[length..];
+        }
 
         foreach (var character in trimmed)
         {

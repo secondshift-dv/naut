@@ -68,6 +68,7 @@ public sealed partial class CustomizationCenter : IDisposable
     private bool _dragging;
     private Windows.Foundation.Point _dragPoint;
     private CancellationTokenSource? _subjectLoadCts;
+    private readonly RefreshCoalescer? _subjectMediaRefresh;
 
     public CustomizationCenter(AppServices services, string category, PresentationContext context, string? slot, object? subject, Action onClosed, Func<Task>? onApplied = null)
     {
@@ -107,6 +108,9 @@ public sealed partial class CustomizationCenter : IDisposable
         ShowCategory(_category, _slot);
         if (context.ProfileId is { } profileId)
         {
+            _subjectMediaRefresh = new RefreshCoalescer(
+                token => RefreshSubjectMediaAsync(profileId, token), TimeSpan.FromMilliseconds(250));
+            _services.Catalog.WriteCoordinator.Invalidated += OnSubjectMediaInvalidated;
             Run(LoadSubjectAsync(profileId, ++_subjectGeneration), "CustomizationCenter.LoadSubjectAsync", UI.T("Customize.SubjectLoadFailed", "This Profile could not be loaded for customization."));
         }
     }
@@ -742,6 +746,8 @@ public sealed partial class CustomizationCenter : IDisposable
 
     public void Dispose()
     {
+        _services.Catalog.WriteCoordinator.Invalidated -= OnSubjectMediaInvalidated;
+        _subjectMediaRefresh?.Dispose();
         _session.Changed -= OnSessionChanged;
         _profilePreviewHeader.CoverFramingSurfaceChanged -= OnCoverFramingSurfaceChanged;
         if (!_closed)

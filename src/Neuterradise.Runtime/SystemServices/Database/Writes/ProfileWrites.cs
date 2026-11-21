@@ -579,7 +579,7 @@ public sealed class ProfileWrites
         await using var lease = await _writeCoordinator.EnterAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken)
             .ConfigureAwait(false);
-        await using var transaction = CatalogTransaction.Begin(connection);
+        await using var transaction = CatalogTransaction.Begin(connection, _writeCoordinator);
 
         var folders = await ReadReconciliationFoldersAsync(
             transaction, profileId, operationId, cancellationToken).ConfigureAwait(false);
@@ -599,13 +599,19 @@ public sealed class ProfileWrites
                 row_version = row_version + 1
             WHERE current_managed_relative_path IS NOT NULL
               AND substr(current_managed_relative_path, 1, length($currentFolder) + 1)
-                  = $currentFolderPrefix;
+                  = $currentFolderPrefix
+            RETURNING media_id;
             """))
         {
             rebase.Parameters.AddWithValue("$targetFolder", folders.TargetFolder);
             rebase.Parameters.AddWithValue("$currentFolder", folders.CurrentFolder);
             rebase.Parameters.AddWithValue("$currentFolderPrefix", folders.CurrentFolder + "/");
-            await rebase.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            var changedMedia = new List<Guid>();
+            await using var reader = await rebase.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                changedMedia.Add(DbGuid.Parse(reader.GetString(0)));
+            if (changedMedia.Count > 0)
+                transaction.QueueInvalidation(CatalogInvalidationDomain.Media, [.. changedMedia]);
         }
 
         await using (var advance = transaction.CreateCommand(
@@ -682,7 +688,7 @@ public sealed class ProfileWrites
         await using var lease = await _writeCoordinator.EnterAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken)
             .ConfigureAwait(false);
-        await using var transaction = CatalogTransaction.Begin(connection);
+        await using var transaction = CatalogTransaction.Begin(connection, _writeCoordinator);
 
         await using (var outstanding = transaction.CreateCommand(
             """
@@ -731,6 +737,7 @@ public sealed class ProfileWrites
                 DbTime.Format(_timeProvider.GetUtcNow()),
                 cancellationToken)
             .ConfigureAwait(false);
+        transaction.QueueInvalidation(CatalogInvalidationDomain.Profile, profileId);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         return true;
     }
@@ -748,7 +755,7 @@ public sealed class ProfileWrites
         await using var lease = await _writeCoordinator.EnterAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken)
             .ConfigureAwait(false);
-        await using var transaction = CatalogTransaction.Begin(connection);
+        await using var transaction = CatalogTransaction.Begin(connection, _writeCoordinator);
         var now = DbTime.Format(_timeProvider.GetUtcNow());
 
         await using (var update = transaction.CreateCommand(
@@ -766,6 +773,7 @@ public sealed class ProfileWrites
 
         await MarkStorageOperationNeedsAttentionAsync(
             transaction, operationId, safeErrorDetail, now, cancellationToken).ConfigureAwait(false);
+        transaction.QueueInvalidation(CatalogInvalidationDomain.Profile, profileId);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 

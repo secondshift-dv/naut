@@ -126,6 +126,7 @@
     <sys:String x:Key="Import.Destination.Current">actual Profile</sys:String>
     <sys:String x:Key="ImportWizard.AlreadyInLibrary">{0} ya en tu Vault</sys:String>
     <sys:String x:Key="ImportWizard.ChooseProfile.Indicator">Destino</sys:String>
+    <sys:String x:Key="ImportWizard.ChooseProfile.Again">El destino guardado falta o no está disponible. Elige un perfil para continuar.</sys:String>
     <sys:String x:Key="ImportWizard.ChooseProfile.Title">Elija Profile</sys:String>
     <sys:String x:Key="ImportWizard.DuplicateName">Ya existe un profile denominado "{0}". Agréguelo o continúe creando un segundo profile con el mismo nombre.</sys:String>
     <sys:String x:Key="ImportWizard.ExistingNote">Agregando a {0}. Su nombre, categoría, etiquetas, calificación y descripción general permanecen como están.</sys:String>
@@ -146,7 +147,7 @@
     <sys:String x:Key="ImportWizard.Transfer.Copy">Sus archivos se copiarán en su Vault. Los originales permanecen exactamente donde están.</sys:String>
     <sys:String x:Key="ImportWizard.Unsupported">{0} no compatible (no se modifica)</sys:String>
     <sys:String x:Key="ImportWizard.Verify.Indicator">Detalles de Profile y decisiones de importación.</sys:String>
-    <sys:String x:Key="ImportWizard.Verify.Title">verificar</sys:String>
+    <sys:String x:Key="ImportWizard.Verify.Title">Revisar</sys:String>
     <sys:String x:Key="Overlay.Cancel">Cancelar</sys:String>
     <sys:String x:Key="Overlay.Confirm">Confirmar</sys:String>
     <sys:String x:Key="Overlay.DestructiveWarning">Esto será {0}. No se puede deshacer.</sys:String>
@@ -1205,6 +1206,7 @@
     <sys:String x:Key="Inspector.Duration">Duración</sys:String>
     <sys:String x:Key="Inspector.Favorite">Favorito</sys:String>
     <sys:String x:Key="Inspector.FileName">Nombre de archivo</sys:String>
+    <sys:String x:Key="Inspector.SourceFileName">Nombre de archivo de origen</sys:String>
     <sys:String x:Key="Inspector.Fit">Encajar</sys:String>
     <sys:String x:Key="Inspector.Format">Formato</sys:String>
     <sys:String x:Key="Inspector.LoadingPeople">Cargando gente…</sys:String>
@@ -1642,7 +1644,7 @@
     <sys:String x:Key="Profile.Rename.Failed">No se pudo cambiar el nombre del Profile.</sys:String>
     <sys:String x:Key="Profile.Rename.NameUpdated">Nombre actualizado.</sys:String>
     <sys:String x:Key="Profile.Rename.NeedsAttention">El cambio de nombre de carpeta requiere atención.</sys:String>
-    <sys:String x:Key="Profile.Rename.Pending">Cambiando el nombre de archivos... (conciliación pendiente)</sys:String>
+    <sys:String x:Key="Profile.Rename.Pending">Se guardó el nombre. Los archivos del Vault se están renombrando en segundo plano.</sys:String>
     <sys:String x:Key="Profile.Rename.Success">Profile renombrado exitosamente.</sys:String>
     <sys:String x:Key="Profile.Unknown.AssignFailed">Los medios no pudieron ser asignados.</sys:String>
     <sys:String x:Key="Profile.Unknown.Assigned">Se asignaron elementos {0} a Profile.</sys:String>
@@ -2010,6 +2012,7 @@
     <sys:String x:Key="Figure.Control.Zoom">Zoom · Ctrl + rueda</sys:String>
     <sys:String x:Key="Figure.Loading">Cargando 3D...</sys:String>
     <sys:String x:Key="Figure.ResetView">Restablecer vista</sys:String>
+    <sys:String x:Key="Figure.Controls">Controles</sys:String>
     <sys:String x:Key="Figure.ThumbnailFallback">Imagen de vista previa - el 3D en vivo no está disponible</sys:String>
     <sys:String x:Key="Home.Empty.LocalNote">Importa tus favoritos para empezar la colección. Los originales quedan intactos; las copias van al Vault.</sys:String>
     <sys:String x:Key="Import.Eta.Preparing">Preparando los medios restantes...</sys:String>

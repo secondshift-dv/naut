@@ -569,6 +569,15 @@ public sealed class PathReconciler
         }
 
         RootPathRules.RejectExistingReparsePoints(_paths.Root, targetDir);
+        if (IsCaseOnlyChange(sourceDir, targetDir))
+        {
+            var intermediate = _paths.ResolveVaultRelativePath(
+                CombineRelative(currentDirectory[..currentDirectory.LastIndexOf('/')], IntermediateName(assetId)));
+            var renamed = MoveCaseOnlyDirectory(sourceDir, targetDir, intermediate);
+            if (!renamed.IsSuccess) return renamed;
+            currentDirectory = targetDirectory;
+            sourceDir = targetDir;
+        }
         Directory.CreateDirectory(targetDir);
         RootPathRules.RejectExistingReparsePoints(_paths.Root, targetDir);
 
@@ -700,6 +709,16 @@ public sealed class PathReconciler
         string intermediateFolderPath,
         CancellationToken cancellationToken)
     {
+        if (IsCaseOnlyChange(currentFolderPath, targetFolderPath))
+        {
+            if (await _profileWrites.IsProfileFolderClaimedByAnotherProfileAsync(
+                    profileId, targetFolder, cancellationToken).ConfigureAwait(false))
+                return new StorageOperationResult(StorageOperationStatus.TargetCollision);
+            if (!Directory.Exists(currentFolderPath) && !Directory.Exists(intermediateFolderPath))
+                return TryCreateDirectory(targetFolderPath) ?? new StorageOperationResult(StorageOperationStatus.Success);
+            return MoveCaseOnlyDirectory(currentFolderPath, targetFolderPath, intermediateFolderPath);
+        }
+
         if (Directory.Exists(intermediateFolderPath))
         {
             if (Directory.Exists(targetFolderPath))
@@ -711,10 +730,7 @@ public sealed class PathReconciler
         }
 
         var currentExists = Directory.Exists(currentFolderPath);
-        var caseOnlyRename = !string.Equals(currentFolderPath, targetFolderPath, StringComparison.Ordinal)
-            && string.Equals(currentFolderPath, targetFolderPath, StringComparison.OrdinalIgnoreCase);
-
-        if (!caseOnlyRename && Directory.Exists(targetFolderPath))
+        if (Directory.Exists(targetFolderPath))
         {
             if (currentExists)
             {
@@ -755,18 +771,33 @@ public sealed class PathReconciler
             }
         }
 
-        if (caseOnlyRename)
-        {
-            var toIntermediate = MoveDirectory(currentFolderPath, intermediateFolderPath);
-            if (!toIntermediate.IsSuccess)
-            {
-                return toIntermediate;
-            }
-
-            return MoveDirectory(intermediateFolderPath, targetFolderPath);
-        }
-
         return MoveDirectory(currentFolderPath, targetFolderPath);
+    }
+
+    private static bool IsCaseOnlyChange(string source, string target) =>
+        !string.Equals(source, target, StringComparison.Ordinal)
+        && string.Equals(source, target, StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasExactName(string path) =>
+        Directory.EnumerateFileSystemEntries(Path.GetDirectoryName(path)!, Path.GetFileName(path))
+            .Any(entry => string.Equals(Path.GetFileName(entry), Path.GetFileName(path), StringComparison.Ordinal));
+
+    private static StorageOperationResult MoveCaseOnlyDirectory(string source, string target, string intermediate)
+    {
+        if (Directory.Exists(intermediate))
+            return Directory.Exists(target)
+                ? new StorageOperationResult(StorageOperationStatus.UnexpectedTarget)
+                : MoveDirectory(intermediate, target);
+
+        var sourceExists = Directory.Exists(source) && HasExactName(source);
+        if (Directory.Exists(target) && HasExactName(target))
+            return new StorageOperationResult(sourceExists
+                ? StorageOperationStatus.UnexpectedTarget : StorageOperationStatus.AlreadyCompleted);
+        if (!sourceExists)
+            return new StorageOperationResult(StorageOperationStatus.SourceMissing);
+
+        var staged = MoveDirectory(source, intermediate);
+        return staged.IsSuccess ? MoveDirectory(intermediate, target) : staged;
     }
 
     internal static StorageOperationResult MoveDirectory(string source, string destination)
@@ -811,11 +842,10 @@ public sealed class PathReconciler
                 : resumed;
         }
 
-        var sourceExists = File.Exists(sourcePath);
-        var caseOnlyRename = !string.Equals(sourcePath, targetPath, StringComparison.Ordinal)
-            && string.Equals(sourcePath, targetPath, StringComparison.OrdinalIgnoreCase);
+        var caseOnlyRename = IsCaseOnlyChange(sourcePath, targetPath);
+        var sourceExists = File.Exists(sourcePath) && (!caseOnlyRename || HasExactName(sourcePath));
 
-        if (!caseOnlyRename && File.Exists(targetPath))
+        if (File.Exists(targetPath) && (!caseOnlyRename || HasExactName(targetPath)))
         {
             if (sourceExists)
             {

@@ -726,6 +726,8 @@ Assert-Sha256 -Path $AssimpNativePath -Expected $RuntimeThirdPartyLock.sharpAssi
 Assert-Sha256 -Path (Join-Path $AssimpPackageRoot 'LICENSE.txt') -Expected $RuntimeThirdPartyLock.sharpAssimp.licenseSha256 -Label 'SharpAssimp and Assimp licenses'
 Copy-Item -LiteralPath (Join-Path $AssimpPackageRoot 'LICENSE.txt') -Destination (Join-Path $LicensesRoot 'SharpAssimp-LICENSE.txt') -Force
 
+$FigureStudio = $RuntimeThirdPartyLock.figureStudio
+Assert-Sha256 -Path (Join-Path $RepositoryRoot $FigureStudio.resourceFile) -Expected $FigureStudio.resourceSha256 -Label 'Figure studio HDRI'
 $ThirdPartyNoticePath = Join-Path $RuntimeInstallRoot 'THIRD-PARTY-NOTICES.txt'
 $notice = @"
 naut v$ProductVersion - Third-Party Runtime Notices
@@ -801,6 +803,15 @@ This runtime package contains third-party runtime artifacts pinned by exact sour
    License: MIT (wrapper), BSD-3-Clause (native library)
    License copy: LICENSES/SharpAssimp-LICENSE.txt
    Used by the isolated Naut Model Worker for static FBX, OBJ, STL and 3MF Figure preparation.
+
+10. Poly Haven Studio Small 08 HDRI
+   Source: $($FigureStudio.sourceUrl)
+   Original 1K HDR: $($FigureStudio.sourceFile)
+   Original SHA-256: $($FigureStudio.sourceSha256)
+   License: $($FigureStudio.license) ($($FigureStudio.licenseUrl))
+   Deployed resource: Naut.Figure.StudioSmall08 in NeuTerradise.dll
+   Filtered resource SHA-256: $($FigureStudio.resourceSha256)
+   Naut stores five roughness levels for reflection and a cosine-weighted diffuse map as linear RGBA16F.
 
 The deployment/artifacts.json manifest remains the operational authority for model/tool/native capabilities explicitly resolved by Naut. The runtime-third-party lock and packaged license inventory are the compliance authority for the remaining bundled runtime libraries. A missing file or SHA-256 mismatch fails the canonical build.
 "@

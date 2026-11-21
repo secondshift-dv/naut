@@ -104,7 +104,7 @@ public sealed class InspectorPanel : IDisposable
 
     private void Render()
     {
-        _title.Text = _vm.OriginalName;
+        _title.Text = _vm.FileName;
         _favorite.Tip(_vm.FavoriteToggleTooltip);
         _deleteMedia.IsEnabled = _vm.CanMoveToTrash && !_deletingMedia;
         if (_favorite.Content is IconView favoriteIcon)
@@ -143,7 +143,7 @@ public sealed class InspectorPanel : IDisposable
                 };
                 _preview.Children.Add(UI.Surface(UI.V(8,
                     new IconView(icon, 38, "textMuted").Align(HorizontalAlignment.Center),
-                    UI.Text(_vm.OriginalName, "control", maxLines: 1).Align(HorizontalAlignment.Center),
+                    UI.Text(_vm.FileName, "control", maxLines: 1).Align(HorizontalAlignment.Center),
                     UI.Text(UI.T("Inspector.PreviewUnavailable", "Preview unavailable"), "caption", "textMuted").Align(HorizontalAlignment.Center)), Material.Raised, 10, 16));
             }
         }
@@ -213,7 +213,8 @@ public sealed class InspectorPanel : IDisposable
                 break;
 
             default:
-                _tab.Children.Add(Row(UI.T("Inspector.FileName", "Filename"), _vm.OriginalName));
+                _tab.Children.Add(Row(UI.T("Inspector.FileName", "Filename"), _vm.FileName));
+                _tab.Children.Add(Row(UI.T("Inspector.SourceFileName", "Source filename"), _vm.OriginalName));
                 _tab.Children.Add(Row(UI.T("Inspector.Type", "Type"), MediaSurfaceText.Type(_vm.MediaType)));
                 switch (_vm.Info)
                 {
@@ -283,7 +284,7 @@ public sealed class InspectorPanel : IDisposable
     {
         if (_deletingMedia || !_vm.CanMoveToTrash) return;
         var mediaId = _vm.MediaId;
-        var name = _vm.OriginalName;
+        var name = _vm.FileName;
         if (!await _services.ConfirmAsync(
                 UI.T("Inspector.MoveToTrashTitle", "Move media to Trash?"),
                 UI.F("Inspector.MoveToTrashBody", "Move {0} to Trash? It will be removed from Profile links and Cover, Banner and Figure selections. Its Face data stays with the recoverable media record. Restore it from Settings → Trash Bin within 30 days.", name),
