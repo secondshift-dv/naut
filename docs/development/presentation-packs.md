@@ -2,7 +2,7 @@
 
 Presentation customization has one transport and validation authority: a **Presentation Pack** with a `pack.json` manifest. Do not add a second standalone-theme/layout/frame loader. A pack may contain **one definition only**, so a single custom component stays lightweight while using the same validation, persistence, replacement, export, and removal path as larger packs.
 
-Presentation Contract 2 keeps the manifest and binding schemas at version 1 and reads Contract 1 packs. **Settings → Appearance** is the global selector for Theme, Font and Control Style, including installed-pack definitions. **Settings → Presentation** displays the installed component library (Fonts, Frames, Backdrops and Effects) for preview and direct-file management, not selection or application. Fonts, Frames and Backdrops can be imported directly; **Packs / Advanced** owns contract pack installation, export, removal and diagnostics. Home/Profile Customize panels apply scoped components. Library cards show previews and Default/Built-in/User provenance, including whether the asset is an Individual file or Pack-managed; icons, input, accessibility, and ResourceGovernor admission remain engine-owned.
+Presentation Contract 3 keeps manifest and binding schemas at version 1 and reads Contract 1 and 2 packs. **Settings → Appearance** is the global selector for Theme, Font and Control Style, including installed-pack definitions. **Settings → Presentation** displays the installed component library (Fonts, Frames, Backdrops and Effects) for preview and direct-file management, not selection or application. Fonts, Frames and Backdrops can be imported directly; **Packs / Advanced** owns contract pack installation, export, removal and diagnostics. Home/Profile Customize panels apply scoped components. Library cards show previews and Default/Built-in/User provenance, including whether the asset is an Individual file or Pack-managed; icons, input, accessibility, and ResourceGovernor admission remain engine-owned.
 
 Directly imported font, frame and backdrop files receive a Delete action in their own Settings library page. Naut records this import origin internally while retaining the standard pack validator, compiler and atomic removal path. Deleting a direct asset in use resets its presentation bindings; Profile and media data remain intact. `.ntpack`, ZIP, folder-based and optional packs remain contract-managed under **Packs / Advanced** and have no per-file Delete. Built-in components cannot be deleted. Earlier individual imports without a recorded origin remain pack-managed because their original intake type cannot be proven. Exporting a direct file as `.ntpack` does not carry the local origin marker; reinstalling that archive makes it pack-managed.
 
@@ -33,7 +33,7 @@ Direct image intake is intentionally static. More advanced custom frame behavior
 
 ## Manifest contract
 
-The current pack schema is `1` and Naut implements Presentation Contract `2`. Set `minContractVersion` to the lowest contract the definitions require. A minimal manifest contains:
+The current pack schema is `1` and Naut implements Presentation Contract `3`. Set `minContractVersion` to the lowest contract the definitions require. A minimal manifest contains:
 
 - `schemaVersion`, `packId`, `version`, `name`, and `minContractVersion`;
 - optional `author`, `description`, and `license`;
@@ -148,7 +148,7 @@ Home and Profile definitions may add a bounded `spec.surface` tree of stack, col
 
 ### Modular surfaces and artwork
 
-Keep `schemaVersion: 1` and declare `minContractVersion: 2` for the capabilities below. A `spec.surface` using `"modular": true` still requires Home's `featured` or Profile's `identity` and `media`. Other semantic regions are optional. Shell navigation remains available when Home omits `local-navigation`. Home's **Show Recently** preference defaults to on and gates `activity` independently of `recent` (Continue). It is saved with the Home layout binding and resets to on with the Home layout.
+Keep `schemaVersion: 1` and declare `minContractVersion: 2` for the capabilities below. A `spec.surface` using `"modular": true` still requires Home's `featured` or Profile's `identity` and `media`. Other semantic regions are optional. Shell navigation remains available when Home omits `local-navigation`. Home's **Show Recently** preference defaults to on and gates `activity` independently of `recent` (Continue). The setting stays saved when the active Home layout changes or its pack is replaced or removed. An explicit Home layout reset restores on.
 
 A `grid` declares `rows` and `columns` using auto, star, or fixed tracks. Children use zero-based `row` and `column`, with `rowSpan` and `columnSpan` defaulting to one. Siblings can share a cell or use `overlay`; later children paint above earlier ones. Tracks without a visible child or span collapse. Put an alternate root at `surface.narrow` and its threshold in DIP at `surface.breakpoint` (default 800). Each arrangement may position the same semantic region once. The renderer selects the arrangement using available content width.
 
@@ -199,6 +199,47 @@ This `spotlight-style` spec places identity and controls below a disk. Declare `
 
 The artwork layer plays the normal Spotlight video or shows the fallback image. Rotate only the rim to keep the video upright. To turn the mask, rim and video together, move the rotation object from the rim to the artwork group. `scrim` and `effect` can also appear in the ordered group. The same group syntax is available under `spec.bannerArtwork` for a Profile layout. Banner framing and Figure controls remain outside the visual group. Rotations pause outside Full quality and with Reduced Motion enabled.
 
+### Spotlight regions and responsive artwork placement
+
+Use `minContractVersion: 3` for an independent Spotlight `spec.surface`, layer placement, or explicit module sizes. On older Naut versions the pack manager reports the required contract version.
+
+In a `spotlight-style` spec, `surface` accepts the modular grid, stack, and overlay syntax. Each arrangement supplies `artwork` and `identity` once. Add `pagination` separately when desired. Its buttons and keyboard actions come from Naut. This example uses a transparent asymmetric mask and a decorative PNG that turns independently of the video. Declare `cutout` and `edge` as Image assets, and set the definition's animation budget to one.
+
+```json
+{
+  "motion": "still",
+  "surface": {
+    "type": "grid", "breakpoint": 760,
+    "rows": ["auto", "auto"], "columns": ["3*", "2*"],
+    "children": [
+      { "type": "semantic", "id": "artwork", "height": 340, "rowSpan": 2 },
+      { "type": "semantic", "id": "identity", "column": 1 },
+      { "type": "semantic", "id": "pagination", "row": 1, "column": 1 }
+    ],
+    "narrow": { "type": "stack", "children": [
+      { "type": "semantic", "id": "artwork", "height": 230 },
+      { "type": "semantic", "id": "identity" },
+      { "type": "semantic", "id": "pagination" }
+    ] }
+  },
+  "artwork": {
+    "mask": "cutout", "breakpoint": 440,
+    "layers": [
+      { "type": "artwork" },
+      { "type": "image", "asset": "edge",
+        "placement": { "width": 0.66, "height": 1, "horizontal": "right", "order": 1 },
+        "narrow": { "width": 0.82, "height": 0.95, "horizontal": "center", "order": 1 },
+        "rotation": { "seconds": 20, "direction": "clockwise" }
+      }
+    ]
+  }
+}
+```
+
+Layer `placement` and optional `narrow` set normalized width, height, x and y offsets, horizontal and vertical anchors, and paint order. Offsets are relative to the artwork bounds. Omitted values fill the artwork bounds with no offset, and order defaults to manifest order. Use the same placement syntax inside Profile `bannerArtwork`.
+
+For a modular `profile-layout`, explicit dimensions use DIP. In the wide arrangement from the Profile example, set the independent Figure region to `{ "type": "semantic", "id": "figure", "column": 1, "width": 460, "height": 360 }`. In the narrow stack, use `{ "type": "semantic", "id": "figure", "height": 240 }`. A width caps the region's allotted width. When height is omitted, Figure uses its default standalone size.
+
 Gallery definitions own only the collection container, envelope and layout, including toolbar treatment (`feed`, `catalog`, `drawer`, or v1 `standard`). Every Gallery item resolves its Profile-owned `profile.card`; a Gallery pack cannot override Card composition. The retired `itemDefinition` property is ignored when reading existing packs. `heightPattern` contains one to eight item aspects between 0.5 and 2.5; its virtualized masonry host realizes only the viewport and buffer. Media `browse` selects wall, workbench or horizontal reel; selection, paging, favorite, hover and Inspector/EXIF actions stay engine-owned.
 
 ## Typography and managed asset intake
@@ -217,7 +258,7 @@ An Effect declares compatible engine target ids or `all`, one of environment/par
 
 Profile Customize is a right inspector over the live surface. Its Media launchers (Cover, Banner, Frame and Media) are grouped first, followed by the engine-owned 3D Figure control; Layout, Backdrop and Profile Effect follow as inline choices. The Layout group also owns the Profile-wide Recent media visibility toggle; it is not duplicated per layout definition. Cover, Banner, Frame, Media and Figure open bounded floating forms sharing the same PreviewSession. Floating Save publishes that shared session and closes Customize after success, without another inspector Save. Other floating forms use Back to return while preserving staged state; Figure Back restores only the Figure choice present at chooser entry. Clicking a Figure model directly selects it in the draft, with no additional confirmation button. Closing or clicking outside the inspector closes immediately when clean and asks before discarding when dirty. Profile editing waits for the authoritative subject snapshot before exposing choices. Card's compact icon Customize Card action opens an independent floating form for profile.card and effect.card with one real Card preview. Card customization is absent from the Profile inspector.
 
-Live and preview identity geometry use finite allocation independent of the native Figure child's desired size. Layout switching and modal occlusion retain the existing viewport/camera while hiding or suspending it as needed; pack geometry cannot turn native hosting into an unbounded measure/arrange loop. Figure framing, pedestal, orbit/pan/zoom and texture-quality policy remain engine-owned and do not add pack parameters.
+Live and preview identity geometry use finite allocation independent of the native Figure child's desired size. Layout switching and modal occlusion retain the existing viewport/camera while hiding or suspending it as needed; pack geometry cannot turn native hosting into an unbounded measure/arrange loop. Figure framing, pedestal, orbit/pan/zoom and texture-quality policy remain engine-owned and do not add pack parameters. Older derivatives refresh when an affected Figure is opened or when Vault Health queues repair. Newly prepared and refreshed derivatives use the v1 header member set read by Naut v0.0.27.
 
 Effects contain only approved engine primitives, with at most three layers, eighty particles, and combined layer opacity 0.6. Interaction-only definitions require pointer or focus activity. Weather, particles, fog, lighting, flow, pattern, grain, celebration and component decorations share bounded primitives; user shaders/scripts and media sources are prohibited. Non-None effects retain visual continuity at Reduced and static Fallback tiers. The compiler derives missing or empty effect tiers from Full with fewer particles and lower speed, then freezes the static representation. At startup Naut prewarms primary built-in effect plans across full/reduced/fallback variants using bounded off-screen procedural draws. Prewarm only primes renderer/JIT/resource paths; it is never a delayed admission gate. Settings Effect preview uses the same renderer as runtime. Loaded visible hosts share a scheduler ordered by surface, active Card, visible Card, selected preview, visible preview and Settings preview. Six hosts receive Full quality; additional visible runtime hosts retain Reduced effects. At most three preview hosts animate, with remaining previews rendering static fallback. Hidden/offscreen/unloaded hosts and suspended warm surfaces stop. Clocks are capped at 30 FPS (15 at Reduced tier). The None state creates no backdrop layer subscriptions. OS Reduced Motion uses the static fallback.
 

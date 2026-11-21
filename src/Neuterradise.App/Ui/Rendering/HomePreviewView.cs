@@ -93,7 +93,19 @@ public sealed class HomePreviewView : Grid
             IsHitTestVisible = false,
         };
         FrameworkElement artwork = _spotlight.Artwork is { } plan ? PreviewArtwork(plan, image) : image;
-        var identity = _data is null ? EmptyHero() : BuildIdentity(_data, !separated);
+        var identity = _data is null ? EmptyHero() : BuildIdentity(_data, _spotlight.Surface is null && !separated);
+        if (_spotlight.Surface is { } surface)
+        {
+            artwork.Height = double.NaN;
+            var pagination = UI.Text("01 / 02", "micro", "textSecondary");
+            return SurfaceComposer.Build(surface, id => id switch
+            {
+                "artwork" => artwork,
+                "identity" => identity,
+                "pagination" when _spotlight.Pagination != "none" => pagination,
+                _ => null,
+            }, _compact ? 480 : 1000);
+        }
         var footer = UI.V(_compact ? 3 : 8, identity);
         footer.VerticalAlignment = separated ? VerticalAlignment.Center : VerticalAlignment.Stretch;
         if (_spotlight.Pagination != "none")
@@ -231,7 +243,9 @@ public sealed class HomePreviewView : Grid
         return new ArtworkCompositionView(plan, role => role switch
         {
             "artwork" => media,
-            "scrim" => new Border { Background = ThemeRuntime.Current.Brush("heroScrimStrong"), Opacity = .25 },
+            "scrim" => HomeSurface.ArtworkScrim(_spotlight.ScrimStrength),
+            "effect" when _data is { } data => PresentationEffects.View(PresentationSlots.BannerEffect,
+                () => new PresentationContext("home", data.ProfileId)),
             _ => null,
         }) { Height = height };
     }

@@ -131,9 +131,12 @@ public sealed record HomeLayoutPlan(
     SurfaceNode? Surface = null);
 
 public sealed record ArtworkRotation(double Seconds, double PivotX, double PivotY, bool Clockwise);
-public sealed record ArtworkLayer(string Kind, string? AssetPath, ArtworkRotation? Rotation);
+public sealed record ArtworkPlacement(double X, double Y, double Width, double Height,
+    string Horizontal, string Vertical, int Order);
+public sealed record ArtworkLayer(string Kind, string? AssetPath, ArtworkRotation? Rotation,
+    ArtworkPlacement? Placement = null, ArtworkPlacement? Narrow = null);
 public sealed record ArtworkPlan(string? MaskPath, ArtworkRotation? Rotation, IReadOnlyList<ArtworkLayer> Layers,
-    double? Aspect);
+    double? Aspect, double Breakpoint = 800);
 
 public enum SpotlightGeometry { FullBleed, ArtworkLeft, IdentityLeft, ArtworkAbove, IdentityAbove }
 
@@ -145,7 +148,7 @@ public sealed record SpotlightPlan(
     bool ShowCover,
     bool ShowOverview,
     string Pagination,
-    double ScrimStrength, ArtworkPlan? Artwork = null, string IdentityPlacement = "legacy")
+    double ScrimStrength, ArtworkPlan? Artwork = null, string IdentityPlacement = "legacy", SurfaceNode? Surface = null)
 {
     public SpotlightGeometry GeometryFor(double width, string homePlacement) => IdentityPlacement switch
     {

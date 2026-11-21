@@ -8,6 +8,8 @@ using Neuterradise.App.Media;
 using Neuterradise.App.Ui.Figure;
 using Neuterradise.App.SystemServices.Resources;
 using Neuterradise.App.SystemServices.Database;
+using Neuterradise.App.Media.Model;
+using Neuterradise.App.Shell;
 using Neuterradise.App.SystemServices.Storage;
 
 namespace Neuterradise.App.Ui;
@@ -277,6 +279,27 @@ public sealed class FigureRuntime : IDisposable
         catch (Exception) { /* Scene faults already produce a Thumbnail fallback; retirement must still drain file handles. */ }
     }
 
+    private readonly CatalogDb? _catalog;
+    public event Action<Guid>? ModelRenderChanged;
+
+    private void OnCatalogInvalidated(object? sender, CatalogInvalidation change)
+    {
+        if (change.DomainKind != CatalogInvalidationDomain.ModelRender) return;
+        ClearSceneCache();
+        UiDispatch.Run(() =>
+        {
+            if (_disposed) return;
+            foreach (var mediaId in change.EntityIds) ModelRenderChanged?.Invoke(mediaId);
+        });
+    }
+
+    internal void QueueModelRefresh(Guid mediaId, FigureSceneData scene)
+    {
+        if (_catalog is not { } catalog || !ModelRenderContainer.NeedsAlphaMipRefresh(scene.Header)) return;
+        TaskObserver.Observe(Task.Run(() => catalog.MediaAssetWrites
+            .QueueModelRenderRefreshAsync(mediaId, scene.Sha256, _lifetime.Token)), "Figure.ModelRenderRefresh");
+    }
+
     public event Action? ResourcesChanged;
     public PresentationTier Tier => _governor.IsMemoryPressure ? PresentationTier.Fallback : _governor.Tier;
     public bool IsLiveAllowed => Tier is PresentationTier.Full or PresentationTier.Reduced;
@@ -308,6 +331,7 @@ public sealed class FigureRuntime : IDisposable
     public FigureRuntime(ResourceGovernor? governor = null, CatalogDb? catalog = null)
     {
         _governor = governor ?? ResourceGovernor.Shared;
+        _catalog = catalog;
         _validationReceipts = catalog is null ? null : new ModelRenderValidationReceipts(catalog);
         _vaultIdentityPath = catalog?.Paths.IdentityFilePath;
         _appliedTier = Tier;
@@ -327,6 +351,7 @@ public sealed class FigureRuntime : IDisposable
             _registered = true;
             CreateHardware();
             _governor.Changed += OnResourcesChanged;
+            if (_catalog is not null) _catalog.WriteCoordinator.Invalidated += OnCatalogInvalidated;
             _governor.TrimRequested += OnTrimRequested;
             _theme.Changed += OnThemeChanged;
         }
@@ -527,6 +552,7 @@ public sealed class FigureRuntime : IDisposable
         if (_disposed) return;
         _disposed = true;
         _lifetime.Cancel();
+        if (_catalog is not null) _catalog.WriteCoordinator.Invalidated -= OnCatalogInvalidated;
         ClearSceneCache();
         _governor.Changed -= OnResourcesChanged;
         _governor.TrimRequested -= OnTrimRequested;

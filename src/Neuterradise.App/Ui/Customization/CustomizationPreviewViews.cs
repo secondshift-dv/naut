@@ -206,7 +206,6 @@ public sealed partial class CustomizationCenter
         var modular = showSurface && profilePlan.Surface?.Modular == true;
         if (figurePreview is ProfileFigureView figure)
         {
-            figure.Height = modular ? 320 : double.NaN;
             if (modular) figure.SetActive(true);
         }
         _profilePreviewHeader.Apply(new ProfileHeaderViewState(

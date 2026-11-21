@@ -17,7 +17,11 @@ public sealed record ModelRenderMaterial(float[] BaseColor, float Metallic, floa
 public sealed record ModelRenderHeader(int ContainerVersion, int ContractVersion, string SourceSha256,
     float[] Minimum, float[] Maximum, float[] GroundOffset, float NormalizationScale,
     ModelRenderMesh[] Meshes, ModelRenderMaterial[] Materials, ModelRenderTexture[] Textures,
-    ModelRenderChunk[] Chunks, int AlphaMipRevision = 0);
+    ModelRenderChunk[] Chunks, int AlphaMipRevision = 0)
+{
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool HasLegacyAlphaMipMember { get; init; }
+}
 public sealed record ModelRenderFile(ModelRenderHeader Header, long PayloadOffset, long ByteLength, string Sha256);
 
 /// <summary>Portable NFIG: bounded JSON descriptors and contiguous, individually hashed binary chunks.</summary>
@@ -27,15 +31,39 @@ public static class ModelRenderContainer
     public const int AlphaMipRevision = 1;
 
     public static bool NeedsAlphaMipRefresh(ModelRenderHeader header) =>
-        header.AlphaMipRevision < AlphaMipRevision && header.Materials.Any(material =>
+        header.HasLegacyAlphaMipMember || (header.AlphaMipRevision < AlphaMipRevision && header.Materials.Any(material =>
             (material.AlphaMode is "MASK" or "BLEND") && material.BaseColorTexture is { } index
-            && header.Textures[index].MipChunks.Length > 1);
+            && header.Textures[index].MipChunks.Length > 1));
     public const long MaxBytes = 768L * 1024 * 1024;
     public const int MaxHeaderBytes = 1024 * 1024;
     public const int VertexStride = 48; // position, normal, UV, tangent including handedness
     private const uint Magic = 0x4749464e;
+    // JSON permits trailing whitespace. Keep the v1 descriptor member set while recording the prepared mip revision.
+    private static ReadOnlySpan<byte> AlphaMipMarker => "\n\t \t\r\t \n"u8;
     private static readonly JsonSerializerOptions JsonOptions = new() { MaxDepth = 16,
         UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow };
+
+    private static readonly JsonSerializerOptions WriteJsonOptions = new(JsonOptions)
+    {
+        TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver
+        {
+            Modifiers = { info =>
+            {
+                if (info.Type != typeof(ModelRenderHeader)) return;
+                var revision = info.Properties.Single(property => property.Name == nameof(ModelRenderHeader.AlphaMipRevision));
+                revision.ShouldSerialize = static (_, _) => false;
+            } },
+        },
+    };
+
+    private static ModelRenderHeader ReadHeader(byte[] json)
+    {
+        var header = JsonSerializer.Deserialize<ModelRenderHeader>(json, JsonOptions) ?? throw Invalid("empty header");
+        using var document = JsonDocument.Parse(json);
+        if (document.RootElement.TryGetProperty(nameof(ModelRenderHeader.AlphaMipRevision), out _))
+            return header with { HasLegacyAlphaMipMember = true };
+        return json.AsSpan().EndsWith(AlphaMipMarker) ? header with { AlphaMipRevision = AlphaMipRevision } : header;
+    }
 
     public static async Task WriteAsync(string path, ModelRenderHeader header,
         IReadOnlyList<ReadOnlyMemory<byte>> payloads, CancellationToken ct = default)
@@ -56,7 +84,9 @@ public static class ModelRenderContainer
         }
         header = header with { Chunks = chunks };
         ValidateHeader(header, offset);
-        var json = JsonSerializer.SerializeToUtf8Bytes(header, JsonOptions);
+        var json = JsonSerializer.SerializeToUtf8Bytes(header, WriteJsonOptions);
+        if (header.AlphaMipRevision == AlphaMipRevision)
+            json = [.. json, .. AlphaMipMarker];
         if (json.Length > MaxHeaderBytes || offset > MaxBytes - json.Length - 12) throw Invalid("file budget");
         var prefix = new byte[12];
         BinaryPrimitives.WriteUInt32LittleEndian(prefix, Magic);
@@ -102,7 +132,7 @@ public static class ModelRenderContainer
         using var fileHash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         fileHash.AppendData(prefix); fileHash.AppendData(json);
         ModelRenderHeader header;
-        try { header = JsonSerializer.Deserialize<ModelRenderHeader>(json, JsonOptions) ?? throw Invalid("empty header"); }
+        try { header = ReadHeader(json); }
         catch (JsonException ex) { throw new InvalidDataException("Malformed NFIG descriptors.", ex); }
         var payloadOffset = stream.Position;
         ValidateHeader(header, stream.Length - payloadOffset);
@@ -166,7 +196,7 @@ public static class ModelRenderContainer
         var json = new byte[length];
         await ReadExactlyAsync(stream, json, ct).ConfigureAwait(false);
         ModelRenderHeader header;
-        try { header = JsonSerializer.Deserialize<ModelRenderHeader>(json, JsonOptions) ?? throw Invalid("empty header"); }
+        try { header = ReadHeader(json); }
         catch (JsonException ex) { throw new InvalidDataException("Malformed NFIG descriptors.", ex); }
         ValidateHeader(header, byteLength - stream.Position);
         if (header.SourceSha256 != sourceSha256) throw Invalid("source provenance");

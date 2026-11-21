@@ -39,12 +39,16 @@ public sealed partial class PresentationCompiler
     private static SurfaceNode? CompileSurface(JsonElement spec, SpecContext context, string kind)
     {
         if (!spec.TryGetProperty("surface", out var root)) return null;
-        var modular = context.Bool(root, "modular", false);
+        var spotlight = kind == DefinitionKinds.SpotlightStyle;
+        var modular = spotlight || context.Bool(root, "modular", false);
+        if (spotlight && context.ContractVersion < 3)
+            context.Error("surface", "Independent Spotlight regions require Presentation Contract 3.");
         if (modular && context.ContractVersion < 2)
             context.Error("surface.modular", "Modular surfaces require Presentation Contract 2.");
         string[] semantics = kind == DefinitionKinds.HomeLayout
             ? ["featured", "recent", "favorites", "profiles", "activity", "statistics", "attention", "imports", "discovery", "local-navigation"]
             : ["identity", "overview", "related", "faces", "recent-media", "media", "actions", "review", "statistics"];
+        if (spotlight) semantics = ["artwork", "identity", "pagination"];
         if (modular && kind == DefinitionKinds.ProfileLayout)
             semantics = [.. semantics, "banner", "cover", "figure"];
 
@@ -83,12 +87,17 @@ public sealed partial class PresentationCompiler
                 || child.Placement.Column + child.Placement.ColumnSpan > columns.Count)))
                 context.Error("surface.grid", "A grid must declare tracks and contain all child placements.");
 
+            var hasSize = node.TryGetProperty("width", out _) || node.TryGetProperty("height", out _);
+            if (hasSize && (context.ContractVersion < 3 || !modular))
+                context.Error("surface", "Region dimensions require a modular Presentation Contract 3 surface.");
             return new SurfaceNode(type, semantic, context.Number(node, "spacing", 12, 0, 64),
                 context.Number(node, "padding", 0, 0, 64), columns, children)
             {
                 Modular = modular,
                 Rows = rows,
                 Placement = modular ? new NodeLayout(
+                    Width: node.TryGetProperty("width", out _) ? context.Number(node, "width", 320, semantic == "figure" ? 200 : 48, 1440) : null,
+                    Height: node.TryGetProperty("height", out _) ? context.Number(node, "height", 320, semantic == "figure" ? 240 : 24, 960) : null,
                     Row: (int)context.Number(node, "row", 0, 0, 7),
                     Column: (int)context.Number(node, "column", 0, 0, 7),
                     RowSpan: (int)context.Number(node, "rowSpan", 1, 1, 8),
@@ -100,7 +109,7 @@ public sealed partial class PresentationCompiler
         {
             used.Clear();
             var result = Read(source, 0);
-            string[] required = kind == DefinitionKinds.HomeLayout
+            string[] required = spotlight ? ["artwork", "identity"] : kind == DefinitionKinds.HomeLayout
                 ? modular ? ["featured"] : ["featured", "activity", "statistics"]
                 : modular ? ["identity", "media"] : ["identity", "overview", "media", "related", "faces", "actions", "review"];
             foreach (var semantic in required.Where(s => !used.Contains(s)))
@@ -131,6 +140,24 @@ public sealed partial class PresentationCompiler
         return context.Enum(spec, "identityPlacement", ["beside", "below", "overlay"], "below");
     }
 
+    private static ArtworkPlacement? ReadArtworkPlacement(JsonElement layer, string property, SpecContext context, int order)
+    {
+        if (!layer.TryGetProperty(property, out var value)) return null;
+        if (context.ContractVersion < 3 || value.ValueKind != JsonValueKind.Object)
+        {
+            context.Error(property, "Artwork placement must be an object and requires Presentation Contract 3.");
+            return null;
+        }
+        return new ArtworkPlacement(
+            context.Number(value, "x", 0, -1, 1),
+            context.Number(value, "y", 0, -1, 1),
+            context.Number(value, "width", 1, 0.05, 2),
+            context.Number(value, "height", 1, 0.05, 2),
+            context.Enum(value, "horizontal", ["left", "center", "right"], "left"),
+            context.Enum(value, "vertical", ["top", "center", "bottom"], "top"),
+            (int)context.Number(value, "order", order, 0, MaxBackdropLayers - 1));
+    }
+
     private static ArtworkPlan? CompileArtwork(JsonElement spec, SpecContext context, string name)
     {
         if (!spec.TryGetProperty(name, out var artwork)) return null;
@@ -143,6 +170,9 @@ public sealed partial class PresentationCompiler
             context.Error(name, "Artwork declares between one and eight ordered layers.");
             return null;
         }
+
+        if (artwork.TryGetProperty("breakpoint", out _) && context.ContractVersion < 3)
+            context.Error(name, "Artwork breakpoints require Presentation Contract 3.");
 
         ArtworkRotation? Rotation(JsonElement node)
         {
@@ -180,7 +210,9 @@ public sealed partial class PresentationCompiler
             if (kind != "image" && !roles.Add(kind))
                 context.Error(name, $"Artwork layer '{kind}' appears more than once.");
             var path = kind == "image" ? context.Asset(context.String(layer, "asset", ""), PackAssetKind.Image, name) : null;
-            plans.Add(new(kind, path, Rotation(layer)));
+            plans.Add(new(kind, path, Rotation(layer),
+                ReadArtworkPlacement(layer, "placement", context, plans.Count),
+                ReadArtworkPlacement(layer, "narrow", context, plans.Count)));
         }
         if (!roles.Contains("artwork")) context.Error(name, "The artwork layer is required.");
         var groupRotation = Rotation(artwork);
@@ -188,7 +220,9 @@ public sealed partial class PresentationCompiler
         if (animated > context.Definition.Performance.MaxAnimatedLayers)
             context.Error(name, "Artwork rotation exceeds its declared animation budget.");
         return new(maskPath, groupRotation, plans,
-            artwork.TryGetProperty("aspect", out _) ? context.Number(artwork, "aspect", 1, 0.5, 4) : null);
+            artwork.TryGetProperty("aspect", out _) ? context.Number(artwork, "aspect", 1, 0.5, 4) : null,
+            artwork.TryGetProperty("breakpoint", out _) && context.ContractVersion >= 3
+                ? context.Number(artwork, "breakpoint", 800, 320, 1920) : 800);
     }
 
     private static TypographyPlan CompileTypography(JsonElement spec, SpecContext context)

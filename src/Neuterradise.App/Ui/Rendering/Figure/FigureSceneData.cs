@@ -9,13 +9,14 @@ public sealed record FigureTextureData(int Index, ModelRenderTexture Descriptor,
 public sealed class FigureSceneData
 {
     public const long CpuBudget = 192L * 1024 * 1024;
-    private FigureSceneData(ModelRenderHeader header, FigureMeshData[] meshes, FigureTextureData[] textures, int lod, long bytes)
+    private FigureSceneData(ModelRenderHeader header, FigureMeshData[] meshes, FigureTextureData[] textures, int lod, long bytes, string sha256)
     {
         Header = header;
         Meshes = meshes;
         Textures = textures;
         Lod = lod;
         ByteLength = bytes;
+        Sha256 = sha256;
     }
 
     public ModelRenderHeader Header { get; }
@@ -23,6 +24,7 @@ public sealed class FigureSceneData
     public FigureTextureData[] Textures { get; }
     public int Lod { get; }
     public long ByteLength { get; }
+    public string Sha256 { get; }
 
     public static async Task<FigureSceneData> LoadAsync(string nfigPath, string? expectedSourceSha256 = null,
         int preferredLod = 1, CancellationToken ct = default, int maximumTextureDimension = 2048,
@@ -83,6 +85,6 @@ public sealed class FigureSceneData
             }
             textures.Add(new(index, descriptor, mips));
         }
-        return new(file.Header, meshes.ToArray(), textures.ToArray(), preferredLod, bytes);
+        return new(file.Header, meshes.ToArray(), textures.ToArray(), preferredLod, bytes, file.Sha256);
     }
 }

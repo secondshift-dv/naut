@@ -84,7 +84,20 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
             return Invalid("MODEL_SOURCE_MISSING", "Canonical Model bytes or provenance are unavailable.");
         if (!await ModelRenderEligibility.IsEligibleAsync(_catalog, source.MediaId, ct).ConfigureAwait(false))
             return await ExecuteRoleAsync(context, MediaAssetRole.Thumbnail, ct).ConfigureAwait(false);
-        if (!await NeedsGenerationAsync(source.MediaId, MediaAssetRole.Thumbnail, ct).ConfigureAwait(false)
+        var modelAsset = await _mediaAssets.GetOwnedMediaAssetAsync(source.MediaId, MediaAssetRole.ModelRender, ct).ConfigureAwait(false);
+        MediaAssetRecord? refresh = null;
+        if (modelAsset is { State: MediaAssetState.Ready })
+        {
+            try
+            {
+                var valid = await _validator.ValidateAsync(_paths.ResolveVaultRelativePath(VaultPathArea.MediaAssets, modelAsset.RelativePath),
+                    MediaAssetRole.ModelRender, ct, source.Sha256).ConfigureAwait(false);
+                if (valid.NeedsRefresh && valid.Sha256 == modelAsset.Sha256 && valid.ByteLength == modelAsset.ByteLength)
+                    refresh = modelAsset;
+            }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException) { }
+        }
+        if (refresh is null && !await NeedsGenerationAsync(source.MediaId, MediaAssetRole.Thumbnail, ct).ConfigureAwait(false)
             && !await NeedsGenerationAsync(source.MediaId, MediaAssetRole.ModelRender, ct).ConfigureAwait(false))
             return JobExecutionResult.Succeeded;
         var tempDirectory = _paths.ResolveContainedPath(VaultPathArea.TempMediaAssets, $"{source.MediaId:N}/{Guid.NewGuid():N}");
@@ -99,12 +112,18 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
                 await using var converted = File.OpenRead(path);
                 inputHash = Convert.ToHexStringLower(await System.Security.Cryptography.SHA256.HashDataAsync(converted, ct).ConfigureAwait(false));
             }
-            var thumbnail = await ExecuteRoleAsync(context, MediaAssetRole.Thumbnail, ct, path).ConfigureAwait(false);
-            if (!thumbnail.IsSucceeded) return thumbnail;
-            if (!await NeedsGenerationAsync(source.MediaId, MediaAssetRole.ModelRender, ct).ConfigureAwait(false))
-                return JobExecutionResult.Succeeded;
+            if (refresh is null)
+            {
+                var thumbnail = await ExecuteRoleAsync(context, MediaAssetRole.Thumbnail, ct, path).ConfigureAwait(false);
+                if (!thumbnail.IsSucceeded) return thumbnail;
+                if (!await NeedsGenerationAsync(source.MediaId, MediaAssetRole.ModelRender, ct).ConfigureAwait(false))
+                    return JobExecutionResult.Succeeded;
+            }
             await GlbThumbnailPreviewAdapter.BuildModelRenderAsync(path, source.Sha256, temp, ct, inputHash).ConfigureAwait(false);
-            await _writes.PublishMediaAssetAsync(source.MediaId, MediaAssetRole.ModelRender, ContractVersion, temp, ct: ct).ConfigureAwait(false);
+            if (refresh is not null)
+                await _writes.PublishModelRenderRefreshAsync(refresh, source.Sha256, temp, ct).ConfigureAwait(false);
+            else
+                await _writes.PublishMediaAssetAsync(source.MediaId, MediaAssetRole.ModelRender, ContractVersion, temp, ct: ct).ConfigureAwait(false);
             return JobExecutionResult.Succeeded;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -114,7 +133,9 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException
             or ArgumentException or NotSupportedException)
         {
-            return Invalid("MODEL_RENDER_PREPARATION_FAILED", ex.Message);
+            return refresh is not null && ex is IOException
+                ? JobExecutionResult.Failed(JobFailureKind.Retryable, "MODEL_RENDER_REFRESH_IO", "The active ModelRender was preserved. Refresh can retry.")
+                : Invalid("MODEL_RENDER_PREPARATION_FAILED", ex.Message);
         }
         finally
         {
@@ -346,7 +367,7 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
                 _paths.ResolveVaultRelativePath(VaultPathArea.MediaAssets, existing.RelativePath),
                 role,
                 ct, sourceHash, existing.ContractVersion).ConfigureAwait(false);
-            if (!current.NeedsRefresh && current.ByteLength == existing.ByteLength
+            if (current.ByteLength == existing.ByteLength
                 && current.Sha256 == existing.Sha256
                 && MediaAssetContracts.IsSupported(role, existing.ContractVersion))
                 return false;

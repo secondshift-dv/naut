@@ -348,7 +348,8 @@ public sealed partial class PresentationCompiler
         context.Bool(spec, "showOverview", true),
         context.Enum(spec, "pagination", ["counter-rail", "counter", "none"], "counter-rail"),
         context.Number(spec, "scrimStrength", 0.65, 0.3, 1),
-        CompileArtwork(spec, context, "artwork"), ReadIdentityPlacement(spec, context));
+        CompileArtwork(spec, context, "artwork"), ReadIdentityPlacement(spec, context),
+        CompileSurface(spec, context, DefinitionKinds.SpotlightStyle));
 
     private static GalleryLayoutPlan? CompileGalleryLayout(JsonElement spec, SpecContext context)
     {

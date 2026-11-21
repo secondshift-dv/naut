@@ -60,6 +60,11 @@ public sealed class RecoveryCoordinator
 
         await RunStageAsync("IMPORT", () => _importRecovery.RecoverAsync(cancellationToken), findings, cancellationToken).ConfigureAwait(false);
         await RunStageAsync("STORAGE", () => _storageRecovery.RecoverPathReconciliationAsync(cancellationToken), findings, cancellationToken).ConfigureAwait(false);
+        await RunStageAsync("MODEL_RENDER_SWAP", async () =>
+        {
+            await _catalog.MediaAssetWrites.RecoverModelRenderSwapsAsync(cancellationToken).ConfigureAwait(false);
+            return [];
+        }, findings, cancellationToken).ConfigureAwait(false);
         await RunStageAsync("TRASH", () => _trashRecovery.RecoverAsync(cancellationToken), findings, cancellationToken).ConfigureAwait(false);
         if (includeMediaAssets)
             await RunStageAsync("MEDIA_ASSETS", () => _storageRecovery.RecoverMediaAssetsAsync(cancellationToken), findings, cancellationToken).ConfigureAwait(false);

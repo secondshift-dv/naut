@@ -2,6 +2,8 @@ using System.Diagnostics;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Neuterradise.App.Media;
+using Neuterradise.App.Shell;
+using Neuterradise.App.SystemServices.Database;
 using Neuterradise.App.SystemServices.Resources;
 
 namespace Neuterradise.App.Ui.Figure;
@@ -23,6 +25,9 @@ public sealed class ProfileFigureView : Grid, IDisposable
     private readonly SkImageView _thumbnail = new();
     private readonly ContentControl _host = new() { Visibility = Visibility.Collapsed };
     private FigureSource? _source;
+    private FigureSource? _checkedFallbackSource;
+    private readonly CatalogDb? _catalog;
+    private readonly CancellationTokenSource _lifetime = new();
     private FigureViewportLease? _lease;
     private CancellationTokenSource? _cameraLoad;
     private CancellationTokenSource? _load;
@@ -38,12 +43,14 @@ public sealed class ProfileFigureView : Grid, IDisposable
     private int _loadedTextureDimension;
 
     public ProfileFigureView(AppServices services, Guid? profileId = null)
-        : this(services.Figures, services.Window, services.Catalog.MediaViewStates, profileId) { }
+        : this(services.Figures, services.Window, services.Catalog.MediaViewStates, profileId, services.Catalog) { }
 
     public ProfileFigureView(
-        FigureRuntime? runtime, Window window, MediaViewStates? viewStates = null, Guid? profileId = null)
+        FigureRuntime? runtime, Window window, MediaViewStates? viewStates = null, Guid? profileId = null,
+        CatalogDb? catalog = null)
     {
         _runtime = runtime;
+        _catalog = catalog;
         _window = window;
         _viewStates = viewStates;
         _profileId = profileId;
@@ -81,7 +88,11 @@ public sealed class ProfileFigureView : Grid, IDisposable
         Unloaded += OnUnloaded;
         SizeChanged += OnSizeChanged;
         _viewport.SizeChanged += OnSizeChanged;
-        if (runtime is not null) runtime.ResourcesChanged += OnResourcesChanged;
+        if (runtime is not null)
+        {
+            runtime.ResourcesChanged += OnResourcesChanged;
+            runtime.ModelRenderChanged += OnModelRenderChanged;
+        }
     }
 
     public bool IsLive => _lease is { IsDisposed: false };
@@ -93,6 +104,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
         var mediaChanged = _source?.MediaId != source?.MediaId;
         Release();
         _source = source;
+        _checkedFallbackSource = null;
         if (mediaChanged)
         {
             _cameraLoad?.Cancel();
@@ -136,6 +148,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
         _active = active;
         if (!active)
         {
+            _checkedFallbackSource = null;
             Release();
             return;
         }
@@ -175,6 +188,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
         {
             lease.SetActive(!IsOccluded && _active && IsLoaded && HasUsableViewport);
             UpdateControls();
+            if (lease.IsActive) EnsureQuality();
             return;
         }
 
@@ -189,6 +203,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
         {
             lease.SetActive(_active && !IsOccluded && HasUsableViewport);
             UpdateControls();
+            if (lease.IsActive) EnsureQuality();
             return;
         }
         EnsureLive();
@@ -214,6 +229,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
         {
             lease.SetActive(_active && !IsOccluded && IsLoaded && HasUsableViewport);
             UpdateControls();
+            if (lease.IsActive) EnsureQuality();
             return;
         }
         if (HasUsableViewport) EnsureLive();
@@ -221,11 +237,23 @@ public sealed class ProfileFigureView : Grid, IDisposable
 
     private void EnsureLive()
     {
-        if (_disposed || !_active || IsOccluded || !IsLoaded || !HasUsableViewport
-            || _cameraLoad is not null || _load is not null || _lease is { IsDisposed: false }
-            || _source is not { RenderPath: not null, SourceSha256: not null } source
-            || _runtime is not { IsLiveAllowed: true } runtime || runtime.Snapshot.IsDisposed
-            || runtime.Snapshot.ActiveDeviceCount == 0) return;
+        if (_disposed || !_active || IsOccluded || !IsLoaded
+            || _source is not { RenderPath: not null, SourceSha256: not null } source) return;
+        if (_runtime is not { IsLiveAllowed: true } runtime || runtime.Snapshot.IsDisposed
+            || runtime.Snapshot.ActiveDeviceCount == 0)
+        {
+            if (_catalog is { } catalog && !Equals(_checkedFallbackSource, source))
+            {
+                _checkedFallbackSource = source;
+                var ct = _lifetime.Token;
+                TaskObserver.Observe(Task.Run(() => catalog.MediaAssetWrites
+                    .InspectModelRenderForRefreshAsync(source.MediaId, source.RenderPath, source.SourceSha256, ct), ct),
+                    "Figure.FallbackModelRenderRefresh");
+            }
+            return;
+        }
+        if (!HasUsableViewport || _cameraLoad is not null || _load is not null
+            || _lease is { IsDisposed: false }) return;
         var (lod, textureDimension) = DesiredQuality(runtime);
         if (runtime.TryGetCachedScene(
                 source.RenderPath!,
@@ -240,6 +268,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
                 _lease = runtime.Attach(_host, WindowChrome.GetNativeHandle(_window));
                 _lease.SetCamera(_camera);
                 _lease.SetScene(cachedScene);
+                runtime.QueueModelRefresh(source.MediaId, cachedScene);
                 _loadedLod = lod;
                 _loadedTextureDimension = textureDimension;
                 _lease.CameraChanged += OnCameraChanged;
@@ -274,6 +303,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
             _lease = runtime.Attach(_host, WindowChrome.GetNativeHandle(_window));
             _lease.SetCamera(_camera);
             _lease.SetScene(scene);
+            runtime.QueueModelRefresh(source.MediaId, scene);
             if (_lease is not { IsDisposed: false } || !ReferenceEquals(_load, request)) return;
             _loadedLod = lod;
             _loadedTextureDimension = textureDimension;
@@ -392,6 +422,18 @@ public sealed class ProfileFigureView : Grid, IDisposable
         }
     }
 
+    private void OnModelRenderChanged(Guid mediaId)
+    {
+        if (_disposed || _source?.MediaId != mediaId) return;
+        _load?.Cancel();
+        _load = null;
+        _qualityLoad?.Cancel();
+        _qualityLoad = null;
+        _loadedLod = -1;
+        if (IsLive) EnsureQuality();
+        else EnsureLive();
+    }
+
     private void OnResourcesChanged()
     {
         if (_disposed || _runtime is not { } runtime) return;
@@ -441,6 +483,8 @@ public sealed class ProfileFigureView : Grid, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        _lifetime.Cancel();
+        _lifetime.Dispose();
         _cameraLoad?.Cancel();
         _cameraLoad = null;
         Release();
@@ -448,7 +492,11 @@ public sealed class ProfileFigureView : Grid, IDisposable
         Unloaded -= OnUnloaded;
         SizeChanged -= OnSizeChanged;
         _viewport.SizeChanged -= OnSizeChanged;
-        if (_runtime is { } runtime) runtime.ResourcesChanged -= OnResourcesChanged;
+        if (_runtime is { } runtime)
+        {
+            runtime.ResourcesChanged -= OnResourcesChanged;
+            runtime.ModelRenderChanged -= OnModelRenderChanged;
+        }
         _thumbnail.Source = null;
     }
 }

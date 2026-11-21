@@ -40,8 +40,9 @@ public static class SurfaceComposer
         if (node.Kind == "semantic")
         {
             var element = semantic(node.Semantic!);
-            if (element is not null) Detach(element);
-            return element;
+            if (element is null) return null;
+            Detach(element);
+            return RegionHost(node.Semantic!, element, node.Placement);
         }
         if (node.Kind == "divider") return UI.Divider();
         if (node.Kind == "spacer") return new Grid { Height = node.Spacing + node.Padding };
@@ -95,6 +96,18 @@ public static class SurfaceComposer
             : node.Padding > 0 ? new Border { Child = stack, Padding = new Thickness(node.Padding) } : stack;
     }
 
+    private static FrameworkElement RegionHost(string id, FrameworkElement element, NodeLayout placement)
+    {
+        var height = placement.Height ?? (id switch { "figure" => 320.0, "artwork" => 260.0, _ => double.NaN });
+        if (placement.Width is null && double.IsNaN(height)) return element;
+        return new Border
+        {
+            Child = element,
+            Height = height,
+            MaxWidth = placement.Width ?? double.PositiveInfinity,
+        };
+    }
+
     private static int[] Occupied(int count, IEnumerable<(int Start, int Span)> placements)
     {
         var used = new bool[count];
@@ -122,7 +135,7 @@ public static class SurfaceComposer
                 if (fallbackRegion is { } id && !arrangement.HasRegion(id) && region(id) is { } fallback)
                 {
                     Detach(fallback);
-                    Children.Add(UI.V(12, content, fallback));
+                    Children.Add(UI.V(12, content, RegionHost(id, fallback, new NodeLayout())));
                 }
                 else if (content is not null) Children.Add(content);
             }

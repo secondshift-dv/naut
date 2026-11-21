@@ -1,5 +1,6 @@
 using Neuterradise.App.SystemServices.Storage;
 using Neuterradise.App.Media.Model;
+using Neuterradise.App.SystemServices.Jobs;
 
 namespace Neuterradise.App.SystemServices.Database.Writes;
 
@@ -101,6 +102,96 @@ public sealed class MediaAssetWrites
             validated.PixelWidth, validated.PixelHeight, validated.DurationMs, sourceTimestampMs);
     }
 
+    public async Task<bool> PublishModelRenderRefreshAsync(MediaAssetRecord expected, string sourceHash,
+        string preparedTempPath, CancellationToken ct)
+    {
+        if (expected.Role != MediaAssetRole.ModelRender || expected.State != MediaAssetState.Ready)
+            throw new ArgumentException("Refresh requires a READY ModelRender.", nameof(expected));
+        var temp = RequireTemp(preparedTempPath, VaultPathArea.TempMediaAssets);
+        var candidate = await _validator.ValidateAsync(temp, MediaAssetRole.ModelRender, ct, sourceHash).ConfigureAwait(false);
+        if (candidate.NeedsRefresh) throw new InvalidDataException("The replacement ModelRender is obsolete.");
+
+        await using var lease = await _catalog.WriteCoordinator.EnterAsync(ct).ConfigureAwait(false);
+        await RecoverModelRenderSwapCoreAsync(expected.MediaId, ct).ConfigureAwait(false);
+        await using var connection = await _catalog.OpenConnectionAsync(ct).ConfigureAwait(false);
+        await using var transaction = CatalogTransaction.Begin(connection, _catalog.WriteCoordinator);
+        await using var update = transaction.CreateCommand("""
+            UPDATE media_assets SET byte_length=$length, sha256=$hash, updated_at_ms=$now, row_version=row_version+1
+            WHERE media_id=$media AND media_asset_id=$asset AND role='MODEL_RENDER' AND state='READY'
+                AND relative_path=$path AND sha256=$oldHash AND byte_length=$oldLength AND contract_version=1
+                AND EXISTS (SELECT 1 FROM media m WHERE m.media_id=$media AND m.state='ACTIVE'
+                    AND m.trashed_at_ms IS NULL AND m.sha256=$source);
+            """);
+        update.Parameters.AddWithValue("$media", DbGuid.Format(expected.MediaId));
+        update.Parameters.AddWithValue("$asset", DbGuid.Format(expected.MediaAssetId));
+        update.Parameters.AddWithValue("$path", expected.RelativePath);
+        update.Parameters.AddWithValue("$oldHash", expected.Sha256);
+        update.Parameters.AddWithValue("$oldLength", expected.ByteLength);
+        update.Parameters.AddWithValue("$source", sourceHash);
+        update.Parameters.AddWithValue("$length", candidate.ByteLength);
+        update.Parameters.AddWithValue("$hash", candidate.Sha256);
+        update.Parameters.AddWithValue("$now", DbTime.Format(_time.GetUtcNow()));
+        if (await update.ExecuteNonQueryAsync(ct).ConfigureAwait(false) != 1) return false;
+
+        var target = _catalog.Paths.ResolveVaultRelativePath(VaultPathArea.MediaAssets, expected.RelativePath);
+        var old = await _validator.ValidateAsync(target, MediaAssetRole.ModelRender, ct, sourceHash).ConfigureAwait(false);
+        if (!old.NeedsRefresh || old.Sha256 != expected.Sha256 || old.ByteLength != expected.ByteLength)
+            throw new InvalidDataException("The ModelRender changed while its replacement was prepared.");
+
+        var backup = ModelRenderBackupPath(expected.MediaId);
+        Directory.CreateDirectory(Path.GetDirectoryName(backup)!);
+        ct.ThrowIfCancellationRequested();
+        try
+        {
+            File.Replace(temp, target, backup);
+            transaction.QueueInvalidation(CatalogInvalidationDomain.ModelRender, expected.MediaId);
+            await transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        catch
+        {
+            await transaction.DisposeAsync().ConfigureAwait(false);
+            await RecoverModelRenderSwapCoreAsync(expected.MediaId, CancellationToken.None).ConfigureAwait(false);
+            throw;
+        }
+
+        TryDeleteModelRenderBackup(backup);
+        return true;
+    }
+
+    public async Task InspectModelRenderForRefreshAsync(Guid mediaId, string path, string sourceHash, CancellationToken ct)
+    {
+        var valid = await new ModelRenderValidationReceipts(_catalog)
+            .ValidateAsync(path, sourceHash, ct, backgroundIo: true).ConfigureAwait(false);
+        if (ModelRenderContainer.NeedsAlphaMipRefresh(valid.Header))
+            await QueueModelRenderRefreshAsync(mediaId, valid.Sha256, ct).ConfigureAwait(false);
+    }
+
+    public async Task<bool> QueueModelRenderRefreshAsync(Guid mediaId, string expectedHash, CancellationToken ct)
+    {
+        await using var lease = await _catalog.WriteCoordinator.EnterAsync(ct).ConfigureAwait(false);
+        await using var connection = await _catalog.OpenConnectionAsync(ct).ConfigureAwait(false);
+        await using var insert = connection.CreateCommand();
+        insert.CommandText = """
+            INSERT INTO jobs(job_id,kind,lane,state,priority,owner_type,owner_id,attempt,max_attempts,checkpoint_json,created_at_ms)
+            SELECT $id,'GenerateModelMediaAssets','MEDIA','PENDING',$priority,'Media',$media,0,$attempts,'{}',$now
+            WHERE EXISTS (SELECT 1 FROM media_assets ma JOIN media m ON m.media_id=ma.media_id
+                WHERE ma.media_id=$media AND ma.role='MODEL_RENDER' AND ma.state='READY' AND ma.sha256=$hash
+                AND m.state='ACTIVE' AND m.trashed_at_ms IS NULL)
+            AND NOT EXISTS (SELECT 1 FROM jobs WHERE owner_type='Media' AND owner_id=$media
+                AND kind='GenerateModelMediaAssets' AND state IN ('PENDING','RUNNABLE','RUNNING','PAUSED',
+                    'FAILED_RETRYABLE','WAITING_DEPENDENCY','WAITING_USER_INPUT'));
+            """;
+        insert.Parameters.AddWithValue("$id", DbGuid.Format(Guid.NewGuid()));
+        insert.Parameters.AddWithValue("$media", DbGuid.Format(mediaId));
+        insert.Parameters.AddWithValue("$hash", expectedHash);
+        insert.Parameters.AddWithValue("$priority", JobPriorityPolicy.PriorityBackground);
+        insert.Parameters.AddWithValue("$attempts", JobRetryPolicy.DefaultMaxAttempts);
+        insert.Parameters.AddWithValue("$now", DbTime.Format(_time.GetUtcNow()));
+        var queued = await insert.ExecuteNonQueryAsync(ct).ConfigureAwait(false) == 1;
+        if (queued) JobSignals.Raise();
+        return queued;
+    }
+
     public async Task<bool> TryAcceptHoverContractAsync(Guid mediaId, CancellationToken ct = default)
     {
         var asset = await _catalog.MediaAssetReads.GetOwnedMediaAssetAsync(mediaId, MediaAssetRole.Hover, ct).ConfigureAwait(false);
@@ -142,6 +233,59 @@ public sealed class MediaAssetWrites
         command.Parameters.AddWithValue("$role", DbEnum.Format(role));
         command.Parameters.AddWithValue("$now", DbTime.Format(_time.GetUtcNow()));
         await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    internal async Task RecoverModelRenderSwapsAsync(CancellationToken ct)
+    {
+        var directory = Path.GetDirectoryName(ModelRenderBackupPath(Guid.Empty))!;
+        if (!Directory.Exists(directory)) return;
+        foreach (var backup in Directory.EnumerateFiles(directory, "*.nfig"))
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!Guid.TryParseExact(Path.GetFileNameWithoutExtension(backup), "N", out var mediaId)) continue;
+            await using var lease = await _catalog.WriteCoordinator.EnterAsync(ct).ConfigureAwait(false);
+            await RecoverModelRenderSwapCoreAsync(mediaId, ct).ConfigureAwait(false);
+        }
+    }
+
+    private string ModelRenderBackupPath(Guid mediaId) =>
+        _catalog.Paths.ResolveContainedPath(VaultPathArea.TempMediaAssets, $"model-render-swaps/{mediaId:N}.nfig");
+
+    private async Task RecoverModelRenderSwapCoreAsync(Guid mediaId, CancellationToken ct)
+    {
+        var backup = ModelRenderBackupPath(mediaId);
+        if (!File.Exists(backup)) return;
+        var current = await _catalog.MediaAssetReads.GetOwnedMediaAssetAsync(mediaId, MediaAssetRole.ModelRender, ct).ConfigureAwait(false);
+        if (current is not { State: MediaAssetState.Ready }) return;
+        var target = _catalog.Paths.ResolveVaultRelativePath(VaultPathArea.MediaAssets, current.RelativePath);
+        if (await MatchesModelRenderAsync(target, current, ct).ConfigureAwait(false))
+        {
+            TryDeleteModelRenderBackup(backup);
+            return;
+        }
+        if (!await MatchesModelRenderAsync(backup, current, ct).ConfigureAwait(false))
+            throw new InvalidDataException("Neither ModelRender copy matches the committed fingerprint.");
+
+        ct.ThrowIfCancellationRequested();
+        File.Move(backup, target, overwrite: true);
+    }
+
+    private static async Task<bool> MatchesModelRenderAsync(string path, MediaAssetRecord expected, CancellationToken ct)
+    {
+        if (!File.Exists(path) || new FileInfo(path).Length != expected.ByteLength) return false;
+        try
+        {
+            var valid = await ModelRenderContainer.ValidateAsync(path, ct: ct).ConfigureAwait(false);
+            return valid.Sha256 == expected.Sha256 && valid.ByteLength == expected.ByteLength;
+        }
+        catch (InvalidDataException) { return false; }
+    }
+
+    private static void TryDeleteModelRenderBackup(string path)
+    {
+        try { File.Delete(path); }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
     }
 
     private string RequireTemp(string path, VaultPathArea area)

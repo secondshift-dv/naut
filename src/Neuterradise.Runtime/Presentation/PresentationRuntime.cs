@@ -668,7 +668,9 @@ public sealed class PresentationRuntime
             return new PackRemovalResult(false, 0, "Only installed user packs can be removed.");
         }
 
-        var usages = Committed.UsingPack(packId).Select(b => BindingChange.Reset(b.ScopeKind, b.ScopeId, b.Slot)).ToList();
+        var usages = Committed.UsingPack(packId).Select(b => b.Slot == PresentationSlots.HomeLayout && b.StateJson is not null
+            ? new BindingChange(b.ScopeKind, b.ScopeId, b.Slot, null, b.StateJson)
+            : BindingChange.Reset(b.ScopeKind, b.ScopeId, b.Slot)).ToList();
         var stage = await _packs.StageRemovalAsync(packId, cancellationToken).ConfigureAwait(false);
         if (stage is null)
         {

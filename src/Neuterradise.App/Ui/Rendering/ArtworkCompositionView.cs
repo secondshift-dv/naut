@@ -14,6 +14,8 @@ namespace Neuterradise.App.Ui;
 internal sealed class ArtworkCompositionView : Grid
 {
     private readonly Grid _layers = new();
+    private readonly Canvas _positionedLayers = new();
+    private readonly List<(Grid Host, ArtworkLayer Plan, int Index)> _placements = [];
     private readonly Grid _stage = new();
     private readonly Grid _output = new();
     private readonly Grid _sourceHost = new();
@@ -29,8 +31,10 @@ internal sealed class ArtworkCompositionView : Grid
     public ArtworkCompositionView(ArtworkPlan plan, Func<string, FrameworkElement?> role)
     {
         _plan = plan;
-        foreach (var layer in plan.Layers)
+        var positioned = plan.Layers.Any(layer => layer.Placement is not null || layer.Narrow is not null);
+        for (var index = 0; index < plan.Layers.Count; index++)
         {
+            var layer = plan.Layers[index];
             var content = layer.Kind == "image"
                 ? new SkImageView { Source = ImageRef.FromPath(layer.AssetPath, 1600), PlaceholderToken = "transparent" }
                 : role(layer.Kind);
@@ -38,10 +42,16 @@ internal sealed class ArtworkCompositionView : Grid
             var host = new Grid();
             SurfaceComposer.Detach(content);
             host.Children.Add(content);
-            _layers.Children.Add(host);
+            if (positioned)
+            {
+                _positionedLayers.Children.Add(host);
+                _placements.Add((host, layer, index));
+            }
+            else _layers.Children.Add(host);
             AddRotation(host, layer.Rotation);
         }
 
+        if (positioned) _layers.Children.Add(_positionedLayers);
         _sourceHost.Children.Add(_layers);
         _stage.Children.Add(_sourceHost);
         if (plan.MaskPath is not null)
@@ -53,7 +63,7 @@ internal sealed class ArtworkCompositionView : Grid
         Children.Add(_stage);
         AddRotation(_stage, plan.Rotation);
         SizeChanged += (_, _) => UpdateSize();
-        _stage.SizeChanged += (_, _) => UpdateSourceSize();
+        _stage.SizeChanged += (_, _) => UpdateStage();
         Loaded += (_, _) =>
         {
             ConnectMask();
@@ -121,11 +131,24 @@ internal sealed class ArtworkCompositionView : Grid
             _stage.HorizontalAlignment = HorizontalAlignment.Center;
             _stage.VerticalAlignment = VerticalAlignment.Center;
         }
-        UpdateSourceSize();
+        UpdateStage();
     }
 
-    private void UpdateSourceSize()
+    private void UpdateStage()
     {
+        foreach (var (host, layer, index) in _placements)
+        {
+            var placement = (ActualWidth < _plan.Breakpoint ? layer.Narrow : null) ?? layer.Placement;
+            var width = _stage.ActualWidth;
+            var height = _stage.ActualHeight;
+            host.Width = width * (placement?.Width ?? 1);
+            host.Height = height * (placement?.Height ?? 1);
+            var horizontal = placement?.Horizontal switch { "center" => 0.5, "right" => 1, _ => 0 };
+            var vertical = placement?.Vertical switch { "center" => 0.5, "bottom" => 1, _ => 0 };
+            Canvas.SetLeft(host, (width - host.Width) * horizontal + width * (placement?.X ?? 0));
+            Canvas.SetTop(host, (height - host.Height) * vertical + height * (placement?.Y ?? 0));
+            Canvas.SetZIndex(host, placement?.Order ?? index);
+        }
         if (_source is null || _sprite is null) return;
         var size = new Vector2((float)_stage.ActualWidth, (float)_stage.ActualHeight);
         // The pinned Uno Skia visual surface uses X for both source clip dimensions.

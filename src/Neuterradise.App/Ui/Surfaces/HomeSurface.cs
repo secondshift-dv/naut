@@ -40,7 +40,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     private TextBlock? _heroMeta;
     private SpotlightGeometry? _heroGeometry;
     private bool? _footerNavBelow;
-    private UIElement? _pagination;
+    private FrameworkElement? _pagination;
     private readonly TextBlock _counter = UI.Text(string.Empty, "numeric", "onHeroSecondary");
     private readonly ScaleTransform _progressScale = new() { ScaleX = 0, ScaleY = 1 };
     private readonly Border _progressFill = new() { Height = 2, HorizontalAlignment = HorizontalAlignment.Left, Width = 120 };
@@ -311,7 +311,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
             _vm.CurrentSpotlight is { } current ? PresentationContext.ForProfile(new ProfilePresentationState(current.ProfileId, 0, null,
                 _appearance.GetValueOrDefault(current.ProfileId) ?? ProfileAppearanceOverrides.Default), "home") : Context);
 
-        var scrim = Scrim();
+        var scrim = ArtworkScrim(_spotlight.ScrimStrength);
         Grid imageLayer;
         if (_spotlight.Artwork is { } artwork)
         {
@@ -339,9 +339,23 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
             CornerRadius = new CornerRadius(_spotlight.Artwork is null && _layout.HeroPlacement == "inset"
                 ? ThemeRuntime.Current.Tokens.Number("radiusHero", 20) : 0),
         };
-        _heroFrame.Children.Add(_heroArtworkHost);
-
         _pagination = Pagination();
+        if (_spotlight.Surface is { } surface)
+        {
+            _heroFooterPanel = null;
+            _heroFrame.Children.Add(SurfaceComposer.Build(surface, id => id switch
+            {
+                "artwork" => _heroArtworkHost,
+                "identity" => _identityHost,
+                "pagination" when _spotlight.Pagination != "none" => _pagination,
+                _ => null,
+            }, 1000));
+            _hero.Children.Add(_heroFrame);
+            LayoutHero();
+            OnSpotlightChanged();
+            return;
+        }
+        _heroFrame.Children.Add(_heroArtworkHost);
         _heroFooter.Children.Add(_identityHost);
         _heroFooter.Children.Add(_pagination);
         _heroFooterPanel = new Border
@@ -358,10 +372,10 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         OnSpotlightChanged();
     }
 
-    private Border Scrim()
+    internal static Border ArtworkScrim(double strength)
     {
         var theme = ThemeRuntime.Current;
-        var strength = Math.Clamp(_spotlight.ScrimStrength, 0, 1);
+        strength = Math.Clamp(strength, 0, 1);
         var fade = new LinearGradientBrush
         {
             StartPoint = new Windows.Foundation.Point(0.5, 1),
@@ -399,7 +413,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     private static Windows.UI.Color WithAlpha(Windows.UI.Color color, double factor) =>
         Windows.UI.Color.FromArgb((byte)Math.Clamp(color.A * factor, 0, 255), color.R, color.G, color.B);
 
-    private UIElement Pagination()
+    private FrameworkElement Pagination()
     {
         var theme = ThemeRuntime.Current;
         _progressFill.Background = theme.Brush("accent");
@@ -459,7 +473,17 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
 
     private void LayoutHero()
     {
-        if (_heroArtworkHost is null || _heroFooterPanel is null) return;
+        if (_heroArtworkHost is null) return;
+        if (_spotlight.Surface is not null)
+        {
+            _hero.Height = double.NaN;
+            _heroArtworkHost.Visibility = _vm.CurrentSpotlight is null ? Visibility.Collapsed : Visibility.Visible;
+            if (_heroName is not null) _heroName.Foreground = ThemeRuntime.Current.Brush("textPrimary");
+            if (_heroMeta is not null) _heroMeta.Foreground = ThemeRuntime.Current.Brush("textSecondary");
+            if (_heroOverview is not null) _heroOverview.Foreground = ThemeRuntime.Current.Brush("textSecondary");
+            return;
+        }
+        if (_heroFooterPanel is null) return;
         var theme = ThemeRuntime.Current;
         var height = _root.ActualHeight > 0 ? _root.ActualHeight : 720;
         var width = _hero.ActualWidth > 0 ? _hero.ActualWidth

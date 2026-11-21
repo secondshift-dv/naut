@@ -9,6 +9,7 @@ public static class CatalogInvalidationDomain
     public const string Tag = "TAG";
     public const string Appearance = "APPEARANCE";
     public const string Media = "MEDIA";
+    public const string ModelRender = "MODEL_RENDER";
     public const string Face = "FACE";
     public const string Related = "RELATED";
     public const string Activity = "ACTIVITY";

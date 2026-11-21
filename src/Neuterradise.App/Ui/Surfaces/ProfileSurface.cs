@@ -346,7 +346,6 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             Context).PlanAs<FramePlan>();
         var identityAlignment = _layout.IdentityAlignment;
         var figureSource = ResolveFigureSource();
-        _figureView.Height = _surface?.Modular == true ? 320 : double.NaN;
         _figureView.SetSource(figureSource);
         _profileHeader.Apply(new ProfileHeaderViewState(
             _layout,

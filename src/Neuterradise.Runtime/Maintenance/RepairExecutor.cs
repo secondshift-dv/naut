@@ -280,6 +280,12 @@ public sealed class RepairExecutor
     private async Task<StorageOperationResult> QueueMediaAssetRepairAsync(
         RepairPlan plan, Guid assetId, CancellationToken cancellationToken)
     {
+        if (plan.ExpectedAuthorityState == "MODEL_RENDER" && plan.FindingCode == HealthFindingCode.ArtifactContractObsolete)
+        {
+            await new MediaAssetWrites(_catalog).QueueModelRenderRefreshAsync(assetId, plan.ExpectedPhysicalSha256!, cancellationToken)
+                .ConfigureAwait(false);
+            return new StorageOperationResult(StorageOperationStatus.Success);
+        }
         await using var connection = await _catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT media_type FROM media WHERE media_id = $id AND state = 'ACTIVE';";
