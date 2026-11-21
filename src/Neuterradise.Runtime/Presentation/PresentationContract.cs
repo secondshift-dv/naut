@@ -9,7 +9,7 @@ namespace Neuterradise.App.Presentation;
 public static class PresentationContract
 {
     /// <summary>The contract version this renderer implements.</summary>
-    public const int Version = 1;
+    public const int Version = 2;
 
     /// <summary>The Presentation Pack manifest schema this build reads.</summary>
     public const int PackSchemaVersion = 1;

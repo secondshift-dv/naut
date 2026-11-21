@@ -1238,6 +1238,7 @@
     <sys:String x:Key="Profile.PrivateNote">Catatan pribadi</sys:String>
     <sys:String x:Key="Profile.Rating">Rating</sys:String>
     <sys:String x:Key="Profile.RecentMedia">Media terbaru</sys:String>
+    <sys:String x:Key="Customize.HomeLayout.ShowRecently">Tampilkan Baru-baru ini</sys:String>
     <sys:String x:Key="Customize.ProfileLayout.RecentMediaVisibility">Tampilkan media terbaru di Profile. Pengaturan ini berlaku untuk semua Tata Letak Profile.</sys:String>
     <sys:String x:Key="Profile.RecentMediaCount">{0} item terbaru</sys:String>
     <sys:String x:Key="Profile.Related.Add">Tambah Profile terkait</sys:String>

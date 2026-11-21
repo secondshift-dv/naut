@@ -260,14 +260,20 @@ public sealed partial class CustomizationCenter
     private FrameworkElement BannerEffectsEditor()
     {
         var row = UI.Wrap(6);
-        var selectedEffect = _session.Resolve(PresentationSlots.BannerEffect).Definition?.DefinitionId;
-        foreach (var effect in new[] { "none", "film", "glitter", "shimmer" })
+        var selectedEffect = _session.Resolve(PresentationSlots.BannerEffect).Definition;
+        var builtIns = new[] { "none", "film", "glitter", "shimmer" };
+        var choices = builtIns.Select(id => (Reference: DefinitionRef.BuiltIn("builtin.neuterradise.effect." + id),
+            Label: UI.T("Banner.Effect." + id, id)))
+            .Concat(_services.Presentation.DefinitionsOf(DefinitionKinds.Effect)
+                .Where(definition => definition.Origin != PackOrigin.BuiltIn
+                    && definition.PlanAs<EffectPlan>().Supports(PresentationSlots.BannerEffect)
+                    && !definition.PlanAs<EffectPlan>().InteractionOnly)
+                .Select(definition => (Reference: definition.Ref, Label: definition.Name)));
+        foreach (var (reference, label) in choices)
         {
-            var value = effect;
-            var selected = selectedEffect == "builtin.neuterradise.effect." + value;
-            var label = UI.T("Banner.Effect." + effect, effect);
+            var selected = selectedEffect == reference;
             row.Children.Add(UI.Tab((selected ? "\u2713 " : string.Empty) + label, selected, () =>
-                _session.Select(PresentationSlots.BannerEffect, ScopeKind.Profile, DefinitionRef.BuiltIn("builtin.neuterradise.effect." + value))));
+                _session.Select(PresentationSlots.BannerEffect, ScopeKind.Profile, reference)));
         }
         var intensity = new Slider { Minimum = 0, Maximum = 100, StepFrequency = 1,
             Value = (_session.ProfileWorking?.Overrides.BannerEffectIntensity ?? .2) * 100 };

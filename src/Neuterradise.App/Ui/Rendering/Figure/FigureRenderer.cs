@@ -13,7 +13,12 @@ public sealed class FigureRenderer : IDisposable
     private readonly int _thread = Environment.CurrentManagedThreadId;
     private IntPtr _device, _context, _vertexShader, _pixelShader, _layout, _constants;
     private IntPtr _cullBack, _cullNone, _opaqueDepth, _blendDepth, _alphaBlend, _depthTexture, _depthView;
+    private const uint ColorFormat = 87, DepthFormat = 45, MultisampleResolve = 0x40000;
+    private static readonly float[] Transparent = [0, 0, 0, 0];
+    private readonly bool _supportsMsaa;
+    private IntPtr _colorTexture, _colorView;
     private int _width, _height;
+    private bool _reducedTargets;
     private GpuScene? _scene;
     private bool _disposed;
     private GpuMesh? _pedestal, _accentRim, _contactShadow;
@@ -33,7 +38,13 @@ public sealed class FigureRenderer : IDisposable
         _context = context;
         Marshal.AddRef(_device);
         Marshal.AddRef(_context);
-        try { CreateCommonResources(); }
+        try
+        {
+            CreateCommonResources();
+            _supportsMsaa = SupportsTwoSamples(ColorFormat) && SupportsTwoSamples(DepthFormat)
+                && FigureNative.Method<FigureD3D.CheckFormatSupport>(_device, 29)(_device, ColorFormat, out var support) >= 0
+                && (support & MultisampleResolve) != 0;
+        }
         catch { Dispose(); throw; }
     }
 
@@ -123,7 +134,10 @@ public sealed class FigureRenderer : IDisposable
         if (!float.IsFinite(camera.Yaw) || !float.IsFinite(camera.Pitch) || !float.IsFinite(camera.DistanceScale)
             || !float.IsFinite(camera.TargetOffsetX) || !float.IsFinite(camera.TargetOffsetY))
             throw new ArgumentException("Camera values must be finite.", nameof(camera));
-        EnsureDepth(width, height);
+        EnsureTargets(width, height, reduced);
+        var renderTarget = _colorView == IntPtr.Zero ? target : _colorView;
+        if (_colorView != IntPtr.Zero)
+            FigureNative.Method<FigureNative.ClearTarget>(_context, 50)(_context, renderTarget, Transparent);
         var header = scene.Header;
         var scale = header.NormalizationScale;
         const float pedestalHeight = 0.06f;
@@ -153,7 +167,7 @@ public sealed class FigureRenderer : IDisposable
         var viewProjection = Matrix4x4.CreateLookAt(eye, center, up)
             * Matrix4x4.CreatePerspectiveFieldOfView(fov, aspect, Math.Max(0.001f, distance - radius * 1.6f), distance + radius * 3);
         var viewport = new FigureD3D.Viewport { Width = width, Height = height, MaximumDepth = 1 };
-        FigureNative.Method<FigureD3D.SetTargets>(_context, 33)(_context, 1, [target], _depthView);
+        FigureNative.Method<FigureD3D.SetTargets>(_context, 33)(_context, 1, [renderTarget], _depthView);
         try
         {
             FigureNative.Method<FigureD3D.ClearDepth>(_context, FigureD3D.ClearDepthStencilViewSlot)(_context, _depthView, 1, 1, 0);
@@ -225,6 +239,12 @@ public sealed class FigureRenderer : IDisposable
             FigureNative.Method<FigureD3D.SetVertexBuffers>(_context, 18)(_context, 0, 1, [IntPtr.Zero], [48], [0]);
             FigureNative.Method<FigureD3D.SetIndexBuffer>(_context, 19)(_context, IntPtr.Zero, 42, 0);
         }
+        if (_colorTexture != IntPtr.Zero)
+        {
+            FigureNative.Method<FigureD3D.GetResource>(target, 7)(target, out var destination);
+            try { FigureNative.Method<FigureD3D.Resolve>(_context, 57)(_context, destination, 0, _colorTexture, 0, ColorFormat); }
+            finally { FigureNative.Release(ref destination); }
+        }
     }
 
     /// <summary>Diagnostic readback from the actual render target; packed little-endian BGRA, 0xAARRGGBB.</summary>
@@ -284,7 +304,7 @@ public sealed class FigureRenderer : IDisposable
         }
         finally { FigureNative.Release(ref vertexCode); FigureNative.Release(ref pixelCode); }
         _constants = CreateBuffer(new byte[Marshal.SizeOf<ShaderConstants>()], 4, immutable: false);
-        var raster = new FigureD3D.RasterizerDescription { FillMode = 3, CullMode = 3, FrontCounterClockwise = 1, DepthClipEnable = 1 };
+        var raster = new FigureD3D.RasterizerDescription { FillMode = 3, CullMode = 3, FrontCounterClockwise = 1, DepthClipEnable = 1, MultisampleEnable = 1 };
         FigureNative.Check(FigureNative.Method<FigureD3D.CreateRasterizer>(_device, 22)(_device, ref raster, out _cullBack));
         raster.CullMode = 1;
         FigureNative.Check(FigureNative.Method<FigureD3D.CreateRasterizer>(_device, 22)(_device, ref raster, out _cullNone));
@@ -483,17 +503,45 @@ public sealed class FigureRenderer : IDisposable
         return (minLinear ? 0x10u : 0) | (texture.MagFilter == 9729 ? 0x4u : 0) | (mipLinear ? 1u : 0);
     }
 
-    private void EnsureDepth(int width, int height)
+    private bool SupportsTwoSamples(uint format) =>
+        FigureNative.Method<FigureD3D.CheckSamples>(_device, 30)(_device, format, 2, out var levels) >= 0 && levels > 0;
+
+    private void EnsureTargets(int width, int height, bool reduced)
     {
-        if (_width == width && _height == height) return;
-        FigureNative.Release(ref _depthView);
-        FigureNative.Release(ref _depthTexture);
-        var desc = new FigureD3D.TextureDescription { Width = (uint)width, Height = (uint)height,
-            MipLevels = 1, ArraySize = 1, Format = 45, SampleCount = 1, BindFlags = 0x40 };
-        FigureNative.Check(FigureNative.Method<FigureD3D.CreateTexture>(_device, 5)(_device, ref desc, null, out _depthTexture));
-        FigureNative.Check(FigureNative.Method<FigureD3D.CreateView>(_device, 10)(_device, _depthTexture, IntPtr.Zero, out _depthView));
+        if (_depthView != IntPtr.Zero && _width == width && _height == height && _reducedTargets == reduced) return;
+        ReleaseTargets();
+        if (!reduced && _supportsMsaa)
+        {
+            try
+            {
+                CreateTarget(width, height, ColorFormat, 2, 0x20, 9, out _colorTexture, out _colorView);
+                CreateTarget(width, height, DepthFormat, 2, 0x40, 10, out _depthTexture, out _depthView);
+            }
+            catch (Exception exception) when (exception.HResult is unchecked((int)0x8007000E) or unchecked((int)0x80070057) or unchecked((int)0x887A0004))
+            {
+                ReleaseTargets();
+            }
+        }
+        if (_depthView == IntPtr.Zero)
+            CreateTarget(width, height, DepthFormat, 1, 0x40, 10, out _depthTexture, out _depthView);
         _width = width;
         _height = height;
+        _reducedTargets = reduced;
+    }
+
+    private void CreateTarget(int width, int height, uint format, uint samples, uint bind, int viewSlot,
+        out IntPtr texture, out IntPtr view)
+    {
+        var desc = new FigureD3D.TextureDescription { Width = (uint)width, Height = (uint)height,
+            MipLevels = 1, ArraySize = 1, Format = format, SampleCount = samples, BindFlags = bind };
+        FigureNative.Check(FigureNative.Method<FigureD3D.CreateTexture>(_device, 5)(_device, ref desc, null, out texture));
+        FigureNative.Check(FigureNative.Method<FigureD3D.CreateView>(_device, viewSlot)(_device, texture, IntPtr.Zero, out view));
+    }
+
+    private void ReleaseTargets()
+    {
+        FigureNative.Release(ref _depthView); FigureNative.Release(ref _depthTexture);
+        FigureNative.Release(ref _colorView); FigureNative.Release(ref _colorTexture);
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -525,7 +573,7 @@ public sealed class FigureRenderer : IDisposable
         _scene?.Dispose();
         _scene = null;
         _contactShadow?.Dispose(); _accentRim?.Dispose(); _pedestal?.Dispose();
-        FigureNative.Release(ref _depthView); FigureNative.Release(ref _depthTexture);
+        ReleaseTargets();
         FigureNative.Release(ref _alphaBlend); FigureNative.Release(ref _blendDepth); FigureNative.Release(ref _opaqueDepth);
         FigureNative.Release(ref _cullNone); FigureNative.Release(ref _cullBack); FigureNative.Release(ref _constants);
         FigureNative.Release(ref _layout); FigureNative.Release(ref _pixelShader); FigureNative.Release(ref _vertexShader);

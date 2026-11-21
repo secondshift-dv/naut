@@ -8,7 +8,7 @@ using SkiaSharp;
 namespace Neuterradise.App.SystemServices.Storage;
 
 public sealed record ValidatedArtifactFile(long ByteLength, string Sha256,
-    int? PixelWidth, int? PixelHeight, long? DurationMs);
+    int? PixelWidth, int? PixelHeight, long? DurationMs, bool NeedsRefresh = false);
 
 public sealed class MediaAssetFileValidator
 {
@@ -30,7 +30,7 @@ public sealed class MediaAssetFileValidator
         if (role == MediaAssetRole.ModelRender)
         {
             var file = await ModelRenderContainer.ValidateAsync(path, sourceSha256, ct).ConfigureAwait(false);
-            return new(file.ByteLength, file.Sha256, null, null, null);
+            return new(file.ByteLength, file.Sha256, null, null, null, ModelRenderContainer.NeedsAlphaMipRefresh(file.Header));
         }
         if (role is not (MediaAssetRole.Thumbnail or MediaAssetRole.Hover or MediaAssetRole.Banner))
             throw new ArgumentOutOfRangeException(nameof(role));

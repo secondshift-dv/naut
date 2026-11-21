@@ -271,6 +271,7 @@ public sealed class RepairPlanner
                 continue;
             }
             var structuralInvalid = false;
+            var derivativeNeedsRefresh = false;
             if (role == "MODEL_RENDER")
             {
                 string expectedModelPath;
@@ -286,6 +287,7 @@ public sealed class RepairPlanner
                     {
                         var valid = await new MediaAssetFileValidator().ValidateAsync(path,MediaAssetRole.ModelRender,cancellationToken,reader.GetString(8)).ConfigureAwait(false);
                         structuralInvalid = valid.ByteLength != expectedLength || valid.Sha256 != expectedSha;
+                        derivativeNeedsRefresh = !structuralInvalid && valid.NeedsRefresh;
                     }
                     catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException or ArgumentException)
                     { structuralInvalid = true; }
@@ -293,7 +295,7 @@ public sealed class RepairPlanner
             }
             var invalid = finding.Code switch
             {
-                HealthFindingCode.ArtifactContractObsolete => !MediaAssetContracts.IsSupported(DbEnum.ParseMediaAssetRole(role), version),
+                HealthFindingCode.ArtifactContractObsolete => derivativeNeedsRefresh || !MediaAssetContracts.IsSupported(DbEnum.ParseMediaAssetRole(role), version),
                 HealthFindingCode.MediaAssetMissing => !File.Exists(path),
                 HealthFindingCode.MediaAssetNeedsRepair => reader.GetString(6) == "NEEDS_REPAIR",
                 _ => role == "MODEL_RENDER" ? structuralInvalid : File.Exists(path) &&

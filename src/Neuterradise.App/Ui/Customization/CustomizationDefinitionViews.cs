@@ -154,10 +154,12 @@ public sealed partial class CustomizationCenter
         }
         if (definition.Plan is HomeLayoutPlan home)
             return new HomePreviewView(home, _session.ResolveCompiled(PresentationSlots.HomeBackdrop).PlanAs<BackdropPlan>(),
-                _session.ResolveCompiled(PresentationSlots.HomeSpotlight).PlanAs<SpotlightPlan>(), SampleData(), compact: true);
+                _session.ResolveCompiled(PresentationSlots.HomeSpotlight).PlanAs<SpotlightPlan>(), SampleData(), compact: true,
+                showRecently: _session.Resolve(PresentationSlots.HomeLayout).ShowRecently);
         if (definition.Plan is SpotlightPlan spotlight)
             return new HomePreviewView(_session.ResolveCompiled(PresentationSlots.HomeLayout).PlanAs<HomeLayoutPlan>(),
-                _session.ResolveCompiled(PresentationSlots.HomeBackdrop).PlanAs<BackdropPlan>(), spotlight, SampleData(), compact: true);
+                _session.ResolveCompiled(PresentationSlots.HomeBackdrop).PlanAs<BackdropPlan>(), spotlight, SampleData(), compact: true,
+                showRecently: _session.Resolve(PresentationSlots.HomeLayout).ShowRecently);
         if (descriptor.Id == PresentationSlots.GalleryLayout)
         {
             return GalleryLayoutOptionPreview(definition.PlanAs<GalleryLayoutPlan>());

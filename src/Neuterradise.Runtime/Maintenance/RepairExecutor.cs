@@ -263,7 +263,7 @@ public sealed class RepairExecutor
             try
             {
                 var valid = await new MediaAssetFileValidator().ValidateAsync(path,MediaAssetRole.ModelRender,cancellationToken,reader.GetString(7)).ConfigureAwait(false);
-                return valid.ByteLength == plan.ExpectedPhysicalByteLength && valid.Sha256 == plan.ExpectedPhysicalSha256
+                return !valid.NeedsRefresh && valid.ByteLength == plan.ExpectedPhysicalByteLength && valid.Sha256 == plan.ExpectedPhysicalSha256
                     ? RepairReadiness.Stale : RepairReadiness.Ready;
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException or ArgumentException)

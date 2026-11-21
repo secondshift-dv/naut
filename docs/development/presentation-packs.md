@@ -2,7 +2,7 @@
 
 Presentation customization has one transport and validation authority: a **Presentation Pack** with a `pack.json` manifest. Do not add a second standalone-theme/layout/frame loader. A pack may contain **one definition only**, so a single custom component stays lightweight while using the same validation, persistence, replacement, export, and removal path as larger packs.
 
-Presentation Contract v1 keeps manifest and binding schemas at version 1. **Settings → Appearance** is the global selector for Theme, Font and Control Style, including installed-pack definitions. **Settings → Presentation** displays the installed component library (Fonts, Frames, Backdrops and Effects) for preview and direct-file management, not selection or application. Fonts, Frames and Backdrops can be imported directly; **Packs / Advanced** owns contract pack installation, export, removal and diagnostics. Home/Profile Customize panels apply scoped components. Library cards show previews and Default/Built-in/User provenance, including whether the asset is an Individual file or Pack-managed; icons, input, accessibility, and ResourceGovernor admission remain engine-owned.
+Presentation Contract 2 keeps the manifest and binding schemas at version 1 and reads Contract 1 packs. **Settings → Appearance** is the global selector for Theme, Font and Control Style, including installed-pack definitions. **Settings → Presentation** displays the installed component library (Fonts, Frames, Backdrops and Effects) for preview and direct-file management, not selection or application. Fonts, Frames and Backdrops can be imported directly; **Packs / Advanced** owns contract pack installation, export, removal and diagnostics. Home/Profile Customize panels apply scoped components. Library cards show previews and Default/Built-in/User provenance, including whether the asset is an Individual file or Pack-managed; icons, input, accessibility, and ResourceGovernor admission remain engine-owned.
 
 Directly imported font, frame and backdrop files receive a Delete action in their own Settings library page. Naut records this import origin internally while retaining the standard pack validator, compiler and atomic removal path. Deleting a direct asset in use resets its presentation bindings; Profile and media data remain intact. `.ntpack`, ZIP, folder-based and optional packs remain contract-managed under **Packs / Advanced** and have no per-file Delete. Built-in components cannot be deleted. Earlier individual imports without a recorded origin remain pack-managed because their original intake type cannot be proven. Exporting a direct file as `.ntpack` does not carry the local origin marker; reinstalling that archive makes it pack-managed.
 
@@ -33,7 +33,7 @@ Direct image intake is intentionally static. More advanced custom frame behavior
 
 ## Manifest contract
 
-The current pack schema is `1`; the current Presentation Contract version is `1`. A minimal manifest contains:
+The current pack schema is `1` and Naut implements Presentation Contract `2`. Set `minContractVersion` to the lowest contract the definitions require. A minimal manifest contains:
 
 - `schemaVersion`, `packId`, `version`, `name`, and `minContractVersion`;
 - optional `author`, `description`, and `license`;
@@ -138,13 +138,66 @@ Media cards expose media info and one external-open action in the upper action r
 
 Declarative card image `stretch` owns fit policy: `uniform` preserves aspect with fit, `uniform-to-fill` preserves aspect with crop, and `fill` stretches both axes into the image slot. Profile framing still supplies focal point, zoom, offsets and rotation. These accepted values remain readable for installed packs.
 
-Home `hero.placement=split` selects split composition in both live and preview rendering and takes precedence over Spotlight composition. Other placements preserve the selected Spotlight composition.
+Home hero placement and the selected Spotlight style supply the default geometry. Contract 2 Spotlight styles can explicitly place identity beside, below, or over the artwork.
 
 Media `metadataLines` accepts 0–3. Nonempty name, detail and favorite groups occupy those rows; the last available row merges remaining groups. `added` uses the existing catalog addition timestamp, displayed in local culture; an absent timestamp is omitted. Zero rows intentionally hides metadata. Customization miniatures scale the complete renderer, including typography, within their finite stage; Profile framing preview scrolls the shared header at its natural height.
 
 ## Surface composition and Gallery items
 
-Home and Profile definitions may add a bounded `spec.surface` tree of stack, columns, panel, overlay, spacer, divider and semantic nodes. Trees have at most 48 nodes and depth 8. Semantic regions consume engine data and commands; they cannot execute queries or scripts. Home requires featured, activity and statistics. Profile requires identity, overview, media, related, faces, actions and review. The actions semantic remains accepted for v1 pack compatibility, but Naut places the sole destructive Delete Profile control in a shared footer after all modules; a pack cannot reposition it. The shared Figure header reserves separate space for identity and native Figure at every supported width, regardless of a pack layout. `recent-media` is an optional Profile semantic region. When present, it remains subject to the Profile-owned Recent media visibility preference; a Presentation Pack cannot force it visible, and selecting another built-in or user layout does not reset that preference. Enabling the preference does not synthesize `recent-media` into a layout that did not author it. Responsive columns collapse below 800 pixels.
+Home and Profile definitions may add a bounded `spec.surface` tree of stack, columns, panel, overlay, spacer, divider and semantic nodes. Trees have at most 48 nodes and depth 8. Semantic regions consume engine data and commands; they cannot execute queries or scripts. Contract 1 Home requires featured, activity and statistics. Contract 1 Profile requires identity, overview, media, related, faces, actions and review. The actions semantic remains accepted for v1 pack compatibility, but Naut places the sole destructive Delete Profile control in a shared footer after all modules; a pack cannot reposition it. Contract 1 layouts use the shared Profile header for the Figure. `recent-media` is an optional Profile semantic region. When present, it remains subject to the Profile-owned Recent media visibility preference; a Presentation Pack cannot force it visible, and selecting another built-in or user layout does not reset that preference. Enabling the preference does not synthesize `recent-media` into a layout that did not author it. Responsive columns collapse below 800 pixels.
+
+### Modular surfaces and artwork
+
+Keep `schemaVersion: 1` and declare `minContractVersion: 2` for the capabilities below. A `spec.surface` using `"modular": true` still requires Home's `featured` or Profile's `identity` and `media`. Other semantic regions are optional. Shell navigation remains available when Home omits `local-navigation`. Home's **Show Recently** preference defaults to on and gates `activity` independently of `recent` (Continue). It is saved with the Home layout binding and resets to on with the Home layout.
+
+A `grid` declares `rows` and `columns` using auto, star, or fixed tracks. Children use zero-based `row` and `column`, with `rowSpan` and `columnSpan` defaulting to one. Siblings can share a cell or use `overlay`; later children paint above earlier ones. Tracks without a visible child or span collapse. Put an alternate root at `surface.narrow` and its threshold in DIP at `surface.breakpoint` (default 800). Each arrangement may position the same semantic region once. The renderer selects the arrangement using available content width.
+
+This `profile-layout` spec places a single Figure next to Banner on a wide viewport and below Banner on a narrow viewport. A selected Figure has a fallback position below the layout when an arrangement omits it.
+
+```json
+{
+  "preset": "portrait",
+  "surface": {
+    "modular": true, "type": "grid", "breakpoint": 860,
+    "rows": ["auto", "auto", "auto"], "columns": ["2*", "*"],
+    "children": [
+      { "type": "semantic", "id": "banner" },
+      { "type": "semantic", "id": "figure", "column": 1 },
+      { "type": "semantic", "id": "identity", "row": 1, "columnSpan": 2 },
+      { "type": "semantic", "id": "media", "row": 2, "columnSpan": 2 }
+    ],
+    "narrow": {
+      "type": "stack",
+      "children": [
+        { "type": "semantic", "id": "banner" },
+        { "type": "semantic", "id": "figure" },
+        { "type": "semantic", "id": "identity" },
+        { "type": "semantic", "id": "media" }
+      ]
+    }
+  }
+}
+```
+
+This `spotlight-style` spec places identity and controls below a disk. Declare `disk-mask` and `disk-rim` as Image assets pointing to local PNG files in the same pack. The mask uses alpha, including transparent holes and partially transparent edges. Export both assets on matching square canvases. Declare `continuousAnimation: true` and `maxAnimatedLayers: 1` in the definition's performance object.
+
+```json
+{
+  "motion": "still",
+  "identityPlacement": "below",
+  "artwork": {
+    "aspect": 1,
+    "mask": "disk-mask",
+    "layers": [
+      { "type": "artwork" },
+      { "type": "image", "asset": "disk-rim",
+        "rotation": { "direction": "clockwise", "seconds": 18, "pivotX": 0.5, "pivotY": 0.5 } }
+    ]
+  }
+}
+```
+
+The artwork layer plays the normal Spotlight video or shows the fallback image. Rotate only the rim to keep the video upright. To turn the mask, rim and video together, move the rotation object from the rim to the artwork group. `scrim` and `effect` can also appear in the ordered group. The same group syntax is available under `spec.bannerArtwork` for a Profile layout. Banner framing and Figure controls remain outside the visual group. Rotations pause outside Full quality and with Reduced Motion enabled.
 
 Gallery definitions own only the collection container, envelope and layout, including toolbar treatment (`feed`, `catalog`, `drawer`, or v1 `standard`). Every Gallery item resolves its Profile-owned `profile.card`; a Gallery pack cannot override Card composition. The retired `itemDefinition` property is ignored when reading existing packs. `heightPattern` contains one to eight item aspects between 0.5 and 2.5; its virtualized masonry host realizes only the viewport and buffer. Media `browse` selects wall, workbench or horizontal reel; selection, paging, favorite, hover and Inspector/EXIF actions stay engine-owned.
 
@@ -160,7 +213,7 @@ Backdrop is a quiet background decision, separate from Theme, Effects and Banner
 
 The durable `appearance.control-skin` slot resolves a Control Set. V1 root radius, border width, padding, height, scrollbar size and state colors remain the fallback for every family. Optional `spec.families` objects override those values for `button`, `icon-button`, `chip`, `tab`, `input`, `toggle`, `slider` and `scrollbar`. Shared factories, native-control resources and weak registrations apply the same plan and refresh live controls. Primary accent, danger, ghost transparency and checked selection remain semantic engine colors. Commands, keyboard/pointer behavior, accessibility and selection authority remain engine-owned; signature Living Navigation remains its own component. Settings and the library display an actual miniature control sheet.
 
-An Effect declares compatible engine target ids or `all`, one of environment/particles/lighting/surface/interaction channels, and full/reduced/fallback variants. Channels remain pack/compiler metadata. Ordinary built-in runtime has one layer per Home (`effect.home`, surface-scoped), Profile (`effect.profile`, Profile-scoped), and Card (`effect.card`, Profile-scoped), with None defaults and six curated choices: **Fireflies**, **Rain**, **Snow**, **Bubbles**, **Light Sweep**, and **Wave**. Compatible user effects must support the selected target. Effects never cascade. The extended slot registry remains for pack compatibility, but built-in rendering does not attach Controls, Banner, Cover, Frame, Media, or Backdrop child effect layers. Effects render above the background/art base and below all foreground content without intercepting input.
+An Effect declares compatible engine target ids or `all`, one of environment/particles/lighting/surface/interaction channels, and full/reduced/fallback variants. Channels remain pack/compiler metadata. Ordinary built-in runtime has one layer per Home (`effect.home`, surface-scoped), Profile (`effect.profile`, Profile-scoped), and Card (`effect.card`, Profile-scoped), with None defaults and six curated choices: **Fireflies**, **Rain**, **Snow**, **Bubbles**, **Light Sweep**, and **Wave**. Compatible user effects must support the selected target. Effects never cascade. The extended slot registry remains available to packs. Banner attaches a separate Profile-scoped effect. The Banner picker offers compatible non-interaction pack effects alongside the built-in options and applies the Profile's intensity setting. Effects render above the background/art base and below all foreground content without intercepting input.
 
 Profile Customize is a right inspector over the live surface. Its Media launchers (Cover, Banner, Frame and Media) are grouped first, followed by the engine-owned 3D Figure control; Layout, Backdrop and Profile Effect follow as inline choices. The Layout group also owns the Profile-wide Recent media visibility toggle; it is not duplicated per layout definition. Cover, Banner, Frame, Media and Figure open bounded floating forms sharing the same PreviewSession. Floating Save publishes that shared session and closes Customize after success, without another inspector Save. Other floating forms use Back to return while preserving staged state; Figure Back restores only the Figure choice present at chooser entry. Clicking a Figure model directly selects it in the draft, with no additional confirmation button. Closing or clicking outside the inspector closes immediately when clean and asks before discarding when dirty. Profile editing waits for the authoritative subject snapshot before exposing choices. Card's compact icon Customize Card action opens an independent floating form for profile.card and effect.card with one real Card preview. Card customization is absent from the Profile inspector.
 

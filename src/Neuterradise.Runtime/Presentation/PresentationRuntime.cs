@@ -53,6 +53,16 @@ public sealed record ResolvedSelection(
     /// <summary>True when the value at <paramref name="scope"/> comes from a parent rather than an override there.</summary>
     public bool IsInheritedAt(ScopeKind scope) => !Chain.Any(step => step.Source == ToSource(scope) && (step.Definition is not null || step.StateJson is not null));
 
+    public bool ShowRecently
+    {
+        get
+        {
+            if (StateJson is null) return true;
+            using var state = JsonDocument.Parse(StateJson);
+            return !state.RootElement.TryGetProperty("showRecently", out var value) || value.ValueKind != JsonValueKind.False;
+        }
+    }
+
     public static ResolutionSource ToSource(ScopeKind scope) => scope switch
     {
         ScopeKind.Global => ResolutionSource.Global,
@@ -790,7 +800,10 @@ public sealed class PreviewSession
         }
         else
         {
-            Working = Working.Apply(new BindingChange(scope, ScopeIdFor(scope, slot), slot, definition, stateJson));
+            var scopeId = ScopeIdFor(scope, slot);
+            if (slot == PresentationSlots.HomeLayout && stateJson is null)
+                stateJson = Working.Get(scope, scopeId, slot)?.StateJson;
+            Working = Working.Apply(new BindingChange(scope, scopeId, slot, definition, stateJson));
             if (scope == ScopeKind.Profile && slot == PresentationSlots.ProfileFrame && ProfileWorking is { } profileState && definition is not null)
             {
                 var plan = ResolveCompiled(slot).PlanAs<FramePlan>();
@@ -819,6 +832,17 @@ public sealed class PreviewSession
             CoverFrameAnimation = animation == CoverFrameAnimation.None ? null : animation.ToString(),
             CoverShadow = frame.Family != CoverFrameFamily.None,
         };
+    }
+
+    public void SetHomeShowRecently(bool show)
+    {
+        EnsureOpen();
+        const string slot = PresentationSlots.HomeLayout;
+        var existing = Working.Get(ScopeKind.Surface, "home", slot);
+        var state = existing?.StateJson is { } json ? JsonNode.Parse(json)!.AsObject() : new JsonObject();
+        state["showRecently"] = show;
+        Working = Working.Apply(new BindingChange(ScopeKind.Surface, "home", slot, existing?.Definition, state.ToJsonString()));
+        Changed?.Invoke(this, slot);
     }
 
     /// <summary>Stores a state-only value such as Gallery density.</summary>

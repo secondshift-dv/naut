@@ -1238,6 +1238,7 @@
     <sys:String x:Key="Profile.PrivateNote">Private note</sys:String>
     <sys:String x:Key="Profile.Rating">Rating</sys:String>
     <sys:String x:Key="Profile.RecentMedia">Recent media</sys:String>
+    <sys:String x:Key="Customize.HomeLayout.ShowRecently">Show Recently</sys:String>
     <sys:String x:Key="Customize.ProfileLayout.RecentMediaVisibility">Show Recent media on the Profile. This setting applies to every Profile Layout.</sys:String>
     <sys:String x:Key="Profile.RecentMediaCount">{0} recent items</sys:String>
     <sys:String x:Key="Profile.Related.Add">Add related Profile</sys:String>

@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Neuterradise.App.Media;
 using Neuterradise.App.Presentation;
+using Neuterradise.App.SystemServices.Resources;
 
 namespace Neuterradise.App.Ui;
 
@@ -12,21 +13,25 @@ namespace Neuterradise.App.Ui;
 public sealed class HomePreviewView : Grid
 {
     private readonly bool _compact;
+    private readonly bool _showRecently;
     private readonly CardData? _data;
     private readonly HomeLayoutPlan _layout;
     private readonly SpotlightPlan _spotlight;
+    private readonly string? _videoPath;
 
     public HomePreviewView(
         HomeLayoutPlan layout,
         BackdropPlan backdropPlan,
         SpotlightPlan spotlight,
         CardData? data,
-        bool compact)
+        bool compact, bool showRecently = true, string? videoPath = null)
     {
         _layout = layout;
         _spotlight = spotlight;
         _data = data;
         _compact = compact;
+        _showRecently = showRecently;
+        _videoPath = videoPath;
         Background = ThemeRuntime.Current.Brush("canvas");
         IsHitTestVisible = false;
         MinHeight = compact ? 118 : 340;
@@ -41,11 +46,16 @@ public sealed class HomePreviewView : Grid
 
         if (layout.Surface is { } surface)
         {
-            FrameworkElement? Region(string id) => id == "featured" ? BuildHero() : BuildRail(
+            FrameworkElement? Region(string id) => id == "featured" ? BuildHero()
+                : id == "activity" && !_showRecently ? null : BuildRail(
                 HomeRailPolicy.Resolve(layout).FirstOrDefault(r => r.Id == id) ?? new HomeRailPlan(id, true, "compact", 3));
             var content = SurfaceComposer.Build(surface, Region, 1000);
-            content.Width = 1000;
-            Children.Add(new Viewbox { Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform, Child = content });
+            if (surface.Modular) Children.Add(content);
+            else
+            {
+                content.Width = 1000;
+                Children.Add(new Viewbox { Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform, Child = content });
+            }
             return;
         }
 
@@ -82,6 +92,7 @@ public sealed class HomePreviewView : Grid
             HorizontalAlignment = HorizontalAlignment.Stretch,
             IsHitTestVisible = false,
         };
+        FrameworkElement artwork = _spotlight.Artwork is { } plan ? PreviewArtwork(plan, image) : image;
         var identity = _data is null ? EmptyHero() : BuildIdentity(_data, !separated);
         var footer = UI.V(_compact ? 3 : 8, identity);
         footer.VerticalAlignment = separated ? VerticalAlignment.Center : VerticalAlignment.Stretch;
@@ -113,7 +124,7 @@ public sealed class HomePreviewView : Grid
                 { Width = new GridLength(first, GridUnitType.Star) });
             splitGrid.ColumnDefinitions.Add(new ColumnDefinition
                 { Width = new GridLength(1 - first, GridUnitType.Star) });
-            splitGrid.Children.Add(image.At(0, identityFirst ? 1 : 0));
+            splitGrid.Children.Add(artwork.At(0, identityFirst ? 1 : 0));
             splitGrid.Children.Add(footerPanel.At(0, identityFirst ? 0 : 1));
             composition = splitGrid;
         }
@@ -125,14 +136,14 @@ public sealed class HomePreviewView : Grid
                 { Height = identityFirst ? GridLength.Auto : new GridLength(1, GridUnitType.Star) });
             stackGrid.RowDefinitions.Add(new RowDefinition
                 { Height = identityFirst ? new GridLength(1, GridUnitType.Star) : GridLength.Auto });
-            stackGrid.Children.Add(image.At(identityFirst ? 1 : 0, 0));
+            stackGrid.Children.Add(artwork.At(identityFirst ? 1 : 0, 0));
             stackGrid.Children.Add(footerPanel.At(identityFirst ? 0 : 1, 0));
             composition = stackGrid;
         }
         else
         {
             var layer = new Grid();
-            layer.Children.Add(image);
+            layer.Children.Add(artwork);
             var strength = Math.Clamp(_spotlight.ScrimStrength, 0, 1);
             var bottomShade = new LinearGradientBrush
             {
@@ -157,7 +168,7 @@ public sealed class HomePreviewView : Grid
                 Color = Windows.UI.Color.FromArgb(0, shade.R, shade.G, shade.B),
                 Offset = 1,
             });
-            layer.Children.Add(new Border
+            if (_spotlight.Artwork is null) layer.Children.Add(new Border
             {
                 Background = bottomShade,
                 IsHitTestVisible = false,
@@ -179,6 +190,50 @@ public sealed class HomePreviewView : Grid
                 : theme.Brush("transparent"),
             BorderThickness = new Thickness(_layout.HeroPlacement == "inset" ? 1 : 0),
         };
+    }
+
+    private FrameworkElement PreviewArtwork(ArtworkPlan plan, SkImageView image)
+    {
+        var height = image.Height;
+        image.Height = double.NaN;
+        var media = new Grid { Children = { image } };
+        if (!_compact && _videoPath is { } path)
+        {
+            var video = new SkVideoView { Visibility = Visibility.Collapsed };
+            video.SetPresentation(_data?.BannerTransform ?? MediaTransformState.Default);
+            video.FrameReady += () => video.Visibility = Visibility.Visible;
+            video.Failed += () => video.Visibility = Visibility.Collapsed;
+            media.Children.Add(video);
+            void Update()
+            {
+                var active = media.IsLoaded && !ReducedMotionAuthority.IsReduced
+                    && ResourceGovernor.Shared.IsPrimaryVideoAllowed;
+                video.SetActive(active);
+                if (active) video.Play(path, loop: true);
+                else video.Visibility = Visibility.Collapsed;
+            }
+            void OnChanged(object? sender, EventArgs args) => UiDispatch.Run(Update);
+            media.Loaded += (_, _) =>
+            {
+                ResourceGovernor.Shared.Changed += OnChanged;
+                ReducedMotionAuthority.Changed += OnChanged;
+                Update();
+            };
+            media.Unloaded += (_, _) =>
+            {
+                ResourceGovernor.Shared.Changed -= OnChanged;
+                ReducedMotionAuthority.Changed -= OnChanged;
+                video.Stop();
+                video.Visibility = Visibility.Collapsed;
+            };
+        }
+
+        return new ArtworkCompositionView(plan, role => role switch
+        {
+            "artwork" => media,
+            "scrim" => new Border { Background = ThemeRuntime.Current.Brush("heroScrimStrong"), Opacity = .25 },
+            _ => null,
+        }) { Height = height };
     }
 
     private FrameworkElement EmptyHero()
@@ -231,6 +286,7 @@ public sealed class HomePreviewView : Grid
     {
         var rails = UI.V(_compact ? 2 : 5);
         foreach (var rail in HomeRailPolicy.Resolve(_layout)
+                     .Where(rail => _showRecently || rail.Id != HomeRailPolicy.ActivityId)
                      .Take(_compact ? 3 : 6))
         {
             rails.Children.Add(BuildRail(rail));

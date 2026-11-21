@@ -72,6 +72,12 @@ internal static class FigureD3D
     }
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    internal delegate int CheckSamples(IntPtr self, uint format, uint samples, out uint qualityLevels);
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    internal delegate int CheckFormatSupport(IntPtr self, uint format, out uint support);
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    internal delegate void Resolve(IntPtr self, IntPtr destination, uint destinationIndex, IntPtr source, uint sourceIndex, uint format);
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     internal delegate int CreateBuffer(IntPtr self, ref BufferDescription desc, ref Subresource data, out IntPtr buffer);
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     internal delegate int CreateTexture(IntPtr self, ref TextureDescription desc, [In] Subresource[]? data, out IntPtr texture);

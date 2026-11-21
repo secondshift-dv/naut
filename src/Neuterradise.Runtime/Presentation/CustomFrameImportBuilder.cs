@@ -104,7 +104,7 @@ public static class CustomFrameImportBuilder
             name = displayName,
             author = "Local user",
             description = "Custom transparent Cover frame imported in naut.",
-            minContractVersion = PresentationContract.Version,
+            minContractVersion = 1,
             assets = new[]
             {
                 new

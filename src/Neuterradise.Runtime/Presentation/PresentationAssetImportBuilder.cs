@@ -76,7 +76,7 @@ public static class PresentationAssetImportBuilder
             var manifest = new
             {
                 schemaVersion = PresentationContract.PackSchemaVersion, packId = pack, version = "1.0.0", name,
-                minContractVersion = PresentationContract.Version,
+                minContractVersion = 1,
                 assets,
                 definitions = new[] { new { id = definition.DefinitionId, kind = font ? DefinitionKinds.Typography : DefinitionKinds.Backdrop, name, spec } },
             };

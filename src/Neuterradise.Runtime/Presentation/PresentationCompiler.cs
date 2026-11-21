@@ -347,7 +347,8 @@ public sealed partial class PresentationCompiler
         context.Bool(spec, "showCover", true),
         context.Bool(spec, "showOverview", true),
         context.Enum(spec, "pagination", ["counter-rail", "counter", "none"], "counter-rail"),
-        context.Number(spec, "scrimStrength", 0.65, 0.3, 1));
+        context.Number(spec, "scrimStrength", 0.65, 0.3, 1),
+        CompileArtwork(spec, context, "artwork"), ReadIdentityPlacement(spec, context));
 
     private static GalleryLayoutPlan? CompileGalleryLayout(JsonElement spec, SpecContext context)
     {
@@ -394,7 +395,7 @@ public sealed partial class PresentationCompiler
                 return null;
             }
 
-            return new ProfileLayoutPlan(builtIn, CompileSurface(spec, context, DefinitionKinds.ProfileLayout));
+            return new ProfileLayoutPlan(builtIn, CompileSurface(spec, context, DefinitionKinds.ProfileLayout), CompileArtwork(spec, context, "bannerArtwork"));
         }
 
         if (spec.TryGetProperty("layout", out var layout) && layout.ValueKind == JsonValueKind.Object)
@@ -405,7 +406,7 @@ public sealed partial class PresentationCompiler
                 context.Error("layout", $"{diagnostic.Code}: {diagnostic.Detail}");
             }
 
-            return parsed.Definition is null ? null : new ProfileLayoutPlan(parsed.Definition, CompileSurface(spec, context, DefinitionKinds.ProfileLayout));
+            return parsed.Definition is null ? null : new ProfileLayoutPlan(parsed.Definition, CompileSurface(spec, context, DefinitionKinds.ProfileLayout), CompileArtwork(spec, context, "bannerArtwork"));
         }
 
         context.Error("layout", "A Profile layout names a built-in 'preset' or embeds a 'layout' object.");
@@ -702,6 +703,7 @@ public sealed partial class PresentationCompiler
 
     private sealed class SpecContext(PresentationPackManifest manifest, PresentationDefinition definition, IPresentationAssetStore? assets)
     {
+        public int ContractVersion => Manifest.MinContractVersion;
         private readonly List<PackDiagnostic> _diagnostics = [];
 
         public PresentationPackManifest Manifest { get; } = manifest;

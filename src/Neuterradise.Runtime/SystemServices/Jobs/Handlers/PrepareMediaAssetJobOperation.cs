@@ -346,7 +346,7 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
                 _paths.ResolveVaultRelativePath(VaultPathArea.MediaAssets, existing.RelativePath),
                 role,
                 ct, sourceHash, existing.ContractVersion).ConfigureAwait(false);
-            if (current.ByteLength == existing.ByteLength
+            if (!current.NeedsRefresh && current.ByteLength == existing.ByteLength
                 && current.Sha256 == existing.Sha256
                 && MediaAssetContracts.IsSupported(role, existing.ContractVersion))
                 return false;

@@ -16,6 +16,7 @@ using Neuterradise.App.SystemServices.Cache;
 using Neuterradise.App.SystemServices.Database;
 using Neuterradise.App.SystemServices.Database.Reads;
 using Neuterradise.App.SystemServices.Operations;
+using Neuterradise.App.Ui.Figure;
 
 namespace Neuterradise.App.Ui;
 
@@ -59,7 +60,9 @@ public sealed partial class CustomizationCenter
             case CustomizationCategories.Home:
                 stage.Children.Add(new HomePreviewView(_session.ResolveCompiled(PresentationSlots.HomeLayout).PlanAs<HomeLayoutPlan>(),
                     _session.ResolveCompiled(PresentationSlots.HomeBackdrop).PlanAs<BackdropPlan>(),
-                    _session.ResolveCompiled(PresentationSlots.HomeSpotlight).PlanAs<SpotlightPlan>(), SampleData(), compact: false));
+                    _session.ResolveCompiled(PresentationSlots.HomeSpotlight).PlanAs<SpotlightPlan>(), SampleData(), compact: false,
+                    showRecently: _session.Resolve(PresentationSlots.HomeLayout).ShowRecently,
+                    videoPath: _services.Root?.SampleHomeVideo()));
                 break;
             case CustomizationCategories.Gallery:
                 stage.Children.Add(GalleryLayoutOptionPreview(_session.ResolveCompiled(PresentationSlots.GalleryLayout).PlanAs<GalleryLayoutPlan>()));
@@ -199,6 +202,13 @@ public sealed partial class CustomizationCenter
         }
 
         var figurePreview = UpdateFigurePreviewSource();
+        var showSurface = !_figureEditorOpen && _slot == PresentationSlots.ProfileLayout;
+        var modular = showSurface && profilePlan.Surface?.Modular == true;
+        if (figurePreview is ProfileFigureView figure)
+        {
+            figure.Height = modular ? 320 : double.NaN;
+            if (modular) figure.SetActive(true);
+        }
         _profilePreviewHeader.Apply(new ProfileHeaderViewState(
             layout,
             _coverSource,
@@ -207,8 +217,9 @@ public sealed partial class CustomizationCenter
             framePlan,
             IdentityPreview,
             ReducedMotionAuthority.IsReduced, _session.LiveContext,
-            FigureView: figurePreview,
-            FigureSize: _figureEditorOpen ? 240 : 300, Tags: _subject?.Detail.AssignedTags, BannerPoster: _bannerSource));
+            FigureView: modular ? null : figurePreview,
+            FigureSize: _figureEditorOpen ? 240 : 300, Tags: _subject?.Detail.AssignedTags, BannerPoster: _bannerSource,
+            IndependentModules: modular, BannerArtwork: profilePlan.BannerArtwork));
         _profilePreviewHeader.SetActive(true);
         AttachFraming(_profilePreviewHeader.CoverFramingSurface, false);
         AttachFraming(_profilePreviewHeader.BannerFramingSurface, true);
@@ -223,20 +234,27 @@ public sealed partial class CustomizationCenter
         });
         stage.Children.Add(PresentationEffects.View(PresentationSlots.ProfileEffect, () => Context, stage,
             () => _session.ResolveCompiled(PresentationSlots.ProfileEffect).PlanAs<EffectPlan>()));
-        if (!_figureEditorOpen && _slot == PresentationSlots.ProfileLayout && profilePlan.Surface is { } surface)
+        if (showSurface && profilePlan.Surface is { } surface)
         {
             FrameworkElement? Region(string id)
             {
                 if (id == "identity") return _profilePreviewHeader;
+                if (id == "banner") return _profilePreviewHeader.BannerModule;
+                if (id == "cover") return _profilePreviewHeader.CoverModule;
+                if (id == "figure") return figurePreview;
                 if (id == "recent-media" && !profile.Overrides.ShowRecentMedia) return null;
                 return UI.Surface(UI.Text(id.Replace('-', ' '), "caption"), Material.Raised, 8, 12);
             }
             var body = SurfaceComposer.WithoutSemantic(surface, "actions");
             if (body is not null)
             {
-                var composition = SurfaceComposer.Build(body, Region, 1100);
-                composition.Width = 1100;
-                stage.Children.Add(new Viewbox { Stretch = Stretch.Uniform, Child = composition });
+                var composition = SurfaceComposer.Build(body, Region, 1100, fallbackRegion: "figure");
+                if (modular) stage.Children.Add(UI.Scroll(composition));
+                else
+                {
+                    composition.Width = 1100;
+                    stage.Children.Add(new Viewbox { Stretch = Stretch.Uniform, Child = composition });
+                }
             }
         }
         else if (_figureEditorOpen)

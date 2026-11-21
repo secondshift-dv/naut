@@ -27,7 +27,8 @@ public sealed record ProfileHeaderViewState(
     FrameworkElement? FigureView = null,
     double FigureSize = 300,
     IReadOnlyList<ProfileTagAssignment>? Tags = null,
-    Func<FrameworkElement>? DetailsFactory = null, ImageRef? BannerPoster = null);
+    Func<FrameworkElement>? DetailsFactory = null, ImageRef? BannerPoster = null,
+    bool IndependentModules = false, ArtworkPlan? BannerArtwork = null);
 
 public static class ProfileIdentityView
 {
@@ -152,6 +153,8 @@ public sealed class ProfileHeaderView : Grid, IDisposable
     {
         Visibility = Visibility.Collapsed,
     };
+    private readonly FrameworkElement _bannerEffect;
+    private ArtworkCompositionView? _artwork;
     private ProfileHeaderViewState? _state;
     private int _identityLayoutBucket = -1;
     private double _geometryWidth = -1;
@@ -162,6 +165,8 @@ public sealed class ProfileHeaderView : Grid, IDisposable
     public event Action<FrameworkElement?>? CoverFramingSurfaceChanged;
     public FrameworkElement? CoverFramingSurface => _coverView;
     public FrameworkElement BannerFramingSurface => _bannerFramingSurface;
+    public FrameworkElement? BannerModule => _bannerFrame.Visibility == Visibility.Visible ? _bannerFrame : null;
+    public FrameworkElement? CoverModule => _coverView?.Align(HorizontalAlignment.Center, VerticalAlignment.Center);
 
     public void RefreshDetails()
     {
@@ -188,17 +193,13 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-        _bannerRegion.Children.Add(_bannerPoster);
         _bannerVideo.FrameReady += () => _bannerVideo.Visibility = Visibility.Visible;
         _bannerVideo.Failed += () => _bannerVideo.Visibility = Visibility.Collapsed;
-        _bannerRegion.Children.Add(_bannerVideo);
-        _bannerRegion.Children.Add(PresentationEffects.View(PresentationSlots.BannerEffect,
+        _bannerEffect = PresentationEffects.View(PresentationSlots.BannerEffect,
             () => _state?.Context is { } context && context.Profile is { } profile
-                ? context with { Profile = profile with { Overrides = _state.Appearance } } : PresentationContext.Global));
+                ? context with { Profile = profile with { Overrides = _state.Appearance } } : PresentationContext.Global);
         PresentationEffects.SetActivityScope(_bannerRegion, () => _active);
-        _bannerRegion.Children.Add(_bannerScrim);
-        _bannerRegion.Children.Add(_bannerFramingSurface);
-        _bannerRegion.Children.Add(_tagOverlay);
+        ComposeBanner(null);
         _bannerRegion.Background = ThemeRuntime.Current.Brush("transparent");
 
         Loaded += (_, _) =>
@@ -217,6 +218,11 @@ public sealed class ProfileHeaderView : Grid, IDisposable
                 if (!_disposed && !IsLoaded) ClearBanner();
             });
         };
+        _bannerFrame.Loaded += (_, _) => UpdateBannerState();
+        _bannerFrame.Unloaded += (_, _) => DispatcherQueue?.TryEnqueue(() =>
+        {
+            if (!_disposed && !_bannerFrame.IsLoaded) ClearBanner();
+        });
         _bannerFrame.Child = _bannerRegion;
         Grid.SetColumnSpan(_bannerFrame, 2);
         Children.Add(_bannerFrame);
@@ -231,6 +237,38 @@ public sealed class ProfileHeaderView : Grid, IDisposable
             ApplyGeometry(IdentityLayoutBucket(width) != _identityLayoutBucket);
         };
     }
+    private void ComposeBanner(ArtworkPlan? plan)
+    {
+        _bannerRegion.Children.Clear();
+        SurfaceComposer.Detach(_bannerPoster);
+        SurfaceComposer.Detach(_bannerVideo);
+        SurfaceComposer.Detach(_bannerEffect);
+        SurfaceComposer.Detach(_bannerScrim);
+        if (plan is null)
+        {
+            _artwork = null;
+            _bannerRegion.Children.Add(_bannerPoster);
+            _bannerRegion.Children.Add(_bannerVideo);
+            _bannerRegion.Children.Add(_bannerEffect);
+            _bannerRegion.Children.Add(_bannerScrim);
+        }
+        else
+        {
+            var art = new Grid { Children = { _bannerPoster, _bannerVideo } };
+            _artwork = new ArtworkCompositionView(plan, role => role switch
+            {
+                "artwork" => art,
+                "scrim" => _bannerScrim,
+                "effect" => _bannerEffect,
+                _ => null,
+            });
+            _artwork.SetActive(_active);
+            _bannerRegion.Children.Add(_artwork);
+        }
+        _bannerRegion.Children.Add(_bannerFramingSurface);
+        _bannerRegion.Children.Add(_tagOverlay);
+    }
+
     public void Apply(ProfileHeaderViewState state, bool rebuildIdentity = true)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -238,13 +276,20 @@ public sealed class ProfileHeaderView : Grid, IDisposable
 
         var previousState = _state;
         var figureChanged = !ReferenceEquals(previousState?.FigureView, state.FigureView);
-        var layoutChanged = previousState is null || previousState.Layout != state.Layout;
+        var layoutChanged = previousState is null || previousState.Layout != state.Layout
+            || previousState.IndependentModules != state.IndependentModules;
+        if (layoutChanged)
+        {
+            SurfaceComposer.Detach(_bannerFrame);
+            if (!state.IndependentModules) Children.Insert(0, _bannerFrame);
+        }
         if (figureChanged && previousState?.FigureView is ProfileFigureView previous)
         {
             previous.SetActive(false);
         }
 
         _state = state;
+        if (previousState?.BannerArtwork != state.BannerArtwork) ComposeBanner(state.BannerArtwork);
         _bannerPoster.Source = state.BannerPoster;
         PresentationEffects.RefreshTree(_bannerRegion);
         if (layoutChanged || figureChanged)
@@ -269,6 +314,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
 
         var changed = _active != active;
         _active = active;
+        _artwork?.SetActive(active);
         _figureRegion.Visibility = active && _state?.FigureView is not null
             ? Visibility.Visible : Visibility.Collapsed;
 
@@ -287,6 +333,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
 
         if (_state?.FigureView is ProfileFigureView figure) figure.SetActive(false);
         _state = null;
+        ComposeBanner(null);
         _figureRegion.Content = null;
         _figureRegion.Visibility = Visibility.Collapsed;
         _identityHost.Content = null;
@@ -318,15 +365,15 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         }
         height = Math.Min(height, width < 960 ? 180.0 : width < 1200 ? 220.0 : 280.0);
 
-        var showBanner = layout.BannerMode != ProfileLayoutBannerMode.None
+        var showBanner = (state.IndependentModules || layout.BannerMode != ProfileLayoutBannerMode.None)
             && (!string.IsNullOrWhiteSpace(state.BannerVideoPath) || state.BannerPoster is not null);
-        _tagOverlay.Visibility = showBanner && layout.Id == "portrait" ? Visibility.Visible : Visibility.Collapsed;
+        _tagOverlay.Visibility = showBanner && !state.IndependentModules && layout.Id == "portrait" ? Visibility.Visible : Visibility.Collapsed;
         _tagOverlay.Margin = new Thickness(pagePadding, 16, pagePadding, 16);
         _tagOverlay.MaxWidth = CanOverlayFigure(layout, showBanner, state.FigureView is not null, width)
             ? Math.Max(0, width * 0.5 - pagePadding * 2)
             : Math.Max(0, width - pagePadding * 2);
         _tagOverlay.Content = TagCapsules.Create(state.Tags ?? [], width < 600 ? 2 : 4);
-        var wideSplit = showBanner && layout.BannerMode == ProfileLayoutBannerMode.Split && width >= 960;
+        var wideSplit = !state.IndependentModules && showBanner && layout.BannerMode == ProfileLayoutBannerMode.Split && width >= 960;
         var splitBannerOnLeft = layout.Id != "split-right";
 
         _bannerFrame.Visibility = showBanner ? Visibility.Visible : Visibility.Collapsed;
@@ -369,7 +416,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
             _bannerFrame.Height = showBanner ? height : 0;
             var contained = layout.BannerMode == ProfileLayoutBannerMode.Contained
                 || (layout.BannerMode == ProfileLayoutBannerMode.Split && width < 960);
-            _bannerFrame.Margin = contained
+            _bannerFrame.Margin = contained && !state.IndependentModules
                 ? new Thickness(pagePadding, 12, pagePadding, 0)
                 : new Thickness(0);
             _bannerFrame.CornerRadius = new CornerRadius(
@@ -406,6 +453,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
             ? Visibility.Collapsed
             : Visibility.Visible;
 
+        if (state.IndependentModules || state.BannerArtwork is not null) _bannerFrame.CornerRadius = new CornerRadius(0);
         if (rebuildIdentity)
         {
             UpdateIdentity(width);
@@ -445,31 +493,33 @@ public sealed class ProfileHeaderView : Grid, IDisposable
             coverSize *= 0.8;
         }
 
-        var coverVisual = layout.CoverPlacement == ProfileLayoutCoverPlacement.None
-            ? null
-            : new CoverFrameView
+        CoverFrameView? coverVisual = null;
+        if (state.IndependentModules || layout.CoverPlacement != ProfileLayoutCoverPlacement.None)
+        {
+            coverVisual = state.IndependentModules ? _coverView ?? new CoverFrameView() : new CoverFrameView();
+            coverVisual.Source = state.CoverSource;
+            coverVisual.Transform = MediaTransformState.FromCover(state.Appearance);
+            coverVisual.Plan = state.Frame;
+            coverVisual.Appearance = CardDataFactory.AppearanceFor(state.Appearance, state.Frame, state.ReducedMotion) with
             {
-                Source = state.CoverSource,
-                Transform = MediaTransformState.FromCover(state.Appearance),
-                Plan = state.Frame,
-                Appearance = CardDataFactory.AppearanceFor(
-                    state.Appearance,
-                    state.Frame,
-                    state.ReducedMotion) with
-                {
-                    DetailLevel = layout.CoverDetailLevel,
-                },
-                FrameMode = layout.CoverDetailLevel == Design.CoverFrames.CoverFrameDetailLevel.Hidden
-                    ? "none"
-                    : layout.CoverDetailLevel == Design.CoverFrames.CoverFrameDetailLevel.Compact ? "lite" : "full",
-                Width = coverSize,
-                Height = coverSize,
+                DetailLevel = layout.CoverDetailLevel,
             };
+            coverVisual.FrameMode = layout.CoverDetailLevel == Design.CoverFrames.CoverFrameDetailLevel.Hidden
+                ? "none"
+                : layout.CoverDetailLevel == Design.CoverFrames.CoverFrameDetailLevel.Compact ? "lite" : "full";
+            coverVisual.Width = coverVisual.Height = coverSize;
+        }
         _coverView = coverVisual;
         CoverFramingSurfaceChanged?.Invoke(coverVisual);
         FrameworkElement? cover = coverVisual;
         var identity = state.IdentityFactory()
             ?? throw new InvalidOperationException("Profile identity factory returned no visual.");
+        if (state.IndependentModules)
+        {
+            _identityHost.Content = identity;
+            _identityLayoutBucket = IdentityLayoutBucket(width);
+            return;
+        }
         var hasBanner = layout.BannerMode != ProfileLayoutBannerMode.None
             && (!string.IsNullOrWhiteSpace(state.BannerVideoPath) || state.BannerPoster is not null);
         var overlap = hasBanner && layout.CoverPlacement is
@@ -625,7 +675,8 @@ public sealed class ProfileHeaderView : Grid, IDisposable
             return;
         }
 
-        if (!_active || state.ReducedMotion || state.Layout.BannerMode == ProfileLayoutBannerMode.None
+        if (!_active || state.ReducedMotion || (state.IndependentModules ? !_bannerFrame.IsLoaded
+                : state.Layout.BannerMode == ProfileLayoutBannerMode.None)
             || !Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.IsPrimaryVideoAllowed)
         {
             PauseBanner();

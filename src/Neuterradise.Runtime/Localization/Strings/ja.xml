@@ -1238,6 +1238,7 @@
     <sys:String x:Key="Profile.PrivateNote">非公開メモ</sys:String>
     <sys:String x:Key="Profile.Rating">評価</sys:String>
     <sys:String x:Key="Profile.RecentMedia">最近のメディア</sys:String>
+    <sys:String x:Key="Customize.HomeLayout.ShowRecently">最近のアクティビティを表示</sys:String>
     <sys:String x:Key="Customize.ProfileLayout.RecentMediaVisibility">Profile に最近のメディアを表示します。この設定はすべての Profile レイアウトに適用されます。</sys:String>
     <sys:String x:Key="Profile.RecentMediaCount">最近の項目 {0} 件</sys:String>
     <sys:String x:Key="Profile.Related.Add">関連 Profile を追加</sys:String>

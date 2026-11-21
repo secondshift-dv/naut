@@ -968,6 +968,10 @@ public sealed class LibraryHealthEvaluator
                                 reader.GetString(9), cancellationToken, deep: options.Mode == HealthScanMode.Deep).ConfigureAwait(false);
                             if (valid.ByteLength != reader.GetInt64(2) || valid.Sha256 != reader.GetString(3))
                                 throw new InvalidDataException("ModelRender catalog fingerprint differs from validated bytes.");
+                            if (ModelRenderContainer.NeedsAlphaMipRefresh(valid.Header))
+                                findings.Add(new HealthFinding(HealthFindingCode.ArtifactContractObsolete,
+                                    HealthSeverity.Warning, null, assetId, null, null,
+                                    $"ModelRender '{relativePath}' can be refreshed to improve transparent texture edges.", true));
                             continue;
                         }
                     }

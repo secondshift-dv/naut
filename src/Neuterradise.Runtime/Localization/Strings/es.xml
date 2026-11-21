@@ -1238,6 +1238,7 @@
     <sys:String x:Key="Profile.PrivateNote">nota privada</sys:String>
     <sys:String x:Key="Profile.Rating">Calificación</sys:String>
     <sys:String x:Key="Profile.RecentMedia">Medios recientes</sys:String>
+    <sys:String x:Key="Customize.HomeLayout.ShowRecently">Mostrar actividad reciente</sys:String>
     <sys:String x:Key="Customize.ProfileLayout.RecentMediaVisibility">Muestra los medios recientes en el perfil. Este ajuste se aplica a todos los diseños de perfil.</sys:String>
     <sys:String x:Key="Profile.RecentMediaCount">{0} artículos recientes</sys:String>
     <sys:String x:Key="Profile.Related.Add">Agregar Profile relacionado</sys:String>

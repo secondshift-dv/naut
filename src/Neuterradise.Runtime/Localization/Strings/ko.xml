@@ -1238,6 +1238,7 @@
     <sys:String x:Key="Profile.PrivateNote">비공개 메모</sys:String>
     <sys:String x:Key="Profile.Rating">등급</sys:String>
     <sys:String x:Key="Profile.RecentMedia">최근 미디어</sys:String>
+    <sys:String x:Key="Customize.HomeLayout.ShowRecently">최근 활동 표시</sys:String>
     <sys:String x:Key="Customize.ProfileLayout.RecentMediaVisibility">Profile에 최근 미디어를 표시합니다. 이 설정은 모든 Profile 레이아웃에 적용됩니다.</sys:String>
     <sys:String x:Key="Profile.RecentMediaCount">{0} 최근 품목</sys:String>
     <sys:String x:Key="Profile.Related.Add">관련 Profile 추가</sys:String>

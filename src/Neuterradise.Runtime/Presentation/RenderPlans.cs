@@ -130,6 +130,11 @@ public sealed record HomeLayoutPlan(
     IReadOnlyList<HomeRailPlan> Rails,
     SurfaceNode? Surface = null);
 
+public sealed record ArtworkRotation(double Seconds, double PivotX, double PivotY, bool Clockwise);
+public sealed record ArtworkLayer(string Kind, string? AssetPath, ArtworkRotation? Rotation);
+public sealed record ArtworkPlan(string? MaskPath, ArtworkRotation? Rotation, IReadOnlyList<ArtworkLayer> Layers,
+    double? Aspect);
+
 public enum SpotlightGeometry { FullBleed, ArtworkLeft, IdentityLeft, ArtworkAbove, IdentityAbove }
 
 public sealed record SpotlightPlan(
@@ -140,9 +145,17 @@ public sealed record SpotlightPlan(
     bool ShowCover,
     bool ShowOverview,
     string Pagination,
-    double ScrimStrength)
+    double ScrimStrength, ArtworkPlan? Artwork = null, string IdentityPlacement = "legacy")
 {
-    public SpotlightGeometry GeometryFor(double width, string homePlacement) => Composition switch
+    public SpotlightGeometry GeometryFor(double width, string homePlacement) => IdentityPlacement switch
+    {
+        "below" => SpotlightGeometry.ArtworkAbove,
+        "beside" => width < 720 ? SpotlightGeometry.ArtworkAbove : SpotlightGeometry.ArtworkLeft,
+        "overlay" => SpotlightGeometry.FullBleed,
+        _ => LegacyGeometry(width, homePlacement),
+    };
+
+    private SpotlightGeometry LegacyGeometry(double width, string homePlacement) => Composition switch
     {
         "storefront" or "editorial" or "cinema" => SpotlightGeometry.FullBleed,
         _ => homePlacement == "split" && width >= 840 ? SpotlightGeometry.ArtworkLeft : SpotlightGeometry.FullBleed,
@@ -185,7 +198,7 @@ public sealed record GalleryLayoutPlan(
     string Toolbar = "standard",
     IReadOnlyList<double>? HeightPattern = null);
 
-public sealed record ProfileLayoutPlan(ProfileLayoutDefinition Layout, SurfaceNode? Surface = null);
+public sealed record ProfileLayoutPlan(ProfileLayoutDefinition Layout, SurfaceNode? Surface = null, ArtworkPlan? BannerArtwork = null);
 
 public sealed record FramePlan(CoverFrameDefinition Frame, string? OverlayAssetPath, double? CoverInsetFraction = null, string? OverlayAssetIdentity = null);
 

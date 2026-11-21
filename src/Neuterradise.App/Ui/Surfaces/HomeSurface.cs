@@ -34,6 +34,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     private readonly Grid _heroFrame = new();
     private readonly Grid _heroFooter = new();
     private Border? _heroArtworkHost;
+    private ArtworkCompositionView? _heroArtwork;
     private Border? _heroFooterPanel;
     private UIElement? _heroScrim;
     private TextBlock? _heroMeta;
@@ -59,6 +60,8 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     private bool _retired;
     private int _mediaGeneration;
     private HomeSpotlightViewModel? _displayedSpotlight;
+
+    public string? SampleSpotlightVideo => _vm.CurrentSpotlight?.BannerVideoPath;
 
     public CardData? SampleCard()
     {
@@ -219,6 +222,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     {
         _backdrop.IsSurfaceActive = true;
         _rotation.Start();
+        _heroArtwork?.SetActive(true);
         StartSpotlightMotion();
         SyncHeroPlayback();
         Services.RunUserAction(
@@ -231,6 +235,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     {
         _backdrop.IsSurfaceActive = false;
         _rotation.Stop();
+        _heroArtwork?.SetActive(false);
         _kenBurns?.Stop();
         _progress?.Stop();
         StopHeroVideo();
@@ -302,18 +307,36 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         };
         art.Children.Add(_heroImage);
         art.Children.Add(_heroVideo);
-        art.Children.Add(PresentationEffects.View(PresentationSlots.BannerEffect, () =>
+        var effect = PresentationEffects.View(PresentationSlots.BannerEffect, () =>
             _vm.CurrentSpotlight is { } current ? PresentationContext.ForProfile(new ProfilePresentationState(current.ProfileId, 0, null,
-                _appearance.GetValueOrDefault(current.ProfileId) ?? ProfileAppearanceOverrides.Default), "home") : Context));
+                _appearance.GetValueOrDefault(current.ProfileId) ?? ProfileAppearanceOverrides.Default), "home") : Context);
 
-        var imageLayer = new Grid();
-        imageLayer.Children.Add(art);
-        _heroScrim = Scrim();
-        imageLayer.Children.Add(_heroScrim);
+        var scrim = Scrim();
+        Grid imageLayer;
+        if (_spotlight.Artwork is { } artwork)
+        {
+            _heroArtwork = new ArtworkCompositionView(artwork, kind => kind switch
+            {
+                "artwork" => art,
+                "scrim" => scrim,
+                "effect" => effect,
+                _ => null,
+            });
+            _heroArtwork.SetActive(IsActive);
+            _heroScrim = null;
+            imageLayer = _heroArtwork;
+        }
+        else
+        {
+            _heroArtwork = null;
+            art.Children.Add(effect);
+            _heroScrim = scrim;
+            imageLayer = new Grid { Children = { art, scrim } };
+        }
         _heroArtworkHost = new Border
         {
             Child = imageLayer,
-            CornerRadius = new CornerRadius(_layout.HeroPlacement == "inset"
+            CornerRadius = new CornerRadius(_spotlight.Artwork is null && _layout.HeroPlacement == "inset"
                 ? ThemeRuntime.Current.Tokens.Number("radiusHero", 20) : 0),
         };
         _heroFrame.Children.Add(_heroArtworkHost);
@@ -335,7 +358,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         OnSpotlightChanged();
     }
 
-    private UIElement Scrim()
+    private Border Scrim()
     {
         var theme = ThemeRuntime.Current;
         var strength = Math.Clamp(_spotlight.ScrimStrength, 0, 1);
@@ -1047,6 +1070,9 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         _page.Children.Clear();
         var padding = UI.PagePadding(_root.ActualWidth > 0 ? _root.ActualWidth : 1280);
 
+        var showRecently = (Preview?.Resolve(PresentationSlots.HomeLayout)
+            ?? Services.Presentation.Resolve(PresentationSlots.HomeLayout, Context)).ShowRecently;
+
         FrameworkElement? Region(string id)
         {
             var rail = _layout.Rails.FirstOrDefault(r => r.Id == id) ?? new HomeRailPlan(id, true, "compact", 12);
@@ -1060,7 +1086,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
                 "recent" or "profiles" => ProfileRail(padding, rail, false, UI.T("Home.Rail.Recent", "Continue")),
                 "favorites" => ProfileRail(padding, rail, true, UI.T("Gallery.Favorites", "Favorites")),
                 "statistics" => PulseBar(padding, rail),
-                "activity" => ChronicleRail(padding, rail),
+                "activity" when showRecently => ChronicleRail(padding, rail),
                 "discovery" when _vm.Discovery.Count > 0 => FeaturedConnectionRail(padding),
                 "attention" when _vm.NeedsAttention.Count > 0 => AttentionRail(padding, rail.MaxItems),
                 "imports" when _vm.ActiveImports.Count > 0 => ActiveImportsRail(padding, rail.MaxItems),
@@ -1090,7 +1116,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
                 "statistics" => PulseBar(padding, rail),
                 "discovery" when _vm.Discovery.Count > 0 => FeaturedConnectionRail(padding),
                 "attention" when _vm.NeedsAttention.Count > 0 => AttentionRail(padding, rail.MaxItems),
-                "activity" => ChronicleRail(padding, rail),
+                "activity" when showRecently => ChronicleRail(padding, rail),
                 "imports" when _vm.ActiveImports.Count > 0 => ActiveImportsRail(padding, rail.MaxItems),
                 _ => null,
             };

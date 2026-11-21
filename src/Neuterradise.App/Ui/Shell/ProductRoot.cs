@@ -781,6 +781,9 @@ public sealed class ProductRoot : Grid
     public CardData? SampleHomeCard() =>
         _topLevel.Values.OfType<HomeSurface>().FirstOrDefault()?.SampleCard();
 
+    public string? SampleHomeVideo() =>
+        _topLevel.Values.OfType<HomeSurface>().FirstOrDefault()?.SampleSpotlightVideo;
+
     public Task ImportAsync(
         IEnumerable<string> paths,
         Guid? destinationProfileId,

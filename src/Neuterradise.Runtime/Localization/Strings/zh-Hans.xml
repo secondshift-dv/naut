@@ -1238,6 +1238,7 @@
     <sys:String x:Key="Profile.PrivateNote">私人笔记</sys:String>
     <sys:String x:Key="Profile.Rating">评级</sys:String>
     <sys:String x:Key="Profile.RecentMedia">最近的媒体</sys:String>
+    <sys:String x:Key="Customize.HomeLayout.ShowRecently">显示近期活动</sys:String>
     <sys:String x:Key="Customize.ProfileLayout.RecentMediaVisibility">在 Profile 中显示最近媒体。此设置适用于所有 Profile 布局。</sys:String>
     <sys:String x:Key="Profile.RecentMediaCount">{0} 近期商品</sys:String>
     <sys:String x:Key="Profile.Related.Add">添加相关Profile</sys:String>

@@ -464,6 +464,10 @@ public sealed partial class CustomizationCenter : IDisposable
                 {
                     _inspector.Children.Add(ProfileLayoutVisibilityEditor());
                 }
+                else if (descriptor.Id == PresentationSlots.HomeLayout)
+                {
+                    _inspector.Children.Add(HomeRecentlyEditor());
+                }
             }
         }
 
@@ -569,6 +573,18 @@ public sealed partial class CustomizationCenter : IDisposable
                 _editor.Children.Add(MediaEditor(descriptor));
                 break;
         }
+    }
+
+    private FrameworkElement HomeRecentlyEditor()
+    {
+        var toggle = new ToggleSwitch
+        {
+            Header = UI.T("Customize.HomeLayout.ShowRecently", "Show Recently"),
+            IsOn = _session.Resolve(PresentationSlots.HomeLayout).ShowRecently,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        toggle.Toggled += (_, _) => _session.SetHomeShowRecently(toggle.IsOn);
+        return toggle;
     }
 
     private FrameworkElement ProfileLayoutVisibilityEditor()

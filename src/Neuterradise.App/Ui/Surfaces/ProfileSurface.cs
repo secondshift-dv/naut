@@ -257,7 +257,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             }
         }
 
-        _profileHeader.SetActive(true);
+        SetHeaderActive(true);
         _backdrop.IsSurfaceActive = true;
     }
 
@@ -267,7 +267,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
     {
         _vm.ClearFolderStatus();
         _vm.CloseInspector();
-        _profileHeader.SetActive(false);
+        SetHeaderActive(false);
         _backdrop.IsSurfaceActive = false;
         HoverVideoCoordinator.Shared.StopAll();
     }
@@ -317,6 +317,12 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
 
     private void UpdateProfileHeader() => UpdateProfileHeader(forceIdentity: true);
 
+    private void SetHeaderActive(bool active)
+    {
+        _profileHeader.SetActive(active);
+        if (_surface?.Modular == true) _figureView.SetActive(active);
+    }
+
     private void UpdateProfileHeader(bool forceIdentity)
     {
         if (_vm.Profile is null)
@@ -331,7 +337,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         if (Preview is null)
             _vm.SetRecentMediaModuleVisible(
                 _layout.Modules.Any(module => module.Id == ProfileLayoutModuleId.RecentMedia && module.Visible)
-                && (_surface is null || HasRecentMediaRegion(_surface)));
+                && (_surface is null || _surface.HasRegion("recent-media") || _surface.Narrow?.HasRegion("recent-media") == true));
         _backdrop.Plan = ResolvePresentation(PresentationSlots.ProfileBackdrop, Context).PlanAs<BackdropPlan>();
         _backdrop.AmbientImagePath = Preview is not null && _hasPreviewMedia ? _previewCover?.Path : _vm.CoverSource?.Path;
         _backdrop.AmbientVideoPath = Preview is not null && _hasPreviewMedia ? _previewBannerVideo : _vm.BannerVideoPath;
@@ -340,6 +346,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             Context).PlanAs<FramePlan>();
         var identityAlignment = _layout.IdentityAlignment;
         var figureSource = ResolveFigureSource();
+        _figureView.Height = _surface?.Modular == true ? 320 : double.NaN;
         _figureView.SetSource(figureSource);
         _profileHeader.Apply(new ProfileHeaderViewState(
             _layout,
@@ -349,11 +356,12 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             frame,
             () => Identity(identityAlignment),
             ReducedMotionAuthority.IsReduced, Context,
-            FigureView: figureSource is null ? null : _figureView, Tags: _vm.AssignedTags,
-            DetailsFactory: _layout.Id == "chronicle" ? ChronicleDetails : null,
-            BannerPoster: Preview is not null && _hasPreviewMedia ? _previewBannerImage : ImageRef.FromPath(_vm.BannerPosterPath, 1600)),
+            FigureView: figureSource is null || _surface?.Modular == true ? null : _figureView, Tags: _vm.AssignedTags,
+            DetailsFactory: _layout.Id == "chronicle" && _surface?.Modular != true ? ChronicleDetails : null,
+            BannerPoster: Preview is not null && _hasPreviewMedia ? _previewBannerImage : ImageRef.FromPath(_vm.BannerPosterPath, 1600),
+             IndependentModules: _surface?.Modular == true, BannerArtwork: plan.BannerArtwork),
             rebuildIdentity: forceIdentity || previousLayout != _layout);
-        _profileHeader.SetActive(IsActive);
+        SetHeaderActive(IsActive);
     }
 
     private FigureSource? ResolveFigureSource()
@@ -415,9 +423,6 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             status: status, assignedTags: _vm.AssignedTags,
             showTags: _layout.Id != "portrait" || (string.IsNullOrWhiteSpace(_vm.BannerVideoPath) && string.IsNullOrWhiteSpace(_vm.BannerPosterPath)));
     }
-    private static bool HasRecentMediaRegion(SurfaceNode node) =>
-        node.Kind == "semantic" && node.Semantic == "recent-media" || node.Children.Any(HasRecentMediaRegion);
-
     private void QueueModulesRefresh() => QueueModulesRefresh(force: true);
 
     private void QueueModulesRefreshForResize(double width)
@@ -505,7 +510,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
 
         // Reparenting can transiently unload the native child. Reassert the logical route state
         // after the new surface tree is installed so a retained lease is made visible again.
-        _profileHeader.SetActive(IsActive);
+        SetHeaderActive(IsActive);
     }
 
     private FrameworkElement? ProfileActions()
@@ -611,7 +616,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         var appearance = Context.Profile?.Overrides ?? _vm.AppearanceOverrides ?? ProfileAppearanceOverrides.Default;
         foreach (var module in _layout.Modules
             .Where(module => module.Visible
-                && (_layout.Id != "chronicle"
+                && (_surface?.Modular == true || _layout.Id != "chronicle"
                     || module.Id is not (ProfileLayoutModuleId.Overview or ProfileLayoutModuleId.Related))
                 && (module.Id != ProfileLayoutModuleId.RecentMedia || appearance.ShowRecentMedia))
             .OrderBy(module => module.Order))
@@ -681,7 +686,14 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             // but cannot reposition the destructive Delete action above Profile modules.
             var body = SurfaceComposer.WithoutSemantic(_surface, "actions");
             if (body is null) return new Grid();
-            var composition = SurfaceComposer.Build(body, id => regions.GetValueOrDefault(id), available);
+            FrameworkElement? Region(string id) => id switch
+            {
+                "banner" => _profileHeader.BannerModule,
+                "cover" => _profileHeader.CoverModule,
+                "figure" when _vm.FigureMediaId is not null => _figureView,
+                _ => regions.GetValueOrDefault(id),
+            };
+            var composition = SurfaceComposer.Build(body, Region, available, fallbackRegion: "figure");
             composition.Width = available;
             composition.HorizontalAlignment = HorizontalAlignment.Center;
             return composition.Margin(padding, 12, padding, 18);

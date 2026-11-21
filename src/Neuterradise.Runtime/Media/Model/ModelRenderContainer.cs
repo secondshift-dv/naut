@@ -17,13 +17,19 @@ public sealed record ModelRenderMaterial(float[] BaseColor, float Metallic, floa
 public sealed record ModelRenderHeader(int ContainerVersion, int ContractVersion, string SourceSha256,
     float[] Minimum, float[] Maximum, float[] GroundOffset, float NormalizationScale,
     ModelRenderMesh[] Meshes, ModelRenderMaterial[] Materials, ModelRenderTexture[] Textures,
-    ModelRenderChunk[] Chunks);
+    ModelRenderChunk[] Chunks, int AlphaMipRevision = 0);
 public sealed record ModelRenderFile(ModelRenderHeader Header, long PayloadOffset, long ByteLength, string Sha256);
 
 /// <summary>Portable NFIG: bounded JSON descriptors and contiguous, individually hashed binary chunks.</summary>
 public static class ModelRenderContainer
 {
     public const int ContractVersion = 1;
+    public const int AlphaMipRevision = 1;
+
+    public static bool NeedsAlphaMipRefresh(ModelRenderHeader header) =>
+        header.AlphaMipRevision < AlphaMipRevision && header.Materials.Any(material =>
+            (material.AlphaMode is "MASK" or "BLEND") && material.BaseColorTexture is { } index
+            && header.Textures[index].MipChunks.Length > 1);
     public const long MaxBytes = 768L * 1024 * 1024;
     public const int MaxHeaderBytes = 1024 * 1024;
     public const int VertexStride = 48; // position, normal, UV, tangent including handedness
@@ -169,7 +175,7 @@ public static class ModelRenderContainer
 
     private static void ValidateHeader(ModelRenderHeader h, long payloadLength)
     {
-        if (h.ContainerVersion != 1 || h.ContractVersion != 1 || !IsHash(h.SourceSha256)) throw Invalid("contract");
+        if (h.ContainerVersion != 1 || h.ContractVersion != 1 || h.AlphaMipRevision is < 0 or > AlphaMipRevision || !IsHash(h.SourceSha256)) throw Invalid("contract");
         Floats(h.Minimum, 3); Floats(h.Maximum, 3); Floats(h.GroundOffset, 3);
         if (!float.IsFinite(h.NormalizationScale) || h.NormalizationScale is <= 0 or > 1_000_000) throw Invalid("normalization");
         for (var i = 0; i < 3; i++) if (h.Minimum[i] > h.Maximum[i]) throw Invalid("bounds");

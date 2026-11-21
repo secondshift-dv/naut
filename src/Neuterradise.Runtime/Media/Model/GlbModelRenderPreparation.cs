@@ -32,7 +32,7 @@ public sealed partial class GlbThumbnailPreviewAdapter
         private readonly List<ReadOnlyMemory<byte>> _payloads = [];
         private readonly List<ModelRenderChunk> _chunks = [];
         private readonly List<ModelRenderTexture> _preparedTextures = [];
-        private readonly Dictionary<(int, bool, bool, int, int, int, int), int> _textureIds = [];
+        private readonly Dictionary<(int, bool, bool, bool, int, int, int, int), int> _textureIds = [];
         private long _preparedBytes, _preparedTextureBytes, _preparedVertices, _preparedIndices;
 
         public (ModelRenderHeader, IReadOnlyList<ReadOnlyMemory<byte>>) Prepare(string hash, CancellationToken ct)
@@ -75,7 +75,7 @@ public sealed partial class GlbThumbnailPreviewAdapter
             var center = (_maximum + _minimum) * 0.5f;
             return (new ModelRenderHeader(1, 1, hash, [_minimum.X, _minimum.Y, _minimum.Z],
                 [_maximum.X, _maximum.Y, _maximum.Z], [-center.X, -_minimum.Y, -center.Z], scale,
-                meshes.ToArray(), materials.ToArray(), _preparedTextures.ToArray(), _chunks.ToArray()), _payloads);
+                meshes.ToArray(), materials.ToArray(), _preparedTextures.ToArray(), _chunks.ToArray(), ModelRenderContainer.AlphaMipRevision), _payloads);
 
             void AddMesh(Vertex[] vertices, int[] indices, int material, int lod)
             {
@@ -129,7 +129,7 @@ public sealed partial class GlbThumbnailPreviewAdapter
             var alpha = m.TryGetProperty("alphaMode",out var alphaValue) ? alphaValue.GetString()! : "OPAQUE";
             if (alpha is not ("OPAQUE" or "MASK" or "BLEND")) throw new InvalidDataException("Invalid GLB alpha mode.");
             return new(baseColor, metallic, roughness, emissive,
-                TextureReference(pbr, "baseColorTexture", true, false, ct), TextureReference(pbr, "metallicRoughnessTexture", false, false, ct),
+                TextureReference(pbr, "baseColorTexture", true, false, ct, alpha != "OPAQUE"), TextureReference(pbr, "metallicRoughnessTexture", false, false, ct),
                 TextureReference(m, "normalTexture", false, true, ct), TextureReference(m, "occlusionTexture", false, false, ct),
                 TextureReference(m, "emissiveTexture", true, false, ct), normalScale, strength, alpha, cutoff,
                 m.TryGetProperty("doubleSided", out var two) && two.GetBoolean());
@@ -141,7 +141,7 @@ public sealed partial class GlbThumbnailPreviewAdapter
                 throw new InvalidDataException("GLB material factor is non-finite or outside its range.");
             return value;
         }
-        private int? TextureReference(JsonElement material, string key, bool srgb, bool normal, CancellationToken ct)
+        private int? TextureReference(JsonElement material, string key, bool srgb, bool normal, CancellationToken ct, bool alphaWeighted = false)
         {
             if (material.ValueKind != JsonValueKind.Object || !material.TryGetProperty(key, out var info)) return null;
             if (Int(info, "texCoord") != 0) throw new NotSupportedException("Only TEXCOORD_0 material bindings are supported.");
@@ -156,7 +156,7 @@ public sealed partial class GlbThumbnailPreviewAdapter
             if (wrapS is not (33071 or 33648 or 10497) || wrapT is not (33071 or 33648 or 10497)
                 || minFilter is not (9728 or 9729 or 9984 or 9985 or 9986 or 9987) || magFilter is not (9728 or 9729))
                 throw new InvalidDataException("Invalid GLB sampler enumerant.");
-            var cacheKey = (image, srgb, normal, wrapS, wrapT, minFilter, magFilter);
+            var cacheKey = (image, srgb, normal, alphaWeighted, wrapS, wrapT, minFilter, magFilter);
             if (_textureIds.TryGetValue(cacheKey, out var existing)) return existing;
             var bitmap = Texture(image);
             var width = bitmap.Width; var height = bitmap.Height;
@@ -197,9 +197,12 @@ public sealed partial class GlbThumbnailPreviewAdapter
                             var at = (Math.Min(height-1,y*2+dy)*width+Math.Min(width-1,x*2+dx))*4;
                             var value = new Vector4(pixels[at]/255f,pixels[at+1]/255f,pixels[at+2]/255f,pixels[at+3]/255f);
                             if (srgb) value = new(ToLinear(value.X),ToLinear(value.Y),ToLinear(value.Z),value.W);
+                            if (alphaWeighted) value = new(value.X * value.W, value.Y * value.W, value.Z * value.W, value.W);
                             sum += value;
                         }
                         sum *= 0.25f;
+                        if (alphaWeighted && sum.W > 0)
+                            sum = new(sum.X / sum.W, sum.Y / sum.W, sum.Z / sum.W, sum.W);
                         if (normal)
                         {
                             var direction = Unit(new(sum.X*2-1,sum.Y*2-1,sum.Z*2-1), Vector3.UnitZ);
