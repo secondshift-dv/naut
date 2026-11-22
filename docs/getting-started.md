@@ -4,13 +4,13 @@
 
 Download **Naut v0.0.34** from the official [GitHub Releases](https://github.com/secondshift-dv/naut/releases/tag/v0.0.34) page.
 
-The Windows package is portable. Extract the complete ZIP to a normal folder; do not run only the EXE from inside the archive.
+The Windows package is portable. Extract the complete ZIP into a new folder before running Naut.
 
 ## 2. Start Naut
 
 Run `naut.exe`.
 
-Keep `runtime/` and `release-manifest.json` beside `naut.exe`. They are part of the application package.
+Keep `runtime/` and `release-manifest.json` beside `naut.exe`. Check the Naut product version in **Settings → About**. Windows file properties for the top-level `naut.exe` show the launcher's component version.
 
 ## 3. Choose where to keep your Vault
 

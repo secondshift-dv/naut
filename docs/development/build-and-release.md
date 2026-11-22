@@ -11,7 +11,7 @@ pwsh ./scripts/verify.ps1 -Scope Source
 pwsh ./scripts/build.ps1
 ```
 
-The canonical build writes the portable application and verified release inputs under `dist/`. The launcher and replacement helper are compressed self-contained executables. App and Runtime track `ProductVersion`. Supporting components use their own version metadata and omit the repository commit, which is recorded in build provenance.
+The canonical build writes the portable application and verified release inputs under `dist/`. The launcher and replacement helper are compressed self-contained executables. App and Runtime track `ProductVersion`. The top-level launcher and other supporting components report their component versions in Windows file properties. To identify the packaged product, check `release-manifest.json` and the exact source commit in `build-provenance.json`.
 
 ## GitHub Actions
 
