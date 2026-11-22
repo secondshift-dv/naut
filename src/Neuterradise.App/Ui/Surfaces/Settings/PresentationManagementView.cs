@@ -9,6 +9,8 @@ namespace Neuterradise.App.Ui;
 
 public sealed class PresentationManagementView
 {
+    internal const string DefaultTab = "packs";
+
     private static readonly HashSet<string> Tabs = new(StringComparer.Ordinal)
     {
         "fonts",
@@ -27,7 +29,7 @@ public sealed class PresentationManagementView
     {
         _services = services;
         _tabChanged = tabChanged;
-        _tab = selectedTab is not null && Tabs.Contains(selectedTab) ? selectedTab : "fonts";
+        _tab = selectedTab is not null && Tabs.Contains(selectedTab) ? selectedTab : DefaultTab;
         Render();
     }
 
@@ -43,11 +45,11 @@ public sealed class PresentationManagementView
         var components = UI.Wrap(6);
         foreach (var (id, key, fallback) in new[]
         {
+            (DefaultTab, "Settings.Presentation.PacksAdvanced", "Packs / Advanced"),
+            ("effects", "Settings.Presentation.Effects", "Effects"),
             ("fonts", "Settings.Presentation.Fonts", "Fonts"),
             ("frames", "Settings.Presentation.Frames", "Frames"),
             ("backdrops", "Settings.Presentation.Backdrops", "Backdrops"),
-            ("effects", "Settings.Presentation.Effects", "Effects"),
-            ("packs", "Settings.Presentation.PacksAdvanced", "Packs / Advanced"),
         })
         {
             var value = id;
@@ -60,9 +62,9 @@ public sealed class PresentationManagementView
             UI.WrappedText(UI.T("Settings.Presentation.Library.Notice",
                 "Preview and manage imported files here. Choose Theme, Font and Control Style in Appearance; select other components in Customize."), "body")));
         _editor.Children.Add(UI.V(4,
-            UI.Text(UI.T("Settings.Presentation.Assets", "Importable assets"), "micro", "textMuted"), assets,
-            UI.Text(UI.T("Settings.Presentation.Components", "Pack components"), "micro", "textMuted").Margin(0, 4, 0, 0), components));
-        if (_tab == "packs")
+            UI.Text(UI.T("Settings.Presentation.Components", "Pack components"), "micro", "textMuted"), components,
+            UI.Text(UI.T("Settings.Presentation.Assets", "Importable assets"), "micro", "textMuted").Margin(0, 4, 0, 0), assets));
+        if (_tab == DefaultTab)
         {
             RenderPacksAdvanced();
             return;

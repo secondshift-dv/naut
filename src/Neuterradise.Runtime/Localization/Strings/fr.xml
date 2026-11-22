@@ -882,6 +882,9 @@
     <sys:String x:Key="Customize.OpenFromProfile">Ouvrez un Profile et choisissez Personnaliser Profile pour modifier ses Cover, Banner et son cadre. Les valeurs par défaut globales de Profile sont inférieures une fois qu'un Profile est ouvert.</sys:String>
     <sys:String x:Key="Customize.PackCounts">Définitions {0} · Actifs {1} · utilisés dans les lieux {2}</sys:String>
     <sys:String x:Key="Customize.PackFile">Dossier de présentation</sys:String>
+    <sys:String x:Key="Customize.PickPack">Choisir dans un pack</sys:String>
+    <sys:String x:Key="Customize.SearchPacks">Rechercher des packs</sys:String>
+    <sys:String x:Key="Customize.NoMatchingPacks">Aucun pack compatible trouvé.</sys:String>
     <sys:String x:Key="Customize.Packs">Packs de présentation</sys:String>
     <sys:String x:Key="Customize.PacksDesc">Les packs ajoutent des thèmes, des arrière-plans, des cartes, des mises en page, des cadres et des styles multimédias. Un pack peut contenir une seule définition, donc un thème, une mise en page ou un cadre autonome n'a pas besoin de remplissage. Installez un dossier contenant pack.json ou un .ntpack/.zip ; les données et l'art sont validés avant l'installation et jamais importés en tant que support.</sys:String>
     <sys:String x:Key="Customize.Previewing">Aperçu des modifications. Rien n'est enregistré jusqu'à l'application.</sys:String>

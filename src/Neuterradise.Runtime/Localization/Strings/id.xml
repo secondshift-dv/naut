@@ -882,6 +882,9 @@
     <sys:String x:Key="Customize.OpenFromProfile">Pilih Profile di atas untuk menyunting Cover, Banner, dan bingkainya.</sys:String>
     <sys:String x:Key="Customize.PackCounts">{0} definisi · {1} aset · dipakai di {2} tempat</sys:String>
     <sys:String x:Key="Customize.PackFile">Paket presentasi</sys:String>
+    <sys:String x:Key="Customize.PickPack">Pilih dari Pack</sys:String>
+    <sys:String x:Key="Customize.SearchPacks">Cari pack</sys:String>
+    <sys:String x:Key="Customize.NoMatchingPacks">Tidak ada pack yang cocok.</sys:String>
     <sys:String x:Key="Customize.Packs">Paket presentasi</sys:String>
     <sys:String x:Key="Customize.PacksDesc">Paket menambahkan tema, latar, kartu, tata letak, bingkai, dan gaya media. Satu paket boleh hanya berisi satu definisi, jadi tema, tata letak, atau bingkai tunggal tidak memerlukan isi tambahan. Pasang folder yang berisi pack.json, atau berkas .ntpack/.zip; data dan karya seni divalidasi sebelum dipasang dan tidak pernah diimpor sebagai media.</sys:String>
     <sys:String x:Key="Customize.Previewing">Pratinjau perubahan. Tidak ada yang disimpan sebelum memilih Simpan perubahan.</sys:String>

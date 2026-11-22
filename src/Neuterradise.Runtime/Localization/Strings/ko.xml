@@ -882,6 +882,9 @@
     <sys:String x:Key="Customize.OpenFromProfile">Profile을 열고 Profile 사용자 정의를 선택하여 Cover, Banner 및 프레임을 편집합니다. Profile이 열리면 전역 Profile 기본값은 다음과 같습니다.</sys:String>
     <sys:String x:Key="Customize.PackCounts">{0} 정의 · {1} 자산 · {2} 장소에서 사용됨</sys:String>
     <sys:String x:Key="Customize.PackFile">프레젠테이션 팩</sys:String>
+    <sys:String x:Key="Customize.PickPack">팩에서 선택</sys:String>
+    <sys:String x:Key="Customize.SearchPacks">팩 검색</sys:String>
+    <sys:String x:Key="Customize.NoMatchingPacks">호환되는 팩을 찾을 수 없습니다.</sys:String>
     <sys:String x:Key="Customize.Packs">프레젠테이션 팩</sys:String>
     <sys:String x:Key="Customize.PacksDesc">팩에는 테마, 배경, 카드, 레이아웃, 프레임 및 미디어 스타일이 추가됩니다. 팩에는 하나의 정의만 포함될 수 있으므로 독립형 테마, 레이아웃 또는 프레임에는 필러가 필요하지 않습니다. pack.json 또는 .ntpack/.zip가 포함된 폴더를 설치합니다. 데이터와 아트는 설치 전에 검증되며 미디어로 가져오지 않습니다.</sys:String>
     <sys:String x:Key="Customize.Previewing">변경사항을 미리 보는 중입니다. 적용 전까지는 아무것도 저장되지 않습니다.</sys:String>

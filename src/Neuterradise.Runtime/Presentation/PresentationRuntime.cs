@@ -352,6 +352,9 @@ public sealed class PresentationRuntime
         return ResolveCompiled(slot, context, bindings).PlanAs<T>();
     }
 
+    public static bool SupportsBannerEffect(CompiledDefinition definition) =>
+        definition.Plan is EffectPlan effect && effect.Supports(PresentationSlots.BannerEffect) && !effect.InteractionOnly;
+
     public ProfileMediaPresentation ResolveMedia(ProfilePresentationState profile) => profile.Media;
 
     private bool IsUsable(DefinitionRef reference, string? kind, string? slot = null) =>
@@ -734,7 +737,7 @@ public sealed class PreviewSession
         ProfileWorking = context.Profile;
     }
 
-    public event EventHandler<string>? Changed;
+    public event EventHandler<string?>? Changed;
 
     public PresentationContext Context { get; private set; }
 
@@ -777,15 +780,90 @@ public sealed class PreviewSession
         _ => ScopeIds.Of(Context.ItemId ?? throw new InvalidOperationException("This preview has no item.")),
     };
 
+    private static readonly string[] HomePackSlots =
+    [
+        PresentationSlots.HomeLayout, PresentationSlots.HomeSpotlight,
+        PresentationSlots.HomeBackdrop, PresentationSlots.HomeEffect,
+    ];
+
+    private static readonly string[] ProfilePackSlots =
+    [
+        PresentationSlots.ProfileLayout, PresentationSlots.ProfileMediaLayout,
+        PresentationSlots.ProfileBackdrop, PresentationSlots.ProfileEffect,
+        PresentationSlots.ProfileFrame, PresentationSlots.BannerEffect,
+        PresentationSlots.ProfileCard, PresentationSlots.CardEffect,
+    ];
+
+    private IReadOnlyList<string> PackSlots => Context.Surface switch
+    {
+        CustomizationCategories.Home => HomePackSlots,
+        CustomizationCategories.Profile when ProfileWorking is not null => ProfilePackSlots,
+        _ => [],
+    };
+
+    public IReadOnlyList<InstalledPack> CompatiblePacks()
+    {
+        var slots = PackSlots;
+        if (slots.Count == 0) return [];
+        return _runtime.Packs.Where(pack => IsSelectablePack(pack)
+            && slots.Any(slot => FirstPackDefinition(pack, slot) is not null)).ToArray();
+    }
+
+    public bool TrySelectPack(string packId)
+    {
+        EnsureOpen();
+        var slots = PackSlots;
+        if (slots.Count == 0 || !_runtime.PackStore.TryGetPack(packId, out var pack)
+            || pack is null || !IsSelectablePack(pack)) return false;
+
+        var scope = Context.Surface == CustomizationCategories.Home ? ScopeKind.Surface : ScopeKind.Profile;
+        var selections = slots.Select(slot => (Slot: slot, Definition: FirstPackDefinition(pack, slot))).ToArray();
+        var found = false;
+        foreach (var (slot, definition) in selections)
+        {
+            if (definition is null) continue;
+            SelectCore(slot, scope, definition.Ref, null, definition);
+            found = true;
+        }
+
+        if (found) Changed?.Invoke(this, null);
+        return found;
+    }
+
+    private static bool IsSelectablePack(InstalledPack pack) =>
+        pack.Origin == PackOrigin.User && pack.IsUsable && !pack.IsStandaloneAsset;
+
+    private CompiledDefinition? FirstPackDefinition(InstalledPack pack, string slot)
+    {
+        var kind = PresentationSlots.Get(slot).Kind;
+        foreach (var definition in pack.Manifest.Definitions)
+        {
+            if (definition.Kind == kind
+                && _runtime.Find(new DefinitionRef(pack.PackId, definition.Id)) is { } compiled
+                && compiled.Kind == kind
+                && PresentationRuntime.SupportsSlot(compiled, slot)
+                && (slot != PresentationSlots.BannerEffect || PresentationRuntime.SupportsBannerEffect(compiled)))
+                return compiled;
+        }
+        return null;
+    }
+
     /// <summary>Selects a definition (and optional state) for a slot at a scope.</summary>
     public void Select(string slot, ScopeKind scope, DefinitionRef? definition, string? stateJson = null)
     {
         EnsureOpen();
         var descriptor = PresentationSlots.Get(slot);
         if (!descriptor.AllowsScope(scope)) throw new ArgumentException("The selection scope is unsupported.");
-        if (definition is { } selected && (_runtime.Find(selected) is not { } compiled || compiled.Kind != descriptor.Kind
+        var compiled = _runtime.Find(definition);
+        if (definition is not null && (compiled is null || compiled.Kind != descriptor.Kind
             || !PresentationRuntime.SupportsSlot(compiled, slot)))
             throw new ArgumentException("The definition does not support this presentation slot.");
+        SelectCore(slot, scope, definition, stateJson, compiled);
+        Changed?.Invoke(this, slot);
+    }
+
+    private void SelectCore(string slot, ScopeKind scope, DefinitionRef? definition, string? stateJson, CompiledDefinition? compiled)
+    {
         if (scope == ScopeKind.Profile && PresentationRuntime.IsBridgedProfileSlot(slot) && ProfileWorking is { } profile && definition is { } reference
             && PresentationRuntime.LegacyValueFor(slot, reference) is { } legacy)
         {
@@ -806,14 +884,12 @@ public sealed class PreviewSession
             if (slot == PresentationSlots.HomeLayout && stateJson is null)
                 stateJson = Working.Get(scope, scopeId, slot)?.StateJson;
             Working = Working.Apply(new BindingChange(scope, scopeId, slot, definition, stateJson));
-            if (scope == ScopeKind.Profile && slot == PresentationSlots.ProfileFrame && ProfileWorking is { } profileState && definition is not null)
+            if (scope == ScopeKind.Profile && slot == PresentationSlots.ProfileFrame && ProfileWorking is { } profileState
+                && compiled?.Plan is FramePlan plan)
             {
-                var plan = ResolveCompiled(slot).PlanAs<FramePlan>();
                 ProfileWorking = profileState with { Overrides = FrameAppearance(profileState.Overrides, plan.Frame, plan.OverlayAssetPath is not null) };
             }
         }
-
-        Changed?.Invoke(this, slot);
     }
 
     private static ProfileAppearanceOverrides FrameAppearance(ProfileAppearanceOverrides current, CoverFrameDefinition frame, bool hasOverlay = false)

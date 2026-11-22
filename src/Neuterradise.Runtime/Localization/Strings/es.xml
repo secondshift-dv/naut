@@ -882,6 +882,9 @@
     <sys:String x:Key="Customize.OpenFromProfile">Abra un Profile y elija Personalizar Profile para editar su Cover, Banner y su marco. Los valores predeterminados globales de Profile se encuentran a continuación una vez que se abre un Profile.</sys:String>
     <sys:String x:Key="Customize.PackCounts">Definiciones de {0} · Activos de {1} · utilizados en lugares de {2}</sys:String>
     <sys:String x:Key="Customize.PackFile">Paquete de presentación</sys:String>
+    <sys:String x:Key="Customize.PickPack">Elegir desde un paquete</sys:String>
+    <sys:String x:Key="Customize.SearchPacks">Buscar paquetes</sys:String>
+    <sys:String x:Key="Customize.NoMatchingPacks">No se encontraron paquetes compatibles.</sys:String>
     <sys:String x:Key="Customize.Packs">Paquetes de presentación</sys:String>
     <sys:String x:Key="Customize.PacksDesc">Los paquetes agregan temas, fondos, tarjetas, diseños, marcos y estilos multimedia. Un paquete puede contener solo una definición, por lo que un tema, diseño o marco independiente no necesita relleno. Instale una carpeta que contenga pack.json o .ntpack/.zip; Los datos y el arte se validan antes de la instalación y nunca se importan como medios.</sys:String>
     <sys:String x:Key="Customize.Previewing">Vista previa de cambios. No se guarda nada hasta Aplicar.</sys:String>

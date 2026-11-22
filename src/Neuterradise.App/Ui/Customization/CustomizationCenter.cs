@@ -316,7 +316,7 @@ public sealed partial class CustomizationCenter : IDisposable
         RenderAll();
     }
 
-    private void OnSessionChanged(object? sender, string slot)
+    private void OnSessionChanged(object? sender, string? slot)
     {
         if (_framingEdit && _session.ProfileWorking is { } framing)
         {
@@ -405,6 +405,65 @@ public sealed partial class CustomizationCenter : IDisposable
         UpdateStatus();
     }
 
+    private FrameworkElement PackPicker()
+    {
+        IReadOnlyList<InstalledPack> packs = [];
+        var results = UI.V(4);
+        var scroll = UI.Scroll(results);
+        scroll.MaxHeight = 240;
+        var list = UI.V(6);
+        list.Visibility = Visibility.Collapsed;
+        var search = UI.Input(UI.T("Customize.SearchPacks", "Search packs"), changed: RenderMatches);
+        list.Children.Add(search);
+        list.Children.Add(scroll);
+
+        var open = UI.Button(UI.T("Customize.PickPack", "Select from pack"), () =>
+        {
+            if (list.Visibility == Visibility.Visible)
+            {
+                list.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            packs = _session.CompatiblePacks();
+            RenderMatches(search.Text);
+            list.Visibility = Visibility.Visible;
+            search.Focus(FocusState.Programmatic);
+        }, ButtonKind.Secondary);
+        open.HorizontalAlignment = HorizontalAlignment.Stretch;
+        return UI.V(6, open, list);
+
+        void RenderMatches(string query)
+        {
+            query = query.Trim();
+            results.Children.Clear();
+            foreach (var pack in packs.OrderBy(pack => pack.Manifest.Name, StringComparer.CurrentCultureIgnoreCase))
+            {
+                if (!pack.Manifest.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)
+                    && !pack.PackId.Contains(query, StringComparison.OrdinalIgnoreCase)) continue;
+
+                var option = UI.Button(pack.Manifest.Name, () =>
+                {
+                    if (_session.TrySelectPack(pack.PackId))
+                    {
+                        list.Visibility = Visibility.Collapsed;
+                        return;
+                    }
+
+                    packs = _session.CompatiblePacks();
+                    RenderMatches(query);
+                }, ButtonKind.Ghost);
+                option.HorizontalAlignment = HorizontalAlignment.Stretch;
+                option.HorizontalContentAlignment = HorizontalAlignment.Left;
+                results.Children.Add(option.Tip(pack.PackId));
+            }
+
+            if (results.Children.Count == 0)
+                results.Children.Add(UI.WrappedText(
+                    UI.T("Customize.NoMatchingPacks", "No compatible packs found."), "caption", "textMuted"));
+        }
+    }
+
     private void RenderInspector()
     {
         _inspector.Children.Clear();
@@ -414,6 +473,9 @@ public sealed partial class CustomizationCenter : IDisposable
             _inspector.Children.Add(UI.Text(UI.T("Customize.Loading.ProfileCard", "Loading this Profile's card…"), "body-muted"));
             return;
         }
+
+        if (_category is CustomizationCategories.Home or CustomizationCategories.Profile)
+            _inspector.Children.Add(PackPicker());
 
         _inspector.Children.Add(UI.Guidance(
             UI.T("Customize.PreviewNote.Title", "Preview note"),

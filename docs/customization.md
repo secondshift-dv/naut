@@ -4,9 +4,18 @@ Naut separates collection data from presentation choices. You can change how Hom
 
 ## Appearance
 
-**Settings → Appearance** is where users select the installed Theme, Typography and Control Style. Naut provides three curated primary themes (Obsidian, Logbook, Foundry) and three distinct built-in Control Styles. The **Settings → Presentation** screen lists installed presentation resources and packs; it is a library view rather than the place where every layout is applied.
+**Settings → Appearance** is where users select the installed Theme, Typography and Control Style. Naut provides three curated primary themes (Obsidian, Logbook, Foundry) and three distinct built-in Control Styles. **Settings → Presentation** opens on **Packs / Advanced** for pack installation and management. The other tabs list individual presentation resources.
 
 Use the contextual **Customize** action on Home, Gallery, Cards or Profiles to apply layout, frame, backdrop and effect choices to the relevant surface. The built-in Home, Spotlight, Profile, Card, Media and Gallery categories each offer three curated alternatives. Saved legacy selections resolve through compatibility mappings; installed-pack selections remain independent when their definitions are available.
+
+## Select from pack
+
+Open **Customize Home** or **Customize Profile**, choose **Select from pack**, and search your installed packs in the inspector. One selection previews the pack's available components for that editor.
+
+- **Home** fills Layout, Spotlight Layout, Backdrop and Effect.
+- **Profile** fills Profile Layout, Media Layout, Backdrop, Profile Effect, Frame, Banner Effect, Card Layout and Card Effect for the Profile being edited.
+
+Naut uses the first compatible definition for each slot. A missing slot keeps its current selection. Try another pack or edit any component individually before choosing **Save Changes**. **Cancel** returns to the saved appearance. Gallery has its own layout picker, and each of its cards follows its Profile's Card choices.
 
 ## Home and Gallery
 

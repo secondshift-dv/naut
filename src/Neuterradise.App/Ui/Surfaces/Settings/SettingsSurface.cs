@@ -31,7 +31,7 @@ public sealed class SettingsSurface : Surface
     private SettingsSection _renderedSection;
     private SettingsSubsection? _renderedSubsection;
     private string _appearanceTab = "theme";
-    private string _presentationTab = "fonts";
+    private string _presentationTab = PresentationManagementView.DefaultTab;
 
     public SettingsSurface(AppServices services, SettingsViewModel vm) : base(services)
     {
@@ -136,7 +136,13 @@ public sealed class SettingsSurface : Surface
             SettingsRoute settings => settings,
             _ => new SettingsRoute(),
         };
+        var refreshOpenPresentation = target.Section == SettingsSection.Presentation
+            && _vm.ActiveSection == target.Section && _vm.ActiveSubsection == target.Subsection
+            && _presentationTab != PresentationManagementView.DefaultTab;
+        if (target.Section == SettingsSection.Presentation)
+            _presentationTab = PresentationManagementView.DefaultTab;
         _vm.ApplyRoute(target);
+        if (refreshOpenPresentation) Render();
     }
 
     private void RenderRail()

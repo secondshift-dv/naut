@@ -882,6 +882,9 @@
     <sys:String x:Key="Customize.OpenFromProfile">Open a Profile and choose Customize Profile to edit its Cover, Banner and frame. Global Profile defaults are below once a Profile is open.</sys:String>
     <sys:String x:Key="Customize.PackCounts">{0} definitions · {1} assets · used in {2} places</sys:String>
     <sys:String x:Key="Customize.PackFile">Presentation pack</sys:String>
+    <sys:String x:Key="Customize.PickPack">Select from pack</sys:String>
+    <sys:String x:Key="Customize.SearchPacks">Search packs</sys:String>
+    <sys:String x:Key="Customize.NoMatchingPacks">No compatible packs found.</sys:String>
     <sys:String x:Key="Customize.Packs">Presentation packs</sys:String>
     <sys:String x:Key="Customize.PacksDesc">Packs add themes, backdrops, cards, layouts, frames and media styles. A pack may contain just one definition, so a standalone theme, layout or frame does not need filler. Install a folder containing pack.json, or a .ntpack/.zip; data and art are validated before installation and never imported as media.</sys:String>
     <sys:String x:Key="Customize.Previewing">Previewing changes. Nothing is saved until Save changes.</sys:String>

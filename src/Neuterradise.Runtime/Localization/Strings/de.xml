@@ -882,6 +882,9 @@
     <sys:String x:Key="Customize.OpenFromProfile">Öffnen Sie ein Profile und wählen Sie „Profile anpassen“, um dessen Cover, Banner und den Rahmen zu bearbeiten. Die globalen Standardwerte für Profile sind unten aufgeführt, sobald ein Profile geöffnet ist.</sys:String>
     <sys:String x:Key="Customize.PackCounts">{0}-Definitionen · {1}-Assets · in {2}-Orten verwendet</sys:String>
     <sys:String x:Key="Customize.PackFile">Präsentationspaket</sys:String>
+    <sys:String x:Key="Customize.PickPack">Aus Paket auswählen</sys:String>
+    <sys:String x:Key="Customize.SearchPacks">Pakete suchen</sys:String>
+    <sys:String x:Key="Customize.NoMatchingPacks">Keine passenden Pakete gefunden.</sys:String>
     <sys:String x:Key="Customize.Packs">Präsentationspakete</sys:String>
     <sys:String x:Key="Customize.PacksDesc">Pakete fügen Themen, Hintergründe, Karten, Layouts, Rahmen und Medienstile hinzu. Ein Paket kann nur eine Definition enthalten, sodass ein eigenständiges Thema, Layout oder Rahmen keinen Füller benötigt. Installieren Sie einen Ordner mit pack.json oder .ntpack/.zip; Daten und Grafiken werden vor der Installation validiert und niemals als Medien importiert.</sys:String>
     <sys:String x:Key="Customize.Previewing">Vorschau der Änderungen. Bis „Anwenden“ wird nichts gespeichert.</sys:String>

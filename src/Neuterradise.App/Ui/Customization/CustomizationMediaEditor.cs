@@ -266,8 +266,7 @@ public sealed partial class CustomizationCenter
             Label: UI.T("Banner.Effect." + id, id)))
             .Concat(_services.Presentation.DefinitionsOf(DefinitionKinds.Effect)
                 .Where(definition => definition.Origin != PackOrigin.BuiltIn
-                    && definition.PlanAs<EffectPlan>().Supports(PresentationSlots.BannerEffect)
-                    && !definition.PlanAs<EffectPlan>().InteractionOnly)
+                    && PresentationRuntime.SupportsBannerEffect(definition))
                 .Select(definition => (Reference: definition.Ref, Label: definition.Name)));
         foreach (var (reference, label) in choices)
         {

@@ -882,6 +882,9 @@
     <sys:String x:Key="Customize.OpenFromProfile">Profile を開き、[Profile のカスタマイズ] を選択して、Cover、Banner、およびフレームを編集します。 Profile が開くと、グローバル Profile のデフォルトは以下になります。</sys:String>
     <sys:String x:Key="Customize.PackCounts">{0} 定義 · {1} アセット · {2} 場所で使用</sys:String>
     <sys:String x:Key="Customize.PackFile">プレゼンテーションパック</sys:String>
+    <sys:String x:Key="Customize.PickPack">パックから選択</sys:String>
+    <sys:String x:Key="Customize.SearchPacks">パックを検索</sys:String>
+    <sys:String x:Key="Customize.NoMatchingPacks">対応するパックが見つかりません。</sys:String>
     <sys:String x:Key="Customize.Packs">プレゼンテーションパック</sys:String>
     <sys:String x:Key="Customize.PacksDesc">パックには、テーマ、背景、カード、レイアウト、フレーム、メディア スタイルが追加されます。パックには定義が 1 つだけ含まれるため、スタンドアロンのテーマ、レイアウト、またはフレームにはフィラーは必要ありません。 pack.json、または .ntpack/.zip を含むフォルダーをインストールします。データとアートはインストール前に検証され、メディアとしてインポートされることはありません。</sys:String>
     <sys:String x:Key="Customize.Previewing">変更をプレビューしています。適用するまで何も保存されません。</sys:String>

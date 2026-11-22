@@ -882,6 +882,9 @@
     <sys:String x:Key="Customize.OpenFromProfile">打开 Profile 并选择“自定义 Profile”以编辑其 Cover、Banner 和框架。一旦 Profile 打开，全局 Profile 默认值将低于以下值。</sys:String>
     <sys:String x:Key="Customize.PackCounts">{0} 定义 · {1} 资产 · 用于 {2} 场所</sys:String>
     <sys:String x:Key="Customize.PackFile">演示包</sys:String>
+    <sys:String x:Key="Customize.PickPack">从套装中选择</sys:String>
+    <sys:String x:Key="Customize.SearchPacks">搜索套装</sys:String>
+    <sys:String x:Key="Customize.NoMatchingPacks">未找到兼容的套装。</sys:String>
     <sys:String x:Key="Customize.Packs">演示包</sys:String>
     <sys:String x:Key="Customize.PacksDesc">从包文件夹、.ntpack 或 .zip 安装主题、布局、边框和其他展示样式。安装前会验证包数据和素材，且不会作为媒体导入。</sys:String>
     <sys:String x:Key="Customize.Previewing">预览更改。在“应用”之前不会保存任何内容。</sys:String>

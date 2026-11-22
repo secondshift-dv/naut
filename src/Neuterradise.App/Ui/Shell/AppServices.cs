@@ -118,13 +118,14 @@ public abstract class Surface : IDisposable
         PresentationEffects.RefreshTree(View);
     }
 
-    private void OnPreviewChanged(object? sender, string slot)
+    private void OnPreviewChanged(object? sender, string? slot)
     {
         UiDispatch.Run(() =>
         {
             if (_disposed || !ReferenceEquals(sender, Preview)) return;
             RefreshPreviewPresentation(slot);
-            if (slot.StartsWith("effect.", StringComparison.Ordinal)) PresentationEffects.RefreshTree(View, slot);
+            if (slot is null || slot.StartsWith("effect.", StringComparison.Ordinal))
+                PresentationEffects.RefreshTree(View, slot);
         });
     }
 

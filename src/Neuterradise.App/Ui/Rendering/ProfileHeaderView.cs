@@ -275,6 +275,8 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         ArgumentNullException.ThrowIfNull(state);
 
         var previousState = _state;
+        var identityAppearanceChanged = previousState?.Frame != state.Frame
+            || previousState?.Appearance != state.Appearance;
         var figureChanged = !ReferenceEquals(previousState?.FigureView, state.FigureView);
         var layoutChanged = previousState is null || previousState.Layout != state.Layout
             || previousState.IndependentModules != state.IndependentModules;
@@ -300,6 +302,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         Visibility = Visibility.Visible;
         var width = ActualWidth > 0 ? ActualWidth : 1200;
         ApplyGeometry(rebuildIdentity
+            || identityAppearanceChanged
             || layoutChanged
             || figureChanged
             || IdentityLayoutBucket(width) != _identityLayoutBucket);
