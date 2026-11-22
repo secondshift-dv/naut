@@ -746,7 +746,7 @@ public sealed class ImportViewModel : ScreenStateViewModel, IDisposable
     {
         // Preparation outlives the route (the user may navigate away); only app shutdown stops it.
         await Task.Run(
-            () => _preparationCoordinator!.PrepareUnitAsync(unitId, _lifetime.Token),
+            () => _preparationCoordinator!.PrepareIntakeUnitAsync(unitId, _lifetime.Token),
             _lifetime.Token);
         _activity?.RequestRefresh();
         _finalizer?.Wake();

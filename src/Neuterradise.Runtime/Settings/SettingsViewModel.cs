@@ -173,6 +173,7 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
     private string? _organizationWarningMessage;
 
     private StorageMetricsSnapshot? _systemMetrics;
+    private string? _storageMetricsStatus;
     private long _unresolvedFaceCount;
 
     public SettingsViewModel(
@@ -199,11 +200,10 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
         if (_catalog is not null)
         {
             _reads = _catalog.SettingsReads;
-            _storageMetrics = storageMetrics ?? new StorageMetricsProvider(_catalog);
-
-            var cachePaths = new CachePaths(_catalog.Paths);
-            var cacheBudget = new PersistentCacheBudget(cachePaths);
-            _cacheMaintenance = cacheMaintenance ?? new CacheMaintenanceOperations(cachePaths, cacheBudget);
+            _storageMetrics = storageMetrics ?? _catalog.StorageMetrics;
+            _cacheMaintenance = cacheMaintenance
+                ?? new CacheMaintenanceOperations(_storageMetrics.CachePaths, _storageMetrics.CacheBudget);
+            _systemMetrics = _storageMetrics.LastSnapshot;
         }
         else
         {
@@ -431,6 +431,14 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
     /// </summary>
     public string VaultRoot => _catalog?.Paths.Root ?? "No vault is open.";
 
+    public bool HasStorageMetrics => _systemMetrics is not null;
+
+    public string? StorageMetricsStatus
+    {
+        get => _storageMetricsStatus;
+        private set => SetProperty(ref _storageMetricsStatus, value);
+    }
+
     public string ManagedStorageFormatted => LibraryHealthViewModel.FormatBytes(_systemMetrics?.ManagedMediaBytes ?? 0);
 
     public long TotalProfilesCount => _systemMetrics?.ProfileCount ?? 0;
@@ -639,7 +647,6 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
         if (_isDisposed) return;
         var generation = Interlocked.Increment(ref _initializeGeneration);
         var organizationRequest = _organizationGuard.Begin();
-        var metricsRequest = _metricsGuard.Begin();
         await UiDispatch.InvokeAsync(() =>
         {
             if (!_isDisposed && IsRouteActive && generation == _initializeGeneration)
@@ -663,7 +670,6 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
             }
 
             var organization = await Task.Run(() => ReadOrganizationSnapshotAsync(cancellationToken), cancellationToken).ConfigureAwait(false);
-            var systemMetrics = await Task.Run(() => ReadSystemMetricsSnapshotAsync(cancellationToken), cancellationToken).ConfigureAwait(false);
 
             await UiDispatch.InvokeAsync(() =>
             {
@@ -678,7 +684,6 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
                 RaisePropertyChanged(nameof(CurrentLanguage));
                 RaisePropertyChanged(nameof(UpdateFeedUrl));
                 if (_organizationGuard.IsCurrent(organizationRequest)) ApplyOrganizationSnapshot(organization);
-                if (_metricsGuard.IsCurrent(metricsRequest)) ApplySystemMetricsSnapshot(systemMetrics);
                 ShowReady();
             }).ConfigureAwait(false);
         }
@@ -1126,25 +1131,24 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
 
     private sealed record SystemMetricsReadSnapshot(StorageMetricsSnapshot? Metrics, long UnresolvedFaceCount);
 
-    private async Task<SystemMetricsReadSnapshot> ReadSystemMetricsSnapshotAsync(CancellationToken cancellationToken)
+    private async Task<SystemMetricsReadSnapshot> ReadSystemMetricsSnapshotAsync(
+        bool includeStorage, CancellationToken cancellationToken)
     {
-        StorageMetricsSnapshot? metrics = null;
-        var unresolved = 0L;
-        if (_storageMetrics is not null)
+        if (includeStorage && _storageMetrics is not null)
         {
-            metrics = await _storageMetrics.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+            var metrics = await _storageMetrics.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+            return new SystemMetricsReadSnapshot(metrics, metrics.UnresolvedFaceCount);
         }
-        if (_catalog is not null)
-        {
-            var summary = await _catalog.HealthReads.GetHealthSummaryAsync(cancellationToken).ConfigureAwait(false);
-            unresolved = summary.UnresolvedFaceDetections;
-        }
-        return new SystemMetricsReadSnapshot(metrics, unresolved);
+
+        var unresolved = _catalog is null ? 0L : (await _catalog.HealthReads
+            .GetHealthSummaryAsync(cancellationToken).ConfigureAwait(false)).UnresolvedFaceDetections;
+        return new SystemMetricsReadSnapshot(null, unresolved);
     }
 
     private void ApplySystemMetricsSnapshot(SystemMetricsReadSnapshot snapshot)
     {
-        _systemMetrics = snapshot.Metrics;
+        _systemMetrics = snapshot.Metrics ?? _systemMetrics;
+        RaisePropertyChanged(nameof(HasStorageMetrics));
         _unresolvedFaceCount = snapshot.UnresolvedFaceCount;
         RaisePropertyChanged(nameof(UnresolvedFaceCount));
         RaisePropertyChanged(nameof(ManagedStorageFormatted));
@@ -1155,14 +1159,20 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
     public async Task LoadSystemMetricsAsync(CancellationToken cancellationToken = default)
     {
         if (_isDisposed || (_storageMetrics is null && _catalog is null)) return;
+        var includeStorage = ActiveSection == SettingsSection.Vault;
         var request = _metricsGuard.Begin();
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, request.CancellationToken);
+        if (includeStorage)
+            StorageMetricsStatus = SurfaceText.Get("Settings.Vault.MetricsLoading", "Calculating storage metrics…");
         try
         {
-            var snapshot = await Task.Run(() => ReadSystemMetricsSnapshotAsync(linked.Token), linked.Token).ConfigureAwait(false);
+            var snapshot = await Task.Run(() => ReadSystemMetricsSnapshotAsync(includeStorage, linked.Token), linked.Token)
+                .ConfigureAwait(false);
             await UiDispatch.InvokeAsync(() =>
             {
-                if (IsRouteActive && _metricsGuard.IsCurrent(request)) ApplySystemMetricsSnapshot(snapshot);
+                if (!IsRouteActive || !_metricsGuard.IsCurrent(request) || linked.IsCancellationRequested) return;
+                ApplySystemMetricsSnapshot(snapshot);
+                if (includeStorage) StorageMetricsStatus = null;
             }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (linked.IsCancellationRequested || !IsRouteActive)
@@ -1172,7 +1182,10 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
         {
             await UiDispatch.InvokeAsync(() =>
             {
-                if (IsRouteActive && _metricsGuard.IsCurrent(request))
+                if (!IsRouteActive || !_metricsGuard.IsCurrent(request) || linked.IsCancellationRequested) return;
+                if (includeStorage)
+                    StorageMetricsStatus = SurfaceText.Get("Settings.Vault.MetricsUnavailable", "Storage metrics could not be read.");
+                else
                     ShowRecoverableError($"Could not evaluate system metrics: {OperationExecution.SafeMessage(ex)}");
             }).ConfigureAwait(false);
         }
@@ -1190,11 +1203,10 @@ public sealed class SettingsViewModel : ScreenStateViewModel, IDisposable
         }
         else if (ActiveSection == SettingsSection.Vault)
         {
-            TaskObserver.Observe(LoadSystemMetricsAsync(), "SettingsViewModel.LoadSystemMetricsAsync");
             if (ActiveSubsection == SettingsSubsection.VaultHealth)
-            {
-                TaskObserver.Observe(Health.LoadMetricsAsync(), "SettingsViewModel.Health.LoadMetricsAsync");
-            }
+                TaskObserver.Observe(Health.LoadMetricsAsync(RouteCancellationToken), "SettingsViewModel.Health.LoadMetricsAsync");
+            else
+                TaskObserver.Observe(LoadSystemMetricsAsync(RouteCancellationToken), "SettingsViewModel.LoadSystemMetricsAsync");
         }
         else if (ActiveSection == SettingsSection.PeopleOrganization)
         {

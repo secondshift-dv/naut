@@ -102,7 +102,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
     {
         if (Equals(_source, source)) return;
         var mediaChanged = _source?.MediaId != source?.MediaId;
-        Release();
+        if (!SameSceneSource(_source, source)) Release();
         _source = source;
         _checkedFallbackSource = null;
         if (mediaChanged)
@@ -122,6 +122,11 @@ public sealed class ProfileFigureView : Grid, IDisposable
         UpdateControls();
         EnsureLive();
     }
+
+    private static bool SameSceneSource(FigureSource? first, FigureSource? second) =>
+        first?.MediaId == second?.MediaId
+        && string.Equals(first?.RenderPath, second?.RenderPath, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(first?.SourceSha256, second?.SourceSha256, StringComparison.OrdinalIgnoreCase);
 
     private async Task RestoreCameraAsync(
         MediaViewStates states, Guid profileId, Guid mediaId, CancellationTokenSource request)
@@ -254,37 +259,6 @@ public sealed class ProfileFigureView : Grid, IDisposable
         }
         if (!HasUsableViewport || _cameraLoad is not null || _load is not null
             || _lease is { IsDisposed: false }) return;
-        var (lod, textureDimension) = DesiredQuality(runtime);
-        if (runtime.TryGetCachedScene(
-                source.RenderPath!,
-                source.SourceSha256!,
-                lod,
-                textureDimension,
-                out var cachedScene))
-        {
-            try
-            {
-                _host.Visibility = Visibility.Visible;
-                _lease = runtime.Attach(_host, WindowChrome.GetNativeHandle(_window));
-                _lease.SetCamera(_camera);
-                _lease.SetScene(cachedScene);
-                runtime.QueueModelRefresh(source.MediaId, cachedScene);
-                _loadedLod = lod;
-                _loadedTextureDimension = textureDimension;
-                _lease.CameraChanged += OnCameraChanged;
-                UpdateControls();
-            }
-            catch (Exception exception)
-            {
-                _lease?.Dispose();
-                _lease = null;
-                _host.Visibility = Visibility.Collapsed;
-                Trace.TraceWarning("Figure cached-scene attach fell back to durable Thumbnail: {0}", exception.Message);
-                runtime.RecoverDeviceLoss(exception);
-                UpdateControls();
-            }
-            return;
-        }
 
         _load = new CancellationTokenSource();
         UpdateControls();
@@ -298,7 +272,8 @@ public sealed class ProfileFigureView : Grid, IDisposable
             var (lod, textureDimension) = DesiredQuality(runtime);
             var scene = await runtime.LoadSceneAsync(source.RenderPath!, source.SourceSha256!, lod, textureDimension, request.Token);
             request.Token.ThrowIfCancellationRequested();
-            if (_disposed || !_active || IsOccluded || !IsLoaded || !ReferenceEquals(_load, request)) return;
+            if (_disposed || !_active || IsOccluded || !IsLoaded || !HasUsableViewport || !runtime.IsLiveAllowed
+                || !ReferenceEquals(_load, request) || !SameSceneSource(_source, source)) return;
             _host.Visibility = Visibility.Visible;
             _lease = runtime.Attach(_host, WindowChrome.GetNativeHandle(_window));
             _lease.SetCamera(_camera);
@@ -396,7 +371,7 @@ public sealed class ProfileFigureView : Grid, IDisposable
             if (_disposed || !_active || IsOccluded || !IsLoaded
                 || !ReferenceEquals(_qualityLoad, request)
                 || !ReferenceEquals(_lease, lease) || lease.IsDisposed
-                || !Equals(_source, source)) return;
+                || !SameSceneSource(_source, source)) return;
 
             // FigureRenderer.Upload builds the replacement GPU scene first and only then swaps
             // renderer authority, so the existing live scene remains visible until this succeeds.

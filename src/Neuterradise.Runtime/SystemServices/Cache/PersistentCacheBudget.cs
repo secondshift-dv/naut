@@ -13,7 +13,7 @@ public sealed class PersistentCacheBudget
 
     private readonly CachePaths _paths;
     private readonly IClock _clock;
-    private readonly DisposableCacheInventory _index;
+    private readonly Lazy<DisposableCacheInventory> _index;
     private readonly object _syncLock = new();
 
     private readonly ConcurrentDictionary<string, int> _pinnedPaths = new(StringComparer.OrdinalIgnoreCase);
@@ -31,7 +31,7 @@ public sealed class PersistentCacheBudget
         _paths = paths;
         _quotaBytes = quotaBytes;
         _clock = clock ?? new SystemClock();
-        _index = index ?? new DisposableCacheInventory(paths);
+        _index = new(() => index ?? new DisposableCacheInventory(paths));
     }
 
     public long QuotaBytes
@@ -46,7 +46,7 @@ public sealed class PersistentCacheBudget
 
     public CachePaths Paths => _paths;
 
-    public DisposableCacheInventory Index => _index;
+    public DisposableCacheInventory Index => _index.Value;
 
     public static void ValidateQuota(long bytes)
     {
@@ -92,30 +92,30 @@ public sealed class PersistentCacheBudget
             return;
         }
 
-        _index.RecordAccess(NormalizePath(path), now ?? _clock.UtcNow);
+        Index.RecordAccess(NormalizePath(path), now ?? _clock.UtcNow);
     }
 
     public void RecordPublished(string path, long byteLength)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(byteLength, 0);
-        _index.RecordPublished(NormalizePath(path), byteLength);
+        Index.RecordPublished(NormalizePath(path), byteLength);
     }
 
     public void Forget(string path)
     {
         if (!string.IsNullOrWhiteSpace(path))
         {
-            _index.Forget(NormalizePath(path));
+            if (_index.IsValueCreated) Index.Forget(NormalizePath(path));
         }
     }
 
     public int ForgetUnderDirectory(string directory) =>
-        string.IsNullOrWhiteSpace(directory) ? 0 : _index.ForgetUnderDirectory(NormalizePath(directory));
+        string.IsNullOrWhiteSpace(directory) ? 0 : Index.ForgetUnderDirectory(NormalizePath(directory));
 
-    public int ForgetFamily(CacheFamily family) => _index.ForgetFamily(family);
+    public int ForgetFamily(CacheFamily family) => Index.ForgetFamily(family);
 
-    public long GetTotalCurrentCacheBytes() => _index.TotalBytes;
+    public long GetTotalCurrentCacheBytes() => Index.TotalBytes;
 
     public bool EnsureCapacity(long incomingBytes, out long freedBytes)
     {
@@ -129,13 +129,13 @@ public sealed class PersistentCacheBudget
 
         lock (_syncLock)
         {
-            var currentBytes = _index.TotalBytes;
+            var currentBytes = Index.TotalBytes;
             if (currentBytes + incomingBytes <= currentQuota)
             {
                 return true;
             }
 
-            foreach (var candidate in _index.GetEvictionCandidates())
+            foreach (var candidate in Index.GetEvictionCandidates())
             {
                 var path = _paths.ResolveContainedCachePath(candidate.RelativePath);
                 if (IsPinned(path))
@@ -151,7 +151,7 @@ public sealed class PersistentCacheBudget
                     }
 
                     freedBytes += candidate.ByteLength;
-                    _index.Forget(path);
+                    Index.Forget(path);
                 }
                 catch (IOException)
                 {
@@ -162,13 +162,13 @@ public sealed class PersistentCacheBudget
                     continue;
                 }
 
-                if (_index.TotalBytes + incomingBytes <= currentQuota)
+                if (Index.TotalBytes + incomingBytes <= currentQuota)
                 {
                     return true;
                 }
             }
 
-            return _index.TotalBytes + incomingBytes <= currentQuota;
+            return Index.TotalBytes + incomingBytes <= currentQuota;
         }
     }
 

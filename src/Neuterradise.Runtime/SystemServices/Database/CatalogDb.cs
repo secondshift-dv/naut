@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Neuterradise.App.Media;
+using Neuterradise.App.Maintenance;
 using Neuterradise.App.SystemServices.Database.Reads;
 using Neuterradise.App.SystemServices.Database.Writes;
 using Neuterradise.App.SystemServices.Storage;
@@ -21,12 +22,14 @@ public sealed class CatalogDb
 
     private readonly CatalogSchemaInitializer _schemaInitializer;
     private readonly TimeProvider _timeProvider;
+    private readonly Lazy<StorageMetricsProvider> _storageMetrics;
 
     public CatalogDb(VaultPaths paths, TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(paths);
         _timeProvider = timeProvider ?? TimeProvider.System;
         Paths = paths;
+        _storageMetrics = new(() => new StorageMetricsProvider(this, timeProvider: _timeProvider));
         ConnectionFactory = new CatalogConnectionFactory(paths);
         WriteCoordinator = new CatalogWriteCoordinator();
         MutationAdmission = new CatalogMutationAdmissionGate();
@@ -36,6 +39,8 @@ public sealed class CatalogDb
     }
 
     public VaultPaths Paths { get; }
+
+    internal StorageMetricsProvider StorageMetrics => _storageMetrics.Value;
 
     public CatalogConnectionFactory ConnectionFactory { get; }
 

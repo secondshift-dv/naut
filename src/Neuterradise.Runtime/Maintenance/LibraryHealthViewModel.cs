@@ -28,6 +28,9 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
     private readonly RepairExecutor? _repairExecutor;
 
     private StorageMetricsSnapshot? _metrics;
+    private readonly StaleResultGuard _metricsRequest = new();
+    private readonly StaleResultGuard _scanRequest = new();
+    private string? _metricsStatus;
     private string? _actionFeedbackMessage;
     private HealthScanResult? _scanResult;
     private HealthFinding? _selectedFinding;
@@ -48,10 +51,10 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
 
         if (_catalog is not null)
         {
-            _storageMetrics = storageMetrics ?? new StorageMetricsProvider(_catalog);
-            var cachePaths = new CachePaths(_catalog.Paths);
-            var cacheBudget = new PersistentCacheBudget(cachePaths);
-            _cacheMaintenance = cacheMaintenance ?? new CacheMaintenanceOperations(cachePaths, cacheBudget);
+            _storageMetrics = storageMetrics ?? _catalog.StorageMetrics;
+            _cacheMaintenance = cacheMaintenance
+                ?? new CacheMaintenanceOperations(_storageMetrics.CachePaths, _storageMetrics.CacheBudget);
+            _metrics = _storageMetrics.LastSnapshot;
             _healthEvaluator = healthEvaluator ?? new LibraryHealthEvaluator(_catalog);
             _repairPlanner = repairPlanner ?? new RepairPlanner(_catalog);
             _repairExecutor = repairExecutor ?? new RepairExecutor(_catalog);
@@ -117,6 +120,12 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
                 RaiseAllMetricProperties();
             }
         }
+    }
+
+    public string? MetricsStatus
+    {
+        get => _metricsStatus;
+        private set => SetProperty(ref _metricsStatus, value);
     }
 
     public string? ActionFeedbackMessage
@@ -234,6 +243,11 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
 
     public void ClearResults()
     {
+        if (_disposed) return;
+        _scanRequest.Begin();
+        _metricsRequest.Begin();
+        MetricsStatus = null;
+
         // Acknowledging a displayed scan never changes files, repair receipts or job authority.
         SelectedFinding = null;
         Findings.Clear();
@@ -266,6 +280,9 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
             return;
         }
 
+        if (_disposed) return;
+        var request = _scanRequest.Begin();
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, request.CancellationToken);
         ShowLoading();
         ScanProgressText = mode == HealthScanMode.Deep
             ? "Checking managed files and content integrity…"
@@ -275,7 +292,8 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
         {
             var result = await _healthEvaluator.RunScanAsync(
                 new HealthScanOptions(mode),
-                cancellationToken: cancellationToken).ConfigureAwait(true);
+                cancellationToken: linked.Token).ConfigureAwait(true);
+            if (!_scanRequest.IsCurrent(request) || linked.IsCancellationRequested) return;
 
             _scanResult = result;
             RaisePropertyChanged(nameof(HasScanResults));
@@ -299,14 +317,16 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
             RaisePropertyChanged(nameof(HealthStatusWord));
             ShowReady();
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (linked.IsCancellationRequested)
         {
+            if (!_scanRequest.IsCurrent(request)) return;
             ScanProgressText = "Health check cancelled. No repair was applied.";
             ShowReady();
         }
         catch (Exception)
         {
-            ShowRecoverableError("The Vault Health check could not complete. Retry when the Vault is available.");
+            if (_scanRequest.IsCurrent(request) && !linked.IsCancellationRequested)
+                ShowRecoverableError("The Vault Health check could not complete. Retry when the Vault is available.");
         }
     }
 
@@ -365,22 +385,27 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
 
     public async Task LoadMetricsAsync(CancellationToken cancellationToken = default)
     {
-        if (_storageMetrics is null)
-        {
-            ShowReady();
-            return;
-        }
+        if (_storageMetrics is null || _disposed) return;
 
-        ShowLoading();
+        var request = _metricsRequest.Begin();
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, request.CancellationToken);
+        if (_storageMetrics.LastSnapshot is { } lastSnapshot) Metrics = lastSnapshot;
+        MetricsStatus = SurfaceText.Get("Settings.Vault.MetricsLoading", "Calculating storage metrics…");
         try
         {
-            var snapshot = await _storageMetrics.GetSnapshotAsync(cancellationToken).ConfigureAwait(true);
+            var snapshot = await _storageMetrics.GetSnapshotAsync(linked.Token).ConfigureAwait(true);
+            if (!_metricsRequest.IsCurrent(request) || linked.IsCancellationRequested) return;
             Metrics = snapshot;
-            ShowReady();
+            MetricsStatus = null;
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (linked.IsCancellationRequested)
         {
-            ShowRecoverableError($"Failed to evaluate Vault metrics: {OperationExecution.SafeMessage(ex)}");
+            if (_metricsRequest.IsCurrent(request)) MetricsStatus = null;
+        }
+        catch (Exception)
+        {
+            if (_metricsRequest.IsCurrent(request) && !linked.IsCancellationRequested)
+                MetricsStatus = SurfaceText.Get("Settings.Vault.MetricsUnavailable", "Storage metrics could not be read.");
         }
     }
 
@@ -397,10 +422,8 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
         {
             var deleted = await _cacheMaintenance.ClearAllDerivedCacheAsync(cancellationToken).ConfigureAwait(true);
             ActionFeedbackMessage = $"Cleared {deleted} cached files.";
-            if (_storageMetrics is not null)
-            {
-                Metrics = await _storageMetrics.GetSnapshotAsync(cancellationToken).ConfigureAwait(true);
-            }
+            _storageMetrics?.InvalidateSnapshot();
+            await LoadMetricsAsync(cancellationToken).ConfigureAwait(true);
         }
         catch (Exception ex)
         {
@@ -512,6 +535,8 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
 
         _disposed = true;
         _refreshCoalescer?.Dispose();
+        _metricsRequest.Dispose();
+        _scanRequest.Dispose();
         if (_catalog is not null)
         {
             _catalog.WriteCoordinator.Invalidated -= OnCatalogInvalidated;

@@ -35,6 +35,7 @@ public static class SourceEnumerator
                 Classification: null);
         }
 
+        var classification = SupportedMediaClassifier.Classify(fileInfo.Name);
         var isReadable = false;
         long length = 0;
         DateTimeOffset? lastWriteUtc = null;
@@ -44,8 +45,9 @@ public static class SourceEnumerator
             length = fileInfo.Length;
             lastWriteUtc = new DateTimeOffset(fileInfo.LastWriteTimeUtc, TimeSpan.Zero);
 
-            using (var stream = fileInfo.Open(FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            if (classification.HasValue)
             {
+                using var stream = fileInfo.Open(FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                 isReadable = stream.CanRead;
             }
         }
@@ -57,8 +59,6 @@ public static class SourceEnumerator
             isReadable = false;
             lastWriteUtc = null;
         }
-
-        var classification = SupportedMediaClassifier.Classify(fileInfo.Name);
 
         return new SourceItemDescriptor(
             fullPath,

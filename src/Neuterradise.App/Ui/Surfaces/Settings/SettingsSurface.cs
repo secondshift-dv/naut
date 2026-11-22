@@ -78,6 +78,8 @@ public sealed class SettingsSurface : Surface
             nameof(SettingsViewModel.ActiveSubsection),
             nameof(SettingsViewModel.CurrentLanguage),
             nameof(SettingsViewModel.ManagedStorageFormatted),
+            nameof(SettingsViewModel.HasStorageMetrics),
+            nameof(SettingsViewModel.StorageMetricsStatus),
             nameof(SettingsViewModel.TotalProfilesCount),
             nameof(SettingsViewModel.ActiveMediaCount),
             nameof(SettingsViewModel.UnresolvedFaceCount),
@@ -853,6 +855,7 @@ public sealed class SettingsSurface : Surface
         var findings = UI.V(8);
         var status = UI.Text(string.Empty, "section-title");
         var metrics = UI.Text(string.Empty, "body");
+        var metricsStatus = UI.WrappedText(string.Empty, "caption");
         var feedback = UI.WrappedText(string.Empty, "caption", "accent");
         var repair = UI.V(8);
 
@@ -863,6 +866,9 @@ public sealed class SettingsSurface : Surface
                 : health.HealthFindingCount == 0
                 ? UI.T("Health.Status.Healthy", "Healthy")
                 : UI.T("Health.Status.Attention", "Needs attention");
+            metrics.Visibility = health.Metrics is null ? Visibility.Collapsed : Visibility.Visible;
+            metricsStatus.Text = health.MetricsStatus ?? string.Empty;
+            metricsStatus.Visibility = health.MetricsStatus is null ? Visibility.Collapsed : Visibility.Visible;
             metrics.Text = UI.F(
                 "Health.Metrics",
                 "{0} media · {1} catalog · {2} / {3} cache · {4} trash",
@@ -939,6 +945,7 @@ public sealed class SettingsSurface : Surface
         return UI.V(12,
             status,
             metrics,
+            metricsStatus,
             feedback,
             UI.H(8,
                 UI.Button(UI.T("Health.Check", "Check Vault"), null, ButtonKind.Primary, command: health.RunHealthCheckCommand),

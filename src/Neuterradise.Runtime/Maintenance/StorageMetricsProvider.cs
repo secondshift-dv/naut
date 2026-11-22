@@ -28,8 +28,65 @@ public sealed class StorageMetricsProvider
 
     public PersistentCacheBudget CacheBudget => _cacheBudget;
 
-    public async Task<StorageMetricsSnapshot> GetSnapshotAsync(
-        CancellationToken cancellationToken = default)
+    private readonly object _snapshotGate = new();
+    private Task<StorageMetricsSnapshot>? _pendingSnapshot;
+    private StorageMetricsSnapshot? _lastSnapshot;
+    private long _snapshotGeneration;
+
+    public StorageMetricsSnapshot? LastSnapshot
+    {
+        get { lock (_snapshotGate) return _lastSnapshot; }
+    }
+
+    public async Task<StorageMetricsSnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default)
+    {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Task<StorageMetricsSnapshot> pending;
+            long generation;
+            lock (_snapshotGate)
+            {
+                generation = _snapshotGeneration;
+                if (_pendingSnapshot is null || _pendingSnapshot.IsCompleted)
+                {
+                    _pendingSnapshot = Task.Run(() => ReadAndPublishSnapshotAsync(generation));
+                    _ = _pendingSnapshot.ContinueWith(static task => { _ = task.Exception; },
+                        CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+                }
+                pending = _pendingSnapshot;
+            }
+
+            var snapshot = await pending.WaitAsync(cancellationToken).ConfigureAwait(false);
+            lock (_snapshotGate)
+            {
+                if (generation == _snapshotGeneration) return snapshot;
+            }
+        }
+    }
+
+    internal void InvalidateSnapshot()
+    {
+        lock (_snapshotGate)
+        {
+            _snapshotGeneration++;
+            _pendingSnapshot = null;
+        }
+    }
+
+    private async Task<StorageMetricsSnapshot> ReadAndPublishSnapshotAsync(long generation)
+    {
+        var snapshot = await ReadSnapshotAsync(CancellationToken.None).ConfigureAwait(false);
+        lock (_snapshotGate)
+        {
+            if (_snapshotGeneration == generation)
+                _lastSnapshot = snapshot;
+        }
+        return snapshot;
+    }
+
+    private async Task<StorageMetricsSnapshot> ReadSnapshotAsync(
+        CancellationToken cancellationToken)
     {
         var healthSummary = await _catalog.HealthReads.GetHealthSummaryAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -38,10 +95,7 @@ public sealed class StorageMetricsProvider
         var integrityFindings = await _catalog.HealthReads.GetDatabaseIntegrityFindingsAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var filesystem = await Task.Run(
-                () => ComputeFilesystemMetrics(cancellationToken),
-                cancellationToken)
-            .ConfigureAwait(false);
+        var filesystem = ComputeFilesystemMetrics(cancellationToken);
 
         var artifactBytes = await GetArtifactBytesAsync(cancellationToken).ConfigureAwait(false);
 
@@ -62,6 +116,7 @@ public sealed class StorageMetricsProvider
         {
             MediaAssetBytes = artifactBytes,
             TemporaryBytes = filesystem.TemporaryBytes,
+            UnresolvedFaceCount = healthSummary.UnresolvedFaceDetections,
         };
     }
 
@@ -110,7 +165,17 @@ public sealed class StorageMetricsProvider
         }
 
         long total = 0;
-        foreach (var file in new DirectoryInfo(directory).EnumerateFiles("*", SearchOption.AllDirectories))
+        var root = new DirectoryInfo(directory);
+        if ((root.Attributes & FileAttributes.ReparsePoint) != 0)
+            throw new IOException("Storage metrics cannot read a redirected directory.");
+
+        var options = new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            IgnoreInaccessible = false,
+            AttributesToSkip = FileAttributes.ReparsePoint,
+        };
+        foreach (var file in root.EnumerateFiles("*", options))
         {
             cancellationToken.ThrowIfCancellationRequested();
             total += file.Length;

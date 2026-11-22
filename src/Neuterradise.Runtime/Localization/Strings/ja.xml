@@ -1072,6 +1072,8 @@
     <sys:String x:Key="Profile.ReviewAll">すべての顔を確認します</sys:String>
     <sys:String x:Key="Profile.SharedMedia">{0} 共有</sys:String>
     <sys:String x:Key="Profile.Tags">タグ</sys:String>
+    <sys:String x:Key="Settings.Vault.MetricsLoading">ストレージの使用状況を計算しています…</sys:String>
+    <sys:String x:Key="Settings.Vault.MetricsUnavailable">ストレージの使用状況を読み取れませんでした。</sys:String>
     <sys:String x:Key="Settings.Vault.Counts">{0} プロフィール · {1} メディア · {2}</sys:String>
     <sys:String x:Key="Settings.Notices">第三者からの通知</sys:String>
     <sys:String x:Key="Settings.OpenFaceReview">顔を確認する</sys:String>

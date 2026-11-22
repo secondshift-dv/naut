@@ -393,9 +393,13 @@ public FrameworkElement Build()
                 UI.T("Settings.Vault.StorageTitle", "Vault storage"),
                 null,
                 UI.Text(vaultRoot, "mono", maxLines: 3),
-                UI.Text(
-                    UI.F("Settings.Vault.Counts", "{0} Profiles · {1} media · {2}", _vm.TotalProfilesCount, _vm.ActiveMediaCount, _vm.ManagedStorageFormatted),
-                    "body"),
+                _vm.HasStorageMetrics
+                    ? UI.Text(UI.F("Settings.Vault.Counts", "{0} Profiles · {1} media · {2}",
+                        _vm.TotalProfilesCount, _vm.ActiveMediaCount, _vm.ManagedStorageFormatted), "body")
+                    : new TextBlock { Visibility = Visibility.Collapsed },
+                _vm.StorageMetricsStatus is { } metricsStatus
+                    ? UI.WrappedText(metricsStatus, "caption")
+                    : new TextBlock { Visibility = Visibility.Collapsed },
                 UI.Wrap(
                     6,
                     changeButton,

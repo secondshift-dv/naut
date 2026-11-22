@@ -323,11 +323,11 @@ public sealed class ImportUnitControlAuthority
         {
             while (true)
             {
-                var runningCount = (await _schedulerReads
-                    .GetCancellableRunningJobIdsForImportUnitAsync(unitId, linked.Token)
-                    .ConfigureAwait(false)).Count;
+                var running = await _schedulerReads
+                    .HasCancellableRunningJobsForImportUnitAsync(unitId, linked.Token)
+                    .ConfigureAwait(false);
 
-                if (runningCount == 0)
+                if (!running)
                 {
                     return RunningJobSettlement.Settled;
                 }

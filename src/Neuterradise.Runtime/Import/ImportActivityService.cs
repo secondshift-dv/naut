@@ -305,16 +305,15 @@ public sealed class ImportActivityService : IAsyncDisposable
             {
                 var unitProgress = progress.GetValueOrDefault(unit.UnitId);
                 var unitFailures = preparationFailures.GetValueOrDefault(unit.UnitId);
-                var projected = Project(unit, unitProgress, preparationFailures: unitFailures);
-                var isPriority = focusedImportUnitId == unit.UnitId && projected.IsActive;
-                if (focusedImportUnitId == unit.UnitId && !projected.IsActive)
+                var isFocused = focusedImportUnitId == unit.UnitId;
+                var projected = ProjectCore(unit, unitProgress, isFocused, null, unitFailures, this);
+                if (isFocused && !projected.IsActive)
                 {
                     await _priorityOperations.ClearIfFocusedAsync(unit.UnitId, token).ConfigureAwait(false);
                     focusedImportUnitId = null;
                 }
 
-                var etaText = ObserveEta(unit.UnitId, projected.Stage, unitProgress);
-                items.Add(Project(unit, unitProgress, isPriority, etaText, unitFailures));
+                items.Add(projected);
             }
 
             var tracked = units.Select(unit => unit.UnitId).ToHashSet();
@@ -340,7 +339,16 @@ public sealed class ImportActivityService : IAsyncDisposable
         ImportUnitProgress? progress,
         bool isPriority = false,
         string? etaText = null,
-        IReadOnlyList<ImportPreparationFailure>? preparationFailures = null)
+        IReadOnlyList<ImportPreparationFailure>? preparationFailures = null) =>
+        ProjectCore(unit, progress, isPriority, etaText, preparationFailures, activity: null);
+
+    private static ImportActivityItem ProjectCore(
+        ImportUnitSummary unit,
+        ImportUnitProgress? progress,
+        bool isPriority,
+        string? etaText,
+        IReadOnlyList<ImportPreparationFailure>? preparationFailures,
+        ImportActivityService? activity)
     {
         ArgumentNullException.ThrowIfNull(unit);
 
@@ -439,6 +447,14 @@ public sealed class ImportActivityService : IAsyncDisposable
         var fraction = TimelineProgress(timelineStage, admitted, prepared, placed, unit.TotalItemCount);
         var duplicateOnlySettled = duplicateOnly
             && stage is ImportActivityStage.Checking or ImportActivityStage.Saving;
+        var isActive = !duplicateOnlySettled
+            && stage is ImportActivityStage.Reading or ImportActivityStage.Checking or ImportActivityStage.Saving;
+        if (activity is not null)
+        {
+            isPriority &= isActive;
+            etaText = activity.ObserveEta(unit.UnitId, stage, progress);
+        }
+
         var progressText = duplicateOnlySettled
             ? null
             : TimelineProgressText(
@@ -452,8 +468,6 @@ public sealed class ImportActivityService : IAsyncDisposable
                         ? SurfaceText.Get("Import.Eta.WaitingForYou", "Waiting for your choice")
                         : etaText);
 
-        var isActive = !duplicateOnlySettled
-            && stage is ImportActivityStage.Reading or ImportActivityStage.Checking or ImportActivityStage.Saving;
         var isTerminal = committed
             || stage == ImportActivityStage.Cancelled
             || unit.State == ImportUnitState.FailedTerminal;

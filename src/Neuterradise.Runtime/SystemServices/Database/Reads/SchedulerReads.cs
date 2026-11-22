@@ -352,54 +352,69 @@ public sealed class SchedulerReads
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken)
             .ConfigureAwait(false);
         await using var command = connection.CreateCommand();
-        command.CommandText =
-            """
-            WITH unit_assets(media_id) AS (
-                SELECT candidate_media_id
-                FROM import_items
-                WHERE import_unit_id = $unitId
-                  AND candidate_media_id IS NOT NULL
-                UNION
-                SELECT media_id
-                FROM import_media_interests
-                WHERE import_unit_id = $unitId
-            )
-            SELECT j.job_id
-            FROM unit_assets mine
-            JOIN jobs j ON j.owner_type = 'Media' AND j.owner_id = mine.media_id
-            WHERE j.state = 'RUNNING'
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM import_items other
-                  JOIN import_units consumer ON consumer.import_unit_id = other.import_unit_id
-                  WHERE other.import_unit_id <> $unitId
-                    AND (other.candidate_media_id = mine.media_id OR other.reused_media_id = mine.media_id)
-                    AND consumer.state NOT IN (
-                        'COMMITTED','COMPLETED','COMMITTED_WITH_CLEANUP_ATTENTION',
-                        'CANCELLED','FAILED_TERMINAL'
-                    )
-              )
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM import_media_interests other
-                  JOIN import_units consumer ON consumer.import_unit_id = other.import_unit_id
-                  WHERE other.import_unit_id <> $unitId
-                    AND other.media_id = mine.media_id
-                    AND consumer.state NOT IN (
-                        'COMMITTED','COMPLETED','COMMITTED_WITH_CLEANUP_ATTENTION',
-                        'CANCELLED','FAILED_TERMINAL'
-                    )
-              )
-            UNION
-            SELECT job_id
-            FROM jobs
-            WHERE owner_type = 'ImportUnit'
-              AND owner_id = $unitId
-              AND state = 'RUNNING';
-            """;
+        command.CommandText = CancellableRunningJobs + "\nSELECT job_id FROM cancellable_jobs;";
         command.Parameters.AddWithValue("$unitId", DbGuid.Format(importUnitId));
         return await ReadGuidListAsync(command, cancellationToken).ConfigureAwait(false);
     }
+
+    public async Task<bool> HasCancellableRunningJobsForImportUnitAsync(
+        Guid importUnitId, CancellationToken cancellationToken = default)
+    {
+        if (importUnitId == Guid.Empty) return false;
+
+        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken)
+            .ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = CancellableRunningJobs + "\nSELECT EXISTS(SELECT 1 FROM cancellable_jobs);";
+        command.Parameters.AddWithValue("$unitId", DbGuid.Format(importUnitId));
+        return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is long count && count != 0;
+    }
+
+    private const string CancellableRunningJobs = """
+        WITH unit_assets(media_id) AS (
+            SELECT candidate_media_id
+            FROM import_items
+            WHERE import_unit_id = $unitId
+              AND candidate_media_id IS NOT NULL
+            UNION
+            SELECT media_id
+            FROM import_media_interests
+            WHERE import_unit_id = $unitId
+        ), cancellable_jobs(job_id) AS (
+        SELECT j.job_id
+        FROM unit_assets mine
+        JOIN jobs j ON j.owner_type = 'Media' AND j.owner_id = mine.media_id
+        WHERE j.state = 'RUNNING'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM import_items other
+              JOIN import_units consumer ON consumer.import_unit_id = other.import_unit_id
+              WHERE other.import_unit_id <> $unitId
+                AND (other.candidate_media_id = mine.media_id OR other.reused_media_id = mine.media_id)
+                AND consumer.state NOT IN (
+                    'COMMITTED','COMPLETED','COMMITTED_WITH_CLEANUP_ATTENTION',
+                    'CANCELLED','FAILED_TERMINAL'
+                )
+          )
+          AND NOT EXISTS (
+              SELECT 1
+              FROM import_media_interests other
+              JOIN import_units consumer ON consumer.import_unit_id = other.import_unit_id
+              WHERE other.import_unit_id <> $unitId
+                AND other.media_id = mine.media_id
+                AND consumer.state NOT IN (
+                    'COMMITTED','COMPLETED','COMMITTED_WITH_CLEANUP_ATTENTION',
+                    'CANCELLED','FAILED_TERMINAL'
+                )
+          )
+        UNION ALL
+        SELECT job_id
+        FROM jobs
+        WHERE owner_type = 'ImportUnit'
+          AND owner_id = $unitId
+          AND state = 'RUNNING'
+        )
+        """;
 
     public async Task<int> CountRunningJobsForImportUnitAsync(
         Guid importUnitId,

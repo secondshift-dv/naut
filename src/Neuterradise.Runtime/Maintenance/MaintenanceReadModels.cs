@@ -91,6 +91,7 @@ public sealed record StorageMetricsSnapshot(
 {
     public long MediaAssetBytes { get; init; }
     public long TemporaryBytes { get; init; }
+    public long UnresolvedFaceCount { get; init; }
 }
 
 public sealed record StorageMetricsAuthorityCounts(

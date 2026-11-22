@@ -17,9 +17,15 @@ public sealed class JobWrites
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
-    public async Task CreateJobAsync(
-        JobDefinition definition,
-        CancellationToken cancellationToken = default)
+    public Task CreateJobAsync(JobDefinition definition, CancellationToken cancellationToken = default) =>
+        CreateJobCoreAsync(definition, importUnitId: null, cancellationToken);
+
+    internal Task<bool> TryCreateImportAdmissionJobAsync(
+        Guid importUnitId, JobDefinition definition, CancellationToken cancellationToken) =>
+        CreateJobCoreAsync(definition, importUnitId, cancellationToken);
+
+    private async Task<bool> CreateJobCoreAsync(
+        JobDefinition definition, Guid? importUnitId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(definition);
         EnsureNonEmpty(definition.JobId, nameof(definition.JobId));
@@ -46,6 +52,21 @@ public sealed class JobWrites
             .ConfigureAwait(false);
         await using var transaction = CatalogTransaction.Begin(connection);
 
+        if (importUnitId is { } unitId)
+        {
+            await using var eligible = transaction.CreateCommand(
+                """
+                SELECT EXISTS(
+                    SELECT 1 FROM import_units
+                    WHERE import_unit_id = $unitId
+                      AND state NOT IN ('CANCELLED','FAILED_TERMINAL','COMMITTED','COMPLETED','COMMITTED_WITH_CLEANUP_ATTENTION')
+                );
+                """);
+            eligible.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
+            if (await eligible.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not 1L)
+                return false;
+        }
+
         var existing = await ReadDefinitionAsync(transaction, definition.JobId, cancellationToken)
             .ConfigureAwait(false);
         if (existing is not null)
@@ -57,7 +78,7 @@ public sealed class JobWrites
             }
 
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-            return;
+            return true;
         }
 
         definition = await ApplyFocusedImportPriorityAsync(transaction, definition, cancellationToken)
@@ -97,7 +118,8 @@ public sealed class JobWrites
         await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-        Neuterradise.App.SystemServices.Jobs.JobSignals.Raise();
+        JobSignals.Raise();
+        return true;
     }
 
     /// <summary>

@@ -230,14 +230,7 @@ public sealed class ImportPreparationCoordinator
         Guid unitId,
         CancellationToken cancellationToken = default)
     {
-        var unit = await _reads.GetUnitSummaryAsync(unitId, cancellationToken)
-            .ConfigureAwait(false);
-        if (unit is null)
-        {
-            throw new InvalidOperationException($"ImportUnit {unitId:D} was not found.");
-        }
-
-        await ScheduleAdmissionHashJobsAsync(unitId, cancellationToken).ConfigureAwait(false);
+        await ScheduleAdmissionHashJobsAsync(unitId, requireUnit: true, cancellationToken).ConfigureAwait(false);
         var readiness = await ResolveUnitStateAsync(unitId, cancellationToken).ConfigureAwait(false);
         var counts = await ReadAdmissionCountsAsync(unitId, cancellationToken).ConfigureAwait(false);
 
@@ -253,23 +246,39 @@ public sealed class ImportPreparationCoordinator
     /// Owns the durable INTAKE to PREPARING handoff and schedules duplicate investigation or
     /// TransferOriginal. The item read is unbounded so retry and recovery see the complete unit.
     /// </summary>
-    public async Task<int> ScheduleAdmissionHashJobsAsync(
+    internal async Task PrepareIntakeUnitAsync(Guid unitId, CancellationToken cancellationToken)
+    {
+        using var admission = _catalog.MutationAdmission.Enter(nameof(PrepareIntakeUnitAsync));
+        await ScheduleAdmissionHashJobsAsync(unitId, cancellationToken).ConfigureAwait(false);
+    }
+
+    public Task<int> ScheduleAdmissionHashJobsAsync(Guid unitId, CancellationToken cancellationToken = default) =>
+        ScheduleAdmissionHashJobsAsync(unitId, requireUnit: false, cancellationToken);
+
+    private async Task<int> ScheduleAdmissionHashJobsAsync(
         Guid unitId,
-        CancellationToken cancellationToken = default)
+        bool requireUnit,
+        CancellationToken cancellationToken)
     {
         var unit = await _reads.GetUnitSummaryAsync(unitId, cancellationToken).ConfigureAwait(false);
-        if (unit is null
-            || unit.State is ImportUnitState.Cancelled or ImportUnitState.FailedTerminal
-            || unit.State.IsUnitCommitted())
-        {
-            return 0;
-        }
+        if (unit is null && requireUnit)
+            throw new InvalidOperationException($"ImportUnit {unitId:D} was not found.");
+        if (!CanScheduleAdmission(unit)) return 0;
 
-        if (unit.State == ImportUnitState.Intake)
+        if (unit!.State == ImportUnitState.Intake)
         {
-            await _importWrites
-                .UpdateUnitStateAsync(unitId, ImportUnitState.Preparing, cancellationToken)
-                .ConfigureAwait(false);
+            try
+            {
+                await _importWrites.UpdateUnitStateAsync(unitId, ImportUnitState.Preparing,
+                    expectedState: ImportUnitState.Intake, expectedRowVersion: null, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (CatalogConcurrencyConflictException)
+            {
+                var current = await _reads.GetUnitSummaryAsync(unitId, cancellationToken).ConfigureAwait(false);
+                if (!CanScheduleAdmission(current)) return 0;
+                if (current!.State == ImportUnitState.Intake) throw;
+            }
         }
 
         var items = await ReadAdmissionCandidatesAsync(unitId, cancellationToken).ConfigureAwait(false);
@@ -281,34 +290,40 @@ public sealed class ImportPreparationCoordinator
         {
             if (existingTransfers.Contains(item.CandidateMediaId)) continue;
             var source = new FileInfo(item.SourcePath);
+            JobDefinition? definition = null;
             if (!source.Exists)
             {
-                await _jobWrites.CreateJobAsync(CandidatePreparationPlan.Create(
-                    item.ImportItemId, item.CandidateMediaId, item.SourcePath).HashJob,
-                    cancellationToken).ConfigureAwait(false);
-                continue;
+                definition = CandidatePreparationPlan.Create(item.ImportItemId, item.CandidateMediaId, item.SourcePath).HashJob;
             }
-            var sameSizeActive = await _duplicateDetector.HasActiveWithLengthAsync(
-                source.Length, item.CandidateMediaId, cancellationToken).ConfigureAwait(false);
-            var stored = await ReadStoredFingerprintAsync(item.CandidateMediaId, cancellationToken)
-                .ConfigureAwait(false);
-            if (sameSizeActive && stored.Sha256 is null)
+            else
             {
-                await _jobWrites.CreateJobAsync(CandidatePreparationPlan.Create(
-                    item.ImportItemId, item.CandidateMediaId, item.SourcePath).HashJob,
-                    cancellationToken).ConfigureAwait(false);
+                var sameSizeActive = await _duplicateDetector.HasActiveWithLengthAsync(
+                    source.Length, item.CandidateMediaId, cancellationToken).ConfigureAwait(false);
+                var stored = await ReadStoredFingerprintAsync(item.CandidateMediaId, cancellationToken)
+                    .ConfigureAwait(false);
+                if (sameSizeActive && stored.Sha256 is null)
+                {
+                    definition = CandidatePreparationPlan.Create(item.ImportItemId, item.CandidateMediaId, item.SourcePath).HashJob;
+                }
+                else if (stored.Sha256 is null || !(await _duplicateDetector.DetectDuplicateAsync(
+                             stored.Sha256, stored.ByteLength ?? -1, item.CandidateMediaId,
+                             cancellationToken: cancellationToken).ConfigureAwait(false)).IsLibraryReuseEligible)
+                {
+                    definition = CandidatePreparationPlan.CreateTransfer(item.ImportItemId, item.CandidateMediaId);
+                }
             }
-            else if (stored.Sha256 is null || !(await _duplicateDetector.DetectDuplicateAsync(
-                         stored.Sha256, stored.ByteLength ?? -1, item.CandidateMediaId,
-                         cancellationToken: cancellationToken).ConfigureAwait(false)).IsLibraryReuseEligible)
-            {
-                await _jobWrites.CreateJobAsync(CandidatePreparationPlan.CreateTransfer(
-                    item.ImportItemId, item.CandidateMediaId), cancellationToken).ConfigureAwait(false);
-            }
+
+            if (definition is not null && !await _jobWrites.TryCreateImportAdmissionJobAsync(
+                    unitId, definition, cancellationToken).ConfigureAwait(false))
+                break;
         }
 
         return items.Count;
     }
+
+    private static bool CanScheduleAdmission(ImportUnitSummary? unit) =>
+        unit is not null && unit.State is not (ImportUnitState.Cancelled or ImportUnitState.FailedTerminal)
+        && !unit.State.IsUnitCommitted();
 
     private async Task<IReadOnlyList<AdmissionCandidate>> ReadAdmissionCandidatesAsync(
         Guid unitId,

@@ -1072,6 +1072,8 @@
     <sys:String x:Key="Profile.ReviewAll">Überprüfen Sie alle Gesichter</sys:String>
     <sys:String x:Key="Profile.SharedMedia">{0} geteilt</sys:String>
     <sys:String x:Key="Profile.Tags">Schlagworte</sys:String>
+    <sys:String x:Key="Settings.Vault.MetricsLoading">Speicherwerte werden berechnet…</sys:String>
+    <sys:String x:Key="Settings.Vault.MetricsUnavailable">Die Speicherwerte konnten nicht gelesen werden.</sys:String>
     <sys:String x:Key="Settings.Vault.Counts">{0} Profile · {1} Medien · {2}</sys:String>
     <sys:String x:Key="Settings.Notices">Hinweise Dritter</sys:String>
     <sys:String x:Key="Settings.OpenFaceReview">Überprüfen Sie Gesichter</sys:String>

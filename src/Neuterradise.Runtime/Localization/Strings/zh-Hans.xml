@@ -1072,6 +1072,8 @@
     <sys:String x:Key="Profile.ReviewAll">查看所有面孔</sys:String>
     <sys:String x:Key="Profile.SharedMedia">{0} 共享</sys:String>
     <sys:String x:Key="Profile.Tags">标签</sys:String>
+    <sys:String x:Key="Settings.Vault.MetricsLoading">正在计算存储指标…</sys:String>
+    <sys:String x:Key="Settings.Vault.MetricsUnavailable">无法读取存储指标。</sys:String>
     <sys:String x:Key="Settings.Vault.Counts">{0} 配置文件 · {1} 媒体 · {2}</sys:String>
     <sys:String x:Key="Settings.Notices">第三方通知</sys:String>
     <sys:String x:Key="Settings.OpenFaceReview">查看面孔</sys:String>

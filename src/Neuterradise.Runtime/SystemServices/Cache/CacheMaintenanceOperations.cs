@@ -1,4 +1,5 @@
 using System.IO;
+using Neuterradise.App.SystemServices.Storage;
 
 namespace Neuterradise.App.SystemServices.Cache;
 
@@ -6,6 +7,12 @@ public sealed class CacheMaintenanceOperations
 {
     private readonly CachePaths _paths;
     private readonly PersistentCacheBudget _budget;
+    private static readonly EnumerationOptions SafeEnumeration = new()
+    {
+        RecurseSubdirectories = true,
+        IgnoreInaccessible = false,
+        AttributesToSkip = FileAttributes.ReparsePoint,
+    };
 
     public CacheMaintenanceOperations(CachePaths paths, PersistentCacheBudget budget)
     {
@@ -41,15 +48,15 @@ public sealed class CacheMaintenanceOperations
             foreach (var familyDir in families)
             {
                 ct.ThrowIfCancellationRequested();
-                if (!Directory.Exists(familyDir))
+                if (!CanAccessFamilyPath(familyDir, familyDir))
                 {
                     continue;
                 }
 
-                foreach (var file in Directory.EnumerateFiles(familyDir, "*", SearchOption.AllDirectories))
+                foreach (var file in Directory.EnumerateFiles(familyDir, "*", SafeEnumeration))
                 {
                     ct.ThrowIfCancellationRequested();
-                    if (!_paths.IsContainedCachePath(file))
+                    if (!CanAccessFamilyPath(familyDir, file))
                     {
                         continue;
                     }
@@ -92,16 +99,16 @@ public sealed class CacheMaintenanceOperations
         return Task.Run(() =>
         {
             var familyDir = _paths.GetFamilyPath(family);
-            if (!Directory.Exists(familyDir))
+            if (!CanAccessFamilyPath(familyDir, familyDir))
             {
                 return 0;
             }
 
             var deleted = 0;
-            foreach (var file in Directory.EnumerateFiles(familyDir, "*", SearchOption.AllDirectories))
+            foreach (var file in Directory.EnumerateFiles(familyDir, "*", SafeEnumeration))
             {
                 ct.ThrowIfCancellationRequested();
-                if (!_paths.IsContainedCachePath(file))
+                if (_budget.IsPinned(file) || !CanAccessFamilyPath(familyDir, file))
                 {
                     continue;
                 }
@@ -115,10 +122,12 @@ public sealed class CacheMaintenanceOperations
 
             try
             {
-                foreach (var dir in Directory.EnumerateDirectories(familyDir, "*", SearchOption.AllDirectories)
+                foreach (var dir in Directory.EnumerateDirectories(familyDir, "*", SafeEnumeration)
                     .OrderByDescending(d => d.Length))
                 {
-                    if (Directory.Exists(dir) && !Directory.EnumerateFileSystemEntries(dir).Any())
+                    ct.ThrowIfCancellationRequested();
+                    if (CanAccessFamilyPath(familyDir, dir) && !Directory.EnumerateFileSystemEntries(dir).Any()
+                        && CanAccessFamilyPath(familyDir, dir))
                     {
                         Directory.Delete(dir, recursive: false);
                     }
@@ -129,6 +138,28 @@ public sealed class CacheMaintenanceOperations
 
             return deleted;
         }, ct);
+    }
+
+    private bool CanAccessFamilyPath(string familyRoot, string candidate)
+    {
+        try
+        {
+            var full = Path.GetFullPath(candidate);
+            var familyPrefix = Path.TrimEndingDirectorySeparator(familyRoot) + Path.DirectorySeparatorChar;
+            if (!string.Equals(full, familyRoot, StringComparison.OrdinalIgnoreCase)
+                && !full.StartsWith(familyPrefix, StringComparison.OrdinalIgnoreCase))
+                return false;
+            if (!_paths.IsContainedCachePath(full)) return false;
+
+            var vaultRoot = _paths.Vault.Root;
+            RootPathRules.RejectExistingReparsePoints(Path.GetPathRoot(vaultRoot)!, full);
+            return (File.GetAttributes(full) & FileAttributes.ReparsePoint) == 0;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+            or ArgumentException or NotSupportedException or System.Security.SecurityException)
+        {
+            return false;
+        }
     }
 
     private static bool TryDeleteFile(string path)

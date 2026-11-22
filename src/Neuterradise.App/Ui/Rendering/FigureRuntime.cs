@@ -79,20 +79,16 @@ public sealed class FigureRuntime : IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceSha256);
         ct.ThrowIfCancellationRequested();
 
-        // A scene that was validated on its original load remains safe while the NTFS
-        // source/Vault identity marker is unchanged. Hot navigation therefore bypasses
-        // CPU admission, receipt validation and a worker Task altogether.
-        if (TryGetCachedScene(path, sourceSha256, lod, textureDimension, out var warm))
-            return Task.FromResult(warm);
 
         var request = CancellationTokenSource.CreateLinkedTokenSource(ct, _lifetime.Token);
         var task = Task.Run(async () =>
         {
             request.Token.ThrowIfCancellationRequested();
-            using var permit = await _governor.AcquireAsync(ResourceClass.CpuHeavy, request.Token, foreground);
-            // Another request could have filled the same cache during CPU admission.
             var key = CreateSceneCacheKey(path, sourceSha256, lod, textureDimension);
             if (TryGetCachedScene(key, out var cached)) return cached;
+
+            using var permit = await _governor.AcquireAsync(ResourceClass.CpuHeavy, request.Token, foreground)
+                .ConfigureAwait(false);
             using var foregroundDisk = _governor.EnterForegroundDiskWork();
             var validated = _validationReceipts is null ? null
                 : await _validationReceipts.ValidateAsync(path, sourceSha256, request.Token).ConfigureAwait(false);
@@ -127,10 +123,6 @@ public sealed class FigureRuntime : IDisposable
     public async Task PrewarmSceneAsync(string path, string sourceSha256, CancellationToken ct = default)
     {
         if (_disposed || !IsLiveAllowed) return;
-        // A completed scene is already warm. Do not queue prefetch work or revalidate
-        // a scene when the same source-detail texture tier is resident in the CPU cache.
-        var warmTextureDimension = Tier == PresentationTier.Reduced ? 1024 : 2048;
-        if (TryGetCachedScene(path, sourceSha256, 0, warmTextureDimension, out _)) return;
         // Prefetch admission waits for foreground idle; an interaction or Import that starts
         // during validation cancels optional work so a visible Figure is not queued behind it.
         using var prefetch = await _governor.AcquireAsync(ResourceClass.Prefetch, ct).ConfigureAwait(false);
@@ -147,7 +139,6 @@ public sealed class FigureRuntime : IDisposable
             if (!_governor.IsPrefetchAllowed) return;
             // The live Figure always uses source-detail LOD0; only texture residency is reduced.
             var textureDimension = Tier == PresentationTier.Reduced ? 1024 : 2048;
-            // LoadSceneAsync now performs the identity-keyed cache check itself.
             try
             {
                 _ = await LoadSceneAsync(path, sourceSha256, 0, textureDimension,
@@ -161,30 +152,6 @@ public sealed class FigureRuntime : IDisposable
         finally
         {
             _governor.Changed -= OnGovernorChanged;
-        }
-    }
-
-    public bool TryGetCachedScene(
-        string path,
-        string sourceSha256,
-        int lod,
-        int textureDimension,
-        out FigureSceneData scene)
-    {
-        scene = null!;
-        if (_disposed) return false;
-        try
-        {
-            return TryGetCachedScene(
-                CreateSceneCacheKey(path, sourceSha256, lod, textureDimension),
-                out scene);
-        }
-        catch (Exception exception) when (exception is ArgumentException
-            or IOException
-            or UnauthorizedAccessException
-            or NotSupportedException)
-        {
-            return false;
         }
     }
 

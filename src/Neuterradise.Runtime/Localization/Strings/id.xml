@@ -1072,6 +1072,8 @@
     <sys:String x:Key="Profile.ReviewAll">Tinjau semua wajah</sys:String>
     <sys:String x:Key="Profile.SharedMedia">{0} bersama</sys:String>
     <sys:String x:Key="Profile.Tags">Tag</sys:String>
+    <sys:String x:Key="Settings.Vault.MetricsLoading">Menghitung metrik penyimpanan…</sys:String>
+    <sys:String x:Key="Settings.Vault.MetricsUnavailable">Metrik penyimpanan tidak dapat dibaca.</sys:String>
     <sys:String x:Key="Settings.Vault.Counts">{0} Profile · {1} media · {2}</sys:String>
     <sys:String x:Key="Settings.Notices">Pemberitahuan pihak ketiga</sys:String>
     <sys:String x:Key="Settings.OpenFaceReview">Tinjau wajah</sys:String>

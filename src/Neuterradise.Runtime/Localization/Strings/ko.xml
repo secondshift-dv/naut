@@ -1072,6 +1072,8 @@
     <sys:String x:Key="Profile.ReviewAll">모든 얼굴 검토</sys:String>
     <sys:String x:Key="Profile.SharedMedia">{0} 공유됨</sys:String>
     <sys:String x:Key="Profile.Tags">태그</sys:String>
+    <sys:String x:Key="Settings.Vault.MetricsLoading">저장소 사용량을 계산하는 중…</sys:String>
+    <sys:String x:Key="Settings.Vault.MetricsUnavailable">저장소 사용량을 읽을 수 없습니다.</sys:String>
     <sys:String x:Key="Settings.Vault.Counts">{0} 프로필 · {1} 미디어 · {2}</sys:String>
     <sys:String x:Key="Settings.Notices">제3자 고지사항</sys:String>
     <sys:String x:Key="Settings.OpenFaceReview">얼굴 검토</sys:String>

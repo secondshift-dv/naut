@@ -1072,6 +1072,8 @@
     <sys:String x:Key="Profile.ReviewAll">Revisar todas las caras</sys:String>
     <sys:String x:Key="Profile.SharedMedia">{0} compartido</sys:String>
     <sys:String x:Key="Profile.Tags">Etiquetas</sys:String>
+    <sys:String x:Key="Settings.Vault.MetricsLoading">Calculando las métricas de almacenamiento…</sys:String>
+    <sys:String x:Key="Settings.Vault.MetricsUnavailable">No se pudieron leer las métricas de almacenamiento.</sys:String>
     <sys:String x:Key="Settings.Vault.Counts">Perfiles {0} · Medios {1} · {2}</sys:String>
     <sys:String x:Key="Settings.Notices">Avisos de terceros</sys:String>
     <sys:String x:Key="Settings.OpenFaceReview">Revisar caras</sys:String>
