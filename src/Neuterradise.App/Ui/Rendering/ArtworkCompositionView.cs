@@ -78,9 +78,28 @@ internal sealed class ArtworkCompositionView : Grid
             ResourceGovernor.Shared.Changed -= OnMotionChanged;
             ReducedMotionAuthority.Changed -= OnMotionChanged;
             UpdateMotion();
-            if (_sprite is { } sprite) _maskHost?.Children.Remove(sprite);
-            _sprite = null;
-            _source = null;
+            if (_sprite is { } sprite)
+            {
+                _maskHost?.Children.Remove(sprite);
+                if (sprite.Brush is CompositionMaskBrush brush)
+                {
+                    var sourceBrush = brush.Source;
+                    var maskBrush = brush.Mask;
+                    sprite.Brush = null;
+                    brush.Dispose();
+                    sourceBrush?.Dispose();
+                    maskBrush?.Dispose();
+                }
+                sprite.Dispose();
+                _sprite = null;
+            }
+
+            if (_source is { } source)
+            {
+                source.SourceVisual = null;
+                source.Dispose();
+                _source = null;
+            }
             var mask = _mask;
             _mask = null;
             if (_maskCompleted) mask?.Dispose();
@@ -108,7 +127,7 @@ internal sealed class ArtworkCompositionView : Grid
         _sprite = sprite;
         mask.LoadCompleted += (sender, args) =>
         {
-            if (ReferenceEquals(_mask, sender) && ReferenceEquals(_sprite, sprite))
+            if (ReferenceEquals(_mask, sender) && _sprite is { } loadedSprite)
             {
                 _maskCompleted = true;
                 if (args.Status != LoadedImageSourceLoadStatus.Success) return;
@@ -118,8 +137,8 @@ internal sealed class ArtworkCompositionView : Grid
                     _maskHost = compositor.CreateContainerVisual();
                     ElementCompositionPreview.SetElementChildVisual(_output, _maskHost);
                 }
-                _maskHost.Children.InsertAtTop(sprite);
-                _maskHost.Size = sprite.Size;
+                _maskHost.Children.InsertAtTop(loadedSprite);
+                _maskHost.Size = loadedSprite.Size;
                 // Clip only the parent so the Skia visual surface can still paint the original layers.
                 _sourceHost.Clip = new RectangleGeometry { Rect = new Rect(-2, -2, 1, 1) };
             }

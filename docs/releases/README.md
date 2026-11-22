@@ -4,6 +4,7 @@ Version-specific changes, update instructions, and compatibility notes for Naut.
 
 ## Version history
 
+- [v0.0.34](v0.0.34.md)
 - [v0.0.33](v0.0.33.md)
 - [v0.0.32](v0.0.32.md)
 - [v0.0.31](v0.0.31.md)

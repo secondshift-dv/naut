@@ -678,13 +678,16 @@ public sealed class ProfileHeaderView : Grid, IDisposable
             return;
         }
 
-        if (!_active || state.ReducedMotion || (state.IndependentModules ? !_bannerFrame.IsLoaded
-                : state.Layout.BannerMode == ProfileLayoutBannerMode.None)
+        if (!_active || state.ReducedMotion
+            || (!state.IndependentModules && state.Layout.BannerMode == ProfileLayoutBannerMode.None)
             || !Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.IsPrimaryVideoAllowed)
         {
             PauseBanner();
             return;
         }
+
+        // Unload already retires a detached frame after the reparent window has closed.
+        if (state.IndependentModules && !_bannerFrame.IsLoaded) return;
 
         PlayBanner(state.BannerVideoPath);
     }

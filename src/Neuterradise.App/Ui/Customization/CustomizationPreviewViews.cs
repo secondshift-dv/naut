@@ -40,9 +40,9 @@ public sealed partial class CustomizationCenter
 
     private void RenderPreview()
     {
-        _profilePreviewHeader.SetActive(false);
         if (!_dedicatedEditor)
         {
+            _profilePreviewHeader.SetActive(false);
             _preview.Children.Clear();
             _preview.Visibility = Visibility.Collapsed;
             return;
@@ -55,6 +55,7 @@ public sealed partial class CustomizationCenter
         var stage = new Grid();
         frame.Child = stage;
         _preview.Children.Add(frame);
+        var profileHeaderActive = false;
         switch (_category)
         {
             case CustomizationCategories.Home:
@@ -88,10 +89,11 @@ public sealed partial class CustomizationCenter
                 }
                 else if (!_figureEditorOpen && _slot == PresentationSlots.ProfileFrame)
                     stage.Children.Add(DefinitionOptionPreview(PresentationSlots.Get(_slot), _session.ResolveCompiled(_slot))!);
-                else ProfilePreview(stage);
+                else profileHeaderActive = ProfilePreview(stage);
                 break;
-
         }
+
+        if (!profileHeaderActive) _profilePreviewHeader.SetActive(false);
     }
 
     private CardData? SampleData()
@@ -172,14 +174,14 @@ public sealed partial class CustomizationCenter
         stage.Children.Add(visual);
     }
 
-    private void ProfilePreview(Grid stage)
+    private bool ProfilePreview(Grid stage)
     {
         if (_session.ProfileWorking is not { } profile)
         {
             stage.Children.Add(UI.Text(
                 UI.T("Customize.ChooseProfileHint", "Choose a Profile above to edit this for that Profile."),
                 "body-muted").Align(HorizontalAlignment.Center, VerticalAlignment.Center));
-            return;
+            return false;
         }
 
         SyncBannerPreviewFromWorkingSource();
@@ -255,12 +257,14 @@ public sealed partial class CustomizationCenter
                     stage.Children.Add(new Viewbox { Stretch = Stretch.Uniform, Child = composition });
                 }
             }
+            else return false;
         }
         else if (_figureEditorOpen)
             stage.Children.Add(UI.Scroll(_profilePreviewHeader));
         else if (_slot is PresentationSlots.ProfileCover or PresentationSlots.ProfileBanner)
             stage.Children.Add(_profilePreviewHeader);
         else stage.Children.Add(UI.Scroll(_profilePreviewHeader));
+        return true;
     }
 
     private ProfileLayoutDefinition PreviewLayoutForActiveSlot(ProfileLayoutDefinition layout)

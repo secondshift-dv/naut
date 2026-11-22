@@ -21,6 +21,8 @@ namespace Neuterradise.App.Ui;
 public sealed class SkVideoView : SKCanvasElement, IDisposable
 {
     private const int FramesPerSecond = 24;
+    private const int BmpHeaderBytes = 54;
+    private const int BmpRowBufferBytes = 64 * 1024;
     private const int MaximumEncodedFrameBytes = 8 * 1024 * 1024;
     private static readonly Lazy<string?> FfmpegExecutable = new(
         static () => ExternalToolResolver.ForProduction()
@@ -330,15 +332,17 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
             _process = process;
         }
 
-        var errorDrain = process.StandardError.ReadToEndAsync();
+        var errorDrain = process.StandardError.BaseStream.CopyToAsync(Stream.Null);
         var playbackClock = new Stopwatch();
         long frameIndex = 0;
         SKBitmap? spare = null;
         try
         {
+            var header = new byte[BmpHeaderBytes];
+            var rowBuffer = new byte[BmpRowBufferBytes];
             while (!cancellationToken.IsCancellationRequested)
             {
-                var bitmap = await ReadBmpFrameAsync(process.StandardOutput.BaseStream, cancellationToken, spare)
+                var bitmap = await ReadBmpFrameAsync(process.StandardOutput.BaseStream, header, rowBuffer, cancellationToken, spare)
                     .ConfigureAwait(false);
                 spare = null;
                 if (bitmap is null)
@@ -493,9 +497,9 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
         return startInfo;
     }
 
-    private static async Task<SKBitmap?> ReadBmpFrameAsync(Stream stream, CancellationToken cancellationToken, SKBitmap? reusable)
+    private static async Task<SKBitmap?> ReadBmpFrameAsync(
+        Stream stream, byte[] header, byte[] rowBuffer, CancellationToken cancellationToken, SKBitmap? reusable)
     {
-        var header = new byte[54];
         if (!await ReadExactlyOrEofAsync(stream, header, cancellationToken).ConfigureAwait(false))
         {
             reusable?.Dispose();
@@ -508,7 +512,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
         }
 
         var frameLength = BinaryPrimitives.ReadInt32LittleEndian(header.AsSpan(2, 4));
-        if (frameLength < 54 || frameLength > MaximumEncodedFrameBytes)
+        if (frameLength < header.Length || frameLength > MaximumEncodedFrameBytes)
         {
             throw new InvalidDataException($"FFmpeg returned an invalid BMP frame length: {frameLength}.");
         }
@@ -520,9 +524,48 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
         var height = Math.Abs((long)rawHeight);
         var stride = ((long)width * bits + 31) / 32 * 4;
         if (width <= 0 || height <= 0 || Math.Max(width, height) > 1600 || Math.Min(width, height) > 900
-            || bits is not (24 or 32) || pixelOffset < 54 || pixelOffset > 138
+            || bits is not (24 or 32) || pixelOffset < header.Length || pixelOffset > 138
             || frameLength != pixelOffset + stride * height)
             throw new InvalidDataException("FFmpeg returned an invalid or oversized BMP geometry.");
+
+        // FFmpeg emits opaque, uncompressed BGRA BMPs. Read batches of bottom-up rows
+        // directly into the reusable bitmap with bounded scratch space per decoder.
+        var compression = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(30, 4));
+        if (bits == 32 && pixelOffset == header.Length && compression == 0 && rawHeight > 0)
+        {
+            var info = new SKImageInfo(width, checked((int)height), SKColorType.Bgra8888, SKAlphaType.Opaque);
+            var bitmap = reusable is not null && reusable.Info == info
+                ? reusable
+                : new SKBitmap(info);
+            try
+            {
+                var rowBytes = checked(width * 4);
+                var rowsPerBatch = rowBuffer.Length / rowBytes;
+                for (var inputRow = 0; inputRow < info.Height;)
+                {
+                    var rows = Math.Min(rowsPerBatch, info.Height - inputRow);
+                    await ReadExactlyAsync(stream, rowBuffer.AsMemory(0, rows * rowBytes), cancellationToken)
+                        .ConfigureAwait(false);
+                    var pixels = bitmap.GetPixelSpan();
+                    for (var row = 0; row < rows; row++)
+                    {
+                        var destinationRow = info.Height - inputRow - row - 1;
+                        rowBuffer.AsSpan(row * rowBytes, rowBytes)
+                            .CopyTo(pixels.Slice(destinationRow * bitmap.RowBytes, rowBytes));
+                    }
+                    inputRow += rows;
+                }
+
+                bitmap.NotifyPixelsChanged();
+                if (!ReferenceEquals(bitmap, reusable)) reusable?.Dispose();
+                return bitmap;
+            }
+            catch
+            {
+                if (!ReferenceEquals(bitmap, reusable)) bitmap.Dispose();
+                throw;
+            }
+        }
 
         var buffer = ArrayPool<byte>.Shared.Rent(frameLength);
         try
@@ -534,39 +577,11 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            // FFmpeg's BGRA BMP is bottom-up and tightly packed. Validate its
-            // uncompressed header before copying rows directly into Skia's pixel buffer.
-            // Keep the existing decoder for supported non-BGRA BMPs used by fixtures.
-            var compression = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(30, 4));
-            if (bits == 32 && pixelOffset == 54 && compression == 0 && rawHeight > 0)
-            {
-                var info = new SKImageInfo(width, checked((int)height), SKColorType.Bgra8888, SKAlphaType.Opaque);
-                var bitmap = reusable is not null && reusable.Info == info
-                    ? reusable
-                    : new SKBitmap(info);
-                if (!ReferenceEquals(bitmap, reusable)) reusable?.Dispose();
-                try
-                {
-                    var pixels = bitmap.GetPixelSpan();
-                    var rowBytes = checked(width * 4);
-                    for (var row = 0; row < info.Height; row++)
-                    {
-                        buffer.AsSpan(pixelOffset + (info.Height - row - 1) * rowBytes, rowBytes)
-                            .CopyTo(pixels.Slice(row * bitmap.RowBytes, rowBytes));
-                    }
-                    return bitmap;
-                }
-                catch
-                {
-                    bitmap.Dispose();
-                    throw;
-                }
-            }
-
-            reusable?.Dispose();
             using var encoded = new MemoryStream(buffer, 0, frameLength, writable: false, publiclyVisible: true);
-            return SKBitmap.Decode(encoded)
+            var bitmap = SKBitmap.Decode(encoded)
                 ?? throw new InvalidDataException("FFmpeg returned a BMP frame that Skia could not decode.");
+            reusable?.Dispose();
+            return bitmap;
         }
         finally
         {

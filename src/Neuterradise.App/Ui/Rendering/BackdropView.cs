@@ -134,6 +134,7 @@ public sealed class BackdropView : Grid
             RetireCanvases();
             ++_ambientGeneration;
             Interlocked.Exchange(ref _ambientImage, null)?.Dispose();
+            _mediaTint = null;
         };
     }
 
@@ -196,6 +197,8 @@ public sealed class BackdropView : Grid
 
             _ambientPath = value;
             var generation = ++_ambientGeneration;
+            if (!IsLoaded) return;
+
             TaskObserver.Observe(
                 LoadAmbientAsync(value, generation),
                 "BackdropView.LoadAmbientAsync");
@@ -346,6 +349,8 @@ public sealed class BackdropView : Grid
 
     private void Rebuild()
     {
+        if (!IsLoaded) return;
+
         StopClock();
         var previousVideos = _videos.ToList();
         var previousCanvases = _canvases.ToList();
@@ -542,7 +547,7 @@ internal sealed class BackdropCanvas : SKCanvasElement
     private readonly BackdropView _owner;
     private readonly BackdropLayer[] _layers;
     private readonly SKPaint[] _paints;
-    private readonly Dictionary<BackdropLayer, SKImage?> _images = [];
+    private readonly Dictionary<BackdropLayer, ImageLease> _images = [];
     private readonly Dictionary<BackdropLayer, SKImage?> _blurred = [];
     private readonly Dictionary<BackdropLayer, Particle[]> _particles = [];
     private readonly Dictionary<BackdropLayer, SKShader> _bokehShaders = [];
@@ -642,18 +647,15 @@ internal sealed class BackdropCanvas : SKCanvasElement
     private async Task LoadMediaAsync(BackdropLayer layer)
     {
         var generation = _generation;
-        var image = await Task.Run(() =>
-        {
-            using var bitmap = TargetSizeDecoder.Decode(layer.AssetPath!, 1920);
-            return bitmap is null ? null : SKImage.FromBitmap(bitmap);
-        }).ConfigureAwait(false);
+        var lease = await DerivedImageLoader.Shared.LoadAsync(layer.AssetPath, 1920).ConfigureAwait(false);
+        if (lease is null) return;
         try
         {
             UiDispatch.Run(() =>
             {
                 if (_retired || generation != _generation)
                 {
-                    image?.Dispose();
+                    lease.Dispose();
                     return;
                 }
 
@@ -662,7 +664,7 @@ internal sealed class BackdropCanvas : SKCanvasElement
                     previous?.Dispose();
                 }
 
-                _images[layer] = image;
+                _images[layer] = lease;
                 if (_blurred.Remove(layer, out var blurred))
                 {
                     blurred?.Dispose();
@@ -672,7 +674,7 @@ internal sealed class BackdropCanvas : SKCanvasElement
         }
         catch (InvalidOperationException)
         {
-            image?.Dispose();
+            lease.Dispose();
         }
     }
 
@@ -690,9 +692,9 @@ internal sealed class BackdropCanvas : SKCanvasElement
             image?.Dispose();
         }
 
-        foreach (var image in _images.Values)
+        foreach (var lease in _images.Values)
         {
-            image?.Dispose();
+            lease.Dispose();
         }
 
         _blurred.Clear();
@@ -1006,7 +1008,7 @@ internal sealed class BackdropCanvas : SKCanvasElement
     private SKImage? ResolveImage(BackdropLayer layer)
     {
         var source = layer.AssetPath is not null
-            ? _images.GetValueOrDefault(layer)
+            ? _images.GetValueOrDefault(layer)?.Image as SKImage
             : _owner.AmbientImage;
         if (source is null)
         {

@@ -87,13 +87,9 @@ public sealed class ImageMetadataAdapter
 
     public ImageMetadata ExtractFromBytes(ReadOnlySpan<byte> bytes, string? hintFormat = null)
     {
-        if (bytes.IsEmpty)
-        {
-            return ImageMetadata.Empty;
-        }
-
-        using var memoryStream = new MemoryStream(bytes.ToArray());
-        return ExtractFromStream(memoryStream, hintFormat);
+        return bytes.IsEmpty
+            ? ImageMetadata.Empty
+            : ExtractFromBuffer(new ArraySegment<byte>(bytes.ToArray()), hintFormat);
     }
 
     public ImageMetadata ExtractFromStream(Stream stream, string? hintFormat = null)
@@ -104,40 +100,49 @@ public sealed class ImageMetadataAdapter
             return ImageMetadata.Empty;
         }
 
-        byte[] buffer;
-        if (stream is MemoryStream ms && ms.TryGetBuffer(out var segment))
+        if (stream is MemoryStream memory && memory.TryGetBuffer(out var segment))
         {
-            buffer = segment.ToArray();
-        }
-        else
-        {
-            using var copy = new MemoryStream();
-            stream.CopyTo(copy);
-            buffer = copy.ToArray();
+            return ExtractFromBuffer(segment, hintFormat);
         }
 
-        if (buffer.Length == 0)
+        var capacity = 0;
+        if (stream is FileStream)
+        {
+            var remaining = stream.Length - stream.Position;
+            if (remaining > 0 && remaining <= Array.MaxLength)
+            {
+                capacity = (int)remaining;
+            }
+        }
+
+        using var copy = new MemoryStream(capacity);
+        stream.CopyTo(copy);
+        return ExtractFromBuffer(new ArraySegment<byte>(copy.GetBuffer(), 0, (int)copy.Length), hintFormat);
+    }
+
+    private static ImageMetadata ExtractFromBuffer(ArraySegment<byte> buffer, string? hintFormat)
+    {
+        if (buffer.Count == 0)
         {
             return ImageMetadata.Empty;
         }
 
-        var wpfResult = TryExtractViaCodec(buffer, hintFormat);
-
+        var codecResult = TryExtractViaCodec(buffer, hintFormat);
         var binaryResult = TryExtractViaBinary(buffer, hintFormat);
 
-        return MergeResults(wpfResult, binaryResult, hintFormat);
+        return MergeResults(codecResult, binaryResult, hintFormat);
     }
 
     /// <summary>
     /// Dimensions, format and pixel depth from the image codec. Camera/lens/time/GPS facts come from the
     /// binary EXIF/XMP parser, which reads the metadata segments directly and is merged over this.
     /// </summary>
-    private static ImageMetadata? TryExtractViaCodec(byte[] buffer, string? hintFormat)
+    private static ImageMetadata? TryExtractViaCodec(ArraySegment<byte> buffer, string? hintFormat)
     {
         try
         {
-            using var data = SkiaSharp.SKData.CreateCopy(buffer);
-            using var codec = SkiaSharp.SKCodec.Create(data);
+            using var stream = new MemoryStream(buffer.Array!, buffer.Offset, buffer.Count, writable: false);
+            using var codec = SkiaSharp.SKCodec.Create(stream);
             if (codec is null)
             {
                 return null;
@@ -171,11 +176,11 @@ public sealed class ImageMetadataAdapter
         }
     }
 
-    private static ImageMetadata? TryExtractViaBinary(byte[] buffer, string? hintFormat)
+    private static ImageMetadata? TryExtractViaBinary(ArraySegment<byte> buffer, string? hintFormat)
     {
         try
         {
-            if (buffer.Length < 8) return null;
+            if (buffer.Count < 8) return null;
 
             if (buffer[0] == 0x89 && buffer[1] == 0x50 && buffer[2] == 0x4E && buffer[3] == 0x47)
             {
@@ -187,30 +192,30 @@ public sealed class ImageMetadataAdapter
                 return ParseJpegBinary(buffer);
             }
 
-            if (buffer.Length >= 12 && buffer.AsSpan(0, 4).SequenceEqual("RIFF"u8)
-                && buffer.AsSpan(8, 4).SequenceEqual("WEBP"u8))
+            if (buffer.Count >= 12 && buffer.AsSpan().Slice(0, 4).SequenceEqual("RIFF"u8)
+                && buffer.AsSpan().Slice(8, 4).SequenceEqual("WEBP"u8))
             {
                 ImageMetadata? metadata = null;
                 var offset = 12;
-                while (offset <= buffer.Length - 8)
+                while (offset <= buffer.Count - 8)
                 {
-                    var length = BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan(offset + 4, 4));
-                    if (length > (uint)(buffer.Length - offset - 8)) break;
+                    var length = BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan().Slice(offset + 4, 4));
+                    if (length > (uint)(buffer.Count - offset - 8)) break;
                     var dataOffset = offset + 8;
                     var dataLength = (int)length;
-                    if (buffer.AsSpan(offset, 4).SequenceEqual("EXIF"u8))
+                    if (buffer.AsSpan().Slice(offset, 4).SequenceEqual("EXIF"u8))
                     {
-                        if (buffer.AsSpan(dataOffset, dataLength).StartsWith("Exif\0\0"u8))
+                        if (buffer.AsSpan().Slice(dataOffset, dataLength).StartsWith("Exif\0\0"u8))
                         {
                             dataOffset += 6;
                             dataLength -= 6;
                         }
                         metadata = MergeResults(metadata, ParseTiffBinary(buffer, dataOffset, dataLength), "WEBP");
                     }
-                    else if (buffer.AsSpan(offset, 4).SequenceEqual("XMP "u8))
-                        metadata = MergeResults(metadata, ParseXmp(buffer.AsSpan(dataOffset, dataLength)), "WEBP");
+                    else if (buffer.AsSpan().Slice(offset, 4).SequenceEqual("XMP "u8))
+                        metadata = MergeResults(metadata, ParseXmp(buffer.AsSpan().Slice(dataOffset, dataLength)), "WEBP");
                     var next = (long)offset + 8 + length + (length & 1);
-                    if (next > buffer.Length) break;
+                    if (next > buffer.Count) break;
                     offset = (int)next;
                 }
                 return metadata;
@@ -218,7 +223,7 @@ public sealed class ImageMetadataAdapter
 
             if ((buffer[0] == 0x49 && buffer[1] == 0x49) || (buffer[0] == 0x4D && buffer[1] == 0x4D))
             {
-                return ParseTiffBinary(buffer, 0, buffer.Length);
+                return ParseTiffBinary(buffer, 0, buffer.Count);
             }
 
             return null;
@@ -229,7 +234,7 @@ public sealed class ImageMetadataAdapter
         }
     }
 
-    private static ImageMetadata ParsePngBinary(byte[] buffer)
+    private static ImageMetadata ParsePngBinary(ArraySegment<byte> buffer)
     {
         ImageMetadata? exif = null;
         int? width = null;
@@ -239,16 +244,16 @@ public sealed class ImageMetadataAdapter
         var rawTags = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         var offset = 8;
-        while (offset + 8 <= buffer.Length)
+        while (offset + 8 <= buffer.Count)
         {
-            var length = BinaryPrimitives.ReadInt32BigEndian(buffer.AsSpan(offset, 4));
-            if (length < 0 || offset + 12 + length > buffer.Length) break;
+            var length = BinaryPrimitives.ReadInt32BigEndian(buffer.AsSpan().Slice(offset, 4));
+            if (length < 0 || offset + 12 + length > buffer.Count) break;
 
-            var chunkType = Encoding.ASCII.GetString(buffer, offset + 4, 4);
+            var chunkType = Encoding.ASCII.GetString(buffer.AsSpan().Slice(offset + 4, 4));
             if (chunkType == "IHDR" && length >= 13)
             {
-                width = BinaryPrimitives.ReadInt32BigEndian(buffer.AsSpan(offset + 8, 4));
-                height = BinaryPrimitives.ReadInt32BigEndian(buffer.AsSpan(offset + 12, 4));
+                width = BinaryPrimitives.ReadInt32BigEndian(buffer.AsSpan().Slice(offset + 8, 4));
+                height = BinaryPrimitives.ReadInt32BigEndian(buffer.AsSpan().Slice(offset + 12, 4));
                 bitDepth = buffer[offset + 16];
                 var colorType = buffer[offset + 17];
                 colorSpace = colorType switch
@@ -267,7 +272,7 @@ public sealed class ImageMetadataAdapter
             }
             else if (chunkType is "tEXt" or "iTXt" or "zTXt")
             {
-                var chunkBytes = buffer.AsSpan(offset + 8, length);
+                var chunkBytes = buffer.AsSpan().Slice(offset + 8, length);
                 var nullIdx = chunkBytes.IndexOf((byte)0);
                 if (nullIdx > 0)
                 {
@@ -296,7 +301,7 @@ public sealed class ImageMetadataAdapter
             RawTags: rawTags.Count > 0 ? rawTags : null), "PNG");
     }
 
-    private static ImageMetadata ParseJpegBinary(byte[] buffer)
+    private static ImageMetadata ParseJpegBinary(ArraySegment<byte> buffer)
     {
         int? width = null;
         int? height = null;
@@ -304,34 +309,34 @@ public sealed class ImageMetadataAdapter
         var rawTags = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         var offset = 2;
-        while (offset + 4 <= buffer.Length)
+        while (offset + 4 <= buffer.Count)
         {
             if (buffer[offset] != 0xFF) break;
             var marker = buffer[offset + 1];
             if (marker is 0xD9 or 0xDA) break;
 
-            var length = BinaryPrimitives.ReadUInt16BigEndian(buffer.AsSpan(offset + 2, 2));
-            if (offset + 2 + length > buffer.Length) break;
+            var length = BinaryPrimitives.ReadUInt16BigEndian(buffer.AsSpan().Slice(offset + 2, 2));
+            if (offset + 2 + length > buffer.Count) break;
 
             if (marker is 0xC0 or 0xC1 or 0xC2 && length >= 7)
             {
-                height = BinaryPrimitives.ReadUInt16BigEndian(buffer.AsSpan(offset + 5, 2));
-                width = BinaryPrimitives.ReadUInt16BigEndian(buffer.AsSpan(offset + 7, 2));
+                height = BinaryPrimitives.ReadUInt16BigEndian(buffer.AsSpan().Slice(offset + 5, 2));
+                width = BinaryPrimitives.ReadUInt16BigEndian(buffer.AsSpan().Slice(offset + 7, 2));
             }
 
             else if (marker == 0xE1 && length >= 8)
             {
-                var app1Header = Encoding.ASCII.GetString(buffer, offset + 4, 6);
+                var app1Header = Encoding.ASCII.GetString(buffer.AsSpan().Slice(offset + 4, 6));
                 if (app1Header.StartsWith("Exif\0\0", StringComparison.Ordinal))
                 {
                     var tiffStart = offset + 10;
                     var tiffLength = length - 8;
                     exifMeta = MergeResults(exifMeta, ParseTiffBinary(buffer, tiffStart, tiffLength), "JPEG");
                 }
-                else if (buffer.AsSpan(offset + 4, length - 2).StartsWith("http://ns.adobe.com/xap/1.0/\0"u8))
+                else if (buffer.AsSpan().Slice(offset + 4, length - 2).StartsWith("http://ns.adobe.com/xap/1.0/\0"u8))
                 {
                     var headerLength = "http://ns.adobe.com/xap/1.0/\0"u8.Length;
-                    var xmp = ParseXmp(buffer.AsSpan(offset + 4 + headerLength, length - 2 - headerLength));
+                    var xmp = ParseXmp(buffer.AsSpan().Slice(offset + 4 + headerLength, length - 2 - headerLength));
                     exifMeta = MergeResults(exifMeta, xmp, "JPEG");
                 }
             }
@@ -398,9 +403,9 @@ public sealed class ImageMetadataAdapter
         }
     }
 
-    private static ImageMetadata ParseTiffBinary(byte[] buffer, int tiffStart, int tiffLength)
+    private static ImageMetadata ParseTiffBinary(ArraySegment<byte> buffer, int tiffStart, int tiffLength)
     {
-        if (tiffLength < 8 || tiffStart + 8 > buffer.Length)
+        if (tiffLength < 8 || tiffStart + 8 > buffer.Count)
         {
             return ImageMetadata.Empty;
         }
@@ -426,7 +431,7 @@ public sealed class ImageMetadataAdapter
         }
 
         var firstIfdOffset = (int)ReadUInt32(buffer, tiffStart + 4, isLittleEndian);
-        if (firstIfdOffset < 8 || tiffStart + firstIfdOffset >= buffer.Length)
+        if (firstIfdOffset < 8 || tiffStart + firstIfdOffset >= buffer.Count)
         {
             return ImageMetadata.Empty;
         }
@@ -511,7 +516,7 @@ public sealed class ImageMetadataAdapter
             }
         });
 
-        if (exifIfdOffset > 0 && tiffStart + exifIfdOffset < buffer.Length)
+        if (exifIfdOffset > 0 && tiffStart + exifIfdOffset < buffer.Count)
         {
             ReadIfd(buffer, tiffStart, exifIfdOffset, isLittleEndian, (tag, type, count, valOffset) =>
             {
@@ -584,7 +589,7 @@ public sealed class ImageMetadataAdapter
             });
         }
 
-        if (gpsIfdOffset > 0 && tiffStart + gpsIfdOffset < buffer.Length)
+        if (gpsIfdOffset > 0 && tiffStart + gpsIfdOffset < buffer.Count)
         {
             string? latRef = null;
             string? lonRef = null;
@@ -662,21 +667,21 @@ public sealed class ImageMetadataAdapter
     }
 
     private static void ReadIfd(
-        byte[] buffer,
+        ArraySegment<byte> buffer,
         int tiffStart,
         int ifdOffset,
         bool isLittleEndian,
         Action<ushort, ushort, uint, int> onEntry)
     {
         var dirOffset = tiffStart + ifdOffset;
-        if (dirOffset + 2 > buffer.Length) return;
+        if (dirOffset + 2 > buffer.Count) return;
 
         var count = ReadUInt16(buffer, dirOffset, isLittleEndian);
         var entryOffset = dirOffset + 2;
 
         for (var i = 0; i < count; i++)
         {
-            if (entryOffset + 12 > buffer.Length) break;
+            if (entryOffset + 12 > buffer.Count) break;
 
             var tag = ReadUInt16(buffer, entryOffset, isLittleEndian);
             var type = ReadUInt16(buffer, entryOffset + 2, isLittleEndian);
@@ -688,9 +693,9 @@ public sealed class ImageMetadataAdapter
         }
     }
 
-    private static uint ReadTagValueUInt(byte[] buffer, int tiffStart, ushort type, int valOffset, bool isLittleEndian)
+    private static uint ReadTagValueUInt(ArraySegment<byte> buffer, int tiffStart, ushort type, int valOffset, bool isLittleEndian)
     {
-        if (valOffset + 4 > buffer.Length) return 0;
+        if (valOffset + 4 > buffer.Count) return 0;
         return type switch
         {
             1 => buffer[valOffset],
@@ -715,7 +720,7 @@ public sealed class ImageMetadataAdapter
         return cleaned.ToUpperInvariant();
     }
 
-    private static string? ReadTagValueString(byte[] buffer, int tiffStart, uint count, int valOffset)
+    private static string? ReadTagValueString(ArraySegment<byte> buffer, int tiffStart, uint count, int valOffset)
     {
         if (count == 0) return null;
         int dataOffset;
@@ -734,29 +739,29 @@ public sealed class ImageMetadataAdapter
             }
             else
             {
-                var ptr = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(valOffset, 4));
+                var ptr = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan().Slice(valOffset, 4));
                 dataOffset = tiffStart + ptr;
             }
         }
         else
         {
-            var ptr = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(valOffset, 4));
+            var ptr = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan().Slice(valOffset, 4));
             dataOffset = tiffStart + ptr;
         }
 
-        if (dataOffset < 0 || dataOffset + count > buffer.Length) return null;
+        if (dataOffset < 0 || dataOffset + count > buffer.Count) return null;
 
         var length = (int)count;
         while (length > 0 && buffer[dataOffset + length - 1] == 0) length--;
-        return length > 0 ? Encoding.ASCII.GetString(buffer, dataOffset, length).Trim() : null;
+        return length > 0 ? Encoding.ASCII.GetString(buffer.AsSpan().Slice(dataOffset, length)).Trim() : null;
     }
 
-    private static double? ReadTagValueRational(byte[] buffer, int tiffStart, int valOffset, bool isLittleEndian)
+    private static double? ReadTagValueRational(ArraySegment<byte> buffer, int tiffStart, int valOffset, bool isLittleEndian)
     {
-        if (valOffset + 4 > buffer.Length) return null;
+        if (valOffset + 4 > buffer.Count) return null;
         var ptr = (int)ReadUInt32(buffer, valOffset, isLittleEndian);
         var absOffset = tiffStart + ptr;
-        if (absOffset < 0 || absOffset + 8 > buffer.Length) return null;
+        if (absOffset < 0 || absOffset + 8 > buffer.Count) return null;
 
         var num = ReadUInt32(buffer, absOffset, isLittleEndian);
         var den = ReadUInt32(buffer, absOffset + 4, isLittleEndian);
@@ -764,12 +769,12 @@ public sealed class ImageMetadataAdapter
         return Math.Round((double)num / den, 4);
     }
 
-    private static double? ReadTagValueSignedRational(byte[] buffer, int tiffStart, int valOffset, bool isLittleEndian)
+    private static double? ReadTagValueSignedRational(ArraySegment<byte> buffer, int tiffStart, int valOffset, bool isLittleEndian)
     {
-        if (valOffset + 4 > buffer.Length) return null;
+        if (valOffset + 4 > buffer.Count) return null;
         var ptr = (int)ReadUInt32(buffer, valOffset, isLittleEndian);
         var absOffset = tiffStart + ptr;
-        if (absOffset < 0 || absOffset + 8 > buffer.Length) return null;
+        if (absOffset < 0 || absOffset + 8 > buffer.Count) return null;
 
         var num = ReadInt32(buffer, absOffset, isLittleEndian);
         var den = ReadInt32(buffer, absOffset + 4, isLittleEndian);
@@ -777,12 +782,12 @@ public sealed class ImageMetadataAdapter
         return Math.Round((double)num / den, 4);
     }
 
-    private static double[]? ReadTagValueRationalArray(byte[] buffer, int tiffStart, uint count, int valOffset, bool isLittleEndian)
+    private static double[]? ReadTagValueRationalArray(ArraySegment<byte> buffer, int tiffStart, uint count, int valOffset, bool isLittleEndian)
     {
         if (count == 0) return null;
         var ptr = (int)ReadUInt32(buffer, valOffset, isLittleEndian);
         var absOffset = tiffStart + ptr;
-        if (absOffset < 0 || absOffset + (count * 8) > buffer.Length) return null;
+        if (absOffset < 0 || absOffset + (count * 8) > buffer.Count) return null;
 
         var result = new double[count];
         for (var i = 0; i < count; i++)
@@ -795,20 +800,20 @@ public sealed class ImageMetadataAdapter
         return result;
     }
 
-    private static ushort ReadUInt16(byte[] buffer, int offset, bool isLittleEndian) =>
+    private static ushort ReadUInt16(ArraySegment<byte> buffer, int offset, bool isLittleEndian) =>
         isLittleEndian
-            ? BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan(offset, 2))
-            : BinaryPrimitives.ReadUInt16BigEndian(buffer.AsSpan(offset, 2));
+            ? BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan().Slice(offset, 2))
+            : BinaryPrimitives.ReadUInt16BigEndian(buffer.AsSpan().Slice(offset, 2));
 
-    private static uint ReadUInt32(byte[] buffer, int offset, bool isLittleEndian) =>
+    private static uint ReadUInt32(ArraySegment<byte> buffer, int offset, bool isLittleEndian) =>
         isLittleEndian
-            ? BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan(offset, 4))
-            : BinaryPrimitives.ReadUInt32BigEndian(buffer.AsSpan(offset, 4));
+            ? BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan().Slice(offset, 4))
+            : BinaryPrimitives.ReadUInt32BigEndian(buffer.AsSpan().Slice(offset, 4));
 
-    private static int ReadInt32(byte[] buffer, int offset, bool isLittleEndian) =>
+    private static int ReadInt32(ArraySegment<byte> buffer, int offset, bool isLittleEndian) =>
         isLittleEndian
-            ? BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(offset, 4))
-            : BinaryPrimitives.ReadInt32BigEndian(buffer.AsSpan(offset, 4));
+            ? BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan().Slice(offset, 4))
+            : BinaryPrimitives.ReadInt32BigEndian(buffer.AsSpan().Slice(offset, 4));
 
     private static (string Label, int Degrees) DecodeOrientation(ushort val) =>
         val switch

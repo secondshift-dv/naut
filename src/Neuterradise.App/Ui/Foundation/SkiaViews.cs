@@ -39,12 +39,12 @@ public sealed class IconView : SKCanvasElement
         Width = size;
         Height = size;
         IsHitTestVisible = false;
-        ThemeRuntime.Current.Changed += Invalidate;
         Unloaded += (_, _) => ThemeRuntime.Current.Changed -= Invalidate;
         Loaded += (_, _) =>
         {
             ThemeRuntime.Current.Changed -= Invalidate;
             ThemeRuntime.Current.Changed += Invalidate;
+            Invalidate();
         };
     }
 
@@ -370,6 +370,7 @@ public sealed class CoverFrameView : SKCanvasElement
     private bool _hover;
     private double _phase;
     private bool _animating;
+    private bool _animationEligible;
     private SKImage? _overlay;
     private ImageLease? _overlayLease;
     private int _overlayGeneration;
@@ -390,7 +391,7 @@ public sealed class CoverFrameView : SKCanvasElement
     {
         IsHitTestVisible = false;
         Loaded += (_, _) => { UpdateAnimation(); EnsureCover(); EnsureOverlay(); };
-        Unloaded += (_, _) => { StopAnimation(); ReleaseCover(); ReleaseOverlay(); };
+        Unloaded += (_, _) => { SetAnimationEligible(false); ReleaseCover(); ReleaseOverlay(); };
     }
 
     public ImageRef? Source
@@ -597,12 +598,32 @@ public sealed class CoverFrameView : SKCanvasElement
         Invalidate();
     }
 
-    private void UpdateAnimation()
-    {
-        var animated = _appearance is { Frame.SupportsAnimation: true, FrameAnimation: not CoverFrameAnimation.None }
+    private void UpdateAnimation() =>
+        SetAnimationEligible(IsLoaded
+            && _appearance is { Frame.SupportsAnimation: true, FrameAnimation: not CoverFrameAnimation.None }
             && (_frameMode == "full" || _hover)
-            && !ThemeRuntime.Current.ReducedMotion
-            && IsLoaded;
+            && !ThemeRuntime.Current.ReducedMotion);
+
+    private void SetAnimationEligible(bool eligible)
+    {
+        if (_animationEligible != eligible)
+        {
+            _animationEligible = eligible;
+            if (eligible)
+                SystemServices.Resources.ResourceGovernor.Shared.Changed += OnAnimationGovernorChanged;
+            else
+                SystemServices.Resources.ResourceGovernor.Shared.Changed -= OnAnimationGovernorChanged;
+        }
+
+        UpdateAnimationClock();
+    }
+
+    private void OnAnimationGovernorChanged(object? sender, EventArgs args) => UiDispatch.Run(UpdateAnimationClock);
+
+    private void UpdateAnimationClock()
+    {
+        var animated = _animationEligible && IsLoaded && SystemServices.Resources.ResourceGovernor.Shared.Tier is not
+            (SystemServices.Resources.PresentationTier.Suspended or SystemServices.Resources.PresentationTier.Fallback);
         if (animated && !_animating)
         {
             _animating = true;

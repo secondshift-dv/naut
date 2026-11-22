@@ -446,7 +446,6 @@ public sealed class CardVisual : Grid
                 }
 
                 Paint();
-                ThemeRuntime.Current.Changed += Paint;
                 border.Unloaded += (_, _) => ThemeRuntime.Current.Changed -= Paint;
                 border.Loaded += (_, _) =>
                 {
