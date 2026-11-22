@@ -1163,6 +1163,7 @@
     <sys:String x:Key="Import.PreparationRetrying">メディアを再度準備しています…</sys:String>
     <sys:String x:Key="Import.PreparationRetryingDetail">naut がメディアを再度準備しています。準備ができると続行できます。</sys:String>
     <sys:String x:Key="Import.PreparationFailed">確認が必要なメディアがあります</sys:String>
+    <sys:String x:Key="Import.MissingModelDependencies">このモデルには不足しているマテリアルまたはテクスチャファイルがあります。</sys:String>
     <sys:String x:Key="Import.PreparationFailedDetail">このインポートに必要なすべての項目を naut で準備できませんでした。もう一度試すか、インポートをキャンセルしてください。</sys:String>
     <sys:String x:Key="Import.PreparationRetry">もう一度試してください</sys:String>
     <sys:String x:Key="Home.Refresh.PartialFailure">Home の一部のセクションを更新できませんでした。</sys:String>
@@ -2154,6 +2155,7 @@
     <sys:String x:Key="Profile.TextFiles.Ignore">インポートしたテキストを無視</sys:String>
     <sys:String x:Key="Profile.TextFiles.Replace">カタログのテキストを書き込む</sys:String>
     <sys:String x:Key="Profile.TextFiles.Imported">インポートした概要</sys:String>
+    <sys:String x:Key="Profile.TextFiles.CurrentOverview">現在の概要</sys:String>
     <sys:String x:Key="Profile.TextFiles.Conflict">ファイルとカタログの内容が異なります。下のテキストを確認してください。カタログの書き込みは外部の変更を置き換えます。「キャンセル」は両方を保持します。</sys:String>
     <sys:String x:Key="Profile.TextFiles.Stale">テキストが再び変更されました。最新の内容を確認してください。</sys:String>
     <sys:String x:Key="Profile.PrivateNote.FileNotice">Profile フォルダーに private-note.txt として保存されます。暗号化されていないため、ファイルシステムにアクセスできる人は読むことができます。</sys:String>

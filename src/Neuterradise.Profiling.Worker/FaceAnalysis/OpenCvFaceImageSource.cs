@@ -64,20 +64,17 @@ public sealed class OpenCvFaceImageSource : IFaceImageSource
             || extension.Equals(".vob", StringComparison.OrdinalIgnoreCase)
             || extension.Equals(".mxf", StringComparison.OrdinalIgnoreCase);
         using var capture = pipeDecoder ? null : new VideoCapture(path);
-        if (!pipeDecoder && capture?.IsOpened() != true)
-        {
-            throw new FaceInputException($"Analyzed video could not be opened: {path}.");
-        }
+        pipeDecoder |= capture?.IsOpened() != true;
 
         var discovered = new List<(long Timestamp, OpenCvFaceImage Frame, Mat Signature, double Contrast)>();
-        try
+        void DiscoverFrames(bool usePipe)
         {
             foreach (var timestamp in plan.SampleTimestampMilliseconds.Distinct().Order().Take(MaximumDiscoverySamples))
             {
-                using var frame = pipeDecoder ? TryDecodeVideoFrame(path, timestamp) : new Mat();
+                using var frame = usePipe ? TryDecodeVideoFrame(path, timestamp) : new Mat();
                 if (frame is null) continue;
-                if (!pipeDecoder) capture!.Set(VideoCaptureProperties.PosMsec, timestamp);
-                if ((!pipeDecoder && !capture!.Read(frame)) || frame.Empty())
+                if (!usePipe) capture!.Set(VideoCaptureProperties.PosMsec, timestamp);
+                if ((!usePipe && !capture!.Read(frame)) || frame.Empty())
                 {
                     continue;
                 }
@@ -88,6 +85,15 @@ public sealed class OpenCvFaceImageSource : IFaceImageSource
                 Cv2.Resize(gray, signature, new Size(32, 32), interpolation: InterpolationFlags.Area);
                 Cv2.MeanStdDev(signature, out _, out var deviation);
                 discovered.Add((timestamp, new OpenCvFaceImage(frame.Clone()), signature, deviation.Val0));
+            }
+        }
+
+        try
+        {
+            DiscoverFrames(pipeDecoder);
+            if (!pipeDecoder && discovered.Count == 0)
+            {
+                DiscoverFrames(usePipe: true);
             }
 
             if (discovered.Count == 0)

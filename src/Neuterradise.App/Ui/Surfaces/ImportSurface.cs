@@ -1601,11 +1601,21 @@ public sealed class ImportSurface : Surface
             foreach (var problem in wizard.PreparationProblems)
             {
                 var failure = problem.Failures.FirstOrDefault();
+                var actions = UI.H(8);
+                if (!problem.MissingDependencies)
+                {
+                    actions.Children.Add(UI.Button(UI.T("Import.PreparationRetry", "Try again"), null,
+                        ButtonKind.Primary, command: wizard.RetryPreparationCommand, parameter: problem));
+                }
+                actions.Children.Add(UI.Button(UI.T("Import.Duplicate.Remove", "Remove from this import"), null,
+                    ButtonKind.Ghost, command: wizard.RemovePreparationItemCommand, parameter: problem));
                 problems.Children.Add(UI.Surface(UI.V(6,
                     UI.Text(UI.T("Import.PreparationFailed", "Some media needs attention"), "body-strong"),
                     UI.Text(problem.SourceFileName, "caption", maxLines: 2),
                     UI.Text(
-                        string.IsNullOrWhiteSpace(failure?.ErrorDetailSafe)
+                        problem.MissingDependencies
+                            ? UI.T("Import.MissingModelDependencies", "This model is missing one or more material or texture files.")
+                            : string.IsNullOrWhiteSpace(failure?.ErrorDetailSafe)
                             ? UI.T(
                                 "Import.PreparationFailedDetail",
                                 "naut could not prepare everything needed for this import. Try again or cancel the import.")
@@ -1620,13 +1630,7 @@ public sealed class ImportSurface : Surface
                         "caption",
                         "textSecondary",
                         2),
-                    UI.H(8,
-                        UI.Button(
-                            UI.T("Import.PreparationRetry", "Try again"),
-                            null,
-                            ButtonKind.Primary,
-                            command: wizard.RetryPreparationCommand,
-                            parameter: problem))),
+                    actions),
                     Material.Raised, 12, 12));
             }
 

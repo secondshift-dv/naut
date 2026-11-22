@@ -139,7 +139,8 @@ public sealed record VerificationProfileCollisionProblem(
 public sealed record VerificationPreparationProblem(
     Guid ImportItemId,
     string SourceFileName,
-    IReadOnlyList<ImportPreparationFailure> Failures);
+    IReadOnlyList<ImportPreparationFailure> Failures,
+    bool MissingDependencies = false);
 
 public sealed record VerificationGateProblems(
     IReadOnlyList<VerificationDuplicateProblem> Duplicates,

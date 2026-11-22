@@ -1163,6 +1163,7 @@
     <sys:String x:Key="Import.PreparationRetrying">再次准备媒体...</sys:String>
     <sys:String x:Key="Import.PreparationRetryingDetail">naut 正在重新准备媒体。准备好后您可以继续。</sys:String>
     <sys:String x:Key="Import.PreparationFailed">一些媒体需要关注</sys:String>
+    <sys:String x:Key="Import.MissingModelDependencies">此模型缺少一个或多个材质或纹理文件。</sys:String>
     <sys:String x:Key="Import.PreparationFailedDetail">naut 无法准备此导入所需的一切。请重试或取消导入。</sys:String>
     <sys:String x:Key="Import.PreparationRetry">再试一次</sys:String>
     <sys:String x:Key="Home.Refresh.PartialFailure">某些主页部分无法刷新。</sys:String>
@@ -2154,6 +2155,7 @@
     <sys:String x:Key="Profile.TextFiles.Ignore">忽略导入文本</sys:String>
     <sys:String x:Key="Profile.TextFiles.Replace">写入目录文本</sys:String>
     <sys:String x:Key="Profile.TextFiles.Imported">导入的概述</sys:String>
+    <sys:String x:Key="Profile.TextFiles.CurrentOverview">当前概述</sys:String>
     <sys:String x:Key="Profile.TextFiles.Conflict">文件与目录内容不同。请查看下方文本。写入目录文本会替换外部修改；取消将保留两者。</sys:String>
     <sys:String x:Key="Profile.TextFiles.Stale">文本再次发生更改。请查看最新版本。</sys:String>
     <sys:String x:Key="Profile.PrivateNote.FileNotice">保存为 Profile 文件夹中的 private-note.txt。这是未加密的纯文本，任何有文件系统访问权限的人都可以读取。</sys:String>

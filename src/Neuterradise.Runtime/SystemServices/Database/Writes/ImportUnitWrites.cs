@@ -556,7 +556,14 @@ public sealed class ImportUnitWrites
                 JOIN import_items mine ON mine.import_unit_id = self.import_unit_id
                 JOIN media asset ON asset.media_id = mine.candidate_media_id
                 WHERE self.import_unit_id = $unitId
-                  AND self.state = 'CANCELLED'
+                  AND (self.state = 'CANCELLED' OR
+                       (self.state = 'COMMITTING' AND mine.disposition = 'SKIPPED'
+                        AND NOT EXISTS (
+                            SELECT 1 FROM import_items kept
+                            WHERE kept.import_unit_id = $unitId
+                              AND ((kept.disposition = 'INCLUDED' AND kept.candidate_media_id = $assetId)
+                                OR (kept.disposition = 'REUSED' AND kept.reused_media_id = $assetId))
+                        )))
                   AND mine.candidate_media_id = $assetId
                   AND asset.state IN ('ACTIVE', 'TRASHED')
                   AND NOT EXISTS (

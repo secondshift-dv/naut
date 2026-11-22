@@ -614,8 +614,8 @@ public sealed class ImportFinalizer : IAsyncDisposable
         // reuse is safe and no duplicate physical authority should be created. The user can
         // still change this decision in Verify before requesting import.
         var authoritativeMatches = matches
-            .Where(match => match is { MatchedMediaState: MediaState.Active, Decision: null })
-            .ToList();
+            .Where(static match => match is { MatchedMediaState: MediaState.Active, Decision: null })
+            .DistinctBy(static match => match.ImportItemId);
         foreach (var match in authoritativeMatches)
         {
             try
@@ -649,7 +649,7 @@ public sealed class ImportFinalizer : IAsyncDisposable
             .ToDictionary(group => group.Key, group => group.First());
 
         var reusedItems = matches
-            .Where(match => match.RequiresDecision)
+            .Where(static match => match.RequiresDecision || match.Decision == DuplicateDecision.Reuse)
             .Select(match => match.ImportItemId)
             .ToHashSet();
         var setAside = new List<Guid>();
@@ -677,7 +677,7 @@ public sealed class ImportFinalizer : IAsyncDisposable
             if (transferJobs.TryGetValue(candidateId, out var transferJob)
                 && transferJob.State == JobState.Succeeded
                 && fingerprints.TryGetValue(candidateId, out var sha)
-                && !string.IsNullOrWhiteSpace(sha))
+                && !string.IsNullOrWhiteSpace(sha.Sha256))
             {
                 continue;
             }
@@ -702,6 +702,26 @@ public sealed class ImportFinalizer : IAsyncDisposable
                 ItemDisposition.Skipped,
                 cancellationToken).ConfigureAwait(false);
             await RecordAttentionAsync(unitId, setAside, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!stillPreparing)
+        {
+            var duplicateItems = items
+                .Where(item => item is { Disposition: ItemDisposition.Included, DuplicateDecision: null, CandidateMediaId: not null }
+                    && !reusedItems.Contains(item.ItemId)
+                    && !setAside.Contains(item.ItemId)
+                    && transferJobs.TryGetValue(item.CandidateMediaId.Value, out var transfer)
+                    && transfer.State == JobState.Succeeded
+                    && fingerprints.TryGetValue(item.CandidateMediaId.Value, out var identity)
+                    && identity.Sha256 is not null && identity.ByteLength is not null)
+                .GroupBy(item => fingerprints[item.CandidateMediaId!.Value])
+                .SelectMany(group => group.OrderBy(static item => item.SourcePath, StringComparer.Ordinal)
+                    .ThenBy(static item => item.ItemId).Skip(1));
+            foreach (var duplicate in duplicateItems)
+            {
+                await _operations.ApplyDuplicateDecisionAsync(duplicate.ItemId, DuplicateDecision.Skip,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+            }
         }
 
         return new AdmissionResult(!stillPreparing);
@@ -850,16 +870,18 @@ public sealed class ImportFinalizer : IAsyncDisposable
         return ids;
     }
 
-    private async Task<Dictionary<Guid, string?>> ReadFingerprintsAsync(
+    private async Task<Dictionary<Guid, (string? Sha256, long? ByteLength, string? BundleSha256)>> ReadFingerprintsAsync(
         Guid unitId,
         CancellationToken cancellationToken)
     {
-        var result = new Dictionary<Guid, string?>();
+        var result = new Dictionary<Guid, (string? Sha256, long? ByteLength, string? BundleSha256)>();
         await using var connection = await _catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT i.candidate_media_id, a.sha256
+            SELECT i.candidate_media_id, a.sha256,
+                   CASE WHEN a.media_type <> 'MODEL' OR a.bundle_sha256 IS NOT NULL THEN a.byte_length END,
+                   a.bundle_sha256
             FROM import_items i
             JOIN media a ON a.media_id = i.candidate_media_id
             WHERE i.import_unit_id = $unitId;
@@ -868,7 +890,10 @@ public sealed class ImportFinalizer : IAsyncDisposable
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            result[DbGuid.Parse(reader.GetString(0))] = reader.IsDBNull(1) ? null : reader.GetString(1);
+            result[DbGuid.Parse(reader.GetString(0))] = (
+                reader.IsDBNull(1) ? null : reader.GetString(1),
+                reader.IsDBNull(2) ? null : reader.GetInt64(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3));
         }
 
         return result;

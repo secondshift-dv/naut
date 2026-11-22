@@ -996,16 +996,31 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
                 TextWrapping = TextWrapping.Wrap, MinHeight = 100, MaxHeight = 240,
             };
             var actions = new VariableWrap(8);
-            if (issue.ExternalText is not null)
+            if (issue.ExternalText is not null && (issue.ImportOfferId is null || !string.IsNullOrWhiteSpace(issue.ExternalText)))
                 actions.Children.Add(UI.Button(UI.T("Profile.TextFiles.Adopt", "Use file text"), () => Choose(1), ButtonKind.Primary));
             actions.Children.Add(UI.Button(issue.ImportOfferId is not null
                 ? UI.T("Profile.TextFiles.Ignore", "Ignore imported text")
                 : UI.T("Profile.TextFiles.Replace", "Write catalog text"), () => Choose(2), ButtonKind.Secondary));
             actions.Children.Add(UI.Button(UI.T("Overlay.Cancel", "Cancel"), () => Choose(0), ButtonKind.Ghost));
-            dialog = Services.Root!.Dialogs.Show(UI.V(12,
-                UI.Text(issue.ImportOfferId is null ? issue.FileName : UI.T("Profile.TextFiles.Imported", "Imported overview"), "section-title"),
-                UI.WrappedText(UI.T("Profile.TextFiles.Conflict", "The file and catalog differ. Review the file text below. Writing catalog text replaces external edits; Cancel preserves both."), "body"),
-                preview, actions), 640,
+            var content = UI.V(12,
+                UI.Text(issue.ImportOfferId is null ? issue.FileName : UI.T("Profile.TextFiles.Imported", "Imported overview"), "section-title"));
+            if (issue.ImportOfferId is not null)
+            {
+                content.Children.Add(UI.Text(UI.T("Profile.TextFiles.CurrentOverview", "Current overview"), "control"));
+                content.Children.Add(new TextBox
+                {
+                    Text = issue.CurrentText ?? string.Empty, IsReadOnly = true, AcceptsReturn = true,
+                    TextWrapping = TextWrapping.Wrap, MinHeight = 70, MaxHeight = 140,
+                });
+                content.Children.Add(UI.Text(UI.T("Profile.TextFiles.Imported", "Imported overview"), "control"));
+            }
+            else
+            {
+                content.Children.Add(UI.WrappedText(UI.T("Profile.TextFiles.Conflict", "The file and catalog differ. Review the file text below. Writing catalog text replaces external edits; Cancel preserves both."), "body"));
+            }
+            content.Children.Add(preview);
+            content.Children.Add(actions);
+            dialog = Services.Root!.Dialogs.Show(content, 640,
                 onDismiss: () => completion.TrySetResult(0), dismissOnScrim: true);
             var choice = await completion.Task.ConfigureAwait(true);
             if (choice != 0 && !await _vm.ResolveTextFileAsync(issue, choice == 1).ConfigureAwait(true))

@@ -166,9 +166,10 @@ public sealed class ImportPublicationCoordinator
             var readiness = await _validator.ValidateCommitReadinessAsync(unitId, cancellationToken).ConfigureAwait(false);
             if (!readiness.IsReady)
             {
+                var blocker = readiness.Blockers.FirstOrDefault();
                 return ImportPublicationResult.Blocked(
-                    readiness.Blockers.FirstOrDefault()?.Code ?? "VERIFY_BLOCKED",
-                    "Verify still has unresolved decisions.");
+                    blocker?.Code ?? "VERIFY_BLOCKED",
+                    blocker?.Message ?? "Verify still has unresolved decisions.");
             }
 
             await _catalog.ImportWrites.UpdateUnitStateAsync(
@@ -193,6 +194,11 @@ public sealed class ImportPublicationCoordinator
 
         try
         {
+            if (!await new ImportCancellationSettlement(_catalog, _trash)
+                .SettleSkippedMediaAsync(unitId, cancellationToken).ConfigureAwait(false))
+            {
+                return ImportPublicationResult.Pending("SKIPPED_MEDIA_CLEANUP_PENDING", "A removed media item still needs cleanup.");
+            }
             await ApplyCorePublicationAsync(unitId, destination, draft, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -434,11 +440,21 @@ public sealed class ImportPublicationCoordinator
 
         // This UPDATE is the media-delta publication boundary for existing Profiles. Every public
         // profile/media read excludes rows carrying this marker.
+        const string retainedMedia = """
+            SELECT CASE item.disposition WHEN 'REUSED' THEN item.reused_media_id ELSE item.candidate_media_id END AS media_id
+            FROM import_items item
+            WHERE item.import_unit_id = $unitId AND item.disposition IN ('INCLUDED','REUSED')
+            """;
         await using (var publishRelations = transaction.CreateCommand(
-            """
+            $"""
+            DELETE FROM profile_media
+            WHERE publication_import_unit_id = $unitId
+              AND relation_type <> 'OWNER'
+              AND NOT EXISTS (SELECT 1 FROM ({retainedMedia}) retained WHERE retained.media_id = profile_media.media_id);
             UPDATE profile_media
             SET publication_import_unit_id = NULL
-            WHERE publication_import_unit_id = $unitId;
+            WHERE publication_import_unit_id = $unitId
+              AND media_id IN ({retainedMedia});
             """))
         {
             publishRelations.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));

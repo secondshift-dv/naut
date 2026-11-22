@@ -2,7 +2,7 @@
 
 ## 1. Download Naut
 
-Download **Naut v0.0.32** from the official [GitHub Releases](https://github.com/secondshift-dv/naut/releases/tag/v0.0.32) page.
+Download **Naut v0.0.33** from the official [GitHub Releases](https://github.com/secondshift-dv/naut/releases/tag/v0.0.33) page.
 
 The Windows package is portable. Extract the complete ZIP to a normal folder; do not run only the EXE from inside the archive.
 
@@ -24,6 +24,8 @@ Use **Import** or **Add media** from a Profile. Naut copies selected files into 
 
 Images, videos, and supported 3D model media receive the preparation appropriate to their type. Cover and Banner choices can be changed later.
 
+Review explains which item needs attention and lets you remove it while keeping the remaining media. Importing a Vault root takes original media from its Profiles and skips derivatives, system files and Trash. A nonempty `overview.txt` in an imported Profile folder is offered for review before replacing an Overview.
+
 ## 5. Explore
 
 - **Home** surfaces featured Profiles and recent activity.
@@ -33,4 +35,4 @@ Images, videos, and supported 3D model media receive the preparation appropriate
 
 You can rename the current Vault and give it an independent icon through **Settings → Vault**. Those preferences belong to the Vault, not the extracted application folder.
 
-For a browser-based preview without touching local files, open the [Naut Interactive Showcase](https://secondshift-dv.github.io/naut/). For update details and compatibility notes, read the [v0.0.32 release notes](releases/v0.0.32.md).
+For a browser-based preview without touching local files, open the [Naut Interactive Showcase](https://secondshift-dv.github.io/naut/). For update details and compatibility notes, read the [v0.0.33 release notes](releases/v0.0.33.md).

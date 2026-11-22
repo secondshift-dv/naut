@@ -393,6 +393,13 @@ public sealed class TrashCoordinator
         }
 
         plan = plan with { MediaAssets = mediaAssetPlans };
+        if (rollbackImportUnitId.HasValue)
+        {
+            foreach (var asset in plan.MediaAssets)
+            {
+                TryRemoveEmptyAssetFolder(asset.SourceRelativePath);
+            }
+        }
 
         var commit = await CommitMediaTrashTransitionAsync(
                 plan,
@@ -808,6 +815,23 @@ public sealed class TrashCoordinator
         return checkpointed;
     }
 
+    private void TryRemoveEmptyAssetFolder(string assetPath)
+    {
+        try
+        {
+            var path = _catalog.Paths.ResolveVaultRelativePath(VaultPathArea.MediaAssets, assetPath);
+            var folder = Path.GetDirectoryName(path);
+            if (folder is not null && !string.Equals(folder, _catalog.Paths.MediaAssetsPath, StringComparison.OrdinalIgnoreCase))
+            {
+                Directory.Delete(folder, recursive: false);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            // A sibling asset, a link, or an open directory must not delay rollback.
+        }
+    }
+
     private static async Task<bool> IsCancellationRollbackMediaEligibleAsync(
         SqliteConnection connection,
         CatalogTransaction? transaction,
@@ -822,7 +846,14 @@ public sealed class TrashCoordinator
                 FROM import_units self
                 JOIN import_items mine ON mine.import_unit_id = self.import_unit_id
                 WHERE self.import_unit_id = $unitId
-                  AND self.state = 'CANCELLED'
+                  AND (self.state = 'CANCELLED' OR
+                       (self.state = 'COMMITTING' AND mine.disposition = 'SKIPPED'
+                        AND NOT EXISTS (
+                            SELECT 1 FROM import_items kept
+                            WHERE kept.import_unit_id = $unitId
+                              AND ((kept.disposition = 'INCLUDED' AND kept.candidate_media_id = $assetId)
+                                OR (kept.disposition = 'REUSED' AND kept.reused_media_id = $assetId))
+                        )))
                   AND mine.candidate_media_id = $assetId
                   AND NOT EXISTS (
                       SELECT 1

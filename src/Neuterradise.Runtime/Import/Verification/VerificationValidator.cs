@@ -60,9 +60,9 @@ public sealed class VerificationValidator
             {
                 blockers.Add(new VerificationBlocker(null, "DISPLAY_NAME_REQUIRED", "Profile display name is required for New Normal destination."));
             }
-            else if (draft.Destination.NewProfile.DisplayName.Trim().Length > 100)
+            else if (!ProfileRules.TryValidateDisplayName(draft.Destination.NewProfile.DisplayName, out _, out var nameFailure))
             {
-                blockers.Add(new VerificationBlocker(null, "DISPLAY_NAME_TOO_LONG", "Profile display name cannot exceed 100 characters."));
+                blockers.Add(new VerificationBlocker(null, "INVALID_DISPLAY_NAME", nameFailure ?? "Profile display name is invalid."));
             }
 
             if (draft.Destination.ProfileId.HasValue)
@@ -218,13 +218,12 @@ public sealed class VerificationValidator
         {
             await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
             await using var cmd = connection.CreateCommand();
-            cmd.CommandText = """
+            cmd.CommandText = $"""
                 SELECT i.import_item_id, i.disposition, i.duplicate_decision,
                        EXISTS (
                            SELECT 1
                            FROM media c
-                           JOIN media a ON a.sha256 = c.sha256
-                                        AND a.byte_length = c.byte_length
+                           JOIN media a ON {ImportReads.ExactMediaIdentitySql}
                                         AND a.media_id <> c.media_id
                                         AND a.state = 'ACTIVE'
                            WHERE c.media_id = i.candidate_media_id
@@ -293,9 +292,9 @@ public sealed class VerificationValidator
                 {
                     blockers.Add(new VerificationBlocker(null, "DISPLAY_NAME_REQUIRED", "Profile display name is required."));
                 }
-                else if (draft.Destination.NewProfile.DisplayName.Trim().Length > 100)
+                else if (!ProfileRules.TryValidateDisplayName(draft.Destination.NewProfile.DisplayName, out _, out var nameFailure))
                 {
-                    blockers.Add(new VerificationBlocker(null, "DISPLAY_NAME_TOO_LONG", "Profile display name cannot exceed 100 characters."));
+                    blockers.Add(new VerificationBlocker(null, "INVALID_DISPLAY_NAME", nameFailure ?? "Profile display name is invalid."));
                 }
 
                 if (draft.Destination.NewProfile?.CategoryId is { Length: > 0 } catId)
@@ -463,15 +462,13 @@ public sealed class VerificationValidator
         var draftBlockers = ValidateDraft(draft);
         blockers.AddRange(draftBlockers);
 
-        for (int step = 1; step <= 4; step++)
+        var stepBlockers = await ValidateStepReadinessAsync(unitId, 4, cancellationToken).ConfigureAwait(false);
+        var identities = blockers.Select(static blocker => (blocker.Code, blocker.ImportItemId)).ToHashSet();
+        foreach (var blocker in stepBlockers)
         {
-            var stepBlockers = await ValidateStepReadinessAsync(unitId, step, cancellationToken).ConfigureAwait(false);
-            foreach (var sb in stepBlockers)
+            if (identities.Add((blocker.Code, blocker.ImportItemId)))
             {
-                if (!blockers.Any(b => b.Code == sb.Code && b.ImportItemId == sb.ImportItemId))
-                {
-                    blockers.Add(sb);
-                }
+                blockers.Add(blocker);
             }
         }
 

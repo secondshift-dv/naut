@@ -121,47 +121,9 @@ internal sealed class ImportCancellationSettlement
             // Re-entry includes legacy TRASHED candidates until permanent cleanup has completed.
             foreach (var assetId in await ReadExclusiveMediaIdsAsync(unitId, cancellationToken).ConfigureAwait(false))
             {
-                var existing = await new TrashReads(_catalog).GetTrashEntryForEntityAsync(TrashEntityType.Media, assetId, cancellationToken)
-                    .ConfigureAwait(false);
-                // Prove legacy receipt ownership before reserving it; ambiguous Trash remains untouched.
-                if (existing is { State: TrashEntryState.InTrash }
-                    && !await _trashCoordinator.AdoptCancellationReceiptAsync(unitId, existing, cancellationToken).ConfigureAwait(false))
-                    return new ImportCancellationSettlementResult(ImportCancellationSettlementStatus.PendingRetry,
-                        "CANCEL_MEDIA_CLEANUP_PENDING");
-
-                var reserved = await _unitWrites.TryReserveCancellationMediaRollbackAsync(unitId, assetId, cancellationToken)
-                    .ConfigureAwait(false);
-                if (!reserved) continue;
-                if (existing is { State: TrashEntryState.InTrash })
-                {
-                    if (!await PurgeAsync(existing.TrashEntryId, false, cancellationToken).ConfigureAwait(false))
-                        return new ImportCancellationSettlementResult(ImportCancellationSettlementStatus.PendingRetry,
-                            "CANCEL_MEDIA_CLEANUP_PENDING");
-                    continue;
-                }
-                var plan = await _trashCoordinator.PrepareMediaTrashAsync(assetId, cancellationToken, unitId)
-                    .ConfigureAwait(false);
-                if (!plan.IsSuccess || plan.Value is null)
-                {
-                    return new ImportCancellationSettlementResult(
-                        ImportCancellationSettlementStatus.PendingRetry,
-                        "CANCEL_ASSET_TRASH_PREPARE_PENDING");
-                }
-
-                var executed = await _trashCoordinator.ExecuteMediaTrashAsync(
-                        plan.Value,
-                        unitId,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-                if (!executed.IsSuccess)
-                {
-                    return new ImportCancellationSettlementResult(
-                        ImportCancellationSettlementStatus.PendingRetry,
-                        "CANCEL_ASSET_TRASH_EXECUTE_PENDING");
-                }
-                if (!await PurgeAsync(plan.Value.TrashEntryId, false, cancellationToken).ConfigureAwait(false))
-                    return new ImportCancellationSettlementResult(ImportCancellationSettlementStatus.PendingRetry,
-                        "CANCEL_MEDIA_CLEANUP_PENDING");
+                var error = await RemoveUnpublishedMediaAsync(unitId, assetId, cancellationToken).ConfigureAwait(false);
+                if (error is not null)
+                    return new ImportCancellationSettlementResult(ImportCancellationSettlementStatus.PendingRetry, error);
             }
 
             // Only this unit's unpublished relations and draft intent are rolled back.
@@ -230,6 +192,55 @@ internal sealed class ImportCancellationSettlement
             await _catalog.ImportWrites.RetireCandidateAsync(id, MediaRetirementReason.Cancelled, cancellationToken).ConfigureAwait(false);
     }
 
+    internal async Task<bool> SettleSkippedMediaAsync(Guid unitId, CancellationToken cancellationToken)
+    {
+        foreach (var assetId in await ReadExclusiveMediaIdsAsync(unitId, cancellationToken, onlySkipped: true).ConfigureAwait(false))
+        {
+            if (await RemoveUnpublishedMediaAsync(unitId, assetId, cancellationToken).ConfigureAwait(false) is not null)
+                return false;
+        }
+        return true;
+    }
+
+    private async Task<string?> RemoveUnpublishedMediaAsync(Guid unitId, Guid assetId, CancellationToken cancellationToken)
+    {
+        var existing = await new TrashReads(_catalog).GetTrashEntryForEntityAsync(TrashEntityType.Media, assetId, cancellationToken)
+            .ConfigureAwait(false);
+        // Prove legacy receipt ownership before reserving it; ambiguous Trash remains untouched.
+        if (existing is { State: TrashEntryState.InTrash }
+            && !await _trashCoordinator.AdoptCancellationReceiptAsync(unitId, existing, cancellationToken).ConfigureAwait(false))
+            return "CANCEL_MEDIA_CLEANUP_PENDING";
+
+        var reserved = await _unitWrites.TryReserveCancellationMediaRollbackAsync(unitId, assetId, cancellationToken)
+            .ConfigureAwait(false);
+        if (!reserved) return null;
+        if (existing is { State: TrashEntryState.InTrash })
+        {
+            if (!await PurgeAsync(existing.TrashEntryId, false, cancellationToken).ConfigureAwait(false))
+                return "CANCEL_MEDIA_CLEANUP_PENDING";
+            return null;
+        }
+        var plan = await _trashCoordinator.PrepareMediaTrashAsync(assetId, cancellationToken, unitId)
+            .ConfigureAwait(false);
+        if (!plan.IsSuccess || plan.Value is null)
+        {
+            return "CANCEL_ASSET_TRASH_PREPARE_PENDING";
+        }
+
+        var executed = await _trashCoordinator.ExecuteMediaTrashAsync(
+                plan.Value,
+                unitId,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (!executed.IsSuccess)
+        {
+            return "CANCEL_ASSET_TRASH_EXECUTE_PENDING";
+        }
+        if (!await PurgeAsync(plan.Value.TrashEntryId, false, cancellationToken).ConfigureAwait(false))
+            return "CANCEL_MEDIA_CLEANUP_PENDING";
+        return null;
+    }
+
     private async Task<bool> PurgeAsync(Guid entryId, bool profile, CancellationToken cancellationToken)
     {
         var prepared = await (profile ? _purge.PreparePurgeProfileAsync(entryId, cancellationToken)
@@ -266,7 +277,8 @@ internal sealed class ImportCancellationSettlement
 
     private async Task<IReadOnlyList<Guid>> ReadExclusiveMediaIdsAsync(
         Guid unitId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool onlySkipped = false)
     {
         var assetIds = new List<Guid>();
         await using var connection = await _catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
@@ -279,6 +291,7 @@ internal sealed class ImportCancellationSettlement
             JOIN import_units self ON self.import_unit_id = item.import_unit_id
             WHERE item.import_unit_id = $unitId
               AND item.candidate_media_id IS NOT NULL
+              AND ($onlySkipped = 0 OR item.disposition = 'SKIPPED')
               AND asset.state IN ('ACTIVE', 'TRASHED')
               AND NOT EXISTS (
                   SELECT 1
@@ -315,6 +328,7 @@ internal sealed class ImportCancellationSettlement
             ORDER BY item.candidate_media_id;
             """;
         command.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
+        command.Parameters.AddWithValue("$onlySkipped", onlySkipped ? 1 : 0);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {

@@ -937,6 +937,16 @@ public sealed class ImportReads
     /// byte length against other media. The match state decides how the surface reacts, and an item
     /// whose <c>duplicate_decision</c> is still NULL is a decision the user must make.
     /// </summary>
+    internal const string ExactMediaIdentitySql = """
+        a.sha256 = c.sha256 AND a.byte_length = c.byte_length AND (
+            (c.bundle_sha256 IS NULL AND a.bundle_sha256 IS NULL)
+            OR (c.bundle_sha256 = a.bundle_sha256
+                AND c.dependency_discovery_state = 'COMPLETE'
+                AND a.dependency_discovery_state = 'COMPLETE'
+                AND c.dependency_status IN ('COMPLETE','SELF_CONTAINED')
+                AND a.dependency_status IN ('COMPLETE','SELF_CONTAINED')))
+        """;
+
     public async Task<IReadOnlyList<ImportDuplicateMatch>> ListExactDuplicateMatchesAsync(
         Guid unitId,
         CancellationToken cancellationToken = default)
@@ -950,18 +960,18 @@ public sealed class ImportReads
             .ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText =
-            """
-            SELECT i.import_item_id, a.media_id, a.state, i.duplicate_decision
+            $"""
+            SELECT i.import_item_id, a.media_id, a.state, i.duplicate_decision, i.source_file_name
             FROM import_items i
             JOIN media c ON c.media_id = i.candidate_media_id
-            JOIN media a ON a.sha256 = c.sha256
-                         AND a.byte_length = c.byte_length
+            JOIN media a ON {ExactMediaIdentitySql}
                          AND a.media_id <> c.media_id
                          AND a.state IN ('ACTIVE','TRASHED')
             WHERE i.import_unit_id = $unitId
               AND c.sha256 IS NOT NULL
               AND c.byte_length IS NOT NULL
-            ORDER BY i.created_at_ms ASC, i.import_item_id ASC;
+            ORDER BY i.created_at_ms ASC, i.import_item_id ASC,
+                     CASE a.state WHEN 'ACTIVE' THEN 0 ELSE 1 END, a.media_id;
             """;
         command.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
 
@@ -973,7 +983,8 @@ public sealed class ImportReads
                 DbGuid.Parse(reader.GetString(0), DomainIdKind.ImportItem),
                 DbGuid.Parse(reader.GetString(1), DomainIdKind.Media),
                 DbEnum.ParseMediaState(reader.GetString(2)),
-                DbEnum.ParseDuplicateDecisionOrNull(reader.IsDBNull(3) ? null : reader.GetString(3))));
+                DbEnum.ParseDuplicateDecisionOrNull(reader.IsDBNull(3) ? null : reader.GetString(3)),
+                reader.GetString(4)));
         }
 
         return matches;
@@ -1138,7 +1149,8 @@ public sealed record ImportDuplicateMatch(
     Guid ImportItemId,
     Guid MatchedMediaId,
     MediaState MatchedMediaState,
-    DuplicateDecision? Decision)
+    DuplicateDecision? Decision,
+    string SourceFileName = "")
 {
     /// <summary>True when the user still has to choose INCLUDE, REUSE or SKIP.</summary>
     public bool RequiresDecision =>

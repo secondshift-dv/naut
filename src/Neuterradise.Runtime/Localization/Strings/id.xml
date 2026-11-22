@@ -1163,6 +1163,7 @@
     <sys:String x:Key="Import.PreparationRetrying">Menyiapkan media kembali…</sys:String>
     <sys:String x:Key="Import.PreparationRetryingDetail">naut sedang menyiapkan media kembali. Anda dapat melanjutkan setelah media siap.</sys:String>
     <sys:String x:Key="Import.PreparationFailed">Beberapa media perlu perhatian</sys:String>
+    <sys:String x:Key="Import.MissingModelDependencies">Model ini kehilangan satu atau beberapa file material atau tekstur.</sys:String>
     <sys:String x:Key="Import.PreparationFailedDetail">naut tidak dapat menyiapkan semua yang diperlukan untuk impor ini. Coba lagi atau batalkan impor.</sys:String>
     <sys:String x:Key="Import.PreparationRetry">Coba lagi</sys:String>
     <sys:String x:Key="Home.Refresh.PartialFailure">Beberapa bagian Beranda tidak dapat dimuat ulang.</sys:String>
@@ -2154,6 +2155,7 @@
     <sys:String x:Key="Profile.TextFiles.Ignore">Abaikan teks impor</sys:String>
     <sys:String x:Key="Profile.TextFiles.Replace">Tulis teks katalog</sys:String>
     <sys:String x:Key="Profile.TextFiles.Imported">Overview dari impor</sys:String>
+    <sys:String x:Key="Profile.TextFiles.CurrentOverview">Overview saat ini</sys:String>
     <sys:String x:Key="Profile.TextFiles.Conflict">Isi file berbeda dari katalog. Tinjau teks di bawah. Menulis teks katalog menggantikan perubahan eksternal; Batal mempertahankan keduanya.</sys:String>
     <sys:String x:Key="Profile.TextFiles.Stale">Teks berubah lagi. Tinjau versi terbaru sebelum mencoba kembali.</sys:String>
     <sys:String x:Key="Profile.PrivateNote.FileNotice">Disimpan sebagai private-note.txt di folder Profile. Teks ini tidak dienkripsi dan dapat dibaca siapa pun yang memiliki akses ke sistem berkas.</sys:String>

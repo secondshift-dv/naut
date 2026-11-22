@@ -1163,6 +1163,7 @@
     <sys:String x:Key="Import.PreparationRetrying">Je prépare à nouveau les médias…</sys:String>
     <sys:String x:Key="Import.PreparationRetryingDetail">naut prépare à nouveau le support. Vous pourrez continuer quand il sera prêt.</sys:String>
     <sys:String x:Key="Import.PreparationFailed">Certains médias ont besoin d’attention</sys:String>
+    <sys:String x:Key="Import.MissingModelDependencies">Il manque des fichiers de matériau ou de texture pour ce modèle.</sys:String>
     <sys:String x:Key="Import.PreparationFailedDetail">naut n'a pas pu préparer tout le nécessaire pour cette importation. Réessayez ou annulez l'importation.</sys:String>
     <sys:String x:Key="Import.PreparationRetry">Réessayez</sys:String>
     <sys:String x:Key="Home.Refresh.PartialFailure">Certaines sections d'accueil n'ont pas pu être actualisées.</sys:String>
@@ -2154,6 +2155,7 @@
     <sys:String x:Key="Profile.TextFiles.Ignore">Ignorer le texte importé</sys:String>
     <sys:String x:Key="Profile.TextFiles.Replace">Écrire le texte du catalogue</sys:String>
     <sys:String x:Key="Profile.TextFiles.Imported">Description importée</sys:String>
+    <sys:String x:Key="Profile.TextFiles.CurrentOverview">Présentation actuelle</sys:String>
     <sys:String x:Key="Profile.TextFiles.Conflict">Le fichier et le catalogue diffèrent. Examinez le texte ci-dessous. Écrire le texte du catalogue remplace les modifications externes ; Annuler conserve les deux.</sys:String>
     <sys:String x:Key="Profile.TextFiles.Stale">Le texte a encore changé. Examinez la dernière version.</sys:String>
     <sys:String x:Key="Profile.PrivateNote.FileNotice">Enregistré dans private-note.txt dans le dossier du Profile. Ce texte non chiffré est lisible par toute personne ayant accès au système de fichiers.</sys:String>

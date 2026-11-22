@@ -153,6 +153,13 @@ public static class SourceEnumerator
             return;
         }
 
+        var originalProfiles = Path.Combine(fullDir, "profiles");
+        if (Directory.Exists(originalProfiles) && File.Exists(Path.Combine(fullDir, "_system", "catalog.db")))
+        {
+            EnumerateDirectoryRecursive(originalProfiles, results, visitedDirectories, cancellationToken);
+            return;
+        }
+
         try
         {
             foreach (var file in dirInfo.EnumerateFiles())

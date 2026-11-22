@@ -1163,6 +1163,7 @@
     <sys:String x:Key="Import.PreparationRetrying">미디어를 다시 준비하는 중…</sys:String>
     <sys:String x:Key="Import.PreparationRetryingDetail">naut가 미디어를 다시 준비하는 중입니다. 준비가 되면 계속할 수 있습니다.</sys:String>
     <sys:String x:Key="Import.PreparationFailed">일부 언론의 관심이 필요합니다</sys:String>
+    <sys:String x:Key="Import.MissingModelDependencies">이 모델에 머티리얼 또는 텍스처 파일이 누락되었습니다.</sys:String>
     <sys:String x:Key="Import.PreparationFailedDetail">naut는 이 가져오기에 필요한 모든 것을 준비할 수 없습니다. 다시 시도하거나 가져오기를 취소하세요.</sys:String>
     <sys:String x:Key="Import.PreparationRetry">다시 시도하세요</sys:String>
     <sys:String x:Key="Home.Refresh.PartialFailure">일부 홈 섹션을 새로고침할 수 없습니다.</sys:String>
@@ -2154,6 +2155,7 @@
     <sys:String x:Key="Profile.TextFiles.Ignore">가져온 텍스트 무시</sys:String>
     <sys:String x:Key="Profile.TextFiles.Replace">카탈로그 텍스트 쓰기</sys:String>
     <sys:String x:Key="Profile.TextFiles.Imported">가져온 개요</sys:String>
+    <sys:String x:Key="Profile.TextFiles.CurrentOverview">현재 개요</sys:String>
     <sys:String x:Key="Profile.TextFiles.Conflict">파일과 카탈로그의 내용이 다릅니다. 아래 텍스트를 검토하세요. 카탈로그 텍스트를 쓰면 외부 변경 내용이 대체됩니다. 취소하면 둘 다 유지됩니다.</sys:String>
     <sys:String x:Key="Profile.TextFiles.Stale">텍스트가 다시 변경되었습니다. 최신 버전을 검토하세요.</sys:String>
     <sys:String x:Key="Profile.PrivateNote.FileNotice">Profile 폴더에 private-note.txt로 저장됩니다. 암호화되지 않은 텍스트이므로 파일 시스템에 접근할 수 있는 사람은 읽을 수 있습니다.</sys:String>

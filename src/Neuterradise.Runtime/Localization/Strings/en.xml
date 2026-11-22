@@ -1163,6 +1163,7 @@
     <sys:String x:Key="Import.PreparationRetrying">Preparing media again…</sys:String>
     <sys:String x:Key="Import.PreparationRetryingDetail">naut is preparing the media again. You can continue when it is ready.</sys:String>
     <sys:String x:Key="Import.PreparationFailed">Some media needs attention</sys:String>
+    <sys:String x:Key="Import.MissingModelDependencies">This model is missing one or more material or texture files.</sys:String>
     <sys:String x:Key="Import.PreparationFailedDetail">naut could not prepare everything needed for this import. Try again or cancel the import.</sys:String>
     <sys:String x:Key="Import.PreparationRetry">Try again</sys:String>
     <sys:String x:Key="Home.Refresh.PartialFailure">Some Home sections could not be refreshed.</sys:String>
@@ -2154,6 +2155,7 @@
     <sys:String x:Key="Profile.TextFiles.Ignore">Ignore imported text</sys:String>
     <sys:String x:Key="Profile.TextFiles.Replace">Write catalog text</sys:String>
     <sys:String x:Key="Profile.TextFiles.Imported">Imported overview</sys:String>
+    <sys:String x:Key="Profile.TextFiles.CurrentOverview">Current overview</sys:String>
     <sys:String x:Key="Profile.TextFiles.Conflict">The file and catalog differ. Review the file text below. Writing catalog text replaces external edits; Cancel preserves both.</sys:String>
     <sys:String x:Key="Profile.TextFiles.Stale">The text changed again. Review the latest version before retrying.</sys:String>
     <sys:String x:Key="Profile.PrivateNote.FileNotice">Saved as private-note.txt in the Profile folder. This is plaintext and can be read by anyone with filesystem access.</sys:String>

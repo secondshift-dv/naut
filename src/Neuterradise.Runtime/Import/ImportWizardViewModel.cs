@@ -147,7 +147,6 @@ public sealed class ImportVisualOption : ObservableObject
 /// </summary>
 public sealed class ImportWizardViewModel : ObservableObject, IDisposable
 {
-    public const int MaximumNameLength = 100;
     public static readonly TimeSpan HintRefreshInterval = TimeSpan.FromSeconds(4);
     public static readonly TimeSpan SearchDebounce = TimeSpan.FromMilliseconds(250);
     public static readonly TimeSpan DraftSaveDebounce = TimeSpan.FromMilliseconds(450);
@@ -302,6 +301,9 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         RetryPreparationCommand = new AsyncRelayCommand(
             parameter => parameter is VerificationPreparationProblem problem ? RetryPreparationAsync(problem) : Task.CompletedTask,
             onError: ReportImportFailure);
+        RemovePreparationItemCommand = new AsyncRelayCommand(
+            parameter => parameter is VerificationPreparationProblem problem ? SkipReviewItemAsync(problem.ImportItemId) : Task.CompletedTask,
+            onError: ReportImportFailure);
         CreateCategoryCommand = new AsyncRelayCommand(CreateCategoryAsync, onError: ReportImportFailure);
     }
 
@@ -328,6 +330,7 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
     public ICommand MoveCollisionCommand { get; }
     public ICommand SkipCollisionCommand { get; }
     public ICommand RetryPreparationCommand { get; }
+    public ICommand RemovePreparationItemCommand { get; }
     public ICommand CreateCategoryCommand { get; }
 
     public bool IsInitialized => _initialized;
@@ -439,9 +442,8 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         }
     }
 
-    public string? NameValidationText => _newProfileName.Trim().Length > MaximumNameLength
-        ? SurfaceText.Get("ImportWizard.NameTooLong", "Keep the name under 100 characters.")
-        : null;
+    public string? NameValidationText => !string.IsNullOrWhiteSpace(_newProfileName)
+        && !ProfileRules.TryValidateDisplayName(_newProfileName, out _, out var failure) ? failure : null;
 
     public ProfileLookupItemViewModel? DuplicateNameProfile
     {
@@ -835,8 +837,7 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
 
     public bool IsProfileChoiceComplete => _choice switch
     {
-        ImportDestinationChoice.New => _newProfileName.Trim().Length <= MaximumNameLength
-            && ProfileRules.TryValidateDisplayName(_newProfileName, out _, out _),
+        ImportDestinationChoice.New => ProfileRules.TryValidateDisplayName(_newProfileName, out _, out _),
         ImportDestinationChoice.Existing => _selectedExistingProfile is not null,
         _ => false,
     };
@@ -859,10 +860,13 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
             RestoreDraft(draft);
             if (model.CommitOperationId is not null || model.LibraryCommitState.HasReachedDomainCommit())
             {
+                var destinationKind = model.DestinationKind is { } kind
+                    ? DbEnum.ParseDestinationKind(kind) : draft.Destination.Kind;
                 _lockedDestination = draft.Destination with
                 {
-                    Kind = model.DestinationKind is { } kind ? DbEnum.ParseDestinationKind(kind) : draft.Destination.Kind,
-                    ProfileId = model.DestinationProfileId ?? draft.Destination.ProfileId,
+                    Kind = destinationKind,
+                    ProfileId = destinationKind == DestinationKind.ExistingNormal
+                        ? model.DestinationProfileId ?? draft.Destination.ProfileId : null,
                 };
             }
         }
@@ -1298,7 +1302,7 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         {
             var preferred = _pendingCoverMediaId is { } coverId
                 ? CoverOptions.FirstOrDefault(option => MatchesPendingCover(option, coverId))
-                : CoverOptions.FirstOrDefault(option => option.IsRecommended);
+                : CoverOptions.FirstOrDefault(option => option.IsRecommended) ?? CoverOptions.FirstOrDefault();
             if (preferred is not null)
             {
                 SelectCover(preferred, byUser: false);
@@ -1312,7 +1316,7 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         {
             var preferred = _pendingBannerMediaId is { } bannerId
                 ? BannerOptions.FirstOrDefault(option => MatchesPendingBanner(option, bannerId))
-                : BannerOptions.FirstOrDefault(option => option.IsRecommended);
+                : BannerOptions.FirstOrDefault(option => option.IsRecommended) ?? BannerOptions.FirstOrDefault();
             if (preferred is not null)
             {
                 SelectBanner(preferred, byUser: false);
@@ -1596,21 +1600,30 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         RaiseProblemsChanged();
     }
 
-    private async Task ResolveDuplicateSkipAsync(VerificationDuplicateProblem problem)
+    private Task ResolveDuplicateSkipAsync(VerificationDuplicateProblem problem) => SkipReviewItemAsync(problem.ImportItemId);
+
+    private async Task SkipReviewItemAsync(Guid itemId)
     {
         if (_operations is null) return;
-        await _operations.ApplyDuplicateDecisionAsync(problem.ImportItemId, DuplicateDecision.Skip, cancellationToken: _lifetime.Token).ConfigureAwait(true);
+        await _operations.ApplyDuplicateDecisionAsync(itemId, DuplicateDecision.Skip, cancellationToken: _lifetime.Token).ConfigureAwait(true);
         _admittedCount = Math.Max(0, _admittedCount - 1);
-        ReplaceDuplicateDecision(new StagedDuplicateDecision(problem.ImportItemId, DuplicateDecisionAction.Skip));
-        DuplicateProblems.Remove(problem);
-        var collision = ProfileCollisionProblems.FirstOrDefault(existing => existing.ImportItemId == problem.ImportItemId);
-        if (collision is not null)
+        ReplaceDuplicateDecision(new StagedDuplicateDecision(itemId, DuplicateDecisionAction.Skip));
+        if (_selectedCover?.Cover?.ImportItemId == itemId)
         {
-            ReplaceCollisionDecision(new StagedProfileCollisionDecision(problem.ImportItemId, ProfileCollisionAction.Skip, null));
-            ProfileCollisionProblems.Remove(collision);
+            SelectCover(null, byUser: true);
+            _coverTouched = false;
+            _coverIntent = VerificationAppearanceIntent.Unchanged;
         }
+        if (_selectedBanner?.Banner?.ImportItemId == itemId)
+        {
+            SelectBanner(null, byUser: true);
+            _bannerTouched = false;
+            _bannerIntent = VerificationAppearanceIntent.Unchanged;
+        }
+        _collisionDecisions.RemoveAll(decision => decision.ImportItemId == itemId);
+        _faceDecisions = _faceDecisions.Where(decision => decision.SourceImportItemId != itemId).ToArray();
         await PersistCurrentDraftAsync().ConfigureAwait(true);
-        RaiseProblemsChanged();
+        await RefreshHintsAsync(_lifetime.Token).ConfigureAwait(true);
     }
 
     private async Task RetryPreparationAsync(VerificationPreparationProblem problem)

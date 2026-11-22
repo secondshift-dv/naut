@@ -10,7 +10,8 @@ public enum ProfileTextState { Current, ExternalChange, Conflict, Missing, Inval
 
 public sealed record ProfileTextInspection(
     Guid ProfileId, string FileName, ProfileTextState State, string Token, string? ExternalText,
-    Guid? ImportOfferId = null);
+    Guid? ImportOfferId = null,
+    string? CurrentText = null);
 
 /// <summary>
 /// Catalog text remains authoritative. A versioned storage-operation receipt records the last
@@ -55,7 +56,7 @@ public sealed class ProfileTextFiles(CatalogDb catalog)
                 result.Add(new ProfileTextInspection(profileId, "overview.txt",
                     source.Value.Text.Length == 0 ? ProfileTextState.ExternalChange : ProfileTextState.Conflict,
                     Hash($"{source.Value.Version}:{Hash(source.Value.Text)}:{offer.SourceHash}"), offer.Text,
-                    Guid.Parse(reader.GetString(0))));
+                    Guid.Parse(reader.GetString(0)), source.Value.Text));
             }
         }
         return result;
@@ -112,7 +113,7 @@ public sealed class ProfileTextFiles(CatalogDb catalog)
         string value;
         try { value = Utf8.GetString(bytes, offset, bytes.Length - offset); }
         catch (DecoderFallbackException) { return; }
-        if (!ProfileRules.IsOverviewValid(value)) return;
+        if (string.IsNullOrWhiteSpace(value) || !ProfileRules.IsOverviewValid(value)) return;
         await using var lease = await catalog.WriteCoordinator.EnterAsync(ct).ConfigureAwait(false);
         await using var connection = await catalog.OpenConnectionAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
@@ -144,7 +145,7 @@ public sealed class ProfileTextFiles(CatalogDb catalog)
         catch (JsonException) { return false; }
         if (offer is not { Version: 1 } || offer.Text is null || offer.Text.Length > ProfileRules.MaximumOverviewLength
             || Hash(offer.Text) != offer.SourceHash || expected.Token != Hash($"{source.Value.Version}:{Hash(source.Value.Text)}:{offer.SourceHash}")) return false;
-        if (adopt)
+        if (adopt && !string.IsNullOrWhiteSpace(offer.Text))
         {
             await using var update = transaction.CreateCommand("UPDATE profiles SET overview=$text,row_version=row_version+1,updated_at_ms=$now WHERE profile_id=$id AND row_version=$version;");
             update.Parameters.AddWithValue("$text", offer.Text); update.Parameters.AddWithValue("$id", expected.ProfileId.ToString("D"));

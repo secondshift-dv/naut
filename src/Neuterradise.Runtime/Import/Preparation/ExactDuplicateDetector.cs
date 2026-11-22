@@ -106,9 +106,12 @@ public sealed class ExactDuplicateDetector
             LEFT JOIN profiles p ON p.profile_id = pa.profile_id
             LEFT JOIN import_items ii ON ii.candidate_media_id = a.media_id
             WHERE (
-                    ($bundleSha IS NOT NULL AND a.bundle_sha256 = $bundleSha)
+                    ($bundleSha IS NOT NULL AND a.bundle_sha256 = $bundleSha
+                        AND a.dependency_discovery_state = 'COMPLETE'
+                        AND a.dependency_status IN ('COMPLETE','SELF_CONTAINED'))
                     OR
-                    ($bundleSha IS NULL AND a.sha256 = $sha256 AND a.byte_length = $byteLength)
+                    ($bundleSha IS NULL AND a.bundle_sha256 IS NULL
+                        AND a.sha256 = $sha256 AND a.byte_length = $byteLength)
                   )
               AND a.state IN ($activeState, $candidateState, $trashedState)
               AND ($excludeMediaId IS NULL OR a.media_id <> $excludeMediaId)

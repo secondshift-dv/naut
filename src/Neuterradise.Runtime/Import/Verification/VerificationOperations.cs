@@ -278,14 +278,27 @@ public sealed class VerificationOperations
 
         var draft = VerificationDraftV1.FromJson(model.VerificationDraftJson, _timeProvider.GetUtcNowUnixMilliseconds());
         var itemMetaMap = new Dictionary<Guid, (Guid? ImportItemId, bool IsFromUnit)>();
+        var excludedMedia = new HashSet<Guid>();
         await using (var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false))
         await using (var command = connection.CreateCommand())
         {
-            command.CommandText = "SELECT COALESCE(reused_media_id,candidate_media_id),import_item_id FROM import_items WHERE import_unit_id=$unit AND disposition IN ('INCLUDED','REUSED') ORDER BY created_at_ms,import_item_id;";
+            command.CommandText = """
+                SELECT COALESCE(reused_media_id,candidate_media_id),import_item_id FROM import_items
+                WHERE import_unit_id=$unit AND disposition IN ('INCLUDED','REUSED') ORDER BY created_at_ms,import_item_id;
+                SELECT media_id FROM profile_media WHERE publication_import_unit_id=$unit;
+                """;
             command.Parameters.AddWithValue("$unit", DbGuid.Format(unitId));
             await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 if (!reader.IsDBNull(0)) itemMetaMap.TryAdd(DbGuid.Parse(reader.GetString(0)), (DbGuid.Parse(reader.GetString(1)), true));
+            if (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+            {
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    var mediaId = DbGuid.Parse(reader.GetString(0));
+                    if (!itemMetaMap.ContainsKey(mediaId)) excludedMedia.Add(mediaId);
+                }
+            }
         }
         var ranked = model.DestinationProfileId is { } profileId
             ? await new ProfileMediaCandidateReads(_catalog).ReadAsync(profileId, cancellationToken, unitId, includePendingBanner: true).ConfigureAwait(false)
@@ -302,7 +315,7 @@ public sealed class VerificationOperations
                 return null;
             }
         }
-        var covers = ranked.Covers.Select(candidate => new VerificationCoverCandidate(
+        var covers = ranked.Covers.Where(candidate => !excludedMedia.Contains(candidate.MediaId)).Select(candidate => new VerificationCoverCandidate(
             candidate.MediaAssetId.ToString("N"), candidate.MediaId,
             itemMetaMap.GetValueOrDefault(candidate.MediaId).ImportItemId,
             candidate.DisplayName, candidate.MediaType,
@@ -313,7 +326,7 @@ public sealed class VerificationOperations
             "Ranked Media Thumbnail", Preview(candidate))).ToArray();
 
         var banners = new List<VerificationBannerCandidate>();
-        foreach (var candidate in ranked.BannerHovers)
+        foreach (var candidate in ranked.BannerHovers.Where(candidate => !excludedMedia.Contains(candidate.MediaId)))
         {
             var ready = model.DestinationProfileId is { } target && await new ProfileBannerOperations(_catalog)
                 .ResolveRenditionAsync(target, candidate.MediaId, unitId, cancellationToken).ConfigureAwait(false) is not null;
@@ -476,16 +489,14 @@ public sealed class VerificationOperations
             return VerificationGateProblems.Empty;
         }
 
-        var items = await GetPagedItemsAsync(unitId, 0, 1000, cancellationToken).ConfigureAwait(false);
-        var itemById = items.Items.ToDictionary(static item => item.ItemId);
         var duplicateDecisions = (draft.DuplicateDecisions ?? [])
             .Select(static decision => decision.ImportItemId)
             .ToHashSet();
         var duplicates = new List<VerificationDuplicateProblem>();
-        foreach (var match in await GetExactDuplicateMatchesAsync(unitId, cancellationToken).ConfigureAwait(false))
+        var matches = await GetExactDuplicateMatchesAsync(unitId, cancellationToken).ConfigureAwait(false);
+        foreach (var match in matches.Where(static match => match.RequiresDecision).DistinctBy(static match => match.ImportItemId))
         {
-            if (!match.RequiresDecision || duplicateDecisions.Contains(match.ImportItemId)
-                || !itemById.TryGetValue(match.ImportItemId, out var item))
+            if (duplicateDecisions.Contains(match.ImportItemId))
             {
                 continue;
             }
@@ -493,7 +504,7 @@ public sealed class VerificationOperations
             duplicates.Add(new VerificationDuplicateProblem(
                 match.ImportItemId,
                 match.MatchedMediaId,
-                item.SourceFileName,
+                match.SourceFileName,
                 await ReadOwnerDisplayNameAsync(match.MatchedMediaId, cancellationToken).ConfigureAwait(false),
                 await ResolvePreviewImagePathAsync(match.MatchedMediaId, cancellationToken).ConfigureAwait(false)));
         }
@@ -515,8 +526,28 @@ public sealed class VerificationOperations
                 group.Key,
                 group.First().SourceFileName,
                 group.ToArray()))
-            .OrderBy(problem => problem.SourceFileName, StringComparer.CurrentCultureIgnoreCase)
-            .ToArray();
+            .ToDictionary(static problem => problem.ImportItemId);
+        await using (var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false))
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText = """
+                SELECT item.import_item_id, item.source_file_name
+                FROM import_items item JOIN media asset ON asset.media_id = item.candidate_media_id
+                WHERE item.import_unit_id = $unit AND item.disposition IN ('INCLUDED','REUSED')
+                  AND asset.dependency_status = 'DEPENDENCIES_MISSING';
+                """;
+            command.Parameters.AddWithValue("$unit", DbGuid.Format(unitId));
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                var itemId = DbGuid.Parse(reader.GetString(0));
+                if (draft.AcknowledgedMissingDependencyItemIds?.Contains(itemId) == true)
+                    continue;
+                preparation[itemId] = preparation.TryGetValue(itemId, out var problem)
+                    ? problem with { MissingDependencies = true }
+                    : new VerificationPreparationProblem(itemId, reader.GetString(1), [], MissingDependencies: true);
+            }
+        }
         var verification = await LoadVerificationReadModelAsync(unitId, cancellationToken).ConfigureAwait(false);
         var pending = verification is null
             || verification.State is not (ImportUnitState.ReadyForVerification or ImportUnitState.Committing)
@@ -524,7 +555,8 @@ public sealed class VerificationOperations
                 .AreAllRequiredCapabilitiesSettledAsync(unitId, cancellationToken)
                 .ConfigureAwait(false);
 
-        return new VerificationGateProblems(duplicates, collisions, preparation, pending);
+        return new VerificationGateProblems(duplicates, collisions,
+            preparation.Values.OrderBy(static problem => problem.SourceFileName, StringComparer.CurrentCultureIgnoreCase).ToArray(), pending);
     }
 
     public async Task<PreparationRetryResult> RetryRequiredPreparationAsync(
