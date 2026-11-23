@@ -36,6 +36,7 @@
     <sys:String x:Key="Import.ReadyForVerification">Siap ditinjau</sys:String>
     <sys:String x:Key="Import.Verifying">Sedang ditinjau</sys:String>
     <sys:String x:Key="Import.AlreadyInLibrary">Sudah ada di Vault</sys:String>
+    <sys:String x:Key="Import.CancelAlreadyCommitted">Impor ini sudah menambahkan media ke Vault Anda sehingga tidak dapat dibatalkan.</sys:String>
     <sys:String x:Key="Import.CancelRequested">Pembatalan diminta. Pekerjaan akan berhenti saat aman.</sys:String>
     <sys:String x:Key="Import.Details.Description">Rating, status favorit, dan Ringkasan adalah detail pribadi Profile.</sys:String>
     <sys:String x:Key="Import.Overview.Placeholder">Tulis deskripsi singkat untuk Profile ini.</sys:String>
@@ -689,6 +690,7 @@
     <sys:String x:Key="Import.Stage.Finalizing">Menyelesaikan</sys:String>
     <sys:String x:Key="Import.Stage.Complete">Selesai</sys:String>
     <sys:String x:Key="Import.Stage.Paused">Dijeda</sys:String>
+    <sys:String x:Key="Import.Stage.Cancelling">Membatalkan…</sys:String>
     <sys:String x:Key="Import.Stage.Cancelled">Dibatalkan</sys:String>
     <sys:String x:Key="Import.Stage.NeedsAttention">Perlu perhatian</sys:String>
     <sys:String x:Key="Import.Headline.OneAttention">1 impor perlu perhatian</sys:String>

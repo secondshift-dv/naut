@@ -36,6 +36,7 @@
     <sys:String x:Key="Import.ReadyForVerification">Ready to review</sys:String>
     <sys:String x:Key="Import.Verifying">Reviewing</sys:String>
     <sys:String x:Key="Import.AlreadyInLibrary">Already in Vault</sys:String>
+    <sys:String x:Key="Import.CancelAlreadyCommitted">This import already added media to your Vault, so it cannot be cancelled.</sys:String>
     <sys:String x:Key="Import.CancelRequested">Cancellation requested. Work will stop when safe.</sys:String>
     <sys:String x:Key="Import.Details.Description">Rating, favorite state and Overview are personal Profile details.</sys:String>
     <sys:String x:Key="Import.Overview.Placeholder">Write a short description for this Profile.</sys:String>
@@ -689,6 +690,7 @@
     <sys:String x:Key="Import.Stage.Finalizing">Finalizing</sys:String>
     <sys:String x:Key="Import.Stage.Complete">Complete</sys:String>
     <sys:String x:Key="Import.Stage.Paused">Paused</sys:String>
+    <sys:String x:Key="Import.Stage.Cancelling">Cancelling…</sys:String>
     <sys:String x:Key="Import.Stage.Cancelled">Cancelled</sys:String>
     <sys:String x:Key="Import.Stage.NeedsAttention">Needs attention</sys:String>
     <sys:String x:Key="Import.Headline.OneAttention">1 import needs attention</sys:String>

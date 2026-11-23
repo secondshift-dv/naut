@@ -1,6 +1,8 @@
 using System.Buffers.Binary;
 using System.Globalization;
 using System.IO;
+using System.IO.MemoryMappedFiles;
+using SkiaSharp;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -85,64 +87,79 @@ public sealed class ImageMetadataAdapter
         }
     }
 
-    public ImageMetadata ExtractFromBytes(ReadOnlySpan<byte> bytes, string? hintFormat = null)
+    public unsafe ImageMetadata ExtractFromBytes(ReadOnlySpan<byte> bytes, string? hintFormat = null)
     {
-        return bytes.IsEmpty
-            ? ImageMetadata.Empty
-            : ExtractFromBuffer(new ArraySegment<byte>(bytes.ToArray()), hintFormat);
+        if (bytes.IsEmpty) return ImageMetadata.Empty;
+
+        fixed (byte* pointer = bytes)
+        {
+            using var stream = new UnmanagedMemoryStream(pointer, bytes.Length);
+            using var data = SKData.Create((IntPtr)pointer, bytes.Length);
+            return Extract(stream, hintFormat, data);
+        }
     }
 
-    public ImageMetadata ExtractFromStream(Stream stream, string? hintFormat = null)
+    private static ImageMetadata ExtractFromStream(FileStream stream, string? hintFormat)
     {
-        ArgumentNullException.ThrowIfNull(stream);
-        if (!stream.CanRead)
+        if (stream.Length == 0) return ImageMetadata.Empty;
+
+        // Skia's WebP decoder requires contiguous input and copies an ordinary stream.
+        // A read-only mapping lets the codec inspect that input without reading it into a buffer.
+        if (NeedsContiguousCodecInput(stream))
         {
-            return ImageMetadata.Empty;
+            return ExtractMapped(stream, hintFormat);
         }
 
-        if (stream is MemoryStream memory && memory.TryGetBuffer(out var segment))
-        {
-            return ExtractFromBuffer(segment, hintFormat);
-        }
-
-        var capacity = 0;
-        if (stream is FileStream)
-        {
-            var remaining = stream.Length - stream.Position;
-            if (remaining > 0 && remaining <= Array.MaxLength)
-            {
-                capacity = (int)remaining;
-            }
-        }
-
-        using var copy = new MemoryStream(capacity);
-        stream.CopyTo(copy);
-        return ExtractFromBuffer(new ArraySegment<byte>(copy.GetBuffer(), 0, (int)copy.Length), hintFormat);
+        return Extract(stream, hintFormat);
     }
 
-    private static ImageMetadata ExtractFromBuffer(ArraySegment<byte> buffer, string? hintFormat)
+    private static bool NeedsContiguousCodecInput(FileStream stream)
     {
-        if (buffer.Count == 0)
+        Span<byte> header = stackalloc byte[12];
+        if (stream.Length < header.Length) return false;
+
+        stream.ReadExactly(header);
+        stream.Position = 0;
+        return IsWebP(header) || header[4..8].SequenceEqual("ftyp"u8)
+            || BinaryPrimitives.ReadUInt32LittleEndian(header) == 0x00010000;
+    }
+
+    private static unsafe ImageMetadata ExtractMapped(FileStream file, string? hintFormat)
+    {
+        // SKData accepts an int-sized view; the container reader still uses the full file length.
+        var codecLength = (int)Math.Min(file.Length, int.MaxValue);
+        using var mapping = MemoryMappedFile.CreateFromFile(file, null, 0,
+            MemoryMappedFileAccess.Read, HandleInheritability.None, leaveOpen: true);
+        using var view = mapping.CreateViewAccessor(0, codecLength, MemoryMappedFileAccess.Read);
+        byte* pointer = null;
+        view.SafeMemoryMappedViewHandle.AcquirePointer(ref pointer);
+        try
         {
-            return ImageMetadata.Empty;
+            using var data = SKData.Create((IntPtr)(pointer + view.PointerOffset), codecLength);
+            return Extract(file, hintFormat, data);
         }
+        finally
+        {
+            view.SafeMemoryMappedViewHandle.ReleasePointer();
+        }
+    }
 
-        var codecResult = TryExtractViaCodec(buffer, hintFormat);
-        var binaryResult = TryExtractViaBinary(buffer, hintFormat);
-
+    private static ImageMetadata Extract(Stream stream, string? hintFormat, SKData? codecData = null)
+    {
+        var input = new MetadataRegion(stream, 0, stream.Length);
+        var binaryResult = TryExtractViaBinary(input);
+        stream.Position = 0;
+        var codecResult = TryExtractViaCodec(stream, hintFormat, codecData);
         return MergeResults(codecResult, binaryResult, hintFormat);
     }
 
-    /// <summary>
-    /// Dimensions, format and pixel depth from the image codec. Camera/lens/time/GPS facts come from the
-    /// binary EXIF/XMP parser, which reads the metadata segments directly and is merged over this.
-    /// </summary>
-    private static ImageMetadata? TryExtractViaCodec(ArraySegment<byte> buffer, string? hintFormat)
+    private static ImageMetadata? TryExtractViaCodec(Stream stream, string? hintFormat, SKData? data)
     {
         try
         {
-            using var stream = new MemoryStream(buffer.Array!, buffer.Offset, buffer.Count, writable: false);
-            using var codec = SkiaSharp.SKCodec.Create(stream);
+            using var codec = data is null
+                ? SKCodec.Create(new SKManagedStream(stream, disposeManagedStream: false))
+                : SKCodec.Create(data);
             if (codec is null)
             {
                 return null;
@@ -151,13 +168,13 @@ public sealed class ImageMetadataAdapter
             var info = codec.Info;
             var (orientation, degrees) = codec.EncodedOrigin switch
             {
-                SkiaSharp.SKEncodedOrigin.RightTop => ("Rotate 90 CW", 90),
-                SkiaSharp.SKEncodedOrigin.BottomRight => ("Rotate 180", 180),
-                SkiaSharp.SKEncodedOrigin.LeftBottom => ("Rotate 270 CW", 270),
-                SkiaSharp.SKEncodedOrigin.TopRight => ("Mirror horizontal", 0),
-                SkiaSharp.SKEncodedOrigin.BottomLeft => ("Mirror vertical", 0),
-                SkiaSharp.SKEncodedOrigin.LeftTop => ("Mirror horizontal and rotate 270 CW", 270),
-                SkiaSharp.SKEncodedOrigin.RightBottom => ("Mirror horizontal and rotate 90 CW", 90),
+                SKEncodedOrigin.RightTop => ("Rotate 90 CW", 90),
+                SKEncodedOrigin.BottomRight => ("Rotate 180", 180),
+                SKEncodedOrigin.LeftBottom => ("Rotate 270 CW", 270),
+                SKEncodedOrigin.TopRight => ("Mirror horizontal", 0),
+                SKEncodedOrigin.BottomLeft => ("Mirror vertical", 0),
+                SKEncodedOrigin.LeftTop => ("Mirror horizontal and rotate 270 CW", 270),
+                SKEncodedOrigin.RightBottom => ("Mirror horizontal and rotate 90 CW", 90),
                 _ => ((string?)null, (int?)null),
             };
 
@@ -176,65 +193,66 @@ public sealed class ImageMetadataAdapter
         }
     }
 
-    private static ImageMetadata? TryExtractViaBinary(ArraySegment<byte> buffer, string? hintFormat)
+    private const int MaximumMetadataValueBytes = 4 * 1024 * 1024;
+
+    private static bool IsWebP(ReadOnlySpan<byte> header) =>
+        header.Length >= 12 && header[..4].SequenceEqual("RIFF"u8) && header[8..12].SequenceEqual("WEBP"u8);
+
+    private static ImageMetadata? TryExtractViaBinary(MetadataRegion input)
     {
         try
         {
-            if (buffer.Count < 8) return null;
+            Span<byte> header = stackalloc byte[12];
+            var size = (int)Math.Min(input.Length, header.Length);
+            if (size < 8 || !input.TryRead(0, header[..size])) return null;
 
-            if (buffer[0] == 0x89 && buffer[1] == 0x50 && buffer[2] == 0x4E && buffer[3] == 0x47)
-            {
-                return ParsePngBinary(buffer);
-            }
-
-            if (buffer[0] == 0xFF && buffer[1] == 0xD8)
-            {
-                return ParseJpegBinary(buffer);
-            }
-
-            if (buffer.Count >= 12 && buffer.AsSpan().Slice(0, 4).SequenceEqual("RIFF"u8)
-                && buffer.AsSpan().Slice(8, 4).SequenceEqual("WEBP"u8))
-            {
-                ImageMetadata? metadata = null;
-                var offset = 12;
-                while (offset <= buffer.Count - 8)
-                {
-                    var length = BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan().Slice(offset + 4, 4));
-                    if (length > (uint)(buffer.Count - offset - 8)) break;
-                    var dataOffset = offset + 8;
-                    var dataLength = (int)length;
-                    if (buffer.AsSpan().Slice(offset, 4).SequenceEqual("EXIF"u8))
-                    {
-                        if (buffer.AsSpan().Slice(dataOffset, dataLength).StartsWith("Exif\0\0"u8))
-                        {
-                            dataOffset += 6;
-                            dataLength -= 6;
-                        }
-                        metadata = MergeResults(metadata, ParseTiffBinary(buffer, dataOffset, dataLength), "WEBP");
-                    }
-                    else if (buffer.AsSpan().Slice(offset, 4).SequenceEqual("XMP "u8))
-                        metadata = MergeResults(metadata, ParseXmp(buffer.AsSpan().Slice(dataOffset, dataLength)), "WEBP");
-                    var next = (long)offset + 8 + length + (length & 1);
-                    if (next > buffer.Count) break;
-                    offset = (int)next;
-                }
-                return metadata;
-            }
-
-            if ((buffer[0] == 0x49 && buffer[1] == 0x49) || (buffer[0] == 0x4D && buffer[1] == 0x4D))
-            {
-                return ParseTiffBinary(buffer, 0, buffer.Count);
-            }
-
+            if (header[0] == 0x89 && header[1..4].SequenceEqual("PNG"u8)) return ParsePngBinary(input);
+            if (header[0] == 0xFF && header[1] == 0xD8) return ParseJpegBinary(input);
+            if (IsWebP(header[..size])) return ParseWebPBinary(input, BinaryPrimitives.ReadUInt32LittleEndian(header[4..]));
+            if (header[..2].SequenceEqual("II"u8) || header[..2].SequenceEqual("MM"u8)) return ParseTiffBinary(input);
             return null;
         }
-        catch
+        catch (IOException)
         {
             return null;
         }
     }
 
-    private static ImageMetadata ParsePngBinary(ArraySegment<byte> buffer)
+    private static ImageMetadata? ParseWebPBinary(MetadataRegion input, uint riffLength)
+    {
+        ImageMetadata? metadata = null;
+        var end = Math.Min(input.Length, 8L + riffLength);
+        Span<byte> header = stackalloc byte[8];
+        Span<byte> exifPrefix = stackalloc byte[6];
+        for (long offset = 12; offset <= end - header.Length && input.TryRead(offset, header);)
+        {
+            var length = BinaryPrimitives.ReadUInt32LittleEndian(header[4..]);
+            var dataOffset = offset + header.Length;
+            var next = dataOffset + length + (length & 1);
+            if (next > end) break;
+
+            var type = header[..4];
+            if (type.SequenceEqual("EXIF"u8))
+            {
+                var exif = input.Slice(dataOffset, length);
+                if (exif.TryRead(0, exifPrefix) && exifPrefix.SequenceEqual("Exif\0\0"u8))
+                {
+                    exif = exif.Slice(6, exif.Length - 6);
+                }
+                metadata = MergeResults(metadata, ParseTiffBinary(exif), "WEBP");
+            }
+            else if (type.SequenceEqual("XMP "u8))
+            {
+                metadata = MergeResults(metadata, ParseXmp(input.Slice(dataOffset, length)), "WEBP");
+            }
+
+            offset = next;
+        }
+
+        return metadata;
+    }
+
+    private static ImageMetadata ParsePngBinary(MetadataRegion input)
     {
         ImageMetadata? exif = null;
         int? width = null;
@@ -243,20 +261,21 @@ public sealed class ImageMetadataAdapter
         string? colorSpace = null;
         var rawTags = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        var offset = 8;
-        while (offset + 8 <= buffer.Count)
+        Span<byte> header = stackalloc byte[8];
+        Span<byte> ihdr = stackalloc byte[13];
+        for (long offset = 8; input.TryRead(offset, header);)
         {
-            var length = BinaryPrimitives.ReadInt32BigEndian(buffer.AsSpan().Slice(offset, 4));
-            if (length < 0 || offset + 12 + length > buffer.Count) break;
+            var length = BinaryPrimitives.ReadInt32BigEndian(header);
+            var dataOffset = offset + header.Length;
+            if (length < 0 || !input.Contains(dataOffset, length + 4L)) break;
 
-            var chunkType = Encoding.ASCII.GetString(buffer.AsSpan().Slice(offset + 4, 4));
-            if (chunkType == "IHDR" && length >= 13)
+            var type = header[4..];
+            if (type.SequenceEqual("IHDR"u8) && length >= ihdr.Length && input.TryRead(dataOffset, ihdr))
             {
-                width = BinaryPrimitives.ReadInt32BigEndian(buffer.AsSpan().Slice(offset + 8, 4));
-                height = BinaryPrimitives.ReadInt32BigEndian(buffer.AsSpan().Slice(offset + 12, 4));
-                bitDepth = buffer[offset + 16];
-                var colorType = buffer[offset + 17];
-                colorSpace = colorType switch
+                width = BinaryPrimitives.ReadInt32BigEndian(ihdr);
+                height = BinaryPrimitives.ReadInt32BigEndian(ihdr[4..]);
+                bitDepth = ihdr[8];
+                colorSpace = ihdr[9] switch
                 {
                     0 => "Grayscale",
                     2 => "RGB",
@@ -266,30 +285,26 @@ public sealed class ImageMetadataAdapter
                     _ => "PNG"
                 };
             }
-            else if (chunkType == "eXIf")
+            else if (type.SequenceEqual("eXIf"u8))
             {
-                exif = ParseTiffBinary(buffer, offset + 8, length);
+                exif = ParseTiffBinary(input.Slice(dataOffset, length));
             }
-            else if (chunkType is "tEXt" or "iTXt" or "zTXt")
+            else if (type.SequenceEqual("tEXt"u8)
+                && input.ReadMetadataValue(dataOffset, length) is { } text)
             {
-                var chunkBytes = buffer.AsSpan().Slice(offset + 8, length);
-                var nullIdx = chunkBytes.IndexOf((byte)0);
-                if (nullIdx > 0)
+                var separator = text.AsSpan().IndexOf((byte)0);
+                if (separator > 0 && separator + 1 < text.Length)
                 {
-                    var key = Encoding.ASCII.GetString(chunkBytes[..nullIdx]);
-                    if (chunkType == "tEXt" && nullIdx + 1 < chunkBytes.Length)
-                    {
-                        var val = Encoding.Latin1.GetString(chunkBytes[(nullIdx + 1)..]);
-                        rawTags[$"PNG:{key}"] = val;
-                    }
+                    var key = Encoding.ASCII.GetString(text.AsSpan(0, separator));
+                    rawTags[$"PNG:{key}"] = Encoding.Latin1.GetString(text.AsSpan(separator + 1));
                 }
             }
-            else if (chunkType == "IEND")
+            else if (type.SequenceEqual("IEND"u8))
             {
                 break;
             }
 
-            offset += 12 + length;
+            offset = dataOffset + length + 4;
         }
 
         return MergeResults(exif, new ImageMetadata(
@@ -301,47 +316,52 @@ public sealed class ImageMetadataAdapter
             RawTags: rawTags.Count > 0 ? rawTags : null), "PNG");
     }
 
-    private static ImageMetadata ParseJpegBinary(ArraySegment<byte> buffer)
+    private static ImageMetadata ParseJpegBinary(MetadataRegion input)
     {
         int? width = null;
         int? height = null;
         ImageMetadata? exifMeta = null;
-        var rawTags = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        var offset = 2;
-        while (offset + 4 <= buffer.Count)
+        Span<byte> markerBytes = stackalloc byte[2];
+        Span<byte> dimensions = stackalloc byte[5];
+        ReadOnlySpan<byte> xmpHeader = "http://ns.adobe.com/xap/1.0/\0"u8;
+        Span<byte> prefix = stackalloc byte[xmpHeader.Length];
+        var offset = 2L;
+        while (input.TryRead(offset, markerBytes) && markerBytes[0] == 0xFF)
         {
-            if (buffer[offset] != 0xFF) break;
-            var marker = buffer[offset + 1];
+            var marker = markerBytes[1];
+            offset += markerBytes.Length;
+            while (marker == 0xFF)
+            {
+                if (!input.TryRead(offset++, markerBytes[..1])) break;
+                marker = markerBytes[0];
+            }
+
             if (marker is 0xD9 or 0xDA) break;
+            if (marker is 0x01 or >= 0xD0 and <= 0xD7) continue;
+            if (!input.TryRead(offset, markerBytes)) break;
+            var length = BinaryPrimitives.ReadUInt16BigEndian(markerBytes);
+            if (length < 2 || !input.Contains(offset, length)) break;
 
-            var length = BinaryPrimitives.ReadUInt16BigEndian(buffer.AsSpan().Slice(offset + 2, 2));
-            if (offset + 2 + length > buffer.Count) break;
-
-            if (marker is 0xC0 or 0xC1 or 0xC2 && length >= 7)
+            var payload = input.Slice(offset + 2, length - 2);
+            if (marker is 0xC0 or 0xC1 or 0xC2 && payload.TryRead(0, dimensions))
             {
-                height = BinaryPrimitives.ReadUInt16BigEndian(buffer.AsSpan().Slice(offset + 5, 2));
-                width = BinaryPrimitives.ReadUInt16BigEndian(buffer.AsSpan().Slice(offset + 7, 2));
+                height = BinaryPrimitives.ReadUInt16BigEndian(dimensions[1..]);
+                width = BinaryPrimitives.ReadUInt16BigEndian(dimensions[3..]);
             }
-
-            else if (marker == 0xE1 && length >= 8)
+            else if (marker == 0xE1)
             {
-                var app1Header = Encoding.ASCII.GetString(buffer.AsSpan().Slice(offset + 4, 6));
-                if (app1Header.StartsWith("Exif\0\0", StringComparison.Ordinal))
+                if (payload.TryRead(0, prefix[..6]) && prefix[..6].SequenceEqual("Exif\0\0"u8))
                 {
-                    var tiffStart = offset + 10;
-                    var tiffLength = length - 8;
-                    exifMeta = MergeResults(exifMeta, ParseTiffBinary(buffer, tiffStart, tiffLength), "JPEG");
+                    exifMeta = MergeResults(exifMeta, ParseTiffBinary(payload.Slice(6, payload.Length - 6)), "JPEG");
                 }
-                else if (buffer.AsSpan().Slice(offset + 4, length - 2).StartsWith("http://ns.adobe.com/xap/1.0/\0"u8))
+                else if (payload.TryRead(0, prefix) && prefix.SequenceEqual(xmpHeader))
                 {
-                    var headerLength = "http://ns.adobe.com/xap/1.0/\0"u8.Length;
-                    var xmp = ParseXmp(buffer.AsSpan().Slice(offset + 4 + headerLength, length - 2 - headerLength));
-                    exifMeta = MergeResults(exifMeta, xmp, "JPEG");
+                    exifMeta = MergeResults(exifMeta, ParseXmp(payload.Slice(prefix.Length, payload.Length - prefix.Length)), "JPEG");
                 }
             }
 
-            offset += 2 + length;
+            offset += length;
         }
 
         if (exifMeta is not null)
@@ -350,23 +370,19 @@ public sealed class ImageMetadataAdapter
             {
                 Width = exifMeta.Width ?? width,
                 Height = exifMeta.Height ?? height,
-                Format = "JPEG",
-                RawTags = MergeDicts(exifMeta.RawTags, rawTags)
+                Format = "JPEG"
             };
         }
 
-        return new ImageMetadata(
-            Width: width,
-            Height: height,
-            Format: "JPEG",
-            RawTags: rawTags.Count > 0 ? rawTags : null);
+        return new ImageMetadata(Width: width, Height: height, Format: "JPEG");
     }
 
-    private static ImageMetadata ParseXmp(ReadOnlySpan<byte> bytes)
+    private static ImageMetadata ParseXmp(MetadataRegion input)
     {
         try
         {
-            using var stream = new MemoryStream(bytes.ToArray());
+            if (input.ReadMetadataValue(0, input.Length) is not { } bytes) return ImageMetadata.Empty;
+            using var stream = new MemoryStream(bytes, writable: false);
             using var reader = XmlReader.Create(stream, new XmlReaderSettings
             {
                 DtdProcessing = DtdProcessing.Prohibit,
@@ -403,38 +419,17 @@ public sealed class ImageMetadataAdapter
         }
     }
 
-    private static ImageMetadata ParseTiffBinary(ArraySegment<byte> buffer, int tiffStart, int tiffLength)
+    private static ImageMetadata ParseTiffBinary(MetadataRegion input)
     {
-        if (tiffLength < 8 || tiffStart + 8 > buffer.Count)
-        {
-            return ImageMetadata.Empty;
-        }
+        Span<byte> header = stackalloc byte[8];
+        if (!input.TryRead(0, header)) return ImageMetadata.Empty;
 
-        bool isLittleEndian;
-        if (buffer[tiffStart] == 0x49 && buffer[tiffStart + 1] == 0x49)
-        {
-            isLittleEndian = true;
-        }
-        else if (buffer[tiffStart] == 0x4D && buffer[tiffStart + 1] == 0x4D)
-        {
-            isLittleEndian = false;
-        }
-        else
-        {
-            return ImageMetadata.Empty;
-        }
+        var isLittleEndian = header[..2].SequenceEqual("II"u8);
+        if (!isLittleEndian && !header[..2].SequenceEqual("MM"u8)) return ImageMetadata.Empty;
+        if (ReadUInt16(header[2..], isLittleEndian) != 42) return ImageMetadata.Empty;
 
-        var magic = ReadUInt16(buffer, tiffStart + 2, isLittleEndian);
-        if (magic != 42)
-        {
-            return ImageMetadata.Empty;
-        }
-
-        var firstIfdOffset = (int)ReadUInt32(buffer, tiffStart + 4, isLittleEndian);
-        if (firstIfdOffset < 8 || tiffStart + firstIfdOffset >= buffer.Count)
-        {
-            return ImageMetadata.Empty;
-        }
+        var firstIfdOffset = ReadUInt32(header[4..], isLittleEndian);
+        if (firstIfdOffset < 8 || !input.Contains(firstIfdOffset, 2)) return ImageMetadata.Empty;
 
         string? make = null;
         string? model = null;
@@ -444,7 +439,6 @@ public sealed class ImageMetadataAdapter
         DateTimeOffset? embeddedDt = null;
         DateTimeOffset? dtOriginal = null;
         DateTimeOffset? dtDigitized = null;
-        DateTimeOffset? xmpCapture = null;
         double? fNumber = null;
         double? focalLength = null;
         double? expTimeSec = null;
@@ -462,37 +456,37 @@ public sealed class ImageMetadataAdapter
 
         var rawTags = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        int exifIfdOffset = 0;
-        int gpsIfdOffset = 0;
-        ReadIfd(buffer, tiffStart, firstIfdOffset, isLittleEndian, (tag, type, count, valOffset) =>
+        uint exifIfdOffset = 0;
+        uint gpsIfdOffset = 0;
+        ReadIfd(input, firstIfdOffset, isLittleEndian, (tag, type, count, valOffset) =>
         {
             switch (tag)
             {
                 case 0x0100:
-                    width = (int)ReadTagValueUInt(buffer, tiffStart, type, valOffset, isLittleEndian);
+                    width = (int)ReadTagValueUInt(input, type, valOffset, isLittleEndian);
                     break;
                 case 0x0101:
-                    height = (int)ReadTagValueUInt(buffer, tiffStart, type, valOffset, isLittleEndian);
+                    height = (int)ReadTagValueUInt(input, type, valOffset, isLittleEndian);
                     break;
                 case 0x010F:
-                    make = ReadTagValueString(buffer, tiffStart, count, valOffset);
+                    make = ReadTagValueString(input, count, valOffset, isLittleEndian);
                     if (make != null) rawTags["IFD0:Make"] = make;
                     break;
                 case 0x0110:
-                    model = ReadTagValueString(buffer, tiffStart, count, valOffset);
+                    model = ReadTagValueString(input, count, valOffset, isLittleEndian);
                     if (model != null) rawTags["IFD0:Model"] = model;
                     break;
                 case 0x0112:
-                    var oVal = (ushort)ReadTagValueUInt(buffer, tiffStart, type, valOffset, isLittleEndian);
+                    var oVal = (ushort)ReadTagValueUInt(input, type, valOffset, isLittleEndian);
                     (orientationStr, orientationDeg) = DecodeOrientation(oVal);
                     rawTags["IFD0:Orientation"] = oVal.ToString(CultureInfo.InvariantCulture);
                     break;
                 case 0x0131:
-                    software = ReadTagValueString(buffer, tiffStart, count, valOffset);
+                    software = ReadTagValueString(input, count, valOffset, isLittleEndian);
                     if (software != null) rawTags["IFD0:Software"] = software;
                     break;
                 case 0x0132:
-                    var dtStr = ReadTagValueString(buffer, tiffStart, count, valOffset);
+                    var dtStr = ReadTagValueString(input, count, valOffset, isLittleEndian);
                     if (dtStr != null && TryParseDateTime(dtStr, out var pdt))
                     {
                         embeddedDt = pdt;
@@ -500,30 +494,30 @@ public sealed class ImageMetadataAdapter
                     }
                     break;
                 case 0x013B:
-                    var artist = ReadTagValueString(buffer, tiffStart, count, valOffset);
+                    var artist = ReadTagValueString(input, count, valOffset, isLittleEndian);
                     if (artist != null) rawTags["IFD0:Artist"] = artist;
                     break;
                 case 0x8298:
-                    var copyright = ReadTagValueString(buffer, tiffStart, count, valOffset);
+                    var copyright = ReadTagValueString(input, count, valOffset, isLittleEndian);
                     if (copyright != null) rawTags["IFD0:Copyright"] = copyright;
                     break;
                 case 0x8769:
-                    exifIfdOffset = (int)ReadTagValueUInt(buffer, tiffStart, type, valOffset, isLittleEndian);
+                    exifIfdOffset = ReadTagValueUInt(input, type, valOffset, isLittleEndian);
                     break;
                 case 0x8825:
-                    gpsIfdOffset = (int)ReadTagValueUInt(buffer, tiffStart, type, valOffset, isLittleEndian);
+                    gpsIfdOffset = ReadTagValueUInt(input, type, valOffset, isLittleEndian);
                     break;
             }
         });
 
-        if (exifIfdOffset > 0 && tiffStart + exifIfdOffset < buffer.Count)
+        if (exifIfdOffset >= 8)
         {
-            ReadIfd(buffer, tiffStart, exifIfdOffset, isLittleEndian, (tag, type, count, valOffset) =>
+            ReadIfd(input, exifIfdOffset, isLittleEndian, (tag, type, count, valOffset) =>
             {
                 switch (tag)
                 {
                     case 0x829A:
-                        if (ReadTagValueRational(buffer, tiffStart, valOffset, isLittleEndian) is { } et)
+                        if (ReadTagValueRational(input, valOffset, isLittleEndian) is { } et)
                         {
                             expTimeSec = et;
                             expTimeString = FormatExposureTime(et);
@@ -531,23 +525,23 @@ public sealed class ImageMetadataAdapter
                         }
                         break;
                     case 0x829D:
-                        if (ReadTagValueRational(buffer, tiffStart, valOffset, isLittleEndian) is { } fn)
+                        if (ReadTagValueRational(input, valOffset, isLittleEndian) is { } fn)
                         {
                             fNumber = fn;
                             rawTags["EXIF:FNumber"] = fn.ToString(CultureInfo.InvariantCulture);
                         }
                         break;
                     case 0x8822:
-                        var ep = (ushort)ReadTagValueUInt(buffer, tiffStart, type, valOffset, isLittleEndian);
+                        var ep = (ushort)ReadTagValueUInt(input, type, valOffset, isLittleEndian);
                         expProgram = DecodeExposureProgram(ep);
                         rawTags["EXIF:ExposureProgram"] = expProgram;
                         break;
                     case 0x8827:
-                        iso = (int)ReadTagValueUInt(buffer, tiffStart, type, valOffset, isLittleEndian);
+                        iso = (int)ReadTagValueUInt(input, type, valOffset, isLittleEndian);
                         rawTags["EXIF:ISO"] = iso.Value.ToString(CultureInfo.InvariantCulture);
                         break;
                     case 0x9003:
-                        var dtoStr = ReadTagValueString(buffer, tiffStart, count, valOffset);
+                        var dtoStr = ReadTagValueString(input, count, valOffset, isLittleEndian);
                         if (dtoStr != null && TryParseDateTime(dtoStr, out var pdto))
                         {
                             dtOriginal = pdto;
@@ -555,7 +549,7 @@ public sealed class ImageMetadataAdapter
                         }
                         break;
                     case 0x9004:
-                        var dtdStr = ReadTagValueString(buffer, tiffStart, count, valOffset);
+                        var dtdStr = ReadTagValueString(input, count, valOffset, isLittleEndian);
                         if (dtdStr != null && TryParseDateTime(dtdStr, out var pdtd))
                         {
                             dtDigitized = pdtd;
@@ -563,57 +557,57 @@ public sealed class ImageMetadataAdapter
                         }
                         break;
                     case 0x9204:
-                        if (ReadTagValueSignedRational(buffer, tiffStart, valOffset, isLittleEndian) is { } eb)
+                        if (ReadTagValueRational(input, valOffset, isLittleEndian, signed: true) is { } eb)
                         {
                             expBias = eb;
                             rawTags["EXIF:ExposureBias"] = eb.ToString(CultureInfo.InvariantCulture);
                         }
                         break;
                     case 0x9209:
-                        var flVal = (ushort)ReadTagValueUInt(buffer, tiffStart, type, valOffset, isLittleEndian);
+                        var flVal = (ushort)ReadTagValueUInt(input, type, valOffset, isLittleEndian);
                         flash = (flVal & 1) != 0 ? "Flash fired" : "Flash did not fire";
                         rawTags["EXIF:Flash"] = flash;
                         break;
                     case 0x920A:
-                        if (ReadTagValueRational(buffer, tiffStart, valOffset, isLittleEndian) is { } fl)
+                        if (ReadTagValueRational(input, valOffset, isLittleEndian) is { } fl)
                         {
                             focalLength = fl;
                             rawTags["EXIF:FocalLength"] = fl.ToString(CultureInfo.InvariantCulture);
                         }
                         break;
                     case 0xA434:
-                        lens = ReadTagValueString(buffer, tiffStart, count, valOffset);
+                        lens = ReadTagValueString(input, count, valOffset, isLittleEndian);
                         if (lens != null) rawTags["EXIF:LensModel"] = lens;
                         break;
                 }
             });
         }
 
-        if (gpsIfdOffset > 0 && tiffStart + gpsIfdOffset < buffer.Count)
+        if (gpsIfdOffset >= 8)
         {
             string? latRef = null;
             string? lonRef = null;
             double[]? latParts = null;
             double[]? lonParts = null;
 
-            ReadIfd(buffer, tiffStart, gpsIfdOffset, isLittleEndian, (tag, type, count, valOffset) =>
+            ReadIfd(input, gpsIfdOffset, isLittleEndian, (tag, type, count, valOffset) =>
             {
                 switch (tag)
                 {
                     case 0x0001:
-                        latRef = ReadTagValueString(buffer, tiffStart, count, valOffset);
+                        latRef = ReadTagValueString(input, count, valOffset, isLittleEndian);
                         break;
                     case 0x0002:
-                        latParts = ReadTagValueRationalArray(buffer, tiffStart, count, valOffset, isLittleEndian);
+                        latParts = ReadGpsCoordinate(input, count, valOffset, isLittleEndian);
                         break;
                     case 0x0003:
-                        lonRef = ReadTagValueString(buffer, tiffStart, count, valOffset);
+                        lonRef = ReadTagValueString(input, count, valOffset, isLittleEndian);
                         break;
                     case 0x0004:
-                        lonParts = ReadTagValueRationalArray(buffer, tiffStart, count, valOffset, isLittleEndian);
+                        lonParts = ReadGpsCoordinate(input, count, valOffset, isLittleEndian);
                         break;
                     case 0x0006:
-                        if (ReadTagValueRational(buffer, tiffStart, valOffset, isLittleEndian) is { } altVal)
+                        if (ReadTagValueRational(input, valOffset, isLittleEndian) is { } altVal)
                         {
                             alt = altVal;
                         }
@@ -636,7 +630,7 @@ public sealed class ImageMetadataAdapter
             }
         }
 
-        var capturedAt = ImageMetadata.ResolveCaptureTime(dtOriginal, xmpCapture, embeddedDt);
+        var capturedAt = ImageMetadata.ResolveCaptureTime(dtOriginal, null, embeddedDt);
 
         return new ImageMetadata(
             Width: width,
@@ -656,7 +650,6 @@ public sealed class ImageMetadataAdapter
             Flash: flash,
             DateTimeOriginal: dtOriginal,
             DateTimeDigitized: dtDigitized,
-            XmpCaptureTime: xmpCapture,
             EmbeddedCreationTime: embeddedDt,
             CapturedAt: capturedAt,
             Latitude: lat,
@@ -667,153 +660,141 @@ public sealed class ImageMetadataAdapter
     }
 
     private static void ReadIfd(
-        ArraySegment<byte> buffer,
-        int tiffStart,
-        int ifdOffset,
-        bool isLittleEndian,
-        Action<ushort, ushort, uint, int> onEntry)
+        MetadataRegion input,
+        uint ifdOffset,
+        bool littleEndian,
+        Action<ushort, ushort, uint, long> onEntry)
     {
-        var dirOffset = tiffStart + ifdOffset;
-        if (dirOffset + 2 > buffer.Count) return;
+        Span<byte> entry = stackalloc byte[12];
+        if (!input.TryRead(ifdOffset, entry[..2])) return;
 
-        var count = ReadUInt16(buffer, dirOffset, isLittleEndian);
-        var entryOffset = dirOffset + 2;
-
-        for (var i = 0; i < count; i++)
+        var count = ReadUInt16(entry, littleEndian);
+        var entryOffset = ifdOffset + 2L;
+        for (var i = 0; i < count && input.TryRead(entryOffset, entry); i++)
         {
-            if (entryOffset + 12 > buffer.Count) break;
-
-            var tag = ReadUInt16(buffer, entryOffset, isLittleEndian);
-            var type = ReadUInt16(buffer, entryOffset + 2, isLittleEndian);
-            var valCount = ReadUInt32(buffer, entryOffset + 4, isLittleEndian);
-            var valOffset = entryOffset + 8;
-
-            onEntry(tag, type, valCount, valOffset);
-            entryOffset += 12;
+            var tag = ReadUInt16(entry, littleEndian);
+            var type = ReadUInt16(entry[2..], littleEndian);
+            var valueCount = ReadUInt32(entry[4..], littleEndian);
+            onEntry(tag, type, valueCount, entryOffset + 8);
+            entryOffset += entry.Length;
         }
     }
 
-    private static uint ReadTagValueUInt(ArraySegment<byte> buffer, int tiffStart, ushort type, int valOffset, bool isLittleEndian)
+    private static uint ReadTagValueUInt(MetadataRegion input, ushort type, long valueOffset, bool littleEndian)
     {
-        if (valOffset + 4 > buffer.Count) return 0;
+        Span<byte> value = stackalloc byte[4];
+        if (!input.TryRead(valueOffset, value)) return 0;
+
         return type switch
         {
-            1 => buffer[valOffset],
-            3 => ReadUInt16(buffer, valOffset, isLittleEndian),
-            4 => ReadUInt32(buffer, valOffset, isLittleEndian),
-            _ => ReadUInt32(buffer, valOffset, isLittleEndian)
+            1 => value[0],
+            3 => ReadUInt16(value, littleEndian),
+            _ => ReadUInt32(value, littleEndian)
         };
     }
 
-    private static string CleanCodecName(string? friendlyName)
+    private static string? ReadTagValueString(MetadataRegion input, uint count, long valueOffset, bool littleEndian)
     {
-        if (string.IsNullOrWhiteSpace(friendlyName)) return "IMAGE";
-        var cleaned = friendlyName;
-        if (cleaned.EndsWith(" Decoder", StringComparison.OrdinalIgnoreCase))
-        {
-            cleaned = cleaned[..^8].Trim();
-        }
-        else if (cleaned.EndsWith(" Encoder", StringComparison.OrdinalIgnoreCase))
-        {
-            cleaned = cleaned[..^8].Trim();
-        }
-        return cleaned.ToUpperInvariant();
-    }
+        if (count == 0 || count > MaximumMetadataValueBytes) return null;
+        Span<byte> value = stackalloc byte[4];
+        if (!input.TryRead(valueOffset, value)) return null;
 
-    private static string? ReadTagValueString(ArraySegment<byte> buffer, int tiffStart, uint count, int valOffset)
-    {
-        if (count == 0) return null;
-        int dataOffset;
         if (count <= 4)
         {
-            var isInlineAscii = true;
-            for (var i = 0; i < count; i++)
+            var inline = value[..(int)count];
+            if (IsInlineAscii(inline))
             {
-                var b = buffer[valOffset + i];
-                if (b != 0 && (b < 0x20 || b > 0x7E)) { isInlineAscii = false; break; }
-            }
-
-            if (isInlineAscii)
-            {
-                dataOffset = valOffset;
-            }
-            else
-            {
-                var ptr = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan().Slice(valOffset, 4));
-                dataOffset = tiffStart + ptr;
+                return DecodeAscii(inline);
             }
         }
-        else
+
+        var pointer = ReadUInt32(value, littleEndian);
+        return pointer >= 8 && input.ReadMetadataValue(pointer, count) is { } bytes ? DecodeAscii(bytes) : null;
+    }
+
+    private static bool IsInlineAscii(ReadOnlySpan<byte> bytes)
+    {
+        foreach (var value in bytes)
         {
-            var ptr = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan().Slice(valOffset, 4));
-            dataOffset = tiffStart + ptr;
+            if (value != 0 && (value < 0x20 || value > 0x7E)) return false;
         }
 
-        if (dataOffset < 0 || dataOffset + count > buffer.Count) return null;
-
-        var length = (int)count;
-        while (length > 0 && buffer[dataOffset + length - 1] == 0) length--;
-        return length > 0 ? Encoding.ASCII.GetString(buffer.AsSpan().Slice(dataOffset, length)).Trim() : null;
+        return true;
     }
 
-    private static double? ReadTagValueRational(ArraySegment<byte> buffer, int tiffStart, int valOffset, bool isLittleEndian)
+    private static string? DecodeAscii(ReadOnlySpan<byte> bytes)
     {
-        if (valOffset + 4 > buffer.Count) return null;
-        var ptr = (int)ReadUInt32(buffer, valOffset, isLittleEndian);
-        var absOffset = tiffStart + ptr;
-        if (absOffset < 0 || absOffset + 8 > buffer.Count) return null;
-
-        var num = ReadUInt32(buffer, absOffset, isLittleEndian);
-        var den = ReadUInt32(buffer, absOffset + 4, isLittleEndian);
-        if (den == 0) return null;
-        return Math.Round((double)num / den, 4);
+        var text = bytes.TrimEnd((byte)0);
+        return text.IsEmpty ? null : Encoding.ASCII.GetString(text).Trim();
     }
 
-    private static double? ReadTagValueSignedRational(ArraySegment<byte> buffer, int tiffStart, int valOffset, bool isLittleEndian)
+    private static double? ReadTagValueRational(
+        MetadataRegion input, long valueOffset, bool littleEndian, bool signed = false)
     {
-        if (valOffset + 4 > buffer.Count) return null;
-        var ptr = (int)ReadUInt32(buffer, valOffset, isLittleEndian);
-        var absOffset = tiffStart + ptr;
-        if (absOffset < 0 || absOffset + 8 > buffer.Count) return null;
+        var pointer = ReadTagValueUInt(input, 4, valueOffset, littleEndian);
+        Span<byte> bytes = stackalloc byte[8];
+        if (pointer < 8 || !input.TryRead(pointer, bytes)) return null;
 
-        var num = ReadInt32(buffer, absOffset, isLittleEndian);
-        var den = ReadInt32(buffer, absOffset + 4, isLittleEndian);
-        if (den == 0) return null;
-        return Math.Round((double)num / den, 4);
+        var numerator = ReadUInt32(bytes, littleEndian);
+        var denominator = ReadUInt32(bytes[4..], littleEndian);
+        if (denominator == 0) return null;
+        var value = signed ? (double)unchecked((int)numerator) / unchecked((int)denominator)
+            : (double)numerator / denominator;
+        return Math.Round(value, 4);
     }
 
-    private static double[]? ReadTagValueRationalArray(ArraySegment<byte> buffer, int tiffStart, uint count, int valOffset, bool isLittleEndian)
+    private static double[]? ReadGpsCoordinate(MetadataRegion input, uint count, long valueOffset, bool littleEndian)
     {
-        if (count == 0) return null;
-        var ptr = (int)ReadUInt32(buffer, valOffset, isLittleEndian);
-        var absOffset = tiffStart + ptr;
-        if (absOffset < 0 || absOffset + (count * 8) > buffer.Count) return null;
+        if (count < 3) return null;
+        var pointer = ReadTagValueUInt(input, 4, valueOffset, littleEndian);
+        Span<byte> bytes = stackalloc byte[24];
+        if (pointer < 8 || !input.Contains(pointer, count * 8L) || !input.TryRead(pointer, bytes)) return null;
 
-        var result = new double[count];
-        for (var i = 0; i < count; i++)
+        var result = new double[3];
+        for (var i = 0; i < result.Length; i++)
         {
-            var num = ReadUInt32(buffer, absOffset + i * 8, isLittleEndian);
-            var den = ReadUInt32(buffer, absOffset + i * 8 + 4, isLittleEndian);
-            result[i] = den != 0 ? (double)num / den : 0.0;
+            var numerator = ReadUInt32(bytes[(i * 8)..], littleEndian);
+            var denominator = ReadUInt32(bytes[(i * 8 + 4)..], littleEndian);
+            result[i] = denominator != 0 ? (double)numerator / denominator : 0.0;
         }
 
         return result;
     }
 
-    private static ushort ReadUInt16(ArraySegment<byte> buffer, int offset, bool isLittleEndian) =>
-        isLittleEndian
-            ? BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan().Slice(offset, 2))
-            : BinaryPrimitives.ReadUInt16BigEndian(buffer.AsSpan().Slice(offset, 2));
+    private static ushort ReadUInt16(ReadOnlySpan<byte> bytes, bool littleEndian) =>
+        littleEndian ? BinaryPrimitives.ReadUInt16LittleEndian(bytes) : BinaryPrimitives.ReadUInt16BigEndian(bytes);
 
-    private static uint ReadUInt32(ArraySegment<byte> buffer, int offset, bool isLittleEndian) =>
-        isLittleEndian
-            ? BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan().Slice(offset, 4))
-            : BinaryPrimitives.ReadUInt32BigEndian(buffer.AsSpan().Slice(offset, 4));
+    private static uint ReadUInt32(ReadOnlySpan<byte> bytes, bool littleEndian) =>
+        littleEndian ? BinaryPrimitives.ReadUInt32LittleEndian(bytes) : BinaryPrimitives.ReadUInt32BigEndian(bytes);
 
-    private static int ReadInt32(ArraySegment<byte> buffer, int offset, bool isLittleEndian) =>
-        isLittleEndian
-            ? BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan().Slice(offset, 4))
-            : BinaryPrimitives.ReadInt32BigEndian(buffer.AsSpan().Slice(offset, 4));
+    private readonly struct MetadataRegion(Stream stream, long start, long length)
+    {
+        public long Length => length;
+
+        public bool Contains(long offset, long size) =>
+            offset >= 0 && size >= 0 && offset <= length && size <= length - offset;
+
+        // The caller validates the chunk or segment before creating a region for nested offsets.
+        public MetadataRegion Slice(long offset, long size) => new(stream, start + offset, size);
+
+        public bool TryRead(long offset, Span<byte> bytes)
+        {
+            if (!Contains(offset, bytes.Length)) return false;
+
+            var position = start + offset;
+            if (stream.Position != position) stream.Position = position;
+            stream.ReadExactly(bytes);
+            return true;
+        }
+
+        public byte[]? ReadMetadataValue(long offset, long size)
+        {
+            if (size > MaximumMetadataValueBytes || !Contains(offset, size)) return null;
+
+            var bytes = new byte[(int)size];
+            return TryRead(offset, bytes) ? bytes : null;
+        }
+    }
 
     private static (string Label, int Degrees) DecodeOrientation(ushort val) =>
         val switch
@@ -866,82 +847,52 @@ public sealed class ImageMetadataAdapter
         return false;
     }
 
-    private static bool TryParseDouble(object obj, out double val)
+    private static ImageMetadata MergeResults(ImageMetadata? primary, ImageMetadata? binary, string? hintFormat)
     {
-        val = 0;
-        if (obj is double d) { val = d; return true; }
-        if (obj is float f) { val = f; return true; }
-        if (obj is int i) { val = i; return true; }
-        if (obj is long l) { val = l; return true; }
-        if (obj is string s && double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed))
-        {
-            val = parsed;
-            return true;
-        }
-        return false;
-    }
-
-    private static bool TryParseInt(object obj, out int val)
-    {
-        val = 0;
-        if (obj is int i) { val = i; return true; }
-        if (obj is ushort u) { val = u; return true; }
-        if (obj is uint ui) { val = (int)ui; return true; }
-        if (obj is string s && int.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed))
-        {
-            val = parsed;
-            return true;
-        }
-        return false;
-    }
-
-
-    private static ImageMetadata MergeResults(ImageMetadata? wpf, ImageMetadata? binary, string? hintFormat)
-    {
-        if (wpf is null && binary is null)
+        if (primary is null && binary is null)
         {
             return ImageMetadata.Empty;
         }
 
-        if (wpf is null) return binary!;
-        if (binary is null) return wpf;
+        if (primary is null) return binary!;
+        if (binary is null) return primary;
 
-        var dtOrig = binary.DateTimeOriginal ?? wpf.DateTimeOriginal;
-        var xmp = binary.XmpCaptureTime ?? wpf.XmpCaptureTime;
-        var emb = binary.EmbeddedCreationTime ?? wpf.EmbeddedCreationTime;
+        var dtOrig = binary.DateTimeOriginal ?? primary.DateTimeOriginal;
+        var xmp = binary.XmpCaptureTime ?? primary.XmpCaptureTime;
+        var emb = binary.EmbeddedCreationTime ?? primary.EmbeddedCreationTime;
         var captured = ImageMetadata.ResolveCaptureTime(dtOrig, xmp, emb);
 
         return new ImageMetadata(
-            Width: wpf.Width ?? binary.Width,
-            Height: wpf.Height ?? binary.Height,
-            Format: wpf.Format ?? binary.Format ?? hintFormat,
-            Orientation: binary.Orientation ?? wpf.Orientation,
-            OrientationDegrees: binary.OrientationDegrees ?? wpf.OrientationDegrees,
-            ColorSpace: wpf.ColorSpace ?? binary.ColorSpace,
-            ColorProfile: wpf.ColorProfile ?? binary.ColorProfile,
-            BitDepth: wpf.BitDepth ?? binary.BitDepth,
-            CameraMake: binary.CameraMake ?? wpf.CameraMake,
-            CameraModel: binary.CameraModel ?? wpf.CameraModel,
-            LensModel: binary.LensModel ?? wpf.LensModel,
-            FocalLengthMm: binary.FocalLengthMm ?? wpf.FocalLengthMm,
-            FNumber: binary.FNumber ?? wpf.FNumber,
-            ExposureTimeString: binary.ExposureTimeString ?? wpf.ExposureTimeString,
-            ExposureTimeSeconds: binary.ExposureTimeSeconds ?? wpf.ExposureTimeSeconds,
-            Iso: binary.Iso ?? wpf.Iso,
-            ExposureProgram: binary.ExposureProgram ?? wpf.ExposureProgram,
-            ExposureBiasEv: binary.ExposureBiasEv ?? wpf.ExposureBiasEv,
-            Flash: binary.Flash ?? wpf.Flash,
+            Width: primary.Width ?? binary.Width,
+            Height: primary.Height ?? binary.Height,
+            Format: primary.Format ?? binary.Format ?? hintFormat,
+            Orientation: binary.Orientation ?? primary.Orientation,
+            OrientationDegrees: binary.OrientationDegrees ?? primary.OrientationDegrees,
+            ColorSpace: primary.ColorSpace ?? binary.ColorSpace,
+            ColorProfile: primary.ColorProfile ?? binary.ColorProfile,
+            BitDepth: primary.BitDepth ?? binary.BitDepth,
+            CameraMake: binary.CameraMake ?? primary.CameraMake,
+            CameraModel: binary.CameraModel ?? primary.CameraModel,
+            LensModel: binary.LensModel ?? primary.LensModel,
+            FocalLengthMm: binary.FocalLengthMm ?? primary.FocalLengthMm,
+            FNumber: binary.FNumber ?? primary.FNumber,
+            ExposureTimeString: binary.ExposureTimeString ?? primary.ExposureTimeString,
+            ExposureTimeSeconds: binary.ExposureTimeSeconds ?? primary.ExposureTimeSeconds,
+            Iso: binary.Iso ?? primary.Iso,
+            ExposureProgram: binary.ExposureProgram ?? primary.ExposureProgram,
+            ExposureBiasEv: binary.ExposureBiasEv ?? primary.ExposureBiasEv,
+            Flash: binary.Flash ?? primary.Flash,
             DateTimeOriginal: dtOrig,
-            DateTimeDigitized: binary.DateTimeDigitized ?? wpf.DateTimeDigitized,
+            DateTimeDigitized: binary.DateTimeDigitized ?? primary.DateTimeDigitized,
             XmpCaptureTime: xmp,
             EmbeddedCreationTime: emb,
             CapturedAt: captured,
-            Latitude: binary.Latitude ?? wpf.Latitude,
-            Longitude: binary.Longitude ?? wpf.Longitude,
-            AltitudeMeters: binary.AltitudeMeters ?? wpf.AltitudeMeters,
-            LocationName: binary.LocationName ?? wpf.LocationName,
-            Software: binary.Software ?? wpf.Software,
-            RawTags: MergeDicts(wpf.RawTags, binary.RawTags));
+            Latitude: binary.Latitude ?? primary.Latitude,
+            Longitude: binary.Longitude ?? primary.Longitude,
+            AltitudeMeters: binary.AltitudeMeters ?? primary.AltitudeMeters,
+            LocationName: binary.LocationName ?? primary.LocationName,
+            Software: binary.Software ?? primary.Software,
+            RawTags: MergeDicts(primary.RawTags, binary.RawTags));
     }
 
     private static IReadOnlyDictionary<string, string>? MergeDicts(

@@ -36,6 +36,7 @@
     <sys:String x:Key="Import.ReadyForVerification">검토 준비 완료</sys:String>
     <sys:String x:Key="Import.Verifying">검토 중</sys:String>
     <sys:String x:Key="Import.AlreadyInLibrary">이미 Vault에 있습니다.</sys:String>
+    <sys:String x:Key="Import.CancelAlreadyCommitted">이 가져오기로 이미 미디어가 Vault에 추가되어 취소할 수 없습니다.</sys:String>
     <sys:String x:Key="Import.CancelRequested">취소를 요청했습니다. 안전하게 멈출 수 있을 때 작업이 중지됩니다.</sys:String>
     <sys:String x:Key="Import.Details.Description">평가, 즐겨찾는 상태 및 개요는 개인 Profile 세부정보입니다.</sys:String>
     <sys:String x:Key="Import.Overview.Placeholder">Profile에 대한 간단한 설명을 작성하세요.</sys:String>
@@ -689,6 +690,7 @@
     <sys:String x:Key="Import.Stage.Finalizing">마무리 중</sys:String>
     <sys:String x:Key="Import.Stage.Complete">완료</sys:String>
     <sys:String x:Key="Import.Stage.Paused">일시중지됨</sys:String>
+    <sys:String x:Key="Import.Stage.Cancelling">취소 중…</sys:String>
     <sys:String x:Key="Import.Stage.Cancelled">취소됨</sys:String>
     <sys:String x:Key="Import.Stage.NeedsAttention">주의가 필요함</sys:String>
     <sys:String x:Key="Import.Headline.OneAttention">가져오기 1개에 주의가 필요합니다.</sys:String>

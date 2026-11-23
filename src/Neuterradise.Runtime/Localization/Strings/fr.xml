@@ -36,6 +36,7 @@
     <sys:String x:Key="Import.ReadyForVerification">Prêt à réviser</sys:String>
     <sys:String x:Key="Import.Verifying">Révision</sys:String>
     <sys:String x:Key="Import.AlreadyInLibrary">Déjà en Vault</sys:String>
+    <sys:String x:Key="Import.CancelAlreadyCommitted">Cet import a déjà ajouté des médias à votre Vault et ne peut plus être annulé.</sys:String>
     <sys:String x:Key="Import.CancelRequested">Annulation demandée. Le travail s’arrêtera dès que cela sera possible sans risque.</sys:String>
     <sys:String x:Key="Import.Details.Description">La note, l'état favori et l'aperçu sont des détails personnels Profile.</sys:String>
     <sys:String x:Key="Import.Overview.Placeholder">Rédigez une brève description de ce Profile.</sys:String>
@@ -689,6 +690,7 @@
     <sys:String x:Key="Import.Stage.Finalizing">Finalisation</sys:String>
     <sys:String x:Key="Import.Stage.Complete">Terminé</sys:String>
     <sys:String x:Key="Import.Stage.Paused">En pause</sys:String>
+    <sys:String x:Key="Import.Stage.Cancelling">Annulation en cours…</sys:String>
     <sys:String x:Key="Import.Stage.Cancelled">Annulé</sys:String>
     <sys:String x:Key="Import.Stage.NeedsAttention">A besoin d'attention</sys:String>
     <sys:String x:Key="Import.Headline.OneAttention">1 importation nécessite une attention particulière</sys:String>

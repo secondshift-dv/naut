@@ -241,15 +241,15 @@ public sealed record ImportCancellationOutcome(
 
     public string UserMessage => Result switch
     {
-        ImportCancellationResult.Cancelled =>
-            "This import was cancelled. No source files were touched.",
-        ImportCancellationResult.AlreadyCancelled =>
-            "This import was already cancelled. No source files were touched.",
+        ImportCancellationResult.Cancelled or ImportCancellationResult.AlreadyCancelled =>
+            SurfaceText.Get("Import.Detail.Cancelled", "Cancelled. The original files were left untouched."),
+        ImportCancellationResult.RollbackPending =>
+            SurfaceText.Get("Import.Detail.CleanupPending", "Import stopped. Complete cleanup before clearing this entry."),
         ImportCancellationResult.RefusedAlreadyCommitted =>
-            "This import already added media to your Vault, so it cannot be cancelled.",
+            SurfaceText.Get("Import.CancelAlreadyCommitted", "This import already added media to your Vault, so it cannot be cancelled."),
         ImportCancellationResult.UnitNotFound =>
-            "That import no longer exists.",
-        _ => "This import could not be cancelled.",
+            SurfaceText.Get("Import.Review.NotFound", "That import is no longer available."),
+        _ => SurfaceText.Get("Import.Failed", "Failed"),
     };
 }
 

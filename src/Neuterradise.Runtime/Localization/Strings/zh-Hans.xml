@@ -36,6 +36,7 @@
     <sys:String x:Key="Import.ReadyForVerification">准备审核</sys:String>
     <sys:String x:Key="Import.Verifying">审阅</sys:String>
     <sys:String x:Key="Import.AlreadyInLibrary">已在 Vault</sys:String>
+    <sys:String x:Key="Import.CancelAlreadyCommitted">此次导入已将媒体添加到 Vault，无法取消。</sys:String>
     <sys:String x:Key="Import.CancelRequested">已请求取消。处理将在可以安全停止时结束。</sys:String>
     <sys:String x:Key="Import.Details.Description">评级、最喜欢的状态和概述是 Profile 的个人详细信息。</sys:String>
     <sys:String x:Key="Import.Overview.Placeholder">为这个 Profile 写一个简短的描述。</sys:String>
@@ -689,6 +690,7 @@
     <sys:String x:Key="Import.Stage.Finalizing">敲定</sys:String>
     <sys:String x:Key="Import.Stage.Complete">完成</sys:String>
     <sys:String x:Key="Import.Stage.Paused">已暂停</sys:String>
+    <sys:String x:Key="Import.Stage.Cancelling">正在取消…</sys:String>
     <sys:String x:Key="Import.Stage.Cancelled">取消</sys:String>
     <sys:String x:Key="Import.Stage.NeedsAttention">需要注意</sys:String>
     <sys:String x:Key="Import.Headline.OneAttention">1 导入需要注意</sys:String>

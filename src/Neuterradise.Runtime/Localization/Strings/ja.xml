@@ -36,6 +36,7 @@
     <sys:String x:Key="Import.ReadyForVerification">レビューする準備ができました</sys:String>
     <sys:String x:Key="Import.Verifying">レビュー中</sys:String>
     <sys:String x:Key="Import.AlreadyInLibrary">すでに Vault にあります</sys:String>
+    <sys:String x:Key="Import.CancelAlreadyCommitted">このインポートではすでにメディアが Vault に追加されているため、キャンセルできません。</sys:String>
     <sys:String x:Key="Import.CancelRequested">キャンセルを要求しました。安全に停止できる時点で処理を止めます。</sys:String>
     <sys:String x:Key="Import.Details.Description">評価、お気に入りの状態、概要は個人的な Profile の詳細です。</sys:String>
     <sys:String x:Key="Import.Overview.Placeholder">この Profile の簡単な説明を書いてください。</sys:String>
@@ -689,6 +690,7 @@
     <sys:String x:Key="Import.Stage.Finalizing">ファイナライズ中</sys:String>
     <sys:String x:Key="Import.Stage.Complete">完了</sys:String>
     <sys:String x:Key="Import.Stage.Paused">一時停止中</sys:String>
+    <sys:String x:Key="Import.Stage.Cancelling">キャンセル中…</sys:String>
     <sys:String x:Key="Import.Stage.Cancelled">キャンセルされました</sys:String>
     <sys:String x:Key="Import.Stage.NeedsAttention">注意が必要です</sys:String>
     <sys:String x:Key="Import.Headline.OneAttention">1 インポートには注意が必要です</sys:String>

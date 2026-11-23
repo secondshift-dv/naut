@@ -36,6 +36,7 @@
     <sys:String x:Key="Import.ReadyForVerification">Listo para revisar</sys:String>
     <sys:String x:Key="Import.Verifying">Revisando</sys:String>
     <sys:String x:Key="Import.AlreadyInLibrary">Ya en Vault</sys:String>
+    <sys:String x:Key="Import.CancelAlreadyCommitted">Esta importación ya añadió archivos a tu Vault y no se puede cancelar.</sys:String>
     <sys:String x:Key="Import.CancelRequested">Cancelación solicitada. El trabajo se detendrá cuando sea seguro.</sys:String>
     <sys:String x:Key="Import.Details.Description">La calificación, el estado favorito y la descripción general son detalles personales Profile.</sys:String>
     <sys:String x:Key="Import.Overview.Placeholder">Escriba una breve descripción para este Profile.</sys:String>
@@ -689,6 +690,7 @@
     <sys:String x:Key="Import.Stage.Finalizing">Finalizando</sys:String>
     <sys:String x:Key="Import.Stage.Complete">completo</sys:String>
     <sys:String x:Key="Import.Stage.Paused">En pausa</sys:String>
+    <sys:String x:Key="Import.Stage.Cancelling">Cancelando…</sys:String>
     <sys:String x:Key="Import.Stage.Cancelled">Cancelado</sys:String>
     <sys:String x:Key="Import.Stage.NeedsAttention">necesita atencion</sys:String>
     <sys:String x:Key="Import.Headline.OneAttention">1 importación necesita atención</sys:String>

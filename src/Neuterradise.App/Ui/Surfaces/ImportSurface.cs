@@ -387,15 +387,13 @@ public sealed class ImportSurface : Surface
             if (_unit.CanCancel)
             {
                 _actions.Children.Add(UI.Button(
-                    UI.T("Import.Cancel", "Cancel"),
-                    () =>
-                    {
-                        _owner.IntakeStatusMessage = UI.T(
-                            "Import.CancelRequested",
-                            "Cancellation requested. Work will stop when safe.");
-                        _owner.CancelUnitCommand.Execute(_unit);
-                    },
-                    ButtonKind.Ghost));
+                    _unit.Stage == ImportActivityStage.CleanupPending
+                        ? UI.T("Health.Import.Cleanup", "Complete cleanup")
+                        : UI.T("Import.Cancel", "Cancel"),
+                    null,
+                    ButtonKind.Ghost,
+                    command: _owner.CancelUnitCommand,
+                    parameter: _unit));
             }
         }
 

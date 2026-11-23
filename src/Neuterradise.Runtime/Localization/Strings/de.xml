@@ -36,6 +36,7 @@
     <sys:String x:Key="Import.ReadyForVerification">Bereit zur Überprüfung</sys:String>
     <sys:String x:Key="Import.Verifying">Überprüfung</sys:String>
     <sys:String x:Key="Import.AlreadyInLibrary">Bereits in Vault</sys:String>
+    <sys:String x:Key="Import.CancelAlreadyCommitted">Dieser Import hat bereits Medien zu Ihrem Vault hinzugefügt und kann deshalb nicht abgebrochen werden.</sys:String>
     <sys:String x:Key="Import.CancelRequested">Abbruch angefordert. Die Arbeit endet, sobald dies sicher möglich ist.</sys:String>
     <sys:String x:Key="Import.Details.Description">Bewertung, Lieblingsstatus und Übersicht sind persönliche Profile-Angaben.</sys:String>
     <sys:String x:Key="Import.Overview.Placeholder">Schreiben Sie eine kurze Beschreibung für diesen Profile.</sys:String>
@@ -689,6 +690,7 @@
     <sys:String x:Key="Import.Stage.Finalizing">Finalisierung</sys:String>
     <sys:String x:Key="Import.Stage.Complete">Komplett</sys:String>
     <sys:String x:Key="Import.Stage.Paused">Angehalten</sys:String>
+    <sys:String x:Key="Import.Stage.Cancelling">Wird abgebrochen…</sys:String>
     <sys:String x:Key="Import.Stage.Cancelled">Abgesagt</sys:String>
     <sys:String x:Key="Import.Stage.NeedsAttention">Braucht Aufmerksamkeit</sys:String>
     <sys:String x:Key="Import.Headline.OneAttention">1 Import erfordert Aufmerksamkeit</sys:String>

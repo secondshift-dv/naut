@@ -106,7 +106,7 @@ public sealed class ImportViewModel : ScreenStateViewModel, IDisposable
 
         ContinueImportCommand = new RelayCommand(parameter =>
         {
-            if (ResolveUnit(parameter) is { } unit)
+            if (ResolveUnit(parameter) is { CanContinue: true } unit)
             {
                 OpenWizard(unit.UnitId, unit.SourceDisplayName, intakeSummary: null);
             }
@@ -620,30 +620,29 @@ public sealed class ImportViewModel : ScreenStateViewModel, IDisposable
     /// <summary>Cancelling the durable import is its own explicit action, separate from closing the overlay.</summary>
     public async Task<ImportCancellationOutcome?> CancelUnitAsync(Guid unitId)
     {
-        if (_controlAuthority is null)
+        if (_controlAuthority is null || _activity is null || !_activity.TryBeginCancellation(unitId))
         {
             return null;
         }
 
-        var unit = _units.FirstOrDefault(item => item.UnitId == unitId);
-        unit?.BeginPendingControl(ImportPendingControl.Cancelling);
-
-        if (Wizard?.UnitId == unitId)
-        {
-            CloseWizard(Wizard);
-        }
-
         try
         {
+            IntakeStatusMessage = null;
+            if (Wizard?.UnitId == unitId)
+            {
+                CloseWizard(Wizard);
+            }
+
             var outcome = await _controlAuthority.CancelAsync(unitId, RouteCancellationToken);
             LastCancellationOutcome = outcome;
             IntakeStatusMessage = outcome.UserMessage;
-            _activity?.RequestRefresh();
+            await _activity.RefreshNowAsync(RouteCancellationToken);
             return outcome;
         }
         finally
         {
-            unit?.EndPendingControl();
+            _activity.EndCancellation(unitId);
+            _activity.RequestRefresh();
         }
     }
 
@@ -785,7 +784,6 @@ public enum ImportPendingControl
     None,
     Pausing,
     Starting,
-    Cancelling,
 }
 
 public sealed class ImportUnitItemViewModel : ObservableObject
@@ -802,17 +800,14 @@ public sealed class ImportUnitItemViewModel : ObservableObject
 
     public string SourceDisplayName => _item.SourceDisplayName;
 
-    public string StageText => _pendingControl switch
+    public string StageText => _item.Stage == ImportActivityStage.Cancelling ? _item.StageText : _pendingControl switch
     {
         ImportPendingControl.Pausing => "Pausing…",
         ImportPendingControl.Starting => "Starting…",
-        ImportPendingControl.Cancelling => "Cancelling…",
         _ => _item.StageText,
     };
 
-    public string DetailText => _pendingControl == ImportPendingControl.Cancelling
-        ? "Stopping new work and finishing safely…"
-        : _item.DetailText;
+    public string DetailText => _item.DetailText;
 
     public string? ProgressText => _item.ProgressText;
 
@@ -846,7 +841,8 @@ public sealed class ImportUnitItemViewModel : ObservableObject
 
     public bool CanStart => _pendingControl == ImportPendingControl.None && _item.CanStart;
 
-    public bool ShowTransportControls => _pendingControl != ImportPendingControl.None || _item.ShowTransportControls;
+    public bool ShowTransportControls => _item.Stage != ImportActivityStage.Cancelling
+        && (_pendingControl != ImportPendingControl.None || _item.ShowTransportControls);
 
     public bool IsPriority => _item.IsPriority;
 

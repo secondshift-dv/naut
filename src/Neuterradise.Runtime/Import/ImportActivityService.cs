@@ -24,6 +24,8 @@ public enum ImportActivityStage
     Paused,
     NeedsAttention,
     Cancelled,
+    Cancelling,
+    CleanupPending,
 }
 
 /// <summary>
@@ -101,6 +103,11 @@ public sealed record ImportActivitySnapshot(IReadOnlyList<ImportActivityItem> It
                     : SurfaceText.Format("Import.Headline.ManyAttention", "{0} imports need attention", AttentionCount);
             }
 
+            if (Items.Any(item => item.Stage == ImportActivityStage.Cancelling))
+            {
+                return SurfaceText.Get("Import.Stage.Cancelling", "Cancelling…");
+            }
+
             if (ActiveCount > 0)
             {
                 return ActiveCount == 1
@@ -124,6 +131,7 @@ public sealed record ImportActivitySnapshot(IReadOnlyList<ImportActivityItem> It
         get
         {
             var leader = Items.FirstOrDefault(item => item.NeedsAttention)
+                ?? Items.FirstOrDefault(item => item.Stage == ImportActivityStage.Cancelling)
                 ?? Items.FirstOrDefault(item => item.IsPriority && item.IsActive)
                 ?? Items.FirstOrDefault(item => item.IsActive)
                 ?? Items.FirstOrDefault(item => item.CanContinue);
@@ -170,6 +178,8 @@ public sealed class ImportActivityService : IAsyncDisposable
 
     private Task? _loop;
     private TaskCompletionSource _wake = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly HashSet<Guid> _cancelling = [];
+    private ImportActivitySnapshot _durableSnapshot = ImportActivitySnapshot.Empty;
     private ImportActivitySnapshot _current = ImportActivitySnapshot.Empty;
     private int _disposed;
     private long _pollCount;
@@ -398,7 +408,7 @@ public sealed class ImportActivityService : IAsyncDisposable
         ImportActivityStage stage;
         if (cancelled)
         {
-            stage = cleanupPending ? ImportActivityStage.NeedsAttention : ImportActivityStage.Cancelled;
+            stage = cleanupPending ? ImportActivityStage.CleanupPending : ImportActivityStage.Cancelled;
         }
         else if (committed && attentionCount > 0)
         {
@@ -455,7 +465,7 @@ public sealed class ImportActivityService : IAsyncDisposable
             etaText = activity.ObserveEta(unit.UnitId, stage, progress);
         }
 
-        var progressText = duplicateOnlySettled
+        var progressText = cancelled || duplicateOnlySettled
             ? null
             : TimelineProgressText(
                 timelineStage,
@@ -511,7 +521,7 @@ public sealed class ImportActivityService : IAsyncDisposable
             stage,
             stageText,
             detailText,
-            duplicateOnlySettled || stage is ImportActivityStage.WaitingForProfile or ImportActivityStage.ReadyToVerify ? null : fraction,
+            cancelled || duplicateOnlySettled || stage is ImportActivityStage.WaitingForProfile or ImportActivityStage.ReadyToVerify ? null : fraction,
             IsIndeterminate: stage == ImportActivityStage.Reading && unit.TotalItemCount == 0,
             IsActive: isActive,
             IsTerminal: isTerminal,
@@ -532,8 +542,8 @@ public sealed class ImportActivityService : IAsyncDisposable
                         or ImportUnitState.Cancelled)),
             CanPause: isActive && !isReadyToVerify && !unit.IsPaused && unit.State != ImportUnitState.Committing,
             CanPrioritize: isActive && !isReadyToVerify && !isPriority && unit.State != ImportUnitState.Committing,
-            CanStart: unit.IsPaused && !committed && !duplicateOnly,
-            ShowTransportControls: !duplicateOnly
+            CanStart: unit.IsPaused && !cancelled && !committed && !duplicateOnly,
+            ShowTransportControls: !cancelled && !duplicateOnly
                 && ((isActive && !isReadyToVerify && unit.State != ImportUnitState.Committing) || unit.IsPaused),
             IsPriority: isPriority,
             TransportTooltip: isPriority
@@ -874,10 +884,39 @@ public sealed class ImportActivityService : IAsyncDisposable
         return message;
     }
 
-    private void Publish(ImportActivitySnapshot snapshot)
+    internal bool TryBeginCancellation(Guid unitId)
     {
         lock (_sync)
         {
+            if (!_cancelling.Add(unitId)) return false;
+        }
+
+        Publish();
+        return true;
+    }
+
+    internal void EndCancellation(Guid unitId)
+    {
+        lock (_sync)
+        {
+            _cancelling.Remove(unitId);
+        }
+
+        Publish();
+    }
+
+    private void Publish(ImportActivitySnapshot? durableSnapshot = null)
+    {
+        ImportActivitySnapshot snapshot;
+        lock (_sync)
+        {
+            if (durableSnapshot is not null) _durableSnapshot = durableSnapshot;
+
+            snapshot = _cancelling.Count == 0
+                ? _durableSnapshot
+                : new ImportActivitySnapshot(_durableSnapshot.Items
+                    .Select(item => _cancelling.Contains(item.UnitId) ? ProjectCancellation(item) : item)
+                    .ToList());
             if (SnapshotsMatch(_current, snapshot))
             {
                 return;
@@ -889,13 +928,41 @@ public sealed class ImportActivityService : IAsyncDisposable
         Interlocked.Increment(ref _publishCount);
         if (_dispatcher is null || ReferenceEquals(SynchronizationContext.Current, _dispatcher))
         {
-            Changed?.Invoke(this, snapshot);
+            NotifyCurrent();
         }
         else
         {
-            _dispatcher.Post(_ => Changed?.Invoke(this, snapshot), null);
+            _dispatcher.Post(_ => NotifyCurrent(), null);
+        }
+
+        void NotifyCurrent()
+        {
+            if (ReferenceEquals(Current, snapshot)) Changed?.Invoke(this, snapshot);
         }
     }
+
+    private static ImportActivityItem ProjectCancellation(ImportActivityItem item) => item with
+    {
+        Stage = ImportActivityStage.Cancelling,
+        StageText = SurfaceText.Get("Import.Stage.Cancelling", "Cancelling…"),
+        DetailText = SurfaceText.Get("Import.CancelRequested", "Cancellation requested. Work will stop when safe."),
+        Progress = null,
+        ProgressText = null,
+        IsIndeterminate = false,
+        IsActive = true,
+        IsTerminal = false,
+        NeedsAttention = false,
+        CanContinue = false,
+        CanRetry = false,
+        CanCancel = false,
+        CanClearHistory = false,
+        CanPause = false,
+        CanPrioritize = false,
+        CanStart = false,
+        ShowTransportControls = false,
+        IsPriority = false,
+        CanOpenProfile = false,
+    };
 
     /// <summary>
     /// Equality that ignores the persisted "updated at" instant: an import writes it constantly while
