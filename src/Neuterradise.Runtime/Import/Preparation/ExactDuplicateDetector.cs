@@ -33,15 +33,14 @@ public sealed record ExactDuplicateMatch(
 public sealed record ExactDuplicateResult(
     bool IsExactDuplicate,
     ExactDuplicateMatchKind MatchKind,
-    ExactDuplicateMatch? Match,
-    IReadOnlyList<ExactDuplicateMatch> AllMatches)
+    ExactDuplicateMatch? Match)
 {
     public bool IsLibraryReuseEligible => MatchKind == ExactDuplicateMatchKind.ActiveDuplicate;
     public bool IsCandidateDuplicate => MatchKind == ExactDuplicateMatchKind.CandidateDuplicate;
     public bool IsTrashedDuplicate => MatchKind == ExactDuplicateMatchKind.TrashedDuplicate;
 
     public static ExactDuplicateResult None { get; } =
-        new(false, ExactDuplicateMatchKind.None, null, Array.Empty<ExactDuplicateMatch>());
+        new(false, ExactDuplicateMatchKind.None, null);
 }
 
 public sealed class ExactDuplicateDetector
@@ -122,7 +121,8 @@ public sealed class ExactDuplicateDetector
                  ELSE 2 
                END),
                a.added_to_library_at_ms ASC,
-               a.created_at_ms ASC;
+               a.created_at_ms ASC, a.media_id ASC
+            LIMIT 1;
             """;
         command.Parameters.AddWithValue("$bundleSha", (object?)normalizedBundleSha ?? DBNull.Value);
         command.Parameters.AddWithValue("$sha256", normalizedSha);
@@ -135,63 +135,30 @@ public sealed class ExactDuplicateDetector
             "$excludeMediaId",
             excludeMediaId.HasValue ? DbGuid.Format(excludeMediaId.Value) : DBNull.Value);
 
-        var matches = new List<ExactDuplicateMatch>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-        {
-            var assetId = DbGuid.Parse(reader.GetString(0));
-            var state = DbEnum.ParseMediaState(reader.GetString(1));
-            var len = reader.GetInt64(2);
-            var hash = reader.GetString(3);
-            var fileName = reader.IsDBNull(4) ? null : reader.GetString(4);
-            var relPath = reader.IsDBNull(5) ? null : reader.GetString(5);
-            var ownerProfileId = reader.IsDBNull(6) ? (Guid?)null : DbGuid.Parse(reader.GetString(6));
-            var ownerName = reader.IsDBNull(7) ? null : reader.GetString(7);
-            var candidateUnitId = reader.IsDBNull(8) ? (Guid?)null : DbGuid.Parse(reader.GetString(8));
-            var candidateSourcePath = reader.IsDBNull(9) ? null : reader.GetString(9);
-
-            matches.Add(new ExactDuplicateMatch(
-                assetId,
-                state,
-                len,
-                hash,
-                fileName,
-                relPath,
-                ownerProfileId,
-                ownerName,
-                candidateUnitId,
-                candidateSourcePath));
-        }
-
-        if (matches.Count == 0)
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             return ExactDuplicateResult.None;
         }
 
-        var activeMatch = matches.FirstOrDefault(m => m.MediaState == MediaState.Active);
-        if (activeMatch is not null)
+        var state = DbEnum.ParseMediaState(reader.GetString(1));
+        var match = new ExactDuplicateMatch(
+            DbGuid.Parse(reader.GetString(0)),
+            state,
+            reader.GetInt64(2),
+            reader.GetString(3),
+            reader.IsDBNull(4) ? null : reader.GetString(4),
+            reader.IsDBNull(5) ? null : reader.GetString(5),
+            reader.IsDBNull(6) ? null : DbGuid.Parse(reader.GetString(6)),
+            reader.IsDBNull(7) ? null : reader.GetString(7),
+            reader.IsDBNull(8) ? null : DbGuid.Parse(reader.GetString(8)),
+            reader.IsDBNull(9) ? null : reader.GetString(9));
+        var kind = state switch
         {
-            return new ExactDuplicateResult(
-                IsExactDuplicate: true,
-                MatchKind: ExactDuplicateMatchKind.ActiveDuplicate,
-                Match: activeMatch,
-                AllMatches: matches);
-        }
-
-        var candidateMatch = matches.FirstOrDefault(m => m.MediaState == MediaState.Candidate);
-        if (candidateMatch is not null)
-        {
-            return new ExactDuplicateResult(
-                IsExactDuplicate: true,
-                MatchKind: ExactDuplicateMatchKind.CandidateDuplicate,
-                Match: candidateMatch,
-                AllMatches: matches);
-        }
-
-        return new ExactDuplicateResult(
-            IsExactDuplicate: true,
-            MatchKind: ExactDuplicateMatchKind.TrashedDuplicate,
-            Match: matches[0],
-            AllMatches: matches);
+            MediaState.Active => ExactDuplicateMatchKind.ActiveDuplicate,
+            MediaState.Candidate => ExactDuplicateMatchKind.CandidateDuplicate,
+            _ => ExactDuplicateMatchKind.TrashedDuplicate,
+        };
+        return new ExactDuplicateResult(true, kind, match);
     }
 }

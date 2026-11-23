@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Neuterradise.App.Import;
 using Neuterradise.App.Import.Intake;
+using Neuterradise.App.Import.Verification;
 using Neuterradise.App.Presentation;
 using Neuterradise.App.Profiles;
 using Neuterradise.App.Shell;
@@ -1565,107 +1566,166 @@ public sealed class ImportSurface : Surface
             });
         }
 
+        const int reviewPageSize = 24;
         var problems = UI.V(8);
-        void RenderProblems()
-        {
-            problems.Children.Clear();
-            problems.Visibility = wizard.HasProblems ? Visibility.Visible : Visibility.Collapsed;
-            if (!wizard.HasProblems)
-            {
-                return;
-            }
-
-            problems.Children.Add(UI.V(
-                2,
-                UI.Text(UI.T("Import.Problems", "Review required"), "body-strong"),
-                UI.Text(
-                    UI.T("Import.Problems.Description", "Fix these issues to continue."),
-                    "caption",
-                    "textSecondary",
-                    3)));
-
-            if (wizard.HasPreparationPending)
-            {
-                problems.Children.Add(UI.Surface(UI.V(6,
+        var cards = UI.V(8);
+        var pageLabel = UI.Text(string.Empty, "caption");
+        var page = 0;
+        var previous = UI.Button(UI.T("Common.Previous", "Previous"), null);
+        var next = UI.Button(UI.T("Common.Next", "Next"), null);
+        var pager = UI.H(8, previous, pageLabel, next);
+        var pending = UI.Surface(UI.V(6,
                     UI.Text(UI.T("Import.PreparationRetrying", "Preparing media again…"), "body-strong"),
                     UI.Text(UI.T(
                         "Import.PreparationRetryingDetail",
                         "naut is preparing the media again. You can continue when it is ready."),
                         "caption",
                         maxLines: 3)),
-                    Material.Raised, 12, 12));
+                    Material.Raised, 12, 12);
+        problems.Children.Add(UI.V(
+            2,
+            UI.Text(UI.T("Import.Problems", "Review required"), "body-strong"),
+            UI.Text(UI.T("Import.Problems.Description", "Fix these issues to continue."), "caption", "textSecondary", 3)));
+        problems.Children.Add(pending);
+        problems.Children.Add(cards);
+        problems.Children.Add(pager);
+
+        var realized = new Dictionary<object, FrameworkElement>();
+        var renderQueued = false;
+        var retired = false;
+        void QueueRender()
+        {
+            if (retired || renderQueued) return;
+            renderQueued = problems.DispatcherQueue.TryEnqueue(() =>
+            {
+                renderQueued = false;
+                if (!retired) RenderProblems();
+            });
+        }
+
+        void RenderProblems()
+        {
+            problems.Visibility = wizard.HasProblems ? Visibility.Visible : Visibility.Collapsed;
+            pending.Visibility = wizard.HasPreparationPending ? Visibility.Visible : Visibility.Collapsed;
+            var preparations = wizard.PreparationProblems;
+            var duplicates = wizard.DuplicateProblems;
+            var collisions = wizard.ProfileCollisionProblems;
+            var total = preparations.Count + duplicates.Count + collisions.Count;
+            var pageCount = Math.Max(1, (total + reviewPageSize - 1) / reviewPageSize);
+            page = Math.Clamp(page, 0, pageCount - 1);
+            previous.IsEnabled = page > 0;
+            next.IsEnabled = page + 1 < pageCount;
+            pager.Visibility = pageCount > 1 ? Visibility.Visible : Visibility.Collapsed;
+            pageLabel.Text = UI.F("Customize.MediaPage", "{0} / {1}", page + 1, pageCount);
+
+            var start = page * reviewPageSize;
+            var visible = new List<object>(reviewPageSize);
+            for (var index = start; index < Math.Min(total, start + reviewPageSize); index++)
+            {
+                var afterPreparation = index - preparations.Count;
+                visible.Add(afterPreparation < 0 ? preparations[index]
+                    : afterPreparation < duplicates.Count ? duplicates[afterPreparation]
+                    : collisions[afterPreparation - duplicates.Count]);
             }
 
-            foreach (var problem in wizard.PreparationProblems)
+            var active = visible.ToHashSet();
+            foreach (var stale in realized.Keys.Where(key => !active.Contains(key)).ToArray())
             {
-                var failure = problem.Failures.FirstOrDefault();
-                var actions = UI.H(8);
-                if (!problem.MissingDependencies)
+                cards.Children.Remove(realized[stale]);
+                realized.Remove(stale);
+            }
+
+            for (var index = 0; index < visible.Count; index++)
+            {
+                var problem = visible[index];
+                if (!realized.TryGetValue(problem, out var card))
                 {
-                    actions.Children.Add(UI.Button(UI.T("Import.PreparationRetry", "Try again"), null,
-                        ButtonKind.Primary, command: wizard.RetryPreparationCommand, parameter: problem));
+                    card = problem switch
+                    {
+                        VerificationPreparationProblem item => PreparationCard(item),
+                        VerificationDuplicateProblem item => DuplicateCard(item),
+                        VerificationProfileCollisionProblem item => CollisionCard(item),
+                        _ => throw new InvalidOperationException("Unknown import review item."),
+                    };
+                    realized.Add(problem, card);
                 }
-                actions.Children.Add(UI.Button(UI.T("Import.Duplicate.Remove", "Remove from this import"), null,
-                    ButtonKind.Ghost, command: wizard.RemovePreparationItemCommand, parameter: problem));
-                problems.Children.Add(UI.Surface(UI.V(6,
-                    UI.Text(UI.T("Import.PreparationFailed", "Some media needs attention"), "body-strong"),
-                    UI.Text(problem.SourceFileName, "caption", maxLines: 2),
-                    UI.Text(
-                        problem.MissingDependencies
-                            ? UI.T("Import.MissingModelDependencies", "This model is missing one or more material or texture files.")
-                            : string.IsNullOrWhiteSpace(failure?.ErrorDetailSafe)
-                            ? UI.T(
-                                "Import.PreparationFailedDetail",
-                                "naut could not prepare everything needed for this import. Try again or cancel the import.")
-                            : failure.ErrorDetailSafe,
-                        "caption",
-                        "textSecondary",
-                        3),
-                    UI.Text(
-                        string.IsNullOrWhiteSpace(failure?.ErrorCode)
-                            ? string.Empty
-                            : $"{failure.Capability}: {failure.ErrorCode}",
-                        "caption",
-                        "textSecondary",
-                        2),
-                    actions),
-                    Material.Raised, 12, 12));
-            }
 
-            foreach (var problem in wizard.DuplicateProblems)
-            {
-                var owner = string.IsNullOrWhiteSpace(problem.ExistingProfileName)
-                    ? UI.T("Import.ExistingLibraryMedia", "Existing Vault media")
-                    : problem.ExistingProfileName;
-                problems.Children.Add(UI.Surface(UI.V(6,
-                    GatePreview(problem.PreviewImagePath),
-                    UI.Text(UI.T("Import.AlreadyInLibrary", "Already in Vault"), "body-strong"),
-                    UI.Text($"{problem.SourceFileName} · {owner}", "caption", maxLines: 2),
-                    UI.Wrap(6,
-                        UI.Button(UI.T("Import.Duplicate.Continue", "Continue in destination"), null, ButtonKind.Primary, command: wizard.ResolveDuplicateReuseCommand, parameter: problem),
-                        UI.Button(UI.T("Import.Duplicate.Remove", "Remove from this import"), null, ButtonKind.Ghost, command: wizard.ResolveDuplicateSkipCommand, parameter: problem))),
-                    Material.Raised, 12, 12));
-            }
-
-            foreach (var problem in wizard.ProfileCollisionProblems)
-            {
-                problems.Children.Add(UI.Surface(UI.V(6,
-                    GatePreview(problem.PreviewImagePath),
-                    UI.Text(UI.T("Import.ProfileCollision", "Recognized as another Profile"), "body-strong"),
-                    UI.Text($"{problem.SourceFileName} · Strong match: {problem.CandidateProfileName}", "caption", maxLines: 2),
-                    UI.Wrap(6,
-                        UI.Button($"Continue {wizard.DestinationDisplayName}", null, ButtonKind.Primary, command: wizard.KeepCollisionCommand, parameter: problem),
-                        UI.Button($"Move to {problem.CandidateProfileName}", null, ButtonKind.Secondary, command: wizard.MoveCollisionCommand, parameter: problem),
-                        UI.Button(UI.T("Import.Collision.Skip", "Cancel this media"), null, ButtonKind.Ghost, command: wizard.SkipCollisionCommand, parameter: problem))),
-                    Material.Raised, 12, 12));
+                var currentIndex = cards.Children.IndexOf(card);
+                if (currentIndex == index) continue;
+                if (currentIndex >= 0) cards.Children.RemoveAt(currentIndex);
+                cards.Children.Insert(index, card);
             }
         }
-        lifetime.Add(Observe.Collection(wizard.DuplicateProblems, RenderProblems));
-        lifetime.Add(Observe.Collection(wizard.ProfileCollisionProblems, RenderProblems));
-        lifetime.Add(Observe.Collection(wizard.PreparationProblems, RenderProblems));
+        FrameworkElement PreparationCard(VerificationPreparationProblem problem)
+        {
+            var failure = problem.Failures.FirstOrDefault();
+            var actions = UI.H(8);
+            if (!problem.MissingDependencies)
+            {
+                actions.Children.Add(UI.Button(UI.T("Import.PreparationRetry", "Try again"), null,
+                    ButtonKind.Primary, command: wizard.RetryPreparationCommand, parameter: problem));
+            }
+            actions.Children.Add(UI.Button(UI.T("Import.Duplicate.Remove", "Remove from this import"), null,
+                ButtonKind.Ghost, command: wizard.RemovePreparationItemCommand, parameter: problem));
+            return UI.Surface(UI.V(6,
+                UI.Text(UI.T("Import.PreparationFailed", "Some media needs attention"), "body-strong"),
+                UI.Text(problem.SourceFileName, "caption", maxLines: 2),
+                UI.Text(
+                    problem.MissingDependencies
+                        ? UI.T("Import.MissingModelDependencies", "This model is missing one or more material or texture files.")
+                        : string.IsNullOrWhiteSpace(failure?.ErrorDetailSafe)
+                        ? UI.T(
+                            "Import.PreparationFailedDetail",
+                            "naut could not prepare everything needed for this import. Try again or cancel the import.")
+                        : failure.ErrorDetailSafe,
+                    "caption",
+                    "textSecondary",
+                    3),
+                UI.Text(
+                    string.IsNullOrWhiteSpace(failure?.ErrorCode)
+                        ? string.Empty
+                        : $"{failure.Capability}: {failure.ErrorCode}",
+                    "caption",
+                    "textSecondary",
+                    2),
+                actions),
+                Material.Raised, 12, 12);
+        }
+        FrameworkElement DuplicateCard(VerificationDuplicateProblem problem)
+        {
+            var owner = string.IsNullOrWhiteSpace(problem.ExistingProfileName)
+                ? UI.T("Import.ExistingLibraryMedia", "Existing Vault media")
+                : problem.ExistingProfileName;
+            return UI.Surface(UI.V(6,
+                GatePreview(problem.PreviewImagePath),
+                UI.Text(UI.T("Import.AlreadyInLibrary", "Already in Vault"), "body-strong"),
+                UI.Text($"{problem.SourceFileName} · {owner}", "caption", maxLines: 2),
+                UI.Wrap(6,
+                    UI.Button(UI.T("Import.Duplicate.Continue", "Continue in destination"), null, ButtonKind.Primary, command: wizard.ResolveDuplicateReuseCommand, parameter: problem),
+                    UI.Button(UI.T("Import.Duplicate.Remove", "Remove from this import"), null, ButtonKind.Ghost, command: wizard.ResolveDuplicateSkipCommand, parameter: problem))),
+                Material.Raised, 12, 12);
+        }
+        FrameworkElement CollisionCard(VerificationProfileCollisionProblem problem)
+        {
+            return UI.Surface(UI.V(6,
+                GatePreview(problem.PreviewImagePath),
+                UI.Text(UI.T("Import.ProfileCollision", "Recognized as another Profile"), "body-strong"),
+                UI.Text($"{problem.SourceFileName} · Strong match: {problem.CandidateProfileName}", "caption", maxLines: 2),
+                UI.Wrap(6,
+                    UI.Button($"Continue {wizard.DestinationDisplayName}", null, ButtonKind.Primary, command: wizard.KeepCollisionCommand, parameter: problem),
+                    UI.Button($"Move to {problem.CandidateProfileName}", null, ButtonKind.Secondary, command: wizard.MoveCollisionCommand, parameter: problem),
+                    UI.Button(UI.T("Import.Collision.Skip", "Cancel this media"), null, ButtonKind.Ghost, command: wizard.SkipCollisionCommand, parameter: problem))),
+                Material.Raised, 12, 12);
+        }
+        previous.Click += (_, _) => { page--; RenderProblems(); };
+        next.Click += (_, _) => { page++; RenderProblems(); };
+        lifetime.Add(() => retired = true);
+        lifetime.Add(Observe.Collection(wizard.DuplicateProblems, QueueRender));
+        lifetime.Add(Observe.Collection(wizard.ProfileCollisionProblems, QueueRender));
+        lifetime.Add(Observe.Collection(wizard.PreparationProblems, QueueRender));
         lifetime.Add(Observe.Props(
             wizard,
-            RenderProblems,
+            QueueRender,
             nameof(ImportWizardViewModel.HasProblems),
             nameof(ImportWizardViewModel.HasPreparationPending)));
         body.Children.Add(problems);

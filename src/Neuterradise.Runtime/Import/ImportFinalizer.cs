@@ -360,6 +360,12 @@ public sealed class ImportFinalizer : IAsyncDisposable
 
         if (model.CommitOperationId is null)
         {
+            if (draft.Destination.Kind == DestinationKind.ExistingNormal
+                && await _catalog.ImportWrites.SkipOwnedDuplicatesAsync(unitId, cancellationToken).ConfigureAwait(false))
+            {
+                return ImportFinalizeOutcome.Committed;
+            }
+
             // Completed Candidate transfer bytes remain in staging until required preparation
             // settles. Moving them into Profile ownership while a decoder is reading would
             // invalidate the job's input authority.
@@ -401,6 +407,10 @@ public sealed class ImportFinalizer : IAsyncDisposable
         var result = await _commitFactory().CommitCanonicalMediaAsync(unitId, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (result.LibraryCommitted)
         {
+            if (result.Checkpoint == ImportCommitCheckpoint.Terminal
+                && (await _reads.GetUnitSummaryAsync(unitId, cancellationToken).ConfigureAwait(false))?.State.IsUnitCommitted() == true)
+                return ImportFinalizeOutcome.Committed;
+
             // Final managed authority permits optional enrichment and reuses settled Candidate outputs.
             try
             {
@@ -526,7 +536,7 @@ public sealed class ImportFinalizer : IAsyncDisposable
                   AND NOT (j.kind = 'FaceAnalysis' AND (
                       j.error_code IS 'FACE_INPUT_INVALID' OR
                       ($explicitDestination = 1 AND COALESCE(j.error_code, '') IN (
-                          'FACE_ANALYSIS_FAILED', 'FACE_MODELS_UNAVAILABLE', 'FACE_WORKER_TIMEOUT',
+                          'FACE_ANALYSIS_FAILED', 'FACE_MODELS_UNAVAILABLE', 'FACE_MODEL_MISSING', 'FACE_WORKER_TIMEOUT',
                           'FACE_WORKER_DISCONNECTED', 'FACE_WORKER_UNAVAILABLE', 'FACE_WORKER_IO_FAILED'))
                   ))
             );
@@ -607,6 +617,19 @@ public sealed class ImportFinalizer : IAsyncDisposable
     {
         var items = await _reads.GetUnitItemsUnboundedAsync(unitId, cancellationToken).ConfigureAwait(false);
         var jobs = await _schedulerReads.GetJobsForImportUnitMediasAsync(unitId, cancellationToken).ConfigureAwait(false);
+        // The hash worker can have persisted a fingerprint before it settles transfer admission.
+        // Finalization must not retire that Candidate while the worker still owns it.
+        var unsettledHashes = jobs
+            .Where(job => job.Kind == "HashMedia" && job.State is not (JobState.Succeeded or JobState.FailedTerminal or JobState.Cancelled))
+            .Select(job => job.OwnerId)
+            .ToHashSet();
+        if (items.Any(item => item.CandidateMediaId is { } candidateId
+            && item.Disposition is ItemDisposition.Included or ItemDisposition.Reused
+            && unsettledHashes.Contains(candidateId)))
+        {
+            return new AdmissionResult(false);
+        }
+
         var fingerprints = await ReadFingerprintsAsync(unitId, cancellationToken).ConfigureAwait(false);
         var matches = await _reads.ListExactDuplicateMatchesAsync(unitId, cancellationToken).ConfigureAwait(false);
 
@@ -652,12 +675,48 @@ public sealed class ImportFinalizer : IAsyncDisposable
             .Where(static match => match.RequiresDecision || match.Decision == DuplicateDecision.Reuse)
             .Select(match => match.ImportItemId)
             .ToHashSet();
+        var skippedDuplicates = new HashSet<Guid>();
+        var fingerprintGroups = items
+            .Where(item => item is { Disposition: ItemDisposition.Included, DuplicateDecision: null, CandidateMediaId: not null }
+                && !reusedItems.Contains(item.ItemId)
+                && fingerprints.TryGetValue(item.CandidateMediaId.Value, out var identity)
+                && identity.Sha256 is not null && identity.ByteLength is not null)
+            .GroupBy(item => (item.MediaType, fingerprints[item.CandidateMediaId!.Value]));
+
+        foreach (var group in fingerprintGroups)
+        {
+            var verifiedCopy = group
+                .Where(item => transferJobs.GetValueOrDefault(item.CandidateMediaId!.Value)?.State == JobState.Succeeded)
+                .OrderBy(item => item.SourcePath, StringComparer.Ordinal).ThenBy(item => item.ItemId)
+                .FirstOrDefault();
+            if (verifiedCopy is not null)
+            {
+                foreach (var sibling in group)
+                {
+                    var job = transferJobs.GetValueOrDefault(sibling.CandidateMediaId!.Value);
+                    if (sibling.ItemId != verifiedCopy.ItemId && (job is null || job.State == JobState.Succeeded))
+                        skippedDuplicates.Add(sibling.ItemId);
+                }
+            }
+            else if (!group.Any(item => transferJobs.GetValueOrDefault(item.CandidateMediaId!.Value) is { } transfer
+                && transfer.State is not (JobState.FailedTerminal or JobState.Cancelled)))
+            {
+                // A sibling can be the next safe source if the original representative failed
+                // or the existing Vault match disappeared after hashing.
+                var next = group.FirstOrDefault(item => !transferJobs.ContainsKey(item.CandidateMediaId!.Value)
+                    && hashJobs.GetValueOrDefault(item.CandidateMediaId.Value)?.State == JobState.Succeeded);
+                if (next is not null)
+                    await _preparation.ScheduleIncludedTransferAsync(next.ItemId, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        await _operations.SkipDuplicateItemsAsync(skippedDuplicates.ToArray(), cancellationToken).ConfigureAwait(false);
         var setAside = new List<Guid>();
         var stillPreparing = false;
 
         foreach (var item in items)
         {
-            if (reusedItems.Contains(item.ItemId)
+            if (reusedItems.Contains(item.ItemId) || skippedDuplicates.Contains(item.ItemId)
                 || item.Disposition is ItemDisposition.Skipped or ItemDisposition.Reused)
             {
                 continue;
@@ -702,26 +761,6 @@ public sealed class ImportFinalizer : IAsyncDisposable
                 ItemDisposition.Skipped,
                 cancellationToken).ConfigureAwait(false);
             await RecordAttentionAsync(unitId, setAside, cancellationToken).ConfigureAwait(false);
-        }
-
-        if (!stillPreparing)
-        {
-            var duplicateItems = items
-                .Where(item => item is { Disposition: ItemDisposition.Included, DuplicateDecision: null, CandidateMediaId: not null }
-                    && !reusedItems.Contains(item.ItemId)
-                    && !setAside.Contains(item.ItemId)
-                    && transferJobs.TryGetValue(item.CandidateMediaId.Value, out var transfer)
-                    && transfer.State == JobState.Succeeded
-                    && fingerprints.TryGetValue(item.CandidateMediaId.Value, out var identity)
-                    && identity.Sha256 is not null && identity.ByteLength is not null)
-                .GroupBy(item => fingerprints[item.CandidateMediaId!.Value])
-                .SelectMany(group => group.OrderBy(static item => item.SourcePath, StringComparer.Ordinal)
-                    .ThenBy(static item => item.ItemId).Skip(1));
-            foreach (var duplicate in duplicateItems)
-            {
-                await _operations.ApplyDuplicateDecisionAsync(duplicate.ItemId, DuplicateDecision.Skip,
-                    cancellationToken: cancellationToken).ConfigureAwait(false);
-            }
         }
 
         return new AdmissionResult(!stillPreparing);

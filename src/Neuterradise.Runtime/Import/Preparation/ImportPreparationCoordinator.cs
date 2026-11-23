@@ -1,3 +1,5 @@
+using System.Buffers;
+using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using Neuterradise.App.Import.Verification;
@@ -52,25 +54,6 @@ public sealed class ImportPreparationCoordinator
         _schedulerReads = new SchedulerReads(catalog);
     }
 
-    private async Task<(string? Sha256, long? ByteLength)> ReadStoredFingerprintAsync(
-        Guid candidateMediaId,
-        CancellationToken cancellationToken)
-    {
-        await using var connection = await _catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT sha256, byte_length FROM media WHERE media_id = $id;";
-        command.Parameters.AddWithValue("$id", DbGuid.Format(candidateMediaId));
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-        {
-            return (null, null);
-        }
-
-        return (
-            reader.IsDBNull(0) ? null : reader.GetString(0),
-            reader.IsDBNull(1) ? null : reader.GetInt64(1));
-    }
-
     public async Task<Guid?> ReadCandidateMediaIdAsync(
         Guid importItemId,
         CancellationToken cancellationToken = default)
@@ -110,24 +93,58 @@ public sealed class ImportPreparationCoordinator
         var lastWriteMs = new DateTimeOffset(fileInfo.LastWriteTimeUtc).ToUnixTimeMilliseconds();
         string sha256;
         {
-            using (await ResourceGovernor.Shared.AcquireAsync(ResourceClass.DiskHeavy, cancellationToken).ConfigureAwait(false))
+            var governor = ResourceGovernor.Shared;
+            using (await governor.AcquireAsync(ResourceClass.DiskHeavy, cancellationToken).ConfigureAwait(false))
+            using (var disk = await governor.AcquireImportDiskAsync(item.SourcePath, null, cancellationToken).ConfigureAwait(false))
             await using (var stream = new FileStream(
                 item.SourcePath,
                 FileMode.Open,
                 FileAccess.Read,
                 FileShare.Read,
-                64 * 1024,
-                useAsync: true))
+                bufferSize: 1,
+                FileOptions.Asynchronous | FileOptions.SequentialScan))
             {
                 var identity = SourceIdentityHelper.CaptureIdentity(item.SourcePath);
                 if (identity is null || !SourceIdentityHelper.VerifyIdentity(
                         identity, stream.SafeFileHandle, item.SourcePath))
                     throw new InvalidOperationException("Source identity could not be established for duplicate investigation.");
-                var hashBytes = await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
+                var priority = disk.BulkPriority;
+                if (priority != DiskIoPriority.Normal) WindowsDiskTelemetry.SetPriority(stream.SafeFileHandle, priority);
+                using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+                const int readSize = 256 * 1024;
+                var buffer = ArrayPool<byte>.Shared.Rent(readSize);
+                try
+                {
+                    var budget = disk.BytesBetweenYields;
+                    while (true)
+                    {
+                        var started = Stopwatch.GetTimestamp();
+                        var read = await stream.ReadAsync(buffer.AsMemory(0, readSize), cancellationToken).ConfigureAwait(false);
+                        if (read == 0) break;
+                        governor.ReportTransferIoLatency(Stopwatch.GetElapsedTime(started));
+                        hash.AppendData(buffer, 0, read);
+                        budget -= read;
+                        if (budget <= 0)
+                        {
+                            await disk.YieldAsync(cancellationToken).ConfigureAwait(false);
+                            var updatedPriority = disk.BulkPriority;
+                            if (updatedPriority != priority)
+                            {
+                                WindowsDiskTelemetry.SetPriority(stream.SafeFileHandle, updatedPriority);
+                                priority = updatedPriority;
+                            }
+                            budget = disk.BytesBetweenYields;
+                        }
+                    }
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(buffer);
+                }
                 if (stream.Length != byteLength || !SourceIdentityHelper.VerifyIdentity(
                         identity, stream.SafeFileHandle, item.SourcePath))
                     throw new InvalidOperationException("Source changed during duplicate investigation.");
-                sha256 = Convert.ToHexStringLower(hashBytes);
+                sha256 = Convert.ToHexStringLower(hash.GetHashAndReset());
             }
 
             await _importWrites.UpdateCandidateFingerprintAsync(
@@ -157,9 +174,14 @@ public sealed class ImportPreparationCoordinator
 
         if (!dupResult.IsLibraryReuseEligible)
         {
-            await _jobWrites.CreateJobAsync(
-                CandidatePreparationPlan.CreateTransfer(importItemId, item.CandidateMediaId.Value),
-                cancellationToken).ConfigureAwait(false);
+            await using var mutation = await _catalog.ImportUnitMutations
+                .EnterAsync(item.UnitId, cancellationToken).ConfigureAwait(false);
+            if (!await HasSiblingTransferAsync(item.UnitId, item.CandidateMediaId.Value, cancellationToken).ConfigureAwait(false))
+            {
+                await _jobWrites.TryCreateImportAdmissionJobAsync(item.UnitId,
+                    CandidatePreparationPlan.CreateTransfer(importItemId, item.CandidateMediaId.Value),
+                    cancellationToken).ConfigureAwait(false);
+            }
         }
 
         return new CandidatePreparationResult(
@@ -169,6 +191,27 @@ public sealed class ImportPreparationCoordinator
             byteLength,
             dupResult.IsExactDuplicate,
             dupResult.Match);
+    }
+
+    private async Task<bool> HasSiblingTransferAsync(Guid unitId, Guid candidateId, CancellationToken cancellationToken)
+    {
+        await using var connection = await _catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"""
+            SELECT EXISTS (
+                SELECT 1 FROM media c
+                JOIN import_items item ON item.import_unit_id = $unit
+                JOIN media a ON a.media_id = item.candidate_media_id AND {ImportReads.ExactMediaIdentitySql}
+                JOIN jobs job ON job.owner_id = a.media_id AND job.owner_type = 'Media' AND job.kind = 'TransferOriginal'
+                WHERE c.media_id = $candidate AND c.media_id <> a.media_id AND c.media_type = a.media_type
+                  AND a.state = 'CANDIDATE' AND item.disposition = 'INCLUDED'
+                  AND (c.media_type <> 'MODEL' OR c.bundle_sha256 IS NOT NULL)
+                  AND job.state NOT IN ('FAILED_TERMINAL', 'CANCELLED')
+            );
+            """;
+        command.Parameters.AddWithValue("$unit", DbGuid.Format(unitId));
+        command.Parameters.AddWithValue("$candidate", DbGuid.Format(candidateId));
+        return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 1;
     }
 
     public async Task RecordTransferredCandidateAsync(
@@ -201,6 +244,8 @@ public sealed class ImportPreparationCoordinator
         CancellationToken cancellationToken)
     {
         if (item.MediaType != MediaType.Model) return null;
+        using var disk = await ResourceGovernor.Shared
+            .AcquireImportDiskAsync(item.SourcePath, null, cancellationToken).ConfigureAwait(false);
         var discovery = await Task.Run(
             () => ModelPackageDiscovery.Discover(item.SourcePath, sha256, byteLength), cancellationToken)
             .ConfigureAwait(false);
@@ -282,12 +327,16 @@ public sealed class ImportPreparationCoordinator
         }
 
         var items = await ReadAdmissionCandidatesAsync(unitId, cancellationToken).ConfigureAwait(false);
+        var repeatedLengths = items.Where(item => item.SourceByteLength.HasValue)
+            .GroupBy(item => item.SourceByteLength!.Value).Where(group => group.Skip(1).Any())
+            .Select(group => group.Key).ToHashSet();
         var existingTransfers = (await _schedulerReads.GetJobsForImportUnitMediasAsync(
             unitId, cancellationToken).ConfigureAwait(false))
             .Where(job => job.Kind == "TransferOriginal")
             .Select(job => job.OwnerId).ToHashSet();
         foreach (var item in items)
         {
+            await using var mutation = await _catalog.ImportUnitMutations.EnterAsync(unitId, cancellationToken).ConfigureAwait(false);
             if (existingTransfers.Contains(item.CandidateMediaId)) continue;
             var source = new FileInfo(item.SourcePath);
             JobDefinition? definition = null;
@@ -297,17 +346,19 @@ public sealed class ImportPreparationCoordinator
             }
             else
             {
-                var sameSizeActive = await _duplicateDetector.HasActiveWithLengthAsync(
-                    source.Length, item.CandidateMediaId, cancellationToken).ConfigureAwait(false);
-                var stored = await ReadStoredFingerprintAsync(item.CandidateMediaId, cancellationToken)
-                    .ConfigureAwait(false);
-                if (sameSizeActive && stored.Sha256 is null)
+                var needsHash = item.Sha256 is null && (repeatedLengths.Contains(source.Length)
+                    || (source.Length == item.SourceByteLength
+                        ? item.HasActiveWithLength
+                        : await _duplicateDetector.HasActiveWithLengthAsync(
+                            source.Length, item.CandidateMediaId, cancellationToken).ConfigureAwait(false)));
+                if (needsHash)
                 {
                     definition = CandidatePreparationPlan.Create(item.ImportItemId, item.CandidateMediaId, item.SourcePath).HashJob;
                 }
-                else if (stored.Sha256 is null || !(await _duplicateDetector.DetectDuplicateAsync(
-                             stored.Sha256, stored.ByteLength ?? -1, item.CandidateMediaId,
-                             cancellationToken: cancellationToken).ConfigureAwait(false)).IsLibraryReuseEligible)
+                else if (item.Sha256 is null || !(await _duplicateDetector.DetectDuplicateAsync(
+                             item.Sha256, item.ByteLength ?? -1, item.CandidateMediaId,
+                             item.BundleSha256, cancellationToken).ConfigureAwait(false)).IsLibraryReuseEligible
+                         && !await HasSiblingTransferAsync(unitId, item.CandidateMediaId, cancellationToken).ConfigureAwait(false))
                 {
                     definition = CandidatePreparationPlan.CreateTransfer(item.ImportItemId, item.CandidateMediaId);
                 }
@@ -334,7 +385,10 @@ public sealed class ImportPreparationCoordinator
         await using var command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT i.import_item_id, i.candidate_media_id, i.source_path
+            SELECT i.import_item_id, i.candidate_media_id, i.source_path, i.source_byte_length,
+                   a.sha256, a.byte_length, a.bundle_sha256,
+                   EXISTS (SELECT 1 FROM media active WHERE active.state = 'ACTIVE'
+                       AND active.byte_length = i.source_byte_length AND active.media_id <> a.media_id)
             FROM import_items i
             JOIN media a ON a.media_id = i.candidate_media_id
             WHERE i.import_unit_id = $unitId
@@ -351,7 +405,11 @@ public sealed class ImportPreparationCoordinator
             items.Add(new AdmissionCandidate(
                 DbGuid.Parse(reader.GetString(0)),
                 DbGuid.Parse(reader.GetString(1)),
-                reader.GetString(2)));
+                reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetInt64(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetInt64(5),
+                reader.IsDBNull(6) ? null : reader.GetString(6),
+                reader.GetBoolean(7)));
         }
 
         return items;
@@ -435,7 +493,12 @@ public sealed class ImportPreparationCoordinator
     private sealed record AdmissionCandidate(
         Guid ImportItemId,
         Guid CandidateMediaId,
-        string SourcePath);
+        string SourcePath,
+        long? SourceByteLength,
+        string? Sha256,
+        long? ByteLength,
+        string? BundleSha256,
+        bool HasActiveWithLength);
 
     private sealed record AdmissionCounts(int TotalCount, int PreparedCount);
 }

@@ -369,6 +369,8 @@ public sealed class ImportActivityService : IAsyncDisposable
         // publication boundary. After canonical commit, the import is still in preparation and must
         // show as active, not "Done".
         var committed = unit.State.IsUnitCommitted();
+        var allDuplicatesSkipped = unit.State == ImportUnitState.Completed
+            && unit.TotalItemCount > 0 && unit.SkippedCount == unit.TotalItemCount;
         var failed = unit.State is ImportUnitState.FailedRetryable or ImportUnitState.FailedTerminal;
         var cancelled = unit.State == ImportUnitState.Cancelled;
         var cleanupPending = cancelled && unit.RollbackSettled != true;
@@ -465,7 +467,7 @@ public sealed class ImportActivityService : IAsyncDisposable
             etaText = activity.ObserveEta(unit.UnitId, stage, progress);
         }
 
-        var progressText = cancelled || duplicateOnlySettled
+        var progressText = cancelled || duplicateOnlySettled || allDuplicatesSkipped
             ? null
             : TimelineProgressText(
                 timelineStage,
@@ -492,7 +494,7 @@ public sealed class ImportActivityService : IAsyncDisposable
 
         var title = stage switch
         {
-            ImportActivityStage.Done when destinationName is not null =>
+            ImportActivityStage.Done when !allDuplicatesSkipped && destinationName is not null =>
                 SurfaceText.Format("Import.Title.ImportedTo", "Added to {0}", destinationName),
             ImportActivityStage.Saving when destinationName is not null =>
                 SurfaceText.Format("Import.Title.ImportingTo", "Adding to {0}", destinationName),
@@ -503,11 +505,13 @@ public sealed class ImportActivityService : IAsyncDisposable
 
         var stageText = cleanupPending
             ? SurfaceText.Get("Import.Stage.CleanupPending", "Cleanup pending")
-            : duplicateOnlySettled
+            : duplicateOnlySettled || allDuplicatesSkipped
             ? SurfaceText.Get("Import.Stage.AlreadyInVault", "Already in your Vault")
             : DescribeStageWithImportPhase(unit, stage);
         var detailText = cleanupPending
             ? SurfaceText.Get("Import.Detail.CleanupPending", "Import has stopped. Complete cleanup before clearing this entry.")
+            : allDuplicatesSkipped
+            ? SurfaceText.Format("Import.Detail.AllDuplicatesSkipped", "0 new · {0} duplicates skipped", unit.TotalItemCount)
             : duplicateOnly
             && stage is not (ImportActivityStage.Done or ImportActivityStage.NeedsAttention or ImportActivityStage.Cancelled)
             ? SurfaceText.Get(
@@ -521,7 +525,7 @@ public sealed class ImportActivityService : IAsyncDisposable
             stage,
             stageText,
             detailText,
-            cancelled || duplicateOnlySettled || stage is ImportActivityStage.WaitingForProfile or ImportActivityStage.ReadyToVerify ? null : fraction,
+            cancelled || duplicateOnlySettled || allDuplicatesSkipped || stage is ImportActivityStage.WaitingForProfile or ImportActivityStage.ReadyToVerify ? null : fraction,
             IsIndeterminate: stage == ImportActivityStage.Reading && unit.TotalItemCount == 0,
             IsActive: isActive,
             IsTerminal: isTerminal,

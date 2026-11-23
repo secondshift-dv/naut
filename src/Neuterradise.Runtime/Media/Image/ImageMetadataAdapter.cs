@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Globalization;
+using System.IO.Compression;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using SkiaSharp;
@@ -8,6 +9,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Xml;
 using System.Xml.Linq;
+using Neuterradise.App.SystemServices.MediaTools;
+using Neuterradise.App.SystemServices.Resources;
 
 namespace Neuterradise.App.Media.Image;
 
@@ -42,7 +45,8 @@ public sealed record ImageMetadata(
     string? LocationName = null,
     string? Software = null,
     IReadOnlyDictionary<string, string>? RawTags = null,
-    IReadOnlyList<string>? Diagnostics = null)
+    IReadOnlyList<string>? Diagnostics = null,
+    bool IsAnimated = false)
 {
     public static ImageMetadata Empty { get; } = new();
 
@@ -67,7 +71,7 @@ public sealed class ImageMetadataAdapter
         WriteIndented = false
     };
 
-    public ImageMetadata ExtractFromFile(string filePath, string? formatHint = null)
+    public ImageMetadata ExtractFromFile(string filePath, string? formatHint = null, bool backgroundIo = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
         if (!File.Exists(filePath))
@@ -78,6 +82,7 @@ public sealed class ImageMetadataAdapter
         try
         {
             using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            if (backgroundIo) WindowsDiskTelemetry.SetPriority(stream.SafeFileHandle, DiskIoPriority.Low);
             var extension = (formatHint ?? Path.GetExtension(filePath)).TrimStart('.').ToUpperInvariant();
             return ExtractFromStream(stream, extension);
         }
@@ -85,6 +90,72 @@ public sealed class ImageMetadataAdapter
         {
             return new ImageMetadata(Diagnostics: [$"Failed to read image file: {ex.Message}"]);
         }
+    }
+
+    private static ImageMetadata ExtractJpegXl(FileStream stream)
+    {
+        var info = JpegXlDecoder.ReadInfo(stream);
+        var (orientation, degrees) = DecodeOrientation((ushort)info.Orientation);
+        var swapsAxes = info.Orientation >= 5;
+        var metadata = new ImageMetadata(Width: swapsAxes ? info.Height : info.Width,
+            Height: swapsAxes ? info.Width : info.Height, Format: "JPEG XL",
+            BitDepth: info.BitDepth);
+        var region = new MetadataRegion(stream, 0, stream.Length);
+        Span<byte> header = stackalloc byte[16];
+        if (!region.TryRead(0, header[..12]) || !JpegXlDecoder.HasSignature(header[..12])
+            || header[0] != 0)
+            return metadata with { Orientation = orientation, OrientationDegrees = degrees, IsAnimated = info.Animated };
+
+        Span<byte> type = stackalloc byte[4];
+        Span<byte> buffer = stackalloc byte[4096];
+        for (long offset = 12; region.TryRead(offset, header[..8]);)
+        {
+            var size = (long)BinaryPrimitives.ReadUInt32BigEndian(header);
+            var headerSize = 8;
+            header[4..8].CopyTo(type);
+            if (size == 1)
+            {
+                if (!region.TryRead(offset + 8, header[8..])) break;
+                size = BinaryPrimitives.ReadInt64BigEndian(header[8..]);
+                headerSize = 16;
+            }
+            if (size == 0) size = region.Length - offset;
+            if (size < headerSize || !region.Contains(offset, size)) break;
+
+            var box = region.Slice(offset + headerSize, size - headerSize);
+            if (type.SequenceEqual("brob"u8) && box.TryRead(0, type)
+                && (type.SequenceEqual("Exif"u8) || type.SequenceEqual("xml "u8))
+                && box.ReadMetadataValue(4, box.Length - 4) is { } compressed)
+            {
+                using var source = new MemoryStream(compressed, writable: false);
+                using var decompressor = new BrotliStream(source, CompressionMode.Decompress);
+                using var decompressed = new MemoryStream();
+                int read;
+                while ((read = decompressor.Read(buffer)) > 0
+                    && decompressed.Length + read <= MaximumMetadataValueBytes)
+                    decompressed.Write(buffer[..read]);
+                if (read == 0)
+                    metadata = MergeResults(metadata, ReadJpegXlMetadataBox(type,
+                        new MetadataRegion(decompressed, 0, decompressed.Length)), "JPEG XL");
+            }
+            else
+            {
+                metadata = MergeResults(metadata, ReadJpegXlMetadataBox(type, box), "JPEG XL");
+            }
+            offset += size;
+        }
+        return metadata with { Orientation = orientation, OrientationDegrees = degrees, IsAnimated = info.Animated };
+    }
+
+    private static ImageMetadata? ReadJpegXlMetadataBox(ReadOnlySpan<byte> type, MetadataRegion box)
+    {
+        if (box.Length > MaximumMetadataValueBytes) return null;
+        if (type.SequenceEqual("xml "u8)) return ParseXmp(box);
+        if (!type.SequenceEqual("Exif"u8)) return null;
+        Span<byte> prefix = stackalloc byte[4];
+        if (!box.TryRead(0, prefix)) return null;
+        var tiffOffset = 4L + BinaryPrimitives.ReadUInt32BigEndian(prefix);
+        return box.Contains(tiffOffset, 8) ? ParseTiffBinary(box.Slice(tiffOffset, box.Length - tiffOffset)) : null;
     }
 
     public unsafe ImageMetadata ExtractFromBytes(ReadOnlySpan<byte> bytes, string? hintFormat = null)
@@ -102,26 +173,21 @@ public sealed class ImageMetadataAdapter
     private static ImageMetadata ExtractFromStream(FileStream stream, string? hintFormat)
     {
         if (stream.Length == 0) return ImageMetadata.Empty;
+        Span<byte> header = stackalloc byte[12];
+        var count = stream.ReadAtLeast(header, header.Length, throwOnEndOfStream: false);
+        stream.Position = 0;
+        if (hintFormat == "JXL" || JpegXlDecoder.HasSignature(header[..count]))
+            return ExtractJpegXl(stream);
 
         // Skia's WebP decoder requires contiguous input and copies an ordinary stream.
         // A read-only mapping lets the codec inspect that input without reading it into a buffer.
-        if (NeedsContiguousCodecInput(stream))
+        if (count == header.Length && (IsWebP(header) || header[4..8].SequenceEqual("ftyp"u8)
+            || BinaryPrimitives.ReadUInt32LittleEndian(header) == 0x00010000))
         {
             return ExtractMapped(stream, hintFormat);
         }
 
         return Extract(stream, hintFormat);
-    }
-
-    private static bool NeedsContiguousCodecInput(FileStream stream)
-    {
-        Span<byte> header = stackalloc byte[12];
-        if (stream.Length < header.Length) return false;
-
-        stream.ReadExactly(header);
-        stream.Position = 0;
-        return IsWebP(header) || header[4..8].SequenceEqual("ftyp"u8)
-            || BinaryPrimitives.ReadUInt32LittleEndian(header) == 0x00010000;
     }
 
     private static unsafe ImageMetadata ExtractMapped(FileStream file, string? hintFormat)
@@ -800,8 +866,12 @@ public sealed class ImageMetadataAdapter
         val switch
         {
             1 => ("Normal (0\u00B0)", 0),
+            2 => ("Mirror horizontal", 0),
             3 => ("Rotate 180\u00B0", 180),
+            4 => ("Mirror vertical", 0),
+            5 => ("Mirror horizontal and rotate 270\u00B0 CW", 270),
             6 => ("Rotate 90\u00B0 CW", 90),
+            7 => ("Mirror horizontal and rotate 90\u00B0 CW", 90),
             8 => ("Rotate 270\u00B0 CW", 270),
             _ => ($"Orientation {val}", 0)
         };

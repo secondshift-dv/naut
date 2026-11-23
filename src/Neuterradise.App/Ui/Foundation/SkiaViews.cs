@@ -150,6 +150,7 @@ public sealed class SkImageView : SKCanvasElement
     private ImageRef? _source;
     private SKImage? _image;
     private ImageLease? _imageLease;
+    private SKImage? _animationFrame;
     private MediaTransformState _transform = MediaTransformState.Default;
     private double _cornerRadius;
     private bool _circle;
@@ -161,7 +162,11 @@ public sealed class SkImageView : SKCanvasElement
     {
         IsHitTestVisible = false;
         Loaded += (_, _) => EnsureImage();
-        Unloaded += (_, _) => ReleaseImage();
+        Unloaded += (_, _) =>
+        {
+            ReleaseImage();
+            SetAnimationFrame(null);
+        };
     }
 
     public ImageRef? Source
@@ -176,6 +181,7 @@ public sealed class SkImageView : SKCanvasElement
 
             _source = value;
             ReleaseImage();
+            SetAnimationFrame(null);
             ++_generation;
             EnsureImage();
         }
@@ -241,6 +247,13 @@ public sealed class SkImageView : SKCanvasElement
     public bool HasImage => _image is not null;
 
     public Size ImagePixelSize => _image is null ? default : new Size(_image.Width, _image.Height);
+
+    public void SetAnimationFrame(SKImage? frame)
+    {
+        _animationFrame?.Dispose();
+        _animationFrame = frame;
+        Invalidate();
+    }
 
     private async Task LoadAsync(ImageRef reference, int generation)
     {
@@ -316,7 +329,8 @@ public sealed class SkImageView : SKCanvasElement
             canvas.ClipRoundRect(new SKRoundRect(rect, (float)_cornerRadius), antialias: true);
         }
 
-        if (_image is null)
+        var currentImage = _animationFrame ?? _image;
+        if (currentImage is null)
         {
             using var shader = SKShader.CreateLinearGradient(
                 new SKPoint(0, 0), new SKPoint(rect.Width, rect.Height),
@@ -328,7 +342,7 @@ public sealed class SkImageView : SKCanvasElement
             return;
         }
 
-        var placement = _transform.Place(_image.Width, _image.Height, rect.Width, rect.Height);
+        var placement = _transform.Place(currentImage.Width, currentImage.Height, rect.Width, rect.Height);
         using (var paint = new SKPaint { IsAntialias = true })
         {
             using var blurFilter = _blur > 0
@@ -343,7 +357,7 @@ public sealed class SkImageView : SKCanvasElement
             }
 
             var destination = SKRect.Create((float)placement.TranslateX, (float)placement.TranslateY, (float)placement.Width, (float)placement.Height);
-            canvas.DrawImage(_image, destination, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear), paint);
+            canvas.DrawImage(currentImage, destination, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear), paint);
             canvas.Restore();
         }
 

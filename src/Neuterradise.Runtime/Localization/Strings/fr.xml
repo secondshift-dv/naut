@@ -708,6 +708,7 @@
     <sys:String x:Key="Import.Detail.Added">{0} ajouté à votre Vault.</sys:String>
     <sys:String x:Key="Import.Detail.WithDuplicates">{0} · {1} déjà dans votre Vault</sys:String>
     <sys:String x:Key="Import.Stage.AlreadyInVault">Déjà dans votre Vault</sys:String>
+    <sys:String x:Key="Import.Detail.AllDuplicatesSkipped">0 nouveau · {0} doublons ignorés</sys:String>
     <sys:String x:Key="Import.Detail.DuplicateOnly">Déjà dans votre Vault — le média existant sera réutilisé au lieu d’importer une autre copie.</sys:String>
     <sys:String x:Key="Import.ReviewBanner.One">1 importation est prête à être examinée</sys:String>
     <sys:String x:Key="Import.ReviewBanner.Many">Les importations {0} sont prêtes à être examinées</sys:String>
@@ -1204,6 +1205,10 @@
     <sys:String x:Key="Import.Title.ImportedTo">Ajouté à {0}</sys:String>
     <sys:String x:Key="Import.Title.ImportingTo">Ajout à {0}</sys:String>
     <sys:String x:Key="Inspector.ActualSize">Taille réelle</sys:String>
+    <sys:String x:Key="Inspector.PlayAnimation">Lire l&apos;animation</sys:String>
+    <sys:String x:Key="Inspector.StopAnimation">Arrêter l&apos;animation</sys:String>
+    <sys:String x:Key="Inspector.Animation">Animation</sys:String>
+    <sys:String x:Key="Inspector.AnimationUnavailable">Impossible de lire cette animation.</sys:String>
     <sys:String x:Key="Inspector.AddAssociation">Ajouter une association de personne</sys:String>
     <sys:String x:Key="Inspector.AddAssociationPrompt">Choisissez un Profile qui apparaît dans cet élément multimédia :</sys:String>
     <sys:String x:Key="Inspector.Associations">Associations</sys:String>

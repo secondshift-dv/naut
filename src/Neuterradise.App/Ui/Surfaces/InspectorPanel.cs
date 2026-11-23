@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.IO;
 using Microsoft.UI.Xaml;
 using ToggleButton = Microsoft.UI.Xaml.Controls.Primitives.ToggleButton;
 using Microsoft.UI.Xaml.Controls;
@@ -11,6 +12,9 @@ using Neuterradise.App.Presentation;
 using Neuterradise.App.Profiles;
 using Neuterradise.App.Shell;
 using Neuterradise.App.SystemServices.Resources;
+using Neuterradise.App.SystemServices.Cache;
+using Neuterradise.App.SystemServices.MediaTools;
+using SkiaSharp;
 
 namespace Neuterradise.App.Ui;
 
@@ -23,6 +27,8 @@ public sealed class InspectorPanel : IDisposable
     private readonly Grid _preview = new() { Height = 200 };
     private readonly VariableWrap _imageControls = UI.Wrap(4);
     private readonly TextBlock _zoomText = UI.Text("100%", "caption");
+    private readonly Button _animationButton;
+    private CancellationTokenSource? _animation;
     private string? _previewIdentity;
     private readonly TextBlock _title = UI.Text(null, "body-strong", maxLines: 1);
     private readonly Dictionary<string, Button> _tabs = [];
@@ -40,6 +46,8 @@ public sealed class InspectorPanel : IDisposable
         _imageControls.Children.Add(UI.IconButton("icon.action.add", UI.T("Inspector.ZoomIn", "Zoom in"), null, 28, _vm.ZoomInCommand));
         _imageControls.Children.Add(UI.Button(UI.T("Inspector.Fit", "Fit"), null, ButtonKind.Ghost, command: _vm.FitCommand));
         _imageControls.Children.Add(UI.Button(UI.T("Inspector.ActualSize", "Actual size"), null, ButtonKind.Ghost, command: _vm.ActualSizeCommand));
+        _animationButton = UI.Button(UI.T("Inspector.PlayAnimation", "Play animation"), ToggleAnimation, ButtonKind.Ghost);
+        _imageControls.Children.Add(_animationButton);
 
         var tabs = UI.Grid("auto", "*,*");
         tabs.ColumnSpacing = 4;
@@ -97,6 +105,9 @@ public sealed class InspectorPanel : IDisposable
         };
         View.SizeChanged += (_, args) => _preview.Height = Math.Clamp(args.NewSize.Height * 0.34, 100, 220);
         _preview.SizeChanged += (_, _) => UpdateImagePreviewTransform();
+        View.Unloaded += (_, _) => StopAnimation();
+        ReducedMotionAuthority.Changed += OnReducedMotionChanged;
+        ResourceGovernor.Shared.Changed += OnPlaybackBudgetChanged;
         _bag.Add(Observe.Props(_vm, Render));
     }
 
@@ -120,6 +131,7 @@ public sealed class InspectorPanel : IDisposable
         var previewIdentity = string.Join("|", _vm.MediaType, _vm.PreviewFilePath, _vm.PresentationPreviewPath, _vm.HasHoverFile);
         if (!string.Equals(_previewIdentity, previewIdentity, StringComparison.Ordinal))
         {
+            StopAnimation();
             _previewIdentity = previewIdentity;
             _preview.Children.Clear();
             if (_vm.PresentationPreviewPath is { } thumbnailPath)
@@ -220,6 +232,8 @@ public sealed class InspectorPanel : IDisposable
                 {
                     case ImageMediaInfo image:
                         _tab.Children.Add(Row(UI.T("Inspector.Format", "Format"), image.Format));
+                        if (image.IsAnimated)
+                            _tab.Children.Add(Row(UI.T("Inspector.Animation", "Animation"), UI.T("Common.Yes", "Yes")));
                         if (image.PixelWidth > 0 && image.PixelHeight > 0)
                         {
                             _tab.Children.Add(Row(UI.T("Inspector.Dimensions", "Dimensions"), $"{image.PixelWidth}×{image.PixelHeight}"));
@@ -345,10 +359,87 @@ public sealed class InspectorPanel : IDisposable
         var image = _preview.Children.OfType<SkImageView>().FirstOrDefault();
         _imageControls.Visibility = _vm.MediaType == MediaType.Image && image is not null
             ? Visibility.Visible : Visibility.Collapsed;
+        var animated = _vm.Info is ImageMediaInfo { IsAnimated: true, Format: "JPEG XL" } && _vm.PreviewFilePath is not null;
+        _animationButton.Visibility = animated ? Visibility.Visible : Visibility.Collapsed;
+        _animationButton.IsEnabled = animated && CanPlayAnimation;
         if (_vm.MediaType == MediaType.Image && image is not null)
         {
             ApplyImagePreviewTransform(image);
         }
+    }
+
+    private void ToggleAnimation()
+    {
+        if (_animation is not null)
+        {
+            StopAnimation();
+            return;
+        }
+        if (!CanPlayAnimation || _vm.PreviewFilePath is not { } path
+            || _preview.Children.OfType<SkImageView>().FirstOrDefault() is not { } image)
+            return;
+
+        var playback = new CancellationTokenSource();
+        _animation = playback;
+        _animationButton.Content = UI.T("Inspector.StopAnimation", "Stop animation");
+        _services.RunUserAction(PlayAnimationAsync(path, image, playback),
+            "Inspector.PlayAnimation", UI.T("Inspector.AnimationUnavailable", "This animation could not be played."));
+    }
+
+    private async Task PlayAnimationAsync(string path, SkImageView surface, CancellationTokenSource playback)
+    {
+        var token = playback.Token;
+        try
+        {
+            JpegXlImage image;
+            using (ResourceGovernor.Shared.EnterForegroundDiskWork())
+                image = await Task.Run(() => JpegXlDecoder.Decode(path, 384, 384, readAnimation: true, token), token);
+            if (!image.Info.Animated || image.Frames.Count < 2)
+                throw new InvalidDataException("JPEG XL did not contain a playable animation.");
+
+            for (uint loop = 0; image.Info.LoopCount == 0 || loop < image.Info.LoopCount; loop++)
+            {
+                foreach (var frame in image.Frames)
+                {
+                    token.ThrowIfCancellationRequested();
+                    using var bitmap = TargetSizeDecoder.CreateRgbaBitmap(image.Width, image.Height, frame.Rgba);
+                    surface.SetAnimationFrame(SKImage.FromBitmap(bitmap));
+                    await Task.Delay(frame.Duration < TimeSpan.FromMilliseconds(20)
+                        ? TimeSpan.FromMilliseconds(20) : frame.Duration, token);
+                }
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            if (ReferenceEquals(_animation, playback)) StopAnimation();
+            playback.Dispose();
+        }
+    }
+
+    private void OnReducedMotionChanged(object? sender, EventArgs args)
+    {
+        if (!CanPlayAnimation) StopAnimation();
+        UpdateImagePreviewTransform();
+    }
+
+    private static bool CanPlayAnimation => !ReducedMotionAuthority.IsReduced && ResourceGovernor.Shared.IsPrimaryVideoAllowed;
+
+    private void OnPlaybackBudgetChanged(object? sender, EventArgs args) =>
+        UiDispatch.Run(() =>
+        {
+            if (View.IsLoaded) OnReducedMotionChanged(sender, args);
+        });
+
+    private void StopAnimation()
+    {
+        if (_animation is not { } playback) return;
+        _animation = null;
+        playback.Cancel();
+        _preview.Children.OfType<SkImageView>().FirstOrDefault()?.SetAnimationFrame(null);
+        _animationButton.Content = UI.T("Inspector.PlayAnimation", "Play animation");
     }
 
     private void ApplyImagePreviewTransform(SkImageView image)
@@ -384,6 +475,9 @@ public sealed class InspectorPanel : IDisposable
 
     public void Dispose()
     {
+        ReducedMotionAuthority.Changed -= OnReducedMotionChanged;
+        ResourceGovernor.Shared.Changed -= OnPlaybackBudgetChanged;
+        StopAnimation();
         _bag.Dispose();
     }
 }

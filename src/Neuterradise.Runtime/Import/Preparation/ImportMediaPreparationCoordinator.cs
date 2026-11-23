@@ -236,7 +236,7 @@ public sealed class ImportMediaPreparationCoordinator
         await using var mutationLease = await _catalog.ImportUnitMutations
             .EnterAsync(unitId, cancellationToken).ConfigureAwait(false);
 
-        var unit = await _importReads.GetUnitSummaryAsync(unitId, cancellationToken).ConfigureAwait(false);
+        var unit = await _importReads.GetVerificationReadModelAsync(unitId, cancellationToken).ConfigureAwait(false);
         if (unit is null || !unit.LibraryCommitState.HasReachedDomainCommit()
             || unit.State is ImportUnitState.Cancelled or ImportUnitState.FailedTerminal
             || unit.State.IsUnitCommitted())

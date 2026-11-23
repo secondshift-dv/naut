@@ -78,7 +78,7 @@ public sealed record ResourceGovernorSnapshot(
 /// Interaction signals are in-memory and debounced. Nothing transient is ever written to SQLite.
 /// Lowering a limit never cancels running work; new permits simply wait for the running count to fall.
 /// </summary>
-public sealed class ResourceGovernor : IDisposable
+public sealed partial class ResourceGovernor : IDisposable
 {
     /// <summary>How long after the last pointer/key/navigation signal the UI is still "interactive".</summary>
     public static readonly TimeSpan InteractiveHold = TimeSpan.FromMilliseconds(1200);
@@ -521,6 +521,7 @@ public sealed class ResourceGovernor : IDisposable
         {
             if (_disposed) return;
             _disposed = true;
+            SignalDiskAdmissionsLocked();
             foreach (var state in _classes.Values)
             {
                 foreach (var waiter in state.Waiting)

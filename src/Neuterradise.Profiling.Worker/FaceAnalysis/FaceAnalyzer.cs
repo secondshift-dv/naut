@@ -121,6 +121,7 @@ public sealed class FaceAnalyzer
             request.ExpectedSha256,
             request.ExpectedByteLength,
             cancellationToken);
+        using var background = FaceBackgroundIo.Enter();
 
         IFaceDetectorAdapter? detector = null;
         try
@@ -348,7 +349,7 @@ public sealed class FaceAnalyzer
                 || expectedSha256.Length != 64
                 || expectedSha256.Any(static character => !Uri.IsHexDigit(character)))
             {
-                throw new FaceInputException(
+                throw new FaceContentMismatchException(
                     "The expected SHA-256 fingerprint is missing or malformed.");
             }
 
@@ -365,19 +366,19 @@ public sealed class FaceAnalyzer
             }
             catch (FileNotFoundException)
             {
-                throw new FaceInputException("The analyzed media file no longer exists.");
+                throw new FaceContentMismatchException("The analyzed media file no longer exists.");
             }
             catch (DirectoryNotFoundException)
             {
-                throw new FaceInputException("The analyzed media file path no longer exists.");
+                throw new FaceContentMismatchException("The analyzed media file path no longer exists.");
             }
             catch (UnauthorizedAccessException)
             {
-                throw new FaceInputException("The analyzed media file cannot be read.");
+                throw new FaceContentMismatchException("The analyzed media file cannot be read.");
             }
             catch (IOException)
             {
-                throw new FaceInputException("The analyzed media file could not be opened safely.");
+                throw new FaceContentMismatchException("The analyzed media file could not be opened safely.");
             }
 
             try
@@ -385,7 +386,7 @@ public sealed class FaceAnalyzer
                 cancellationToken.ThrowIfCancellationRequested();
                 if (expectedByteLength is null or < 0)
                 {
-                    throw new FaceInputException(
+                    throw new FaceContentMismatchException(
                         "The authoritative Media byte length is missing.");
                 }
 

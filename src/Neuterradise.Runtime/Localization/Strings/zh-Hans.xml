@@ -708,6 +708,7 @@
     <sys:String x:Key="Import.Detail.Added">{0} 已添加到您的 Vault。</sys:String>
     <sys:String x:Key="Import.Detail.WithDuplicates">{0} · {1} 已在您的 Vault 中</sys:String>
     <sys:String x:Key="Import.Stage.AlreadyInVault">已在您的 Vault 中</sys:String>
+    <sys:String x:Key="Import.Detail.AllDuplicatesSkipped">新增 0 项 · 已跳过 {0} 个重复项</sys:String>
     <sys:String x:Key="Import.Detail.DuplicateOnly">已在您的 Vault 中 — 将复用现有媒体，而不会再导入一份副本。</sys:String>
     <sys:String x:Key="Import.ReviewBanner.One">1 条导入已准备好供您审核</sys:String>
     <sys:String x:Key="Import.ReviewBanner.Many">{0}导入已备好供您审阅</sys:String>
@@ -1204,6 +1205,10 @@
     <sys:String x:Key="Import.Title.ImportedTo">添加至 {0}</sys:String>
     <sys:String x:Key="Import.Title.ImportingTo">添加到 {0}</sys:String>
     <sys:String x:Key="Inspector.ActualSize">实际尺寸</sys:String>
+    <sys:String x:Key="Inspector.PlayAnimation">播放动画</sys:String>
+    <sys:String x:Key="Inspector.StopAnimation">停止动画</sys:String>
+    <sys:String x:Key="Inspector.Animation">动画</sys:String>
+    <sys:String x:Key="Inspector.AnimationUnavailable">无法播放此动画。</sys:String>
     <sys:String x:Key="Inspector.AddAssociation">添加人物关联</sys:String>
     <sys:String x:Key="Inspector.AddAssociationPrompt">选择此媒体项目中出现的 Profile：</sys:String>
     <sys:String x:Key="Inspector.Associations">关联</sys:String>

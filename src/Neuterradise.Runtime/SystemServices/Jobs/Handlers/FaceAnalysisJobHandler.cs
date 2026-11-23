@@ -202,10 +202,9 @@ public sealed class ProfilingFaceAnalysisJobOperation : IFaceAnalysisJobOperatio
 
                 var classification = error?.ErrorCode switch
                 {
-                    "CONTENT_MISMATCH" or "FACE_INPUT_INVALID" =>
-                        JobFailureClassification.ContentMismatch,
+                    "CONTENT_MISMATCH" => JobFailureClassification.ContentMismatch,
                     "FACE_MODELS_UNAVAILABLE" => JobFailureClassification.MissingRequiredToolOrModel,
-                    "FACE_ANALYSIS_FAILED" => JobFailureClassification.DeterministicInvalidInput,
+                    "FACE_INPUT_INVALID" or "FACE_ANALYSIS_FAILED" => JobFailureClassification.DeterministicInvalidInput,
                     _ when error?.IsFatal == true =>
                         JobFailureClassification.DeterministicInvalidInput,
                     _ => JobFailureClassification.WorkerDisconnected,
@@ -260,7 +259,7 @@ public sealed class ProfilingFaceAnalysisJobOperation : IFaceAnalysisJobOperatio
             return JobExecutionResult.Failed(
                 JobFailureClassification.WorkerDisconnected,
                 "FACE_WORKER_DISCONNECTED",
-                "The Profiling Profiling Worker connection dropped during analysis.");
+                "The Profiling Worker connection dropped during analysis.");
         }
         catch (ProfilingWorkerProcessException)
         {
@@ -273,7 +272,7 @@ public sealed class ProfilingFaceAnalysisJobOperation : IFaceAnalysisJobOperatio
         {
             return JobExecutionResult.Failed(
                 JobFailureClassification.MissingRequiredToolOrModel,
-                "FACE_MODEL_MISSING",
+                "FACE_MODELS_UNAVAILABLE",
                 "Required YuNet/SFace model files are not available.");
         }
         catch (IOException)
@@ -281,7 +280,7 @@ public sealed class ProfilingFaceAnalysisJobOperation : IFaceAnalysisJobOperatio
             return JobExecutionResult.Failed(
                 JobFailureClassification.TransientIo,
                 "FACE_WORKER_IO_FAILED",
-                "The Profiling Profiling Worker connection failed while analysis was in flight.");
+                "The Profiling Worker connection failed while analysis was in flight.");
         }
     }
 

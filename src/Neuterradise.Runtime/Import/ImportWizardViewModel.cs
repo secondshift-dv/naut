@@ -173,7 +173,11 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
     private IReadOnlyList<Guid> _attentionItemIds = [];
     private CancellationTokenSource? _nameCheck;
     private CancellationTokenSource? _profileSearch;
-    private long _hintGeneration;
+    private readonly SemaphoreSlim _hintRefreshGate = new(1, 1);
+    private int _pendingHintSections;
+
+    [Flags]
+    private enum HintSection { None = 0, Progress = 1, Review = 2, Faces = 4, Appearance = 8, All = 15 }
 
     private ImportWizardStep _step = ImportWizardStep.Profile;
     private ImportDestinationChoice _choice = ImportDestinationChoice.New;
@@ -236,7 +240,7 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         if (_catalog is not null)
         {
             _hintRefreshCoalescer = new RefreshCoalescer(
-                RefreshHintsAsync,
+                RefreshSignalledHintsAsync,
                 TimeSpan.FromMilliseconds(250));
             _draftSaveCoalescer = new RefreshCoalescer(
                 PersistAutosaveDraftAsync,
@@ -1012,63 +1016,77 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
 
     private void OnCatalogInvalidated(object? sender, CatalogInvalidation invalidation)
     {
-        if (invalidation.DomainKind is not (
-            CatalogInvalidationDomain.Import
-            or CatalogInvalidationDomain.Media
-            or CatalogInvalidationDomain.Face
-            or CatalogInvalidationDomain.Appearance
-            or CatalogInvalidationDomain.Profile))
-            return;
-
-        UiDispatch.Run(() => _hintRefreshCoalescer?.Signal());
+        var sections = invalidation.DomainKind switch
+        {
+            CatalogInvalidationDomain.Import => HintSection.Progress | HintSection.Review,
+            CatalogInvalidationDomain.Media => HintSection.Progress | HintSection.Review | HintSection.Appearance,
+            CatalogInvalidationDomain.Face => HintSection.Faces | HintSection.Review,
+            CatalogInvalidationDomain.Appearance => HintSection.Appearance,
+            CatalogInvalidationDomain.Profile => HintSection.All,
+            _ => HintSection.None,
+        };
+        if (sections != 0) SignalHints(sections);
     }
 
-    private void OnFinalizerChanged(object? sender, EventArgs args) =>
-        UiDispatch.Run(() => _hintRefreshCoalescer?.Signal());
+    private void OnFinalizerChanged(object? sender, EventArgs args) => SignalHints(HintSection.All);
 
-    public async Task RefreshHintsAsync(CancellationToken cancellationToken = default)
+    private void SignalHints(HintSection sections)
     {
-        if (_operations is null || _catalog is null)
-        {
-            return;
-        }
+        Interlocked.Or(ref _pendingHintSections, (int)sections);
+        _hintRefreshCoalescer?.Signal();
+    }
 
-        var generation = Interlocked.Increment(ref _hintGeneration);
-        using var measure = PerfTrace.Measure("import.wizard.hints", 150);
+    public Task RefreshHintsAsync(CancellationToken cancellationToken = default) =>
+        RefreshHintsAsync(HintSection.All, cancellationToken);
 
-        ImportUnitProgress? progress;
-        IReadOnlyList<ImportDuplicateMatch> matches;
-        IReadOnlyList<ImportProfileHint> shared;
-        IReadOnlyList<VerificationFaceCandidate> faces;
-        VerificationAppearanceCandidates candidates;
-        VerificationGateProblems problems;
+    private Task RefreshSignalledHintsAsync(CancellationToken token) =>
+        RefreshHintsAsync((HintSection)Interlocked.Exchange(ref _pendingHintSections, 0), token);
 
+    private async Task RefreshHintsAsync(HintSection sections, CancellationToken cancellationToken)
+    {
+        if (_operations is null || _catalog is null || sections == 0) return;
+        var entered = false;
         try
         {
-            var progressMap = await _catalog.ImportReads.ListUnitProgressAsync([UnitId], cancellationToken).ConfigureAwait(false);
-            progress = progressMap.GetValueOrDefault(UnitId);
-            matches = await _operations.GetExactDuplicateMatchesAsync(UnitId, cancellationToken).ConfigureAwait(false);
-            shared = await ImportWizardQueries.ReadSharedMediaHintsAsync(_catalog, matches, cancellationToken).ConfigureAwait(false);
-            faces = await ReadFaceCandidatesSafelyAsync(cancellationToken).ConfigureAwait(false);
-            candidates = await _operations.GetAppearanceCandidatesAsync(UnitId, cancellationToken).ConfigureAwait(false);
-            problems = await _operations.GetGateProblemsAsync(UnitId, BuildDraft(), cancellationToken).ConfigureAwait(false);
+            await _hintRefreshGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            entered = true;
+            using var measure = PerfTrace.Measure("import.wizard.hints", 150);
+            if (sections.HasFlag(HintSection.Progress))
+            {
+                var progress = await _catalog.ImportReads.ListUnitProgressAsync([UnitId], cancellationToken).ConfigureAwait(false);
+                await DispatchAsync(() => ApplyProgress(progress.GetValueOrDefault(UnitId))).ConfigureAwait(false);
+            }
+            if (sections.HasFlag(HintSection.Review))
+            {
+                VerificationDraftV1? draft = null;
+                await DispatchAsync(() => draft = BuildDraft()).ConfigureAwait(false);
+                var matches = await _operations.GetExactDuplicateMatchesAsync(UnitId, cancellationToken).ConfigureAwait(false);
+                var shared = await ImportWizardQueries.ReadSharedMediaHintsAsync(_catalog, matches, cancellationToken).ConfigureAwait(false);
+                var problems = await _operations.GetGateProblemsAsync(UnitId, draft!, matches, cancellationToken).ConfigureAwait(false);
+                await DispatchAsync(() => ApplyReview(matches, shared, problems)).ConfigureAwait(false);
+            }
+            if (sections.HasFlag(HintSection.Faces))
+            {
+                var hints = BuildFaceHints(await ReadFaceCandidatesSafelyAsync(cancellationToken).ConfigureAwait(false));
+                await DispatchAsync(() => { if (!_disposed) ReplaceIfChanged(FaceHints, hints); }).ConfigureAwait(false);
+            }
+            if (sections.HasFlag(HintSection.Appearance))
+            {
+                var appearance = await _operations.GetAppearanceCandidatesAsync(UnitId, cancellationToken).ConfigureAwait(false);
+                await DispatchAsync(() => ApplyAppearance(appearance)).ConfigureAwait(false);
+            }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return;
         }
         catch (Exception exception)
         {
             Trace.TraceWarning("Import overlay hints could not be read: {0}", exception.GetType().Name);
-            return;
         }
-
-        if (generation != Interlocked.Read(ref _hintGeneration) || _disposed)
+        finally
         {
-            return;
+            if (entered) _hintRefreshGate.Release();
         }
-
-        await DispatchAsync(() => ApplyHints(progress, matches, shared, faces, candidates, problems)).ConfigureAwait(false);
     }
 
     private async Task<IReadOnlyList<VerificationFaceCandidate>> ReadFaceCandidatesSafelyAsync(CancellationToken token)
@@ -1086,12 +1104,20 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
 
     private static Task DispatchAsync(Action action) => UiDispatch.InvokeAsync(action);
 
-    public void ApplyHints(
-        ImportUnitProgress? progress,
+    private void ApplyProgress(ImportUnitProgress? progress)
+    {
+        if (_disposed || progress is null) return;
+        _totalCount = progress.TotalItemCount;
+        _preparedCount = progress.PreparedItemCount;
+        _admittedCount = progress.AdmittedItemCount;
+        RaisePropertyChanged(nameof(MediaSummaryText));
+        RaisePropertyChanged(nameof(TransferText));
+        RaisePreparationStatus();
+    }
+
+    private void ApplyReview(
         IReadOnlyList<ImportDuplicateMatch> matches,
         IReadOnlyList<ImportProfileHint> shared,
-        IReadOnlyList<VerificationFaceCandidate> faces,
-        VerificationAppearanceCandidates candidates,
         VerificationGateProblems problems)
     {
         if (_disposed)
@@ -1099,9 +1125,6 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
             return;
         }
 
-        _totalCount = progress?.TotalItemCount ?? _totalCount;
-        _preparedCount = progress?.PreparedItemCount ?? _preparedCount;
-        _admittedCount = progress?.AdmittedItemCount ?? _admittedCount;
         _alreadyInLibraryCount = matches
             .Where(match => match.MatchedMediaState == Media.MediaState.Active)
             .Select(match => match.ImportItemId)
@@ -1109,45 +1132,62 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
             .Count();
 
         ReplaceIfChanged(SharedMediaHints, shared);
-        ReplaceIfChanged(FaceHints, BuildFaceHints(faces));
-        MergeOptions(CoverOptions, candidates.Covers.Select(c => new ImportVisualOption(c)), isCover: true);
-        MergeOptions(BannerOptions, candidates.Banners.Select(b => new ImportVisualOption(b)), isCover: false);
         ReplaceProblems(DuplicateProblems, problems.Duplicates, static problem => problem.ImportItemId);
         ReplaceProblems(ProfileCollisionProblems, problems.ProfileCollisions, static problem => problem.ImportItemId);
-        ReplaceProblems(PreparationProblems, problems.PreparationFailures, static problem => problem.ImportItemId);
+        ReplaceProblems(PreparationProblems, problems.PreparationFailures, static problem => problem.ImportItemId,
+            static (current, replacement) => current.SourceFileName == replacement.SourceFileName
+                && current.MissingDependencies == replacement.MissingDependencies
+                && current.Failures.SequenceEqual(replacement.Failures));
         _hasPreparationPending = problems.RequiredPreparationPending;
-        _candidatesLoaded = true;
-
-        AutoSelectVisuals();
-
         RaisePropertyChanged(nameof(MediaSummaryText));
+        RaisePropertyChanged(nameof(HasPreparationPending));
+        RaisePropertyChanged(nameof(HasProblems));
+        RaisePreparationStatus();
+    }
+
+    private void ApplyAppearance(VerificationAppearanceCandidates candidates)
+    {
+        if (_disposed) return;
+        MergeOptions(CoverOptions, candidates.Covers.Select(c => new ImportVisualOption(c)), isCover: true);
+        MergeOptions(BannerOptions, candidates.Banners.Select(b => new ImportVisualOption(b)), isCover: false);
+        _candidatesLoaded = true;
+        AutoSelectVisuals();
+        RaisePreparationStatus();
+    }
+
+    private void RaisePreparationStatus()
+    {
         RaisePropertyChanged(nameof(PreparationText));
         RaisePropertyChanged(nameof(IsPreparing));
-        RaisePropertyChanged(nameof(TransferText));
         RaisePropertyChanged(nameof(IsCoverPending));
         RaisePropertyChanged(nameof(IsBannerPending));
         RaisePropertyChanged(nameof(HasNoCoverOptions));
         RaisePropertyChanged(nameof(HasNoBannerOptions));
         RaisePropertyChanged(nameof(HasWeakCoverOptions));
         RaisePropertyChanged(nameof(HasWeakBannerOptions));
-        RaisePropertyChanged(nameof(HasPreparationPending));
-        RaisePropertyChanged(nameof(HasProblems));
         RaiseValidity();
     }
 
-    private static void ReplaceProblems<T>(ObservableCollection<T> target, IReadOnlyList<T> source, Func<T, Guid> id)
+    private static void ReplaceProblems<T>(
+        ObservableCollection<T> target, IReadOnlyList<T> source, Func<T, Guid> id, Func<T, T, bool>? sameDetails = null)
     {
-        var nextIds = source.Select(id).ToHashSet();
-        foreach (var stale in target.Where(item => !nextIds.Contains(id(item))).ToList())
+        var next = source.ToDictionary(id);
+        for (var index = target.Count - 1; index >= 0; index--)
         {
-            target.Remove(stale);
+            var current = target[index];
+            if (!next.Remove(id(current), out var replacement))
+            {
+                target.RemoveAt(index);
+            }
+            else if (!(sameDetails?.Invoke(current, replacement) ?? EqualityComparer<T>.Default.Equals(current, replacement)))
+            {
+                target[index] = replacement;
+            }
         }
+
         foreach (var item in source)
         {
-            if (!target.Any(existing => id(existing) == id(item)))
-            {
-                target.Add(item);
-            }
+            if (next.Remove(id(item))) target.Add(item);
         }
     }
 
@@ -1622,8 +1662,15 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         }
         _collisionDecisions.RemoveAll(decision => decision.ImportItemId == itemId);
         _faceDecisions = _faceDecisions.Where(decision => decision.SourceImportItemId != itemId).ToArray();
+        if (DuplicateProblems.FirstOrDefault(problem => problem.ImportItemId == itemId) is { } duplicate)
+            DuplicateProblems.Remove(duplicate);
+        if (ProfileCollisionProblems.FirstOrDefault(problem => problem.ImportItemId == itemId) is { } collision)
+            ProfileCollisionProblems.Remove(collision);
+        if (PreparationProblems.FirstOrDefault(problem => problem.ImportItemId == itemId) is { } preparation)
+            PreparationProblems.Remove(preparation);
+        RaiseProblemsChanged();
         await PersistCurrentDraftAsync().ConfigureAwait(true);
-        await RefreshHintsAsync(_lifetime.Token).ConfigureAwait(true);
+        SignalHints(HintSection.Progress | HintSection.Review | HintSection.Appearance);
     }
 
     private async Task RetryPreparationAsync(VerificationPreparationProblem problem)

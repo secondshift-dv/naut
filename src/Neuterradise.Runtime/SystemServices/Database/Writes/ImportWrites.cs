@@ -1,7 +1,9 @@
+using System.Text.Json;
 using Neuterradise.App.Import;
 using Neuterradise.App.Import.Verification;
 using Neuterradise.App.Media;
 using Neuterradise.App.Media.Model;
+using Neuterradise.App.SystemServices.Database.Reads;
 using Neuterradise.App.SystemServices.Jobs;
 
 namespace Neuterradise.App.SystemServices.Database.Writes;
@@ -560,6 +562,191 @@ public sealed class ImportWrites
         }
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static readonly string OwnedDuplicateAuthoritySql = $"""
+        EXISTS (
+            SELECT 1 FROM media a
+            JOIN profile_media owner ON owner.media_id = a.media_id AND owner.profile_id = unit.destination_profile_id
+            WHERE a.media_id <> c.media_id AND a.media_type = c.media_type AND {ImportReads.ExactMediaIdentitySql}
+              AND (c.media_type <> 'MODEL' OR c.bundle_sha256 IS NOT NULL)
+              AND owner.relation_type = 'OWNER' AND owner.publication_import_unit_id IS NULL
+              AND a.state = 'ACTIVE' AND a.trashed_at_ms IS NULL AND a.path_state = 'NONE'
+              AND a.current_managed_relative_path IS NOT NULL AND a.current_managed_file_name IS NOT NULL
+              AND NOT EXISTS (SELECT 1 FROM import_cancel_media_reservations reservation WHERE reservation.media_id = a.media_id)
+              AND NOT EXISTS (SELECT 1 FROM trash_entries trash WHERE trash.entity_type = 'MEDIA'
+                              AND trash.entity_id = a.media_id AND trash.state IN ('PENDING', 'EXECUTING'))
+        )
+        """;
+
+    internal async Task<IReadOnlyDictionary<Guid, long>> ReadParkedOwnedDuplicatesAsync(
+        Guid unitId, Guid operationId, CancellationToken cancellationToken)
+    {
+        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var query = connection.CreateCommand();
+        query.CommandText = $"""
+            SELECT c.media_id, c.row_version
+            FROM import_units unit JOIN import_items item ON item.import_unit_id = unit.import_unit_id
+            JOIN media c ON c.media_id = item.candidate_media_id
+            WHERE unit.import_unit_id = $unit AND unit.commit_operation_id = $op
+              AND unit.destination_kind = 'EXISTING_NORMAL' AND unit.is_paused = 0
+              AND item.disposition IN ('INCLUDED','REUSED') AND item.source_cleanup_state = 'SOURCE_PRESENT'
+              AND c.state = 'CANDIDATE' AND c.path_state = 'PENDING' AND c.media_type IN ('IMAGE','VIDEO')
+              AND c.current_managed_relative_path IS NULL AND c.current_managed_file_name IS NULL
+              AND c.reconciliation_operation_id = $op AND c.original_source_path = item.source_path
+              AND NOT EXISTS (SELECT 1 FROM jobs job WHERE job.owner_type = 'Media'
+                              AND job.owner_id = c.media_id AND job.state = 'RUNNING')
+              AND {OwnedDuplicateAuthoritySql};
+            """;
+        query.Parameters.AddWithValue("$unit", DbGuid.Format(unitId));
+        query.Parameters.AddWithValue("$op", DbGuid.Format(operationId));
+        var result = new Dictionary<Guid, long>();
+        await using var reader = await query.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            result.Add(DbGuid.Parse(reader.GetString(0)), reader.GetInt64(1));
+        return result;
+    }
+
+    internal async Task<bool> SkipOwnedDuplicatesAsync(Guid unitId, CancellationToken cancellationToken,
+        Guid? recoveryOperation = null, IReadOnlyDictionary<string, long>? verifiedStaged = null)
+    {
+        await using var lease = await _writeCoordinator.EnterAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = CatalogTransaction.Begin(connection, _writeCoordinator);
+
+        var unitKey = DbGuid.Format(unitId);
+        var now = DbTime.Format(_timeProvider.GetUtcNow());
+        await using var skip = transaction.CreateCommand(
+            $"""
+            UPDATE import_items AS item
+            SET disposition = 'SKIPPED', duplicate_decision = 'SKIP', reused_media_id = NULL, updated_at_ms = $now
+            WHERE item.import_unit_id = $unit
+              AND item.disposition IN ('INCLUDED', 'REUSED')
+              AND (item.duplicate_decision IS NULL OR item.duplicate_decision = 'REUSE')
+              AND item.source_cleanup_state = 'SOURCE_PRESENT'
+              AND EXISTS (
+                  SELECT 1 FROM import_units unit
+                  JOIN profiles profile ON profile.profile_id = unit.destination_profile_id
+                  JOIN media c ON c.media_id = item.candidate_media_id
+                  WHERE unit.import_unit_id = item.import_unit_id
+                    AND unit.commit_operation_id IS $op AND unit.is_paused = 0
+                    AND (unit.state = 'PREPARING' OR ($op IS NOT NULL AND unit.state = 'FAILED_RETRYABLE'))
+                    AND unit.destination_kind = 'EXISTING_NORMAL'
+                    AND profile.kind = 'NORMAL' AND profile.visibility = 'PUBLISHED' AND profile.trashed_at_ms IS NULL
+                    AND {OwnedDuplicateAuthoritySql}
+                    AND c.state = 'CANDIDATE' AND c.current_managed_relative_path IS NULL
+                    AND c.current_managed_file_name IS NULL
+                    AND ((c.path_state = 'NONE' AND c.target_managed_relative_path IS NULL)
+                         OR ($op IS NOT NULL AND c.path_state = 'PENDING'
+                             AND c.reconciliation_operation_id = $op AND c.original_source_path = item.source_path
+                             AND EXISTS (SELECT 1 FROM json_each($verified) proof
+                                         WHERE proof.key = c.media_id AND proof.value = c.row_version)))
+                    AND ($op IS NULL OR EXISTS (
+                        SELECT 1 FROM storage_operations operation
+                        WHERE operation.operation_id = $op AND operation.kind = 'IMPORT_COMMIT'
+                          AND operation.entity_type = 'IMPORT_UNIT' AND operation.entity_id = unit.import_unit_id
+                          AND operation.state = unit.library_commit_state
+                          AND operation.state IN ('DESTINATION_PREPARED','PLACEMENT_PLANNED')))
+                    AND NOT EXISTS (
+                        SELECT 1 FROM jobs job WHERE job.owner_type = 'Media' AND job.owner_id = c.media_id
+                          AND (job.state = 'RUNNING'
+                               OR ($op IS NULL AND (job.kind <> 'HashMedia'
+                                   OR job.state NOT IN ('SUCCEEDED', 'CANCELLED', 'FAILED_TERMINAL')))))
+              )
+            RETURNING candidate_media_id;
+            """);
+        skip.Parameters.AddWithValue("$unit", unitKey);
+        skip.Parameters.AddWithValue("$now", now);
+        var operationKey = recoveryOperation.HasValue ? (object)DbGuid.Format(recoveryOperation.Value) : DBNull.Value;
+        skip.Parameters.AddWithValue("$op", operationKey);
+        skip.Parameters.AddWithValue("$verified", verifiedStaged is null ? "{}" : JsonSerializer.Serialize(verifiedStaged));
+        var retired = new List<string>();
+        await using (var reader = await skip.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+        {
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                retired.Add(reader.GetString(0));
+            }
+        }
+
+        if (retired.Count == 0) return false;
+
+        var retiredJson = JsonSerializer.Serialize(retired);
+        if (recoveryOperation.HasValue)
+        {
+            // A preserved legacy journal can still have queued preparation for a Candidate
+            // that has just proven redundant. Cancel it in this transaction, preserving
+            // existing successful/failed job evidence and never retiring a running owner.
+            await using var cancel = transaction.CreateCommand(
+                """
+                UPDATE jobs SET state = 'CANCELLED', completed_at_ms = $now, not_before_ms = NULL,
+                    error_code = 'CANCELLED', error_detail_safe = 'Exact owned duplicate skipped during import recovery.',
+                    row_version = row_version + 1
+                WHERE owner_type = 'Media' AND owner_id IN (SELECT value FROM json_each($ids))
+                  AND state IN ('PENDING','RUNNABLE','PAUSED','FAILED_RETRYABLE','WAITING_DEPENDENCY','WAITING_USER_INPUT');
+                """);
+            cancel.Parameters.AddWithValue("$ids", retiredJson);
+            cancel.Parameters.AddWithValue("$now", now);
+            await cancel.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        await using (var retire = transaction.CreateCommand(
+            """
+            UPDATE media SET state = 'RETIRED', retirement_reason = 'SKIPPED',
+                path_state = 'NONE', target_managed_relative_path = NULL, target_managed_file_name = NULL,
+                reconciliation_operation_id = NULL, row_version = row_version + 1
+            WHERE media_id IN (SELECT value FROM json_each($ids)) AND state = 'CANDIDATE';
+            """))
+        {
+            retire.Parameters.AddWithValue("$ids", retiredJson);
+            if (await retire.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != retired.Count)
+                throw new CatalogConcurrencyConflictException("An owned duplicate changed before candidate retirement.");
+        }
+
+        await using var complete = transaction.CreateCommand(
+            $"""
+            UPDATE import_units AS unit
+            SET state = 'COMPLETED', completed_at_ms = $now, updated_at_ms = $now, row_version = row_version + 1,
+                library_commit_state = CASE WHEN $op IS NULL THEN library_commit_state ELSE 'TERMINAL' END
+            WHERE unit.import_unit_id = $unit
+              AND unit.state IN ('PREPARING', 'FAILED_RETRYABLE') AND unit.commit_operation_id IS $op
+              AND NOT EXISTS (SELECT 1 FROM profile_media owner WHERE owner.publication_import_unit_id = $unit)
+              AND NOT EXISTS (
+                  SELECT 1 FROM import_items item
+                  LEFT JOIN media c ON c.media_id = item.candidate_media_id
+                  WHERE item.import_unit_id = $unit AND (
+                      item.disposition <> 'SKIPPED' OR item.duplicate_decision IS NOT 'SKIP'
+                      OR c.state IS NOT 'RETIRED' OR c.retirement_reason IS NOT 'SKIPPED'
+                      OR NOT {OwnedDuplicateAuthoritySql}
+                  )
+              );
+            """);
+        complete.Parameters.AddWithValue("$unit", unitKey);
+        complete.Parameters.AddWithValue("$now", now);
+        complete.Parameters.AddWithValue("$op", operationKey);
+        var completed = await complete.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) == 1;
+        if (completed && recoveryOperation.HasValue)
+        {
+            await using var operation = transaction.CreateCommand(
+                """
+                UPDATE storage_operations
+                SET state = 'TERMINAL', updated_at_ms = $now, row_version = row_version + 1,
+                    checkpoint_json = json_set(checkpoint_json, '$.checkpoint', $terminal, '$.retiredCandidateIds',
+                        (SELECT json_group_array(candidate_media_id) FROM import_items WHERE import_unit_id = $unit))
+                WHERE operation_id = $op AND kind = 'IMPORT_COMMIT' AND entity_id = $unit
+                  AND state IN ('DESTINATION_PREPARED','PLACEMENT_PLANNED');
+                """);
+            operation.Parameters.AddWithValue("$unit", unitKey);
+            operation.Parameters.AddWithValue("$op", operationKey);
+            operation.Parameters.AddWithValue("$now", now);
+            operation.Parameters.AddWithValue("$terminal", (int)ImportCommitCheckpoint.Terminal);
+            if (await operation.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
+                throw new CatalogConcurrencyConflictException("Recovered duplicate commit journal changed before completion.");
+        }
+
+        transaction.QueueInvalidation(new CatalogInvalidation(Guid.Empty, [unitId], CatalogInvalidationDomain.Import, 0));
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return completed;
     }
 
     public async Task ApplyDuplicateDecisionAsync(
@@ -1961,90 +2148,66 @@ public sealed class ImportWrites
         return true;
     }
 
-    public async Task RetireCandidateAsync(
-        Guid candidateMediaId,
-        MediaRetirementReason reason,
-        CancellationToken cancellationToken = default)
+    public Task RetireCandidateAsync(
+        Guid candidateMediaId, MediaRetirementReason reason, CancellationToken cancellationToken = default)
     {
         EnsureNonEmpty(candidateMediaId, nameof(candidateMediaId));
-        var retirementReason = DbEnum.Format(reason);
+        return RetireCandidatesAsync([candidateMediaId], reason, cancellationToken);
+    }
 
+    internal async Task RetireCandidatesAsync(
+        IReadOnlyCollection<Guid> candidateMediaIds, MediaRetirementReason reason, CancellationToken cancellationToken)
+    {
+        if (candidateMediaIds.Count == 0) return;
+        var ids = JsonSerializer.Serialize(candidateMediaIds.Select(DbGuid.Format).Distinct());
+        var retirementReason = DbEnum.Format(reason);
         await using var lease = await _writeCoordinator.EnterAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = CatalogTransaction.Begin(connection);
 
-        (string state, string? reason)? row = null;
-        await using (var read = transaction.CreateCommand(
-            "SELECT state, retirement_reason FROM media WHERE media_id = $id;"))
-        {
-            read.Parameters.AddWithValue("$id", DbGuid.Format(candidateMediaId));
-            await using var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-            if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            {
-                row = (reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1));
-            }
-        }
-
-        if (row is null)
-        {
-            throw new CatalogInvariantException($"Media {candidateMediaId:D} does not exist.");
-        }
-
-        if (DbEnum.ParseMediaState(row.Value.state) == MediaState.Retired)
-        {
-            if (!string.Equals(row.Value.reason, retirementReason, StringComparison.Ordinal))
-            {
-                throw new CatalogInvariantException(
-                    $"Media {candidateMediaId:D} is already RETIRED for '{row.Value.reason}'.");
-            }
-
-            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-            return;
-        }
-
-        if (DbEnum.ParseMediaState(row.Value.state) != MediaState.Candidate)
-        {
-            throw new CatalogInvariantException(
-                $"Only a CANDIDATE Media can be retired; {candidateMediaId:D} is {row.Value.state}.");
-        }
-
-        await using (var update = transaction.CreateCommand(
+        await using (var validation = transaction.CreateCommand(
             """
-            UPDATE media
-            SET state = 'RETIRED', retirement_reason = $reason, row_version = row_version + 1
-            WHERE media_id = $id AND state = 'CANDIDATE';
+            SELECT requested.value FROM json_each($ids) requested
+            LEFT JOIN media candidate ON candidate.media_id = requested.value
+            WHERE candidate.state IS NOT 'CANDIDATE'
+              AND (candidate.state IS NOT 'RETIRED' OR candidate.retirement_reason IS NOT $reason)
+            LIMIT 1;
             """))
         {
-            update.Parameters.AddWithValue("$reason", retirementReason);
-            update.Parameters.AddWithValue("$id", DbGuid.Format(candidateMediaId));
-            if (await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
-            {
-                throw new CatalogInvariantException(
-                    $"Candidate {candidateMediaId:D} retirement lost its expected state.");
-            }
+            validation.Parameters.AddWithValue("$ids", ids);
+            validation.Parameters.AddWithValue("$reason", retirementReason);
+            if (await validation.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is string invalidId)
+                throw new CatalogInvariantException($"Media {invalidId} cannot be retired for '{retirementReason}'.");
         }
 
-        // Work queued for this candidate (hash follow-up, metadata, previews, face analysis) no longer
-        // applies. Leaving it queued made every skipped, cancelled or de-duplicated item turn into
-        // failed jobs later ("owner retired"). A job already running finishes on its own and sees the
-        // retired owner.
-        await using (var cancelJobs = transaction.CreateCommand(
+        // Only newly retired Candidates lose queued work. Retried retirement preserves history.
+        await using (var cancel = transaction.CreateCommand(
             """
             UPDATE jobs
-            SET state = 'CANCELLED',
-                not_before_ms = NULL,
-                completed_at_ms = $now,
-                error_code = 'OWNER_RETIRED',
-                error_detail_safe = 'The media left the import before this work ran.',
+            SET state = 'CANCELLED', not_before_ms = NULL, completed_at_ms = $now,
+                error_code = 'OWNER_RETIRED', error_detail_safe = 'The media left the import before this work ran.',
                 row_version = row_version + 1
-            WHERE owner_type = 'Media'
-              AND owner_id = $id
-              AND state IN ('PENDING','RUNNABLE','PAUSED','FAILED_RETRYABLE');
+            WHERE owner_type = 'Media' AND state IN ('PENDING','RUNNABLE','PAUSED','FAILED_RETRYABLE')
+              AND owner_id IN (
+                  SELECT media_id FROM media WHERE state = 'CANDIDATE'
+                    AND media_id IN (SELECT value FROM json_each($ids))
+              );
             """))
         {
-            cancelJobs.Parameters.AddWithValue("$id", DbGuid.Format(candidateMediaId));
-            cancelJobs.Parameters.AddWithValue("$now", DbTime.Format(_timeProvider.GetUtcNow()));
-            await cancelJobs.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            cancel.Parameters.AddWithValue("$ids", ids);
+            cancel.Parameters.AddWithValue("$now", DbTime.Format(_timeProvider.GetUtcNow()));
+            await cancel.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        await using (var retire = transaction.CreateCommand(
+            """
+            UPDATE media SET state = 'RETIRED', retirement_reason = $reason, row_version = row_version + 1
+            WHERE state = 'CANDIDATE' AND media_id IN (SELECT value FROM json_each($ids));
+            """))
+        {
+            retire.Parameters.AddWithValue("$ids", ids);
+            retire.Parameters.AddWithValue("$reason", retirementReason);
+            await retire.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);

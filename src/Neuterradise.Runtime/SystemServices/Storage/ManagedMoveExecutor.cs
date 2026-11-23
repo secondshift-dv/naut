@@ -320,52 +320,11 @@ public sealed class ManagedMoveExecutor
         Guid assetId, string targetPath, long expectedLength, string expectedSha,
         CancellationToken cancellationToken)
     {
-        var transfer = await _assetWrites.ReadCompletedTransferAsync(assetId, cancellationToken)
-            .ConfigureAwait(false);
-        if (transfer is null)
-            return new StorageOperationResult(StorageOperationStatus.NeedsAttention,
-                SafeErrorDetail: "A completed TransferOriginal job is required for placement.");
+        var staged = await VerifyStagedOriginalAsync(assetId, expectedLength, expectedSha,
+            verifyBytes: false, cancellationToken).ConfigureAwait(false);
+        if (staged.Error is { } error) return error;
+        var stagedPath = staged.Path!;
 
-        var stagedPath = _paths.ResolveStagedOriginalPartialPath(
-            transfer.Value.ImportUnitId, new MediaStorageToken(transfer.Value.StorageToken));
-        var relativePath = Path.GetRelativePath(_paths.Root, stagedPath).Replace('\\', '/');
-        var completedInThisProcess = false;
-        try
-        {
-            using var document = JsonDocument.Parse(transfer.Value.CheckpointJson);
-            var checkpoint = document.RootElement;
-            if (checkpoint.GetProperty("SchemaVersion").GetInt32() != 1
-                || checkpoint.GetProperty("CandidateMediaId").GetGuid() != assetId
-                || checkpoint.GetProperty("ImportUnitId").GetGuid() != transfer.Value.ImportUnitId
-                || checkpoint.GetProperty("ExpectedLength").GetInt64() != expectedLength
-                || checkpoint.GetProperty("SafeOffset").GetInt64() != expectedLength
-                || !string.Equals(checkpoint.GetProperty("PrefixSha256").GetString(), expectedSha,
-                    StringComparison.Ordinal)
-                || !string.Equals(checkpoint.GetProperty("PartialRelativePath").GetString(), relativePath,
-                    StringComparison.Ordinal)
-                || string.IsNullOrWhiteSpace(checkpoint.GetProperty("SourceIdentity").GetString()))
-                return new StorageOperationResult(StorageOperationStatus.NeedsAttention,
-                    SafeErrorDetail: "The completed transfer checkpoint does not match placement authority.");
-            completedInThisProcess = checkpoint.TryGetProperty("ProcessNonce", out var processNonce)
-                && processNonce.TryGetGuid(out var nonce)
-                && nonce == TransferOriginalJobHandler.ProcessNonce;
-        }
-        catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException)
-        {
-            return new StorageOperationResult(StorageOperationStatus.NeedsAttention,
-                SafeErrorDetail: "The completed transfer checkpoint is invalid.");
-        }
-
-        RootPathRules.RejectExistingReparsePoints(_paths.Root, stagedPath);
-        if (!File.Exists(stagedPath) || new FileInfo(stagedPath).Length != expectedLength)
-            return new StorageOperationResult(StorageOperationStatus.NeedsAttention,
-                SafeErrorDetail: "Completed staged bytes are missing or shorter than the transfer checkpoint.");
-        if (!completedInThisProcess)
-        {
-            var recovered = await _verifier.VerifyAsync(stagedPath, expectedLength, expectedSha, cancellationToken)
-                .ConfigureAwait(false);
-            if (!recovered.IsMatch) return MapTargetVerification(recovered);
-        }
         if (!VolumeIdentity.CanUseSameVolumeMove(_volumeIdentityProvider, stagedPath, _paths.ProfilesPath))
             return new StorageOperationResult(StorageOperationStatus.VolumeResolutionFailed);
         try
@@ -390,6 +349,117 @@ public sealed class ManagedMoveExecutor
             return new StorageOperationResult(File.Exists(targetPath)
                 ? StorageOperationStatus.UnexpectedTarget : StorageOperationStatus.FileLocked);
         }
+    }
+
+    // A paused Candidate may remain invisible in its journaled state only when its original
+    // bytes can still be proved without advancing placement or transferring ownership.
+    internal Task<bool> HasVerifiedParkedPlacementAsync(Guid assetId, CancellationToken cancellationToken) =>
+        ReconcileParkedPlacementAsync(assetId, returnTargetToStaging: false, cancellationToken);
+
+    internal Task<bool> PreserveParkedDuplicateInStagingAsync(Guid assetId, CancellationToken cancellationToken) =>
+        ReconcileParkedPlacementAsync(assetId, returnTargetToStaging: true, cancellationToken);
+
+    private async Task<bool> ReconcileParkedPlacementAsync(Guid assetId, bool returnTargetToStaging,
+        CancellationToken cancellationToken)
+    {
+        var plan = await _assetWrites.ReadSameVolumeMovePlanAsync(assetId, cancellationToken).ConfigureAwait(false);
+        if (plan is null || !Path.IsPathFullyQualified(plan.SourcePath)) return false;
+
+        var targetPath = _paths.ResolveVaultRelativePath(CombineRelative(plan.TargetManagedRelativePath, plan.TargetManagedFileName));
+        if (string.Equals(Path.GetFullPath(plan.SourcePath), targetPath, StringComparison.OrdinalIgnoreCase)
+            || await _assetWrites.ResolveTargetAuthorityAsync(plan, cancellationToken).ConfigureAwait(false) == ManagedTargetAuthority.OtherMedia)
+            return false;
+
+        try
+        {
+            RootPathRules.RejectExistingReparsePoints(_paths.Root, targetPath);
+            if ((File.GetAttributes(targetPath) & FileAttributes.Directory) != 0) return false;
+            if (!(await _verifier.VerifyAsync(targetPath, plan.ExpectedByteLength, plan.ExpectedSha256, cancellationToken)
+                .ConfigureAwait(false)).IsMatch)
+                return false;
+            if (!returnTargetToStaging) return true;
+
+            // A crash can leave a verified target before its location checkpoint. Return it
+            // to the same transfer receipt on the same volume. A retry can use either location.
+            var receipt = await ReadStagingReceiptAsync(assetId, plan.ExpectedByteLength, plan.ExpectedSha256,
+                cancellationToken).ConfigureAwait(false);
+            if (receipt.Path is not { } backToStaging || receipt.Error is not null || Path.Exists(backToStaging)
+                || !VolumeIdentity.CanUseSameVolumeMove(_volumeIdentityProvider, targetPath, Path.GetDirectoryName(backToStaging)!))
+                return false;
+            cancellationToken.ThrowIfCancellationRequested();
+            File.Move(targetPath, backToStaging);
+            return true;
+        }
+        catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+        {
+            // A missing target is expected before placement. Prove staged authority below.
+        }
+
+        var staged = await VerifyStagedOriginalAsync(assetId, plan.ExpectedByteLength, plan.ExpectedSha256,
+            verifyBytes: true, cancellationToken).ConfigureAwait(false);
+        return staged.Path is { } stagedPath && staged.Error is null
+            && VolumeIdentity.CanUseSameVolumeMove(_volumeIdentityProvider, stagedPath, _paths.ProfilesPath);
+    }
+
+    private async Task<(string? Path, StorageOperationResult? Error)> VerifyStagedOriginalAsync(
+        Guid assetId, long expectedLength, string expectedSha, bool verifyBytes, CancellationToken cancellationToken)
+    {
+        var (stagedPath, completedInThisProcess, error) = await ReadStagingReceiptAsync(
+            assetId, expectedLength, expectedSha, cancellationToken).ConfigureAwait(false);
+        if (error is not null) return (null, error);
+        if (!File.Exists(stagedPath) || new FileInfo(stagedPath!).Length != expectedLength)
+            return (null, new StorageOperationResult(StorageOperationStatus.NeedsAttention,
+                SafeErrorDetail: "Completed staged bytes are missing or shorter than the transfer checkpoint."));
+        if (verifyBytes || !completedInThisProcess)
+        {
+            var recovered = await _verifier.VerifyAsync(stagedPath!, expectedLength, expectedSha, cancellationToken)
+                .ConfigureAwait(false);
+            if (!recovered.IsMatch) return (null, MapTargetVerification(recovered));
+        }
+        return (stagedPath, null);
+    }
+
+    private async Task<(string? Path, bool CompletedInThisProcess, StorageOperationResult? Error)> ReadStagingReceiptAsync(
+        Guid assetId, long expectedLength, string expectedSha, CancellationToken cancellationToken)
+    {
+        var transfer = await _assetWrites.ReadCompletedTransferAsync(assetId, cancellationToken)
+            .ConfigureAwait(false);
+        if (transfer is null)
+            return (null, false, new StorageOperationResult(StorageOperationStatus.NeedsAttention,
+                SafeErrorDetail: "A completed TransferOriginal job is required for placement."));
+
+        var stagedPath = _paths.ResolveStagedOriginalPartialPath(
+            transfer.Value.ImportUnitId, new MediaStorageToken(transfer.Value.StorageToken));
+        var relativePath = Path.GetRelativePath(_paths.Root, stagedPath).Replace('\\', '/');
+        var completedInThisProcess = false;
+        try
+        {
+            using var document = JsonDocument.Parse(transfer.Value.CheckpointJson);
+            var checkpoint = document.RootElement;
+            if (checkpoint.GetProperty("SchemaVersion").GetInt32() != 1
+                || checkpoint.GetProperty("CandidateMediaId").GetGuid() != assetId
+                || checkpoint.GetProperty("ImportUnitId").GetGuid() != transfer.Value.ImportUnitId
+                || checkpoint.GetProperty("ExpectedLength").GetInt64() != expectedLength
+                || checkpoint.GetProperty("SafeOffset").GetInt64() != expectedLength
+                || !string.Equals(checkpoint.GetProperty("PrefixSha256").GetString(), expectedSha,
+                    StringComparison.Ordinal)
+                || !string.Equals(checkpoint.GetProperty("PartialRelativePath").GetString(), relativePath,
+                    StringComparison.Ordinal)
+                || string.IsNullOrWhiteSpace(checkpoint.GetProperty("SourceIdentity").GetString()))
+                return (null, false, new StorageOperationResult(StorageOperationStatus.NeedsAttention,
+                    SafeErrorDetail: "The completed transfer checkpoint does not match placement authority."));
+            completedInThisProcess = checkpoint.TryGetProperty("ProcessNonce", out var processNonce)
+                && processNonce.TryGetGuid(out var nonce)
+                && nonce == TransferOriginalJobHandler.ProcessNonce;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException)
+        {
+            return (null, false, new StorageOperationResult(StorageOperationStatus.NeedsAttention,
+                SafeErrorDetail: "The completed transfer checkpoint is invalid."));
+        }
+
+        RootPathRules.RejectExistingReparsePoints(_paths.Root, stagedPath);
+        return (stagedPath, completedInThisProcess, null);
     }
 
     private async Task<StorageOperationResult> ExecuteModelPackagePlacementAsync(

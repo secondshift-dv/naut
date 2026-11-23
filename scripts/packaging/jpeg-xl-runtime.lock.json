@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "version": "0.13.0",
+  "archiveUrl": "https://github.com/libjxl/libjxl/releases/download/v0.13.0/jxl-x64-windows.zip",
+  "archiveSha256": "61f382a964f4669095cd460f0b588ed8fb55500b33f7a16bc03c6ef7dce689d9",
+  "files": {
+    "jxl.dll": "abcc2145cb3838e753efd9748174868773e6102ae010ae8a408c9db101bd7c6a",
+    "jxl_cms.dll": "11320fb72d524a40d26a9612012175f0b846759cb071ed1b0ec5c44a48d328a1",
+    "brotlicommon.dll": "2f302085531b2b35695ce265d2809e1e5c3864c629f0d88fe7a01f1cb35ebe09",
+    "brotlidec.dll": "e690802f3f9b25626b0460ab0629702e7fe26920413d00399d290d4a13dd6919",
+    "brotlienc.dll": "d393e6756488e0d1a71de8e66e6885c08515c7ff1e92b2014b847ae260ab14bf"
+  }
+}

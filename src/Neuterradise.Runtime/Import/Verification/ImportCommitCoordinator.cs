@@ -160,7 +160,7 @@ public sealed class ImportCommitCoordinator
             .EnterAsync(unitId, cancellationToken).ConfigureAwait(false);
 
         var canonicalCommit = await CommitCanonicalMediaAsync(unitId, expectedUnitRowVersion, cancellationToken).ConfigureAwait(false);
-        if (!canonicalCommit.LibraryCommitted)
+        if (!canonicalCommit.LibraryCommitted || canonicalCommit.Checkpoint == ImportCommitCheckpoint.Terminal)
         {
             return canonicalCommit;
         }
@@ -188,6 +188,16 @@ public sealed class ImportCommitCoordinator
             return ImportCommitResult.CancelledAt(unitId, state.OperationId, state.Checkpoint);
         }
         var currentDraft = VerificationDraftV1.FromJson(currentUnit.VerificationDraftJson, _timeProvider.GetUtcNowUnixMilliseconds());
+        if (currentDraft.Destination.Kind == DestinationKind.ExistingNormal
+            && state.Checkpoint is ImportCommitCheckpoint.DestinationPrepared or ImportCommitCheckpoint.PlacementPlanned
+            && await SettleParkedDuplicatesAsync(unitId, state, cancellationToken).ConfigureAwait(false))
+        {
+            var settled = await ReadAllUnitItemsAsync(unitId, cancellationToken).ConfigureAwait(false);
+            NotifyCheckpoint(ImportCommitCheckpoint.Terminal);
+            return new ImportCommitResult(unitId, state.OperationId, ImportCommitOutcome.Committed,
+                ImportCommitCheckpoint.Terminal, state.DestinationProfileId, false, [], [],
+                [.. settled.Select(item => item.CandidateMediaId).OfType<Guid>()], [], []);
+        }
         var currentItems = await ReadAllUnitItemsAsync(unitId, cancellationToken).ConfigureAwait(false);
 
         var included = currentItems
@@ -384,14 +394,10 @@ public sealed class ImportCommitCoordinator
                     cancellationToken).ConfigureAwait(false);
             }
 
-            foreach (var item in skipped)
-            {
-                await _catalog.ImportWrites.RetireCandidateAsync(
-                    item.CandidateMediaId!.Value,
-                    MediaRetirementReason.Skipped,
-                    cancellationToken).ConfigureAwait(false);
-                state.RetiredCandidateIds.Add(item.CandidateMediaId!.Value);
-            }
+            var skippedIds = skipped.Select(item => item.CandidateMediaId!.Value).ToArray();
+            await importWrites.RetireCandidatesAsync(skippedIds, MediaRetirementReason.Skipped, cancellationToken)
+                .ConfigureAwait(false);
+            state.RetiredCandidateIds.AddRange(skippedIds);
 
             // Canonical commit does not mutate published appearance. A rollback snapshot for untouched
             // presentation could overwrite a legitimate Profile edit after cancellation.
@@ -420,6 +426,31 @@ public sealed class ImportCommitCoordinator
             state.RetiredCandidateIds,
             [],
             []);
+    }
+
+    private async Task<bool> SettleParkedDuplicatesAsync(Guid unitId, CommitState state, CancellationToken cancellationToken)
+    {
+        if (state.DestinationProfileCreated || state.DestinationProfileId is null) return false;
+        var parked = await _catalog.ImportWrites.ReadParkedOwnedDuplicatesAsync(
+            unitId, state.OperationId, cancellationToken).ConfigureAwait(false);
+        var verified = new Dictionary<string, long>(parked.Count);
+        foreach (var (candidateId, revision) in parked)
+        {
+            try
+            {
+                if (await _moveExecutor.PreserveParkedDuplicateInStagingAsync(
+                    candidateId, cancellationToken).ConfigureAwait(false))
+                    verified.Add(DbGuid.Format(candidateId), revision);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+                or FormatException or ArgumentException)
+            {
+                // Normal placement recovery owns missing or ambiguous files. An owned match
+                // alone cannot authorize retiring a Candidate whose target might hold bytes.
+            }
+        }
+        return await _catalog.ImportWrites.SkipOwnedDuplicatesAsync(
+            unitId, cancellationToken, state.OperationId, verified).ConfigureAwait(false);
     }
 
     /// <summary>

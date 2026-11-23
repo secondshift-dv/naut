@@ -708,6 +708,7 @@
     <sys:String x:Key="Import.Detail.Added">{0} が Vault に追加されました。</sys:String>
     <sys:String x:Key="Import.Detail.WithDuplicates">{0} · {1} はすでに Vault にあります</sys:String>
     <sys:String x:Key="Import.Stage.AlreadyInVault">すでに Vault にあります</sys:String>
+    <sys:String x:Key="Import.Detail.AllDuplicatesSkipped">新規 0 件 · 重複 {0} 件をスキップ</sys:String>
     <sys:String x:Key="Import.Detail.DuplicateOnly">すでに Vault にあります — 別のコピーをインポートせず、既存のメディアを再利用します。</sys:String>
     <sys:String x:Key="Import.ReviewBanner.One">1 件のインポートがレビューできるようになりました</sys:String>
     <sys:String x:Key="Import.ReviewBanner.Many">{0} インポートをレビューする準備ができました</sys:String>
@@ -1204,6 +1205,10 @@
     <sys:String x:Key="Import.Title.ImportedTo">{0} に追加済み</sys:String>
     <sys:String x:Key="Import.Title.ImportingTo">{0} に追加しています</sys:String>
     <sys:String x:Key="Inspector.ActualSize">実際のサイズ</sys:String>
+    <sys:String x:Key="Inspector.PlayAnimation">アニメーションを再生</sys:String>
+    <sys:String x:Key="Inspector.StopAnimation">アニメーションを停止</sys:String>
+    <sys:String x:Key="Inspector.Animation">アニメーション</sys:String>
+    <sys:String x:Key="Inspector.AnimationUnavailable">このアニメーションを再生できませんでした。</sys:String>
     <sys:String x:Key="Inspector.AddAssociation">人物の関連付けを追加</sys:String>
     <sys:String x:Key="Inspector.AddAssociationPrompt">このメディアに写っている Profile を選択してください:</sys:String>
     <sys:String x:Key="Inspector.Associations">関連付け</sys:String>

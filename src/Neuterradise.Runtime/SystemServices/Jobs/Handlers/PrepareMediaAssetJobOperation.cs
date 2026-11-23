@@ -488,7 +488,7 @@ public sealed class PrepareMediaAssetJobOperation : IGenerateThumbnailJobOperati
 
     private void EncodeWebp(string input, string output)
     {
-        using var bitmap = TargetSizeDecoder.Decode(input, 1024, 1024, _tools)
+        using var bitmap = TargetSizeDecoder.Decode(input, 1024, 1024, _tools, backgroundIo: true)
             ?? throw new InvalidDataException("The model or image adapter did not return a decodable still.");
         using var image = SKImage.FromBitmap(bitmap);
         using var encoded = image.Encode(SKEncodedImageFormat.Webp, 85)

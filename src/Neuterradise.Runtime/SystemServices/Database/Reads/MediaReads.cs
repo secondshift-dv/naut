@@ -207,7 +207,8 @@ public sealed class MediaReads
                     PixelHeight: metaHeight ?? 0,
                     Orientation: imageMeta.Orientation,
                     ColorSpace: imageMeta.ColorSpace,
-                    BitDepth: imageMeta.BitDepth);
+                    BitDepth: imageMeta.BitDepth,
+                    IsAnimated: imageMeta.IsAnimated);
             }
             else if (metaWidth.HasValue && metaHeight.HasValue)
             {

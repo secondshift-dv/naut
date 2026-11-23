@@ -6,7 +6,8 @@ public sealed record ImageMediaInfo(
     int PixelHeight,
     string? Orientation = null,
     string? ColorSpace = null,
-    int? BitDepth = null);
+    int? BitDepth = null,
+    bool IsAnimated = false);
 
 public sealed record VideoMediaInfo(
     string Container,

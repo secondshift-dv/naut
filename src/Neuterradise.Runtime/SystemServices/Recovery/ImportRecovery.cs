@@ -15,8 +15,9 @@ public sealed class ImportRecovery
         """
         SELECT import_unit_id
         FROM import_units
-        WHERE state IN ('CANCELLED', 'COMPLETED', 'FAILED_TERMINAL')
-           OR library_commit_state = 'TERMINAL';
+        WHERE (state = 'CANCELLED' AND rollback_settled = 1)
+           OR (state NOT IN ('CANCELLED', 'FAILED_TERMINAL')
+               AND (state = 'COMPLETED' OR library_commit_state = 'TERMINAL'));
         """;
 
     private const string KnownUnitSql =

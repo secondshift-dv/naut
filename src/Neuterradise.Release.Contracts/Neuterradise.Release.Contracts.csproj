@@ -4,6 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>Neuterradise.Release.Contracts</AssemblyName>
     <RootNamespace>Neuterradise.Release.Contracts</RootNamespace>
   </PropertyGroup>
@@ -11,5 +12,7 @@
     <EmbeddedResource Include="..\..\release-contract.json"
                       Link="release-contract.json"
                       LogicalName="Neuterradise.Release.Contracts.release-contract.json" />
+    <EmbeddedResource Include="..\..\scripts\packaging\jpeg-xl-runtime.lock.json"
+                      LogicalName="Neuterradise.Release.Contracts.jpeg-xl-runtime.lock.json" />
   </ItemGroup>
 </Project>

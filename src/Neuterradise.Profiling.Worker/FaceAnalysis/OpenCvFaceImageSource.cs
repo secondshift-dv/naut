@@ -21,6 +21,34 @@ public sealed class OpenCvFaceImageSource : IFaceImageSource
         }
 
         var extension = Path.GetExtension(path);
+        using (var file = File.OpenRead(path))
+        {
+            Span<byte> signature = stackalloc byte[12];
+            var count = file.ReadAtLeast(signature, signature.Length, throwOnEndOfStream: false);
+            if (extension.Equals(".jxl", StringComparison.OrdinalIgnoreCase) || JpegXlDecoder.HasSignature(signature[..count]))
+            {
+                try
+                {
+                    var image = JpegXlDecoder.Decode(file, 2048, 2048);
+                    using var rgba = Mat.FromPixelData(image.Height, image.Width, MatType.CV_8UC4, image.Frames[0].Rgba);
+                    var bgr = new Mat();
+                    try
+                    {
+                        Cv2.CvtColor(rgba, bgr, ColorConversionCodes.RGBA2BGR);
+                        return new OpenCvFaceImage(bgr);
+                    }
+                    catch
+                    {
+                        bgr.Dispose();
+                        throw;
+                    }
+                }
+                catch (Exception error) when (error is InvalidDataException or DllNotFoundException)
+                {
+                    throw new FaceInputException("JPEG XL cannot be decoded for face analysis.");
+                }
+            }
+        }
         if (extension.Equals(".jp2", StringComparison.OrdinalIgnoreCase)
             || extension.Equals(".j2k", StringComparison.OrdinalIgnoreCase))
             return new OpenCvFaceImage(DecodeFrame(path, null));

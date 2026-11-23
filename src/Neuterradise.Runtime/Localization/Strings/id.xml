@@ -708,6 +708,7 @@
     <sys:String x:Key="Import.Detail.Added">{0} ditambahkan ke Vault Anda.</sys:String>
     <sys:String x:Key="Import.Detail.WithDuplicates">{0} · {1} sudah ada di Vault</sys:String>
     <sys:String x:Key="Import.Stage.AlreadyInVault">Sudah ada di Vault</sys:String>
+    <sys:String x:Key="Import.Detail.AllDuplicatesSkipped">0 baru · {0} duplikat dilewati</sys:String>
     <sys:String x:Key="Import.Detail.DuplicateOnly">Sudah ada di Vault — media yang ada akan digunakan kembali tanpa mengimpor salinan lain.</sys:String>
     <sys:String x:Key="Import.ReviewBanner.One">1 impor siap Anda tinjau</sys:String>
     <sys:String x:Key="Import.ReviewBanner.Many">{0} impor siap Anda tinjau</sys:String>
@@ -1204,6 +1205,10 @@
     <sys:String x:Key="Import.Title.ImportedTo">Ditambahkan ke {0}</sys:String>
     <sys:String x:Key="Import.Title.ImportingTo">Menambahkan ke {0}</sys:String>
     <sys:String x:Key="Inspector.ActualSize">Ukuran asli</sys:String>
+    <sys:String x:Key="Inspector.PlayAnimation">Putar animasi</sys:String>
+    <sys:String x:Key="Inspector.StopAnimation">Hentikan animasi</sys:String>
+    <sys:String x:Key="Inspector.Animation">Animasi</sys:String>
+    <sys:String x:Key="Inspector.AnimationUnavailable">Animasi ini tidak dapat diputar.</sys:String>
     <sys:String x:Key="Inspector.AddAssociation">Tambahkan asosiasi orang</sys:String>
     <sys:String x:Key="Inspector.AddAssociationPrompt">Pilih Profile yang muncul dalam item media ini:</sys:String>
     <sys:String x:Key="Inspector.Associations">Asosiasi</sys:String>

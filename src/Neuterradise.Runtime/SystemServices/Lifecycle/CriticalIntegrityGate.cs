@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using System.IO;
 using Neuterradise.App.SystemServices.Database;
 using Neuterradise.App.Media;
 using Neuterradise.App.Media.Model;
@@ -94,7 +95,7 @@ public sealed class CriticalIntegrityGate
         await using var r=await cmd.ExecuteReaderAsync(t).ConfigureAwait(false); while(await r.ReadAsync(t).ConfigureAwait(false)) v.Add(new("STAGING_ORPHANED_REFERENCE","An import item has an orphaned durable reference.","ImportItem",r.GetString(0)));
     }
 
-    private static async Task CheckManagedPathAuthorityAsync(
+    private async Task CheckManagedPathAuthorityAsync(
         SqliteConnection c,
         List<CriticalIntegrityViolation> v,
         CancellationToken t)
@@ -118,23 +119,61 @@ public sealed class CriticalIntegrityGate
             }
         }
 
+        var unresolved = new List<(string MediaId, string State, bool Parked)>();
         await using (var media = c.CreateCommand())
         {
             media.CommandText =
                 """
-                SELECT media_id, path_state
-                FROM media
-                WHERE path_state IN ('PENDING','NEEDS_ATTENTION');
+                SELECT candidate.media_id, candidate.path_state,
+                       candidate.state = 'CANDIDATE' AND candidate.path_state = 'PENDING' AND candidate.media_type <> 'MODEL'
+                       AND candidate.current_managed_relative_path IS NULL AND candidate.current_managed_file_name IS NULL
+                       AND EXISTS (
+                           SELECT 1 FROM import_items item
+                           JOIN import_units unit ON unit.import_unit_id = item.import_unit_id
+                           JOIN storage_operations operation ON operation.operation_id = unit.commit_operation_id
+                           WHERE item.candidate_media_id = candidate.media_id AND item.disposition = 'INCLUDED'
+                             AND unit.state IN ('PREPARING', 'FAILED_RETRYABLE') AND unit.is_paused = 1
+                             AND unit.library_commit_state IN ('DESTINATION_PREPARED', 'PLACEMENT_PLANNED')
+                             AND operation.kind = 'IMPORT_COMMIT' AND operation.entity_type = 'IMPORT_UNIT'
+                             AND operation.entity_id = unit.import_unit_id AND operation.state = unit.library_commit_state
+                             AND candidate.reconciliation_operation_id = operation.operation_id
+                             AND candidate.original_source_path = item.source_path
+                       )
+                FROM media candidate
+                WHERE candidate.path_state IN ('PENDING','NEEDS_ATTENTION');
                 """;
             await using var reader = await media.ExecuteReaderAsync(t).ConfigureAwait(false);
             while (await reader.ReadAsync(t).ConfigureAwait(false))
-            {
-                v.Add(new CriticalIntegrityViolation(
-                    "UNRESOLVED_MEDIA_PATH_AUTHORITY",
-                    $"Media managed-path authority remains {reader.GetString(1)} after recovery.",
-                    "Media",
-                    reader.GetString(0)));
-            }
+                unresolved.Add((reader.GetString(0), reader.GetString(1), reader.GetBoolean(2)));
+        }
+
+        var move = new ManagedMoveExecutor(_catalog.Paths, new WindowsVolumeIdentityProvider(),
+            new ManagedFileVerifier(), _catalog.MediaWrites);
+        foreach (var item in unresolved)
+        {
+            t.ThrowIfCancellationRequested();
+            if (item.Parked && await HasVerifiedParkedPlacementAsync(move, item.MediaId, t).ConfigureAwait(false))
+                continue;
+
+            v.Add(new CriticalIntegrityViolation(
+                "UNRESOLVED_MEDIA_PATH_AUTHORITY",
+                $"Media managed-path authority remains {item.State} after recovery.",
+                "Media",
+                item.MediaId));
+        }
+    }
+
+    private static async Task<bool> HasVerifiedParkedPlacementAsync(
+        ManagedMoveExecutor move, string mediaId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await move.HasVerifiedParkedPlacementAsync(DbGuid.Parse(mediaId), cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+            or ArgumentException or FormatException or CatalogInvariantException)
+        {
+            return false;
         }
     }
 

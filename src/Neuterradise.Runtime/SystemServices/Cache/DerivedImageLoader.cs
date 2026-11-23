@@ -1,6 +1,9 @@
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using Neuterradise.App.SystemServices.Diagnostics;
+using Neuterradise.App.SystemServices.MediaTools;
+using Neuterradise.App.SystemServices.Resources;
 using SkiaSharp;
 
 namespace Neuterradise.App.SystemServices.Cache;
@@ -45,12 +48,42 @@ public sealed class SkiaDerivedImageDecoder : IDerivedImageDecoder
 public static class TargetSizeDecoder
 {
     public static SKBitmap? Decode(string path, int decodeWidth, int? decodeHeight = null,
-        Neuterradise.App.SystemServices.MediaTools.ExternalToolResolver? tools = null)
+        ExternalToolResolver? tools = null, bool backgroundIo = false)
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 64 * 1024);
+        if (backgroundIo) WindowsDiskTelemetry.SetPriority(stream.SafeFileHandle, DiskIoPriority.Low);
+        Span<byte> header = stackalloc byte[12];
+        var count = stream.ReadAtLeast(header, header.Length, throwOnEndOfStream: false);
+        stream.Position = 0;
+        if (JpegXlDecoder.HasSignature(header[..count]) || Path.GetExtension(path).Equals(".jxl", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var image = JpegXlDecoder.Decode(stream, decodeWidth > 0 ? decodeWidth : 4096, decodeHeight ?? 4096);
+                return CreateRgbaBitmap(image.Width, image.Height, image.Frames[0].Rgba);
+            }
+            catch (Exception error) when (error is InvalidDataException or DllNotFoundException)
+            {
+                Trace.TraceWarning("JPEG XL preview unavailable: {0}", error.Message);
+                return null;
+            }
+        }
         var decoded = Decode(stream, decodeWidth, decodeHeight);
         return decoded ?? (Neuterradise.App.Media.Image.Jpeg2000Decoder.IsSource(path)
             ? Neuterradise.App.Media.Image.Jpeg2000Decoder.Decode(path, decodeWidth, decodeHeight, tools) : null);
+    }
+
+    public static SKBitmap CreateRgbaBitmap(int width, int height, byte[] rgba)
+    {
+        var bitmap = new SKBitmap(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Unpremul));
+        var pixels = bitmap.GetPixels();
+        if (pixels == IntPtr.Zero)
+        {
+            bitmap.Dispose();
+            throw new InvalidOperationException("Unable to allocate the decoded image bitmap.");
+        }
+        Marshal.Copy(rgba, 0, pixels, rgba.Length);
+        return bitmap;
     }
 
     public static SKBitmap? Decode(Stream stream, int decodeWidth, int? decodeHeight = null)

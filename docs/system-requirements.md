@@ -1,4 +1,4 @@
-# Naut v0.0.35 System Requirements
+# Naut v0.0.36 System Requirements
 
 These requirements describe the current Windows x64 implementation and build target. Figure / interactive 3D is an optional workload tier; Naut is intended to remain usable without high-end discrete GPU hardware.
 
@@ -24,7 +24,7 @@ Opening an **original video** from Naut uses the Windows default media player. P
 
 ## Native model conversion
 
-FBX, OBJ, STL and 3MF preparation requires the **Microsoft Visual C++ v14 Redistributable (x64)**. If conversion reports that its native library cannot load, install the current x64 runtime from [Microsoft's official download page](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist/), restart Naut, and retry preparation. The .NET runtime is included in the Naut package; this C++ runtime is a separate Windows prerequisite.
+JPEG XL support and FBX, OBJ, STL and 3MF preparation require the **Microsoft Visual C++ v14 Redistributable (x64)**. If decoding or conversion reports that its native library cannot load, install the current x64 runtime from [Microsoft's official download page](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist/), restart Naut, and retry preparation. The .NET runtime is included in the Naut package; this C++ runtime is a separate Windows prerequisite.
 
 ## Figure / interactive 3D
 

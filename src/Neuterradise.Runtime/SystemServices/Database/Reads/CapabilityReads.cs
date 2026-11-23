@@ -1,5 +1,7 @@
+using System.Text.Json;
 using Neuterradise.App.Import;
 using Neuterradise.App.Import.Preparation;
+using Neuterradise.App.Media;
 
 namespace Neuterradise.App.SystemServices.Database.Reads;
 
@@ -18,6 +20,8 @@ public sealed record UnitCapabilitySummary(
 
 public sealed class CapabilityReads
 {
+    private static readonly string PreCommitRequirements = SerializeRequirements(domainCommitted: false);
+    private static readonly string PostCommitRequirements = SerializeRequirements(domainCommitted: true);
     private readonly CatalogConnectionFactory _connectionFactory;
 
     public CapabilityReads(CatalogDb catalog)
@@ -147,8 +151,8 @@ public sealed class CapabilityReads
         await using var command = connection.CreateCommand();
         command.CommandText =
             """
-            WITH eligible_assets AS (
-                SELECT DISTINCT CASE
+            WITH eligible_assets AS NOT MATERIALIZED (
+                SELECT CASE
                     WHEN ii.disposition = 'REUSED' AND ii.reused_media_id IS NOT NULL THEN ii.reused_media_id
                     ELSE ii.candidate_media_id
                 END AS media_id
@@ -158,70 +162,23 @@ public sealed class CapabilityReads
                   AND ((ii.disposition='REUSED' AND ii.reused_media_id IS NOT NULL)
                     OR (ii.disposition='INCLUDED' AND ii.candidate_media_id IS NOT NULL))
             )
-            SELECT ea.media_id, a.media_type, cr.capability, cr.state, j.state
-            FROM eligible_assets ea
-            JOIN media a ON a.media_id = ea.media_id
-            LEFT JOIN media_capability_readiness cr ON cr.media_id = ea.media_id
-            LEFT JOIN jobs j ON j.job_id = cr.job_id
-            ORDER BY ea.media_id, cr.capability;
+            SELECT EXISTS (SELECT 1 FROM eligible_assets ea JOIN media a ON a.media_id = ea.media_id)
+               AND NOT EXISTS (
+                   SELECT 1 FROM eligible_assets ea
+                   JOIN media a ON a.media_id = ea.media_id
+                   CROSS JOIN json_each($requirements, '$.' || a.media_type) requirement
+                   LEFT JOIN media_capability_readiness cr
+                       ON cr.media_id = ea.media_id AND cr.capability = requirement.value
+                   LEFT JOIN jobs j ON j.job_id = cr.job_id
+                   WHERE cr.state IS NULL
+                      OR cr.state NOT IN ('READY','NOT_APPLICABLE','FAILED')
+                      OR (cr.state = 'FAILED' AND j.state IS NOT NULL
+                          AND j.state NOT IN ('FAILED_TERMINAL','CANCELLED','SUCCEEDED'))
+               );
             """;
         command.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
-
-        var media = new Dictionary<Guid, CapabilitySettlementSnapshot>();
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-        {
-            var assetId = DbGuid.Parse(reader.GetString(0));
-            if (!media.TryGetValue(assetId, out var snapshot))
-            {
-                snapshot = new CapabilitySettlementSnapshot(
-                    DbEnum.ParseMediaType(reader.GetString(1)),
-                    new Dictionary<MediaCapability, CapabilitySettlementState>());
-                media.Add(assetId, snapshot);
-            }
-
-            if (!reader.IsDBNull(2) && !reader.IsDBNull(3))
-            {
-                var capability = DbEnum.ParseMediaCapability(reader.GetString(2));
-                snapshot.States[capability] = new CapabilitySettlementState(
-                    DbEnum.ParseMediaCapabilityState(reader.GetString(3)),
-                    reader.IsDBNull(4) ? null : reader.GetString(4));
-            }
-        }
-
-        if (media.Count == 0)
-        {
-            return false;
-        }
-
-        foreach (var snapshot in media.Values)
-        {
-            foreach (var capability in CapabilityApplicability.GetRequiredForImportPhase(snapshot.MediaType, domainCommitted))
-            {
-                if (!snapshot.States.TryGetValue(capability, out var state))
-                {
-                    return false;
-                }
-
-                if (state.State is MediaCapabilityState.Ready or MediaCapabilityState.NotApplicable)
-                {
-                    continue;
-                }
-
-                if (state.State != MediaCapabilityState.Failed)
-                {
-                    return false;
-                }
-
-                if (state.JobState is not null
-                    && state.JobState is not ("FAILED_TERMINAL" or "CANCELLED" or "SUCCEEDED"))
-                {
-                    return false;
-                }
-            }
-        }
-
-        return true;
+        command.Parameters.AddWithValue("$requirements", domainCommitted ? PostCommitRequirements : PreCommitRequirements);
+        return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 1;
     }
 
     /// <summary>
@@ -286,12 +243,9 @@ public sealed class CapabilityReads
         Neuterradise.App.Media.MediaType MediaType,
         Dictionary<MediaCapability, MediaCapabilityState> States);
 
-    private sealed record CapabilitySettlementSnapshot(
-        Neuterradise.App.Media.MediaType MediaType,
-        Dictionary<MediaCapability, CapabilitySettlementState> States);
-
-    private sealed record CapabilitySettlementState(
-        MediaCapabilityState State,
-        string? JobState);
-
+    private static string SerializeRequirements(bool domainCommitted) =>
+        JsonSerializer.Serialize(Enum.GetValues<MediaType>().ToDictionary(
+            mediaType => DbEnum.Format(mediaType),
+            mediaType => CapabilityApplicability.GetRequiredForImportPhase(mediaType, domainCommitted)
+                .Select(capability => DbEnum.Format(capability)).ToArray()));
 }

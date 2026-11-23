@@ -188,8 +188,7 @@ internal sealed class ImportCancellationSettlement
             await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) ids.Add(DbGuid.Parse(reader.GetString(0)));
         }
-        foreach (var id in ids)
-            await _catalog.ImportWrites.RetireCandidateAsync(id, MediaRetirementReason.Cancelled, cancellationToken).ConfigureAwait(false);
+        await _catalog.ImportWrites.RetireCandidatesAsync(ids, MediaRetirementReason.Cancelled, cancellationToken).ConfigureAwait(false);
     }
 
     internal async Task<bool> SettleSkippedMediaAsync(Guid unitId, CancellationToken cancellationToken)

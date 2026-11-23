@@ -10,7 +10,7 @@
 <p align="center">Local-first media collections for Windows — offline face intelligence, interactive 3D Figures, and your own portable Vault.</p>
 
 <p align="center">
-  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.35"><strong>Download Naut v0.0.35</strong></a>
+  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.36"><strong>Download Naut v0.0.36</strong></a>
   ·
   <a href="https://secondshift-dv.github.io/naut/"><strong>View Live Demo</strong></a>
   ·
@@ -74,7 +74,7 @@ Naut ships with English, Bahasa Indonesia, 日本語, 한국어, 简体中文, D
 <td width="50%" valign="top">
 <a href="docs/vault.md"><img src="docs/assets/readme/feature-local-vault.png" alt="Portable local Vault" width="100%"></a><br>
 <strong>Portable local Vault</strong><br>
-The portable app package and the Vault are separate boundaries. Imports copy files into the Vault while the source files remain where they were.
+The portable app package and the Vault are separate boundaries. Imports copy files into the Vault while the source files remain where they were. Exact duplicates already owned by the destination are skipped. JPEG XL images use the same import and preview path as other images.
 </td>
 </tr>
 </table>
@@ -104,7 +104,7 @@ The portable app package and the Vault are separate boundaries. Imports copy fil
 
 ## Quick Start
 
-1. Open the official [Naut v0.0.35 download](https://github.com/secondshift-dv/naut/releases/tag/v0.0.35) and choose **`naut-v0.0.35-win-x64.zip`** under Assets.
+1. Open the official [Naut v0.0.36 download](https://github.com/secondshift-dv/naut/releases/tag/v0.0.36) and choose **`naut-v0.0.36-win-x64.zip`** under Assets.
 2. Extract the complete ZIP to a normal folder.
 3. Run `naut.exe`.
 4. Choose **where to keep** your Vault.
@@ -125,7 +125,7 @@ Naut's normal collection experience is intentionally lighter than its optional F
 | **Display** | 1280 × 720 | 1920 × 1080 or higher |
 | **Free app/update space** | 3 GB | 3 GB+ on SSD |
 
-Vault storage is separate and depends on the size of your collection. See the full [Naut v0.0.35 System Requirements](docs/system-requirements.md).
+Vault storage is separate and depends on the size of your collection. See the full [Naut v0.0.36 System Requirements](docs/system-requirements.md).
 
 ## Optional pack collection
 

@@ -13,6 +13,7 @@ Source authorities:
 - scripts/packaging/package-win-x64.ps1 — runtime notices generator.
 - scripts/packaging/runtime-third-party.lock.json — native runtime and licenses.
 - scripts/packaging/ffmpeg/ffmpeg-runtime.lock.json — FFmpeg build and sources.
+- scripts/packaging/jpeg-xl-runtime.lock.json — libjxl Windows x64 archive and deployed library hashes.
 - src/Neuterradise.App/Assets/Presentation/BuiltIn/Fonts/provenance.json — fonts.
 - Poly Haven Studio Small 08 - CC0-1.0 HDRI. The source and filtered Figure resource are pinned by runtime-third-party.lock.json.
 - release-contract.json — required packaged notice and runtime members.

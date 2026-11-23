@@ -369,8 +369,11 @@ public sealed class ProductionMediaToolPlanSource : IAuthorizedMediaToolPlanSour
                 try
                 {
                     metadata = _imageMetadata.ExtractFromFile(readablePath,
-                        Path.GetExtension(source.SourcePath ?? readablePath));
+                        Path.GetExtension(source.SourcePath ?? readablePath), backgroundIo: true);
                     var extension = Path.GetExtension(source.SourcePath ?? readablePath);
+                    if (extension.Equals(".jxl", StringComparison.OrdinalIgnoreCase)
+                        && (metadata.Format != "JPEG XL" || metadata.Width is null or <= 0 || metadata.Height is null or <= 0))
+                        throw new InvalidDataException(metadata.Diagnostics?.FirstOrDefault() ?? "JPEG XL metadata is unavailable or invalid.");
                     var jpeg2000 = Jpeg2000Decoder.IsSource(readablePath);
                     if (!jpeg2000 && (extension.Equals(".jp2", StringComparison.OrdinalIgnoreCase)
                         || extension.Equals(".j2k", StringComparison.OrdinalIgnoreCase)))

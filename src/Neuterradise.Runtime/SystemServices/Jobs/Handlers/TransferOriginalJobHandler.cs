@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Neuterradise.App.Import.Preparation;
 using Neuterradise.App.SystemServices.Database;
+using Neuterradise.App.SystemServices.Resources;
 using Neuterradise.App.SystemServices.Storage;
 
 namespace Neuterradise.App.SystemServices.Jobs.Handlers;
@@ -65,6 +66,9 @@ internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
 
         try
         {
+            var governor = ResourceGovernor.Shared;
+            using var disk = await governor.AcquireImportDiskAsync(item.SourcePath, _catalog.Paths.Root, cancellationToken)
+                .ConfigureAwait(false);
             Directory.CreateDirectory(Path.GetDirectoryName(partialPath)!);
             RootPathRules.RejectExistingReparsePoints(_catalog.Paths.Root, partialPath);
             await using var source = new FileStream(item.SourcePath, FileMode.Open, FileAccess.Read,
@@ -118,8 +122,13 @@ internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
                 var lastCheckpoint = safeOffset;
                 var checkpointSavedThisRun = false;
                 var lastProgressReport = System.Diagnostics.Stopwatch.GetTimestamp();
-                var nextThrottleBoundary = (safeOffset / Neuterradise.App.SystemServices.Resources.ResourceGovernor.TransferThrottleQuantumBytes + 1)
-                    * Neuterradise.App.SystemServices.Resources.ResourceGovernor.TransferThrottleQuantumBytes;
+                var bulkPriority = disk.BulkPriority;
+                if (bulkPriority != DiskIoPriority.Normal)
+                {
+                    WindowsDiskTelemetry.SetPriority(source.SafeFileHandle, bulkPriority);
+                    WindowsDiskTelemetry.SetPriority(partial.SafeFileHandle, bulkPriority);
+                }
+                var nextThrottleBoundary = safeOffset + disk.BytesBetweenYields;
                 // Publish the starting state once; subsequent progress is coalesced at the
                 // same 100 ms cadence as the scheduler, while EOF always reports exactly.
                 await context.Progress.ReportProgressAsync(written, length, "Transferring", cancellationToken)
@@ -131,18 +140,10 @@ internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
                         cancellationToken).ConfigureAwait(false);
                     if (read == 0) return Failed("SOURCE_CHANGED", "The source ended before its expected length.");
                     await partial.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
-                    Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.ReportTransferIoLatency(
+                    governor.ReportTransferIoLatency(
                         System.Diagnostics.Stopwatch.GetElapsedTime(ioStarted));
                     hash.AppendData(buffer, 0, read);
                     written += read;
-                    if (written >= nextThrottleBoundary)
-                    {
-                        nextThrottleBoundary = (written / Neuterradise.App.SystemServices.Resources.ResourceGovernor.TransferThrottleQuantumBytes + 1)
-                            * Neuterradise.App.SystemServices.Resources.ResourceGovernor.TransferThrottleQuantumBytes;
-                        if (written < length)
-                            await Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared
-                                .YieldBackgroundDiskAsync(cancellationToken).ConfigureAwait(false);
-                    }
                     // The scheduler's progress hub publishes at most 10 times per second.
                     // Reporting each 1 MiB chunk still allocates and locks the hub repeatedly.
                     // Preserve the final progress event and durable checkpoints independently.
@@ -155,18 +156,36 @@ internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
                     }
                     if (written - lastCheckpoint >= _checkpointInterval)
                     {
+                        WindowsDiskTelemetry.SetPriority(partial.SafeFileHandle, DiskIoPriority.Normal);
                         await SaveCheckpointAsync(context, partial, checkpoint.ImportItemId, item.UnitId, identity, length,
                             written, relativePath, hash).ConfigureAwait(false);
+                        if (written < length && bulkPriority != DiskIoPriority.Normal)
+                            WindowsDiskTelemetry.SetPriority(partial.SafeFileHandle, bulkPriority);
                         lastCheckpoint = written;
                         checkpointSavedThisRun = true;
+                    }
+                    if (written >= nextThrottleBoundary && written < length && !cancellationToken.IsCancellationRequested)
+                    {
+                        await disk.YieldAsync(cancellationToken).ConfigureAwait(false);
+                        var updatedPriority = disk.BulkPriority;
+                        if (updatedPriority != bulkPriority)
+                        {
+                            WindowsDiskTelemetry.SetPriority(source.SafeFileHandle, updatedPriority);
+                            WindowsDiskTelemetry.SetPriority(partial.SafeFileHandle, updatedPriority);
+                            bulkPriority = updatedPriority;
+                        }
+                        nextThrottleBoundary = written + disk.BytesBetweenYields;
                     }
                 }
 
                 // A checkpoint written at EOF is already durable; a second flush and
                 // catalog write at the same offset adds no recovery information.
                 if (written != lastCheckpoint || !checkpointSavedThisRun)
+                {
+                    WindowsDiskTelemetry.SetPriority(partial.SafeFileHandle, DiskIoPriority.Normal);
                     await SaveCheckpointAsync(context, partial, checkpoint.ImportItemId, item.UnitId, identity, length,
                         written, relativePath, hash).ConfigureAwait(false);
+                }
                 if (cancellationToken.IsCancellationRequested)
                     return JobExecutionResult.Cancelled("Transfer stopped after a durable safe checkpoint.");
                 if (!SourceIdentityHelper.VerifyIdentity(identity, source.SafeFileHandle, item.SourcePath)
@@ -180,6 +199,7 @@ internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
                     || !string.Equals(existing.Value.Sha, sha, StringComparison.Ordinal)))
                     return Failed("SOURCE_CHANGED", "The transferred source differs from its duplicate investigation.");
 
+                disk.Dispose();
                 await _preparation.RecordTransferredCandidateAsync(checkpoint.ImportItemId, context.OwnerId,
                     sha, length, new DateTimeOffset(File.GetLastWriteTimeUtc(item.SourcePath)).ToUnixTimeMilliseconds(),
                     cancellationToken).ConfigureAwait(false);

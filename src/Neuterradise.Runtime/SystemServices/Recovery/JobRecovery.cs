@@ -113,7 +113,7 @@ public sealed class JobRecovery
                 row_version = row_version + 1
             WHERE kind = 'FaceAnalysis'
               AND state IN ('FAILED_RETRYABLE','FAILED_TERMINAL')
-              AND error_code IN ('FACE_MODELS_UNAVAILABLE','FACE_WORKER_NOT_DEPLOYED');
+              AND error_code IN ('FACE_MODELS_UNAVAILABLE','FACE_MODEL_MISSING','FACE_WORKER_NOT_DEPLOYED');
             """).ConfigureAwait(false);
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);

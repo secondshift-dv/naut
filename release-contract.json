@@ -31,6 +31,12 @@
     "runtime/LICENSES/SharpAssimp-LICENSE.txt",
     "runtime/tools/ffmpeg.exe",
     "runtime/tools/ffprobe.exe",
+    "runtime/tools/jpeg-xl/jxl.dll",
+    "runtime/tools/jpeg-xl/jxl_cms.dll",
+    "runtime/tools/jpeg-xl/brotlicommon.dll",
+    "runtime/tools/jpeg-xl/brotlidec.dll",
+    "runtime/tools/jpeg-xl/brotlienc.dll",
+    "runtime/LICENSES/jpeg-xl/LICENSE.libjxl",
     "runtime/deployment/artifacts.json",
     "runtime/deployment/release-contract.json",
     "runtime/THIRD-PARTY-NOTICES.txt"

@@ -43,6 +43,11 @@ $ModelsRelativeRoot = ([string]$ReleaseContract.modelsRelativeRoot).Replace('\',
 $RequiredReleaseMembers = @($ReleaseContract.requiredMembers | ForEach-Object { ([string]$_).Replace('\', '/') })
 $RequiredUniqueFileNames = @($ReleaseContract.requiredUniqueFileNames | ForEach-Object { [string]$_ })
 $FfmpegMirrorUrl = [string]$ReleaseContract.ffmpegMirrorUrl
+$JpegXlLock = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'scripts/packaging/jpeg-xl-runtime.lock.json') -Raw | ConvertFrom-Json
+if ($JpegXlLock.schemaVersion -ne 1 -or [string]$JpegXlLock.archiveSha256 -notmatch '^[0-9a-f]{64}$') {
+    throw 'JPEG XL runtime lock is invalid.'
+}
+$JpegXlArchiveUrl = [string]$JpegXlLock.archiveUrl
 
 $RuntimeDirectoryName = 'runtime'
 $AppExe = 'naut.exe'
@@ -221,6 +226,9 @@ function Invoke-Download {
     elseif ([string]::Equals($Uri, $FfmpegArchiveUrl, [StringComparison]::Ordinal)) {
         'FFmpeg-archive'
     }
+    elseif ([string]::Equals($Uri, $JpegXlArchiveUrl, [StringComparison]::Ordinal)) {
+        'JPEG-XL-archive'
+    }
     elseif ([string]::Equals($Uri, $FfmpegSourceCompanionUrl, [StringComparison]::Ordinal)) {
         'FFmpeg-corresponding-source'
     }
@@ -266,6 +274,9 @@ function Invoke-Download {
         [StringComparison]::Ordinal)) {
 
         $FfmpegArchiveSha256
+    }
+    elseif ([string]::Equals($Uri, $JpegXlArchiveUrl, [StringComparison]::Ordinal)) {
+        [string]$JpegXlLock.archiveSha256
     }
     elseif ([string]::Equals(
         $Uri,
@@ -597,6 +608,23 @@ Assert-Sha256 -Path $SFacePath -Expected $SFaceSha256 -Label 'SFace model'
 
 $LicensesRoot = Join-Path $RuntimeInstallRoot 'LICENSES'
 New-Item -ItemType Directory -Path $LicensesRoot -Force | Out-Null
+$JpegXlArchive = Join-Path $DownloadRoot 'jxl-x64-windows.zip'
+Invoke-Download -Uri $JpegXlArchiveUrl -OutFile $JpegXlArchive
+Assert-Sha256 -Path $JpegXlArchive -Expected $JpegXlLock.archiveSha256 -Label 'JPEG XL runtime archive'
+$JpegXlExpand = Join-Path $ExtractRoot 'jpeg-xl'
+Expand-Archive -LiteralPath $JpegXlArchive -DestinationPath $JpegXlExpand -Force
+$JpegXlExtracted = Join-Path $JpegXlExpand 'x64-windows'
+$JpegXlInstall = Join-Path $RuntimeInstallRoot 'tools/jpeg-xl'
+$JpegXlLicenses = Join-Path $LicensesRoot 'jpeg-xl'
+New-Item -ItemType Directory -Path $JpegXlInstall,$JpegXlLicenses -Force | Out-Null
+foreach ($member in $JpegXlLock.files.PSObject.Properties) {
+    $nativeFile = Join-Path $JpegXlExtracted "bin/$($member.Name)"
+    Assert-Sha256 -Path $nativeFile -Expected $member.Value -Label "JPEG XL $($member.Name)"
+    Copy-Item -LiteralPath $nativeFile -Destination $JpegXlInstall
+}
+foreach ($component in @('libjxl', 'brotli', 'highway', 'skcms')) {
+    Copy-Item -LiteralPath (Join-Path $JpegXlExtracted "licenses/LICENSE.$component") -Destination $JpegXlLicenses
+}
 Invoke-Download -Uri $YuNetLicenseUrl -OutFile (Join-Path $LicensesRoot 'YuNet-MIT.txt')
 Invoke-Download -Uri $SFaceLicenseUrl -OutFile (Join-Path $LicensesRoot 'SFace-Apache-2.0.txt')
 foreach ($notice in @(
@@ -813,7 +841,14 @@ This runtime package contains third-party runtime artifacts pinned by exact sour
    Filtered resource SHA-256: $($FigureStudio.resourceSha256)
    Naut stores five roughness levels for reflection and a cosine-weighted diffuse map as linear RGBA16F.
 
-The deployment/artifacts.json manifest remains the operational authority for model/tool/native capabilities explicitly resolved by Naut. The runtime-third-party lock and packaged license inventory are the compliance authority for the remaining bundled runtime libraries. A missing file or SHA-256 mismatch fails the canonical build.
+11. libjxl $($JpegXlLock.version) for JPEG XL
+   Source: https://github.com/libjxl/libjxl/tree/v$($JpegXlLock.version)
+   Windows x64 archive: $JpegXlArchiveUrl
+   Archive SHA-256: $($JpegXlLock.archiveSha256)
+   License: BSD-3-Clause
+   License copies for libjxl and its bundled dependencies are in LICENSES/jpeg-xl/.
+
+The deployment/artifacts.json manifest remains the operational authority for model/tool/native capabilities explicitly resolved by Naut. The runtime locks and packaged license inventory are the compliance authority for the remaining bundled runtime libraries. A missing file or SHA-256 mismatch fails the canonical build.
 "@
 [IO.File]::WriteAllText($ThirdPartyNoticePath, $notice.TrimStart() + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
 

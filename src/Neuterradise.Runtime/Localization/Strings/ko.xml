@@ -708,6 +708,7 @@
     <sys:String x:Key="Import.Detail.Added">{0}가 Vault에 추가되었습니다.</sys:String>
     <sys:String x:Key="Import.Detail.WithDuplicates">{0} · {1}는 이미 Vault에 있습니다.</sys:String>
     <sys:String x:Key="Import.Stage.AlreadyInVault">이미 Vault에 있습니다</sys:String>
+    <sys:String x:Key="Import.Detail.AllDuplicatesSkipped">새 미디어 0개 · 중복 {0}개 건너뜀</sys:String>
     <sys:String x:Key="Import.Detail.DuplicateOnly">이미 Vault에 있습니다 — 다른 사본을 가져오지 않고 기존 미디어를 다시 사용합니다.</sys:String>
     <sys:String x:Key="Import.ReviewBanner.One">검토할 수 있는 가져오기 1개가 준비되었습니다.</sys:String>
     <sys:String x:Key="Import.ReviewBanner.Many">{0} 가져오기를 검토할 준비가 되었습니다.</sys:String>
@@ -1204,6 +1205,10 @@
     <sys:String x:Key="Import.Title.ImportedTo">{0}에 추가됨</sys:String>
     <sys:String x:Key="Import.Title.ImportingTo">{0}에 추가</sys:String>
     <sys:String x:Key="Inspector.ActualSize">실제 크기</sys:String>
+    <sys:String x:Key="Inspector.PlayAnimation">애니메이션 재생</sys:String>
+    <sys:String x:Key="Inspector.StopAnimation">애니메이션 정지</sys:String>
+    <sys:String x:Key="Inspector.Animation">애니메이션</sys:String>
+    <sys:String x:Key="Inspector.AnimationUnavailable">이 애니메이션을 재생할 수 없습니다.</sys:String>
     <sys:String x:Key="Inspector.AddAssociation">인물 연관 추가</sys:String>
     <sys:String x:Key="Inspector.AddAssociationPrompt">이 미디어 항목에 나타나는 Profile을 선택하십시오:</sys:String>
     <sys:String x:Key="Inspector.Associations">협회</sys:String>

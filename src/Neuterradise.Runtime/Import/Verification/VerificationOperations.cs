@@ -8,6 +8,7 @@ using Neuterradise.App.SystemServices.Database.Reads;
 using Neuterradise.App.SystemServices.Database.Writes;
 using Neuterradise.App.SystemServices.Storage;
 using System.IO;
+using System.Text.Json;
 
 namespace Neuterradise.App.Import.Verification;
 
@@ -417,38 +418,41 @@ public sealed class VerificationOperations
             cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task SetBatchItemDispositionsAsync(
+    public Task SetBatchItemDispositionsAsync(
         IReadOnlyList<Guid> importItemIds,
         ItemDisposition disposition,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        SetBatchItemDispositionsAsync(importItemIds, disposition, decision: null, cancellationToken);
+
+    internal Task SkipDuplicateItemsAsync(IReadOnlyList<Guid> importItemIds, CancellationToken cancellationToken) =>
+        SetBatchItemDispositionsAsync(importItemIds, ItemDisposition.Skipped, DuplicateDecision.Skip, cancellationToken);
+
+    private async Task SetBatchItemDispositionsAsync(
+        IReadOnlyList<Guid> importItemIds, ItemDisposition disposition, DuplicateDecision? decision,
+        CancellationToken cancellationToken)
     {
         using var mutationAdmission = _catalog.MutationAdmission.Enter(nameof(SetBatchItemDispositionsAsync));
         ArgumentNullException.ThrowIfNull(importItemIds);
-        if (importItemIds.Count == 0)
-        {
-            return;
-        }
+        if (importItemIds.Count == 0) return;
 
         await using var lease = await _writeCoordinator.EnterAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = CatalogTransaction.Begin(connection);
-
-        var now = DbTime.Format(_timeProvider.GetUtcNow());
-        foreach (var itemId in importItemIds)
-        {
-            await using var command = transaction.CreateCommand(
-                """
-                UPDATE import_items
-                SET disposition = $disposition,
-                    updated_at_ms = $now
-                WHERE import_item_id = $itemId;
-                """);
-            command.Parameters.AddWithValue("$itemId", DbGuid.Format(itemId));
-            command.Parameters.AddWithValue("$disposition", DbEnum.Format(disposition));
-            command.Parameters.AddWithValue("$now", now);
-            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        }
-
+        await using var command = transaction.CreateCommand(
+            """
+            UPDATE import_items
+            SET disposition = $disposition,
+                duplicate_decision = COALESCE($decision, duplicate_decision),
+                reused_media_id = CASE WHEN $decision = 'SKIP' THEN NULL ELSE reused_media_id END,
+                updated_at_ms = $now
+            WHERE import_item_id IN (SELECT value FROM json_each($ids))
+              AND ($decision IS NULL OR (disposition = 'INCLUDED' AND duplicate_decision IS NULL));
+            """);
+        command.Parameters.AddWithValue("$ids", JsonSerializer.Serialize(importItemIds.Select(DbGuid.Format)));
+        command.Parameters.AddWithValue("$disposition", DbEnum.Format(disposition));
+        command.Parameters.AddWithValue("$decision", decision is { } value ? DbEnum.Format(value) : DBNull.Value);
+        command.Parameters.AddWithValue("$now", DbTime.Format(_timeProvider.GetUtcNow()));
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
@@ -479,10 +483,17 @@ public sealed class VerificationOperations
         CancellationToken cancellationToken = default) =>
         _catalog.ImportReads.ListExactDuplicateMatchesAsync(unitId, cancellationToken);
 
-    public async Task<VerificationGateProblems> GetGateProblemsAsync(
+    public Task<VerificationGateProblems> GetGateProblemsAsync(
         Guid unitId,
         VerificationDraftV1 draft,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        GetGateProblemsAsync(unitId, draft, matches: null, cancellationToken);
+
+    internal async Task<VerificationGateProblems> GetGateProblemsAsync(
+        Guid unitId,
+        VerificationDraftV1 draft,
+        IReadOnlyList<ImportDuplicateMatch>? matches,
+        CancellationToken cancellationToken)
     {
         if (unitId == Guid.Empty)
         {
@@ -492,22 +503,22 @@ public sealed class VerificationOperations
         var duplicateDecisions = (draft.DuplicateDecisions ?? [])
             .Select(static decision => decision.ImportItemId)
             .ToHashSet();
-        var duplicates = new List<VerificationDuplicateProblem>();
-        var matches = await GetExactDuplicateMatchesAsync(unitId, cancellationToken).ConfigureAwait(false);
-        foreach (var match in matches.Where(static match => match.RequiresDecision).DistinctBy(static match => match.ImportItemId))
+        matches ??= await GetExactDuplicateMatchesAsync(unitId, cancellationToken).ConfigureAwait(false);
+        var unresolved = matches
+            .Where(match => match.RequiresDecision && !duplicateDecisions.Contains(match.ImportItemId))
+            .DistinctBy(static match => match.ImportItemId)
+            .ToArray();
+        var details = await ReadDuplicateDetailsAsync(unresolved, cancellationToken).ConfigureAwait(false);
+        var duplicates = unresolved.Select(match =>
         {
-            if (duplicateDecisions.Contains(match.ImportItemId))
-            {
-                continue;
-            }
-
-            duplicates.Add(new VerificationDuplicateProblem(
+            var detail = details.GetValueOrDefault(match.MatchedMediaId);
+            return new VerificationDuplicateProblem(
                 match.ImportItemId,
                 match.MatchedMediaId,
                 match.SourceFileName,
-                await ReadOwnerDisplayNameAsync(match.MatchedMediaId, cancellationToken).ConfigureAwait(false),
-                await ResolvePreviewImagePathAsync(match.MatchedMediaId, cancellationToken).ConfigureAwait(false)));
-        }
+                detail.OwnerName,
+                detail.PreviewPath);
+        }).ToArray();
 
         var collisionDecisions = (draft.ProfileCollisionDecisions ?? [])
             .Select(static decision => decision.ImportItemId)
@@ -570,21 +581,48 @@ public sealed class VerificationOperations
             .ConfigureAwait(false);
     }
 
-    private async Task<string?> ReadOwnerDisplayNameAsync(Guid assetId, CancellationToken cancellationToken)
+    private async Task<Dictionary<Guid, (string? OwnerName, string? PreviewPath)>> ReadDuplicateDetailsAsync(
+        IReadOnlyList<ImportDuplicateMatch> matches,
+        CancellationToken cancellationToken)
     {
+        var details = new Dictionary<Guid, (string?, string?)>();
+        if (matches.Count == 0) return details;
+
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT p.display_name
-            FROM profile_media pa
-            JOIN profiles p ON p.profile_id = pa.profile_id
-            WHERE pa.media_id = $assetId AND pa.relation_type = 'OWNER'
-              AND p.kind = 'NORMAL' AND p.trashed_at_ms IS NULL
-            ORDER BY pa.created_at_ms ASC
-            LIMIT 1;
+            SELECT asset.media_id, owner.display_name, thumbnail.relative_path
+            FROM json_each($assetIds) ids
+            JOIN media asset ON asset.media_id = ids.value AND asset.state = 'ACTIVE'
+            LEFT JOIN profile_media ownership ON ownership.media_id = asset.media_id
+              AND ownership.relation_type = 'OWNER' AND ownership.publication_import_unit_id IS NULL
+            LEFT JOIN profiles owner ON owner.profile_id = ownership.profile_id
+              AND owner.kind = 'NORMAL' AND owner.trashed_at_ms IS NULL
+            LEFT JOIN media_assets thumbnail ON thumbnail.media_id = asset.media_id
+              AND thumbnail.role = 'THUMBNAIL' AND thumbnail.state = 'READY';
             """;
-        command.Parameters.AddWithValue("$assetId", DbGuid.Format(assetId));
-        return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string;
+        command.Parameters.AddWithValue("$assetIds", JsonSerializer.Serialize(
+            matches.Select(static match => DbGuid.Format(match.MatchedMediaId)).Distinct()));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            string? preview = null;
+            if (!reader.IsDBNull(2))
+            {
+                try
+                {
+                    preview = _catalog.Paths.ResolveVaultRelativePath(VaultPathArea.MediaAssets, reader.GetString(2));
+                }
+                catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
+                {
+                    // A stale thumbnail leaves the review card usable.
+                }
+            }
+
+            details[DbGuid.Parse(reader.GetString(0))] = (reader.IsDBNull(1) ? null : reader.GetString(1), preview);
+        }
+
+        return details;
     }
 
     private async Task<IReadOnlyList<VerificationProfileCollisionProblem>> ReadStrongProfileCollisionsAsync(

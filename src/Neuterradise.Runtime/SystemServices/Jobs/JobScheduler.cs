@@ -628,15 +628,7 @@ public sealed class JobScheduler : IAsyncDisposable
                     return;
                 }
 
-                JobExecutionResult result;
-                using (record.Kind is "TransferOriginal" or "HashMedia" or "ExtractMetadata"
-                    or "GenerateThumbnail" or "GenerateVideoMediaAssets" or "GenerateBanner"
-                    or "GenerateModelMediaAssets" or "FaceAnalysis"
-                    ? ResourceGovernor.Shared.EnterImportPressure()
-                    : null)
-                {
-                    result = await handler.ExecuteAsync(context, cancelSignal.Token).ConfigureAwait(false);
-                }
+                var result = await ExecuteWithImportDiskBudgetAsync(handler, context, cancelSignal.Token).ConfigureAwait(false);
                 if (result.IsSucceeded)
                 {
                     await FlushFinalProgressAsync(lease, jobId, CancellationToken.None).ConfigureAwait(false);
@@ -689,6 +681,21 @@ public sealed class JobScheduler : IAsyncDisposable
         {
             _inflight.TryRemove(jobId, out _);
         }
+    }
+
+    private async Task<JobExecutionResult> ExecuteWithImportDiskBudgetAsync(
+        IJobHandler handler, JobExecutionContext context, CancellationToken ct)
+    {
+        // Hash and transfer acquire the actual external source and staging devices inside
+        // their handlers. These later jobs read from staging or the managed Vault tree.
+        var vaultIo = context.Kind is "ExtractMetadata" or "GenerateThumbnail" or "GenerateVideoMediaAssets"
+            or "GenerateBanner" or "GenerateModelMediaAssets" or "FaceAnalysis";
+        using var pressure = vaultIo || context.Kind is "TransferOriginal" or "HashMedia"
+            ? _governor.EnterImportPressure() : null;
+        using var disk = vaultIo
+            ? await _governor.AcquireImportDiskAsync(_catalog.Paths.Root, null, ct).ConfigureAwait(false) : null;
+        if (disk is not null) await disk.YieldAsync(ct).ConfigureAwait(false);
+        return await handler.ExecuteAsync(context, ct).ConfigureAwait(false);
     }
 
     private async Task CompleteAttemptAsync(JobLease lease, Guid jobId, JobExecutionResult result)

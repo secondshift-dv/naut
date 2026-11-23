@@ -7,7 +7,7 @@ public static class SupportedMediaClassifier
 {
     private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tiff", ".tif", ".avif", ".heic", ".heif", ".ico", ".jp2", ".j2k"
+        ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tiff", ".tif", ".avif", ".heic", ".heif", ".ico", ".jp2", ".j2k", ".jxl"
     };
 
     private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
