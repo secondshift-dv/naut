@@ -566,7 +566,7 @@ public sealed class ImportWrites
 
     private static readonly string OwnedDuplicateAuthoritySql = $"""
         EXISTS (
-            SELECT 1 FROM media a
+            SELECT 1 FROM media a INDEXED BY ix_media_active_byte_length
             JOIN profile_media owner ON owner.media_id = a.media_id AND owner.profile_id = unit.destination_profile_id
             WHERE a.media_id <> c.media_id AND a.media_type = c.media_type AND {ImportReads.ExactMediaIdentitySql}
               AND (c.media_type <> 'MODEL' OR c.bundle_sha256 IS NOT NULL)

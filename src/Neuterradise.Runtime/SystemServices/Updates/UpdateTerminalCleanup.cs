@@ -1,4 +1,5 @@
 using Neuterradise.App.SystemServices.Storage;
+using Neuterradise.Release.Contracts;
 
 namespace Neuterradise.App.SystemServices.Updates;
 
@@ -198,6 +199,11 @@ public sealed class UpdateTerminalCleanup
             }
         }
 
+        UpdatePathGuard.RequireDisjoint(_vaultRoot is null
+            ? [installRoot, _appState.Root, stagingRoot, backupRoot]
+            : [installRoot, _appState.Root, stagingRoot, backupRoot, _vaultRoot]);
+        UpdatePathGuard.Resolve(payloadRoot);
+        UpdatePathGuard.Resolve(toolsRoot);
         return new CleanupPaths(
             stagingRoot,
             backupRoot,
@@ -205,46 +211,8 @@ public sealed class UpdateTerminalCleanup
             toolsRoot);
     }
 
-    private static void DeleteDirectoryTreeNoFollow(
-        string root,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!Directory.Exists(root))
-            return;
-
-        var rootAttributes = File.GetAttributes(root);
-        if ((rootAttributes & FileAttributes.ReparsePoint) != 0)
-            throw new IOException(
-                "Update cleanup root cannot be a reparse point.");
-
-        foreach (var entry in Directory.EnumerateFileSystemEntries(root))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var attributes = File.GetAttributes(entry);
-            var isDirectory = (attributes & FileAttributes.Directory) != 0;
-            var isReparsePoint =
-                (attributes & FileAttributes.ReparsePoint) != 0;
-
-            if (isDirectory)
-            {
-                if (isReparsePoint)
-                {
-                    Directory.Delete(entry, recursive: false);
-                }
-                else
-                {
-                    DeleteDirectoryTreeNoFollow(entry, cancellationToken);
-                }
-            }
-            else
-            {
-                File.Delete(entry);
-            }
-        }
-
-        Directory.Delete(root, recursive: false);
-    }
+    private static void DeleteDirectoryTreeNoFollow(string root, CancellationToken cancellationToken) =>
+        UpdatePathGuard.DeleteTree(root, cancellationToken);
 
     private sealed record CleanupPaths(
         string StagingRoot,

@@ -76,6 +76,7 @@
     <sys:String x:Key="Import.PreparingCover">Cover の提案を準備しています…</sys:String>
     <sys:String x:Key="Import.PreviewUnavailable">プレビューは利用できません</sys:String>
     <sys:String x:Key="Import.Prioritize">優先順位を付ける</sys:String>
+    <sys:String x:Key="Import.Normalize">通常</sys:String>
     <sys:String x:Key="Import.Problems">要レビュー</sys:String>
     <sys:String x:Key="Import.Problems.Description">問題を解決して続行してください。</sys:String>
     <sys:String x:Key="Import.ProfileCollision">別の Profile として認識されます</sys:String>
@@ -706,7 +707,7 @@
     <sys:String x:Key="Import.Detail.OneItem">1 件</sys:String>
     <sys:String x:Key="Import.Detail.ManyItems">{0} アイテム</sys:String>
     <sys:String x:Key="Import.Detail.Added">{0} が Vault に追加されました。</sys:String>
-    <sys:String x:Key="Import.Detail.WithDuplicates">{0} · {1} はすでに Vault にあります</sys:String>
+    <sys:String x:Key="Import.Detail.PendingReuse">{0} 件を再利用に選択</sys:String>
     <sys:String x:Key="Import.Stage.AlreadyInVault">すでに Vault にあります</sys:String>
     <sys:String x:Key="Import.Progress.CheckingMedia">メディアを確認中</sys:String>
     <sys:String x:Key="Import.Progress.Session">一括処理: {0} / {1} 件確認済み</sys:String>
@@ -1009,7 +1010,7 @@
     <sys:String x:Key="Import.Pause.Tooltip">インポートを一時停止する</sys:String>
     <sys:String x:Key="Import.Start">スタート</sys:String>
     <sys:String x:Key="Import.Start.Prioritize">このインポートを優先する</sys:String>
-    <sys:String x:Key="Import.Start.Prioritized">このインポートは優先されます</sys:String>
+    <sys:String x:Key="Import.Start.Normalize">通常の優先度に戻す</sys:String>
     <sys:String x:Key="Import.Start.Resume">インポートを開始する</sys:String>
     <sys:String x:Key="Import.Preparing">プレビューを準備しています…</sys:String>
     <sys:String x:Key="Import.Priority">優先順位</sys:String>

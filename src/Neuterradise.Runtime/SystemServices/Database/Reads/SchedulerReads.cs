@@ -706,7 +706,7 @@ public sealed class SchedulerReads
                    SUM(CASE WHEN j.state = 'FAILED_TERMINAL' THEN 1 ELSE 0 END),
                    SUM(CASE WHEN j.state = 'CANCELLED' THEN 1 ELSE 0 END)
             FROM import_items i
-            JOIN jobs j ON j.owner_type = 'Media' AND j.owner_id = i.candidate_media_id
+            CROSS JOIN jobs j ON j.owner_type = 'Media' AND j.owner_id = i.candidate_media_id
             WHERE i.import_unit_id = $unitId
               AND i.candidate_media_id IS NOT NULL;
             """;
@@ -807,7 +807,7 @@ public sealed class SchedulerReads
                    j.stage, j.checkpoint_json, j.error_code, j.error_detail_safe,
                    j.created_at_ms, j.started_at_ms, j.completed_at_ms, j.row_version
             FROM import_items i
-            JOIN jobs j ON j.owner_type = 'Media' AND j.owner_id = i.candidate_media_id
+            CROSS JOIN jobs j ON j.owner_type = 'Media' AND j.owner_id = i.candidate_media_id
             WHERE i.import_unit_id = $unitId
               AND i.candidate_media_id IS NOT NULL
             ORDER BY j.created_at_ms ASC, j.job_id ASC;

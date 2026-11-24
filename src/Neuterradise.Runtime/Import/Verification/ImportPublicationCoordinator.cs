@@ -7,6 +7,7 @@ using Neuterradise.App.Profiles;
 using Neuterradise.App.RelatedProfiles;
 using Neuterradise.App.SystemServices.Database;
 using Neuterradise.App.SystemServices.Database.Writes;
+using Neuterradise.App.SystemServices.Diagnostics;
 using Neuterradise.App.SystemServices.Storage;
 using Neuterradise.App.Trash;
 
@@ -52,6 +53,7 @@ public sealed class ImportPublicationCoordinator
         await using var mutationLease = await _catalog.ImportUnitMutations
             .EnterAsync(unitId, cancellationToken).ConfigureAwait(false);
 
+        using (PerfTrace.Measure("import.publication.draft", 1000))
         for (var attempt = 0; attempt < 3; attempt++)
         {
             var model = await _verification.LoadVerificationReadModelAsync(unitId, cancellationToken).ConfigureAwait(false);
@@ -163,7 +165,9 @@ public sealed class ImportPublicationCoordinator
         {
             await new ImportMediaPreparationCoordinator(_catalog, _catalog.Paths, _timeProvider)
                 .ReconcilePersistedArtifactsAsync(unitId, cancellationToken).ConfigureAwait(false);
-            var readiness = await _validator.ValidateCommitReadinessAsync(unitId, cancellationToken).ConfigureAwait(false);
+            VerificationReadinessResult readiness;
+            using (PerfTrace.Measure("import.publication.readiness", 1000))
+                readiness = await _validator.ValidateCommitReadinessAsync(unitId, cancellationToken).ConfigureAwait(false);
             if (!readiness.IsReady)
             {
                 var blocker = readiness.Blockers.FirstOrDefault();
@@ -182,7 +186,9 @@ public sealed class ImportPublicationCoordinator
 
         // Ownership choices can change the Stage-1 delta, but the relation remains unpublished until
         // the core publication transaction clears its Unit marker.
-        var collisionResult = await ApplyCollisionDecisionsAsync(
+        ImportPublicationResult collisionResult;
+        using (PerfTrace.Measure("import.publication.collisions", 1000))
+            collisionResult = await ApplyCollisionDecisionsAsync(
             unitId,
             destination.ProfileId,
             draft,
@@ -194,12 +200,16 @@ public sealed class ImportPublicationCoordinator
 
         try
         {
-            if (!await new ImportCancellationSettlement(_catalog, _trash)
-                .SettleSkippedMediaAsync(unitId, cancellationToken).ConfigureAwait(false))
+            bool skippedSettled;
+            using (PerfTrace.Measure("import.publication.skipped", 1000))
+                skippedSettled = await new ImportCancellationSettlement(_catalog, _trash)
+                    .SettleSkippedMediaAsync(unitId, cancellationToken).ConfigureAwait(false);
+            if (!skippedSettled)
             {
                 return ImportPublicationResult.Pending("SKIPPED_MEDIA_CLEANUP_PENDING", "A removed media item still needs cleanup.");
             }
-            await ApplyCorePublicationAsync(unitId, destination, draft, cancellationToken).ConfigureAwait(false);
+            using (PerfTrace.Measure("import.publication.core", 1000))
+                await ApplyCorePublicationAsync(unitId, destination, draft, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -214,7 +224,9 @@ public sealed class ImportPublicationCoordinator
 
         // Face choices are deliberately after the core boundary: APPEARS/evidence/identity samples
         // must never leak into a published Profile before Save. They are idempotent on re-entry.
-        var faceResult = await ApplyFaceDecisionsAsync(destination.ProfileId, draft, cancellationToken).ConfigureAwait(false);
+        ImportPublicationResult faceResult;
+        using (PerfTrace.Measure("import.publication.faces", 1000))
+            faceResult = await ApplyFaceDecisionsAsync(destination.ProfileId, draft, cancellationToken).ConfigureAwait(false);
         if (!faceResult.IsSuccess)
         {
             return faceResult;
@@ -225,6 +237,7 @@ public sealed class ImportPublicationCoordinator
         // Re-entry is safe because evidence keys are deterministic and RelatedWrites is idempotent.
         try
         {
+            using var measure = PerfTrace.Measure("import.publication.related", 1000);
             var related = new RelatedEvidenceProjector(_catalog, _timeProvider);
             foreach (var assetId in await ReadUnitPublishedMediaIdsAsync(unitId, cancellationToken).ConfigureAwait(false))
             {
@@ -246,6 +259,7 @@ public sealed class ImportPublicationCoordinator
         ImportCommitResult cleanup;
         try
         {
+            using var measure = PerfTrace.Measure("import.publication.cleanup", 1000);
             cleanup = await ImportFinalizer.CreateDefaultCommitCoordinator(_catalog)
                 .CommitAsync(unitId, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
@@ -267,6 +281,7 @@ public sealed class ImportPublicationCoordinator
                 ? ImportUnitState.Completed
                 : ImportUnitState.Committed;
 
+        using var terminalMeasure = PerfTrace.Measure("import.publication.terminal", 1000);
         var textFiles = new ProfileTextFiles(_catalog);
         await textFiles.InspectAsync(destination.ProfileId, cancellationToken).ConfigureAwait(false);
         if (model.SourceKind == "DIRECTORY" && model.SourcePathOrReference is { } sourceFolder)

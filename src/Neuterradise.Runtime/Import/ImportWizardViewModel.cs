@@ -856,7 +856,8 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         }
 
         var token = _lifetime.Token;
-        var model = await _operations.LoadVerificationReadModelAsync(UnitId, token).ConfigureAwait(true);
+        var model = await Task.Run(() => _operations.LoadVerificationReadModelAsync(UnitId, token), token).ConfigureAwait(true);
+        token.ThrowIfCancellationRequested();
         VerificationDraftV1? draft = null;
         if (model is not null)
         {
@@ -951,8 +952,9 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
     {
         try
         {
-            var categories = await _catalog!.SettingsReads.GetAllCategoriesAsync(token).ConfigureAwait(true);
-            var tags = await _catalog.SettingsReads.GetAllTagsAsync(token).ConfigureAwait(true);
+            var categories = await Task.Run(() => _catalog!.SettingsReads.GetAllCategoriesAsync(token), token).ConfigureAwait(true);
+            var tags = await Task.Run(() => _catalog!.SettingsReads.GetAllTagsAsync(token), token).ConfigureAwait(true);
+            token.ThrowIfCancellationRequested();
 
             Categories.Clear();
             foreach (var category in categories.OrderBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase))
@@ -988,7 +990,8 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         {
             try
             {
-                var profileName = await _operations!.ReadActiveDestinationNameAsync(existingId, token).ConfigureAwait(true);
+                var profileName = await Task.Run(() => _operations!.ReadActiveDestinationNameAsync(existingId, token), token).ConfigureAwait(true);
+                token.ThrowIfCancellationRequested();
                 if (profileName is not null)
                 {
                     UseExistingProfile(existingId, profileName);
@@ -1044,7 +1047,13 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
 
     private async Task RefreshHintsAsync(HintSection sections, CancellationToken cancellationToken)
     {
-        if (_operations is null || _catalog is null || sections == 0) return;
+        if (_disposed || _operations is null || _catalog is null || sections == 0) return;
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
+        await Task.Run(() => ReadHintsAsync(sections, linked.Token)).ConfigureAwait(false);
+    }
+
+    private async Task ReadHintsAsync(HintSection sections, CancellationToken cancellationToken)
+    {
         var entered = false;
         try
         {
@@ -1053,17 +1062,30 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
             using var measure = PerfTrace.Measure("import.wizard.hints", 150);
             if (sections.HasFlag(HintSection.Progress))
             {
-                var progress = await _catalog.ImportReads.ListUnitProgressAsync([UnitId], cancellationToken).ConfigureAwait(false);
+                var progress = await _catalog!.ImportReads.ListUnitProgressAsync([UnitId], cancellationToken).ConfigureAwait(false);
                 await DispatchAsync(() => ApplyProgress(progress.GetValueOrDefault(UnitId))).ConfigureAwait(false);
             }
             if (sections.HasFlag(HintSection.Review))
             {
                 VerificationDraftV1? draft = null;
-                await DispatchAsync(() => draft = BuildDraft()).ConfigureAwait(false);
-                var matches = await _operations.GetExactDuplicateMatchesAsync(UnitId, cancellationToken).ConfigureAwait(false);
-                var shared = await ImportWizardQueries.ReadSharedMediaHintsAsync(_catalog, matches, cancellationToken).ConfigureAwait(false);
-                var problems = await _operations.GetGateProblemsAsync(UnitId, draft!, matches, cancellationToken).ConfigureAwait(false);
-                await DispatchAsync(() => ApplyReview(matches, shared, problems)).ConfigureAwait(false);
+                await DispatchAsync(() =>
+                {
+                    if (!_disposed && !cancellationToken.IsCancellationRequested) draft = BuildDraft();
+                }).ConfigureAwait(false);
+                if (draft is null) return;
+                var matches = await _operations!.GetExactDuplicateMatchesAsync(UnitId, cancellationToken).ConfigureAwait(false);
+                var shared = await ImportWizardQueries.ReadSharedMediaHintsAsync(_catalog!, matches, cancellationToken).ConfigureAwait(false);
+                var problems = await _operations.GetGateProblemsAsync(UnitId, draft, matches, cancellationToken).ConfigureAwait(false);
+                await DispatchAsync(() =>
+                {
+                    if (_disposed || cancellationToken.IsCancellationRequested) return;
+                    if ((BuildDraft() with { UpdatedAtMs = 0 }).ToJson() != (draft with { UpdatedAtMs = 0 }).ToJson())
+                    {
+                        SignalHints(HintSection.Review);
+                        return;
+                    }
+                    ApplyReview(matches, shared, problems);
+                }).ConfigureAwait(false);
             }
             if (sections.HasFlag(HintSection.Faces))
             {
@@ -1072,7 +1094,7 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
             }
             if (sections.HasFlag(HintSection.Appearance))
             {
-                var appearance = await _operations.GetAppearanceCandidatesAsync(UnitId, cancellationToken).ConfigureAwait(false);
+                var appearance = await _operations!.GetAppearanceCandidatesAsync(UnitId, cancellationToken).ConfigureAwait(false);
                 await DispatchAsync(() => ApplyAppearance(appearance)).ConfigureAwait(false);
             }
         }
@@ -1756,8 +1778,7 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
 
         for (var attempt = 0; attempt < 3; attempt++)
         {
-            var model = await _operations
-                .LoadVerificationReadModelAsync(UnitId, cancellationToken)
+            var model = await Task.Run(() => _operations.LoadVerificationReadModelAsync(UnitId, cancellationToken), cancellationToken)
                 .ConfigureAwait(false);
             if (model is null
                 || model.State.IsUnitCommitted()
@@ -1812,14 +1833,17 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         ErrorMessage = null;
         try
         {
+            var token = _lifetime.Token;
+            var draft = BuildDraft();
             if (_selectedExistingProfile is { } selected && _choice == ImportDestinationChoice.Existing
-                && await _operations!.ReadActiveDestinationNameAsync(selected.ProfileId, _lifetime.Token).ConfigureAwait(true) is null)
+                && await Task.Run(() => _operations!.ReadActiveDestinationNameAsync(selected.ProfileId, token), token).ConfigureAwait(true) is null)
             {
                 SelectedExistingProfile = null;
                 ErrorMessage = SurfaceText.Get("ImportWizard.ChooseProfile.Again", "The saved destination is missing or unavailable. Choose a Profile to continue.");
                 return;
             }
-            var accepted = await _finalizer.RequestImportAsync(UnitId, BuildDraft(), _lifetime.Token).ConfigureAwait(true);
+            token.ThrowIfCancellationRequested();
+            var accepted = await Task.Run(() => _finalizer.RequestImportAsync(UnitId, draft, token), token).ConfigureAwait(true);
             if (!accepted)
             {
                 ErrorMessage = SurfaceText.Get("ImportWizard.Gone", "This import is no longer available.");
@@ -1911,7 +1935,9 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         try
         {
             await CommitPendingTagInputForSubmissionAsync().ConfigureAwait(true);
-            var result = await _publication.PublishAsync(UnitId, BuildDraft(), _lifetime.Token).ConfigureAwait(true);
+            var token = _lifetime.Token;
+            var draft = BuildDraft();
+            var result = await Task.Run(() => _publication.PublishAsync(UnitId, draft, token), token).ConfigureAwait(true);
             if (result.Status == ImportPublicationStatus.Blocked)
             {
                 ErrorMessage = result.UserMessage ?? SurfaceText.Get("ImportWizard.PublishBlocked", "Verify still has unresolved choices.");

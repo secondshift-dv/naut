@@ -141,7 +141,7 @@ public sealed class IncrementalUpdateService(AppStatePaths appState, InstallPath
             written.Add(controlPath);
             await File.WriteAllTextAsync(controlPath, JsonSerializer.Serialize(new UpdateReleaseManifest(
                 manifest.SchemaVersion, manifest.ProductId, manifest.ProductVersion, manifest.RuntimeIdentifier,
-                manifest.Files), UpdateManifest.JsonOptions), cancellationToken).ConfigureAwait(false);
+                manifest.Files, manifest.MinimumCompatibleVersion), UpdateManifest.JsonOptions), cancellationToken).ConfigureAwait(false);
             progress?.Report(new(UpdatePhase.Verifying, 0, null, 0, manifest.Files.Count));
             var validation = validator.Validate(manifest, staging);
             if (!validation.IsAccepted) return new(false, false, validation.SafeError);

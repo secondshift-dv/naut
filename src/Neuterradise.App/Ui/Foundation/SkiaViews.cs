@@ -29,6 +29,7 @@ public sealed class IconView : SKCanvasElement
     private string _key;
     private string _color;
     private bool _filled;
+    private ThemeRuntime? _registeredTheme;
 
     private sealed record CachedPath(string Data, SKPath Path);
 
@@ -39,13 +40,22 @@ public sealed class IconView : SKCanvasElement
         Width = size;
         Height = size;
         IsHitTestVisible = false;
-        Unloaded += (_, _) => ThemeRuntime.Current.Changed -= Invalidate;
-        Loaded += (_, _) =>
-        {
-            ThemeRuntime.Current.Changed -= Invalidate;
-            ThemeRuntime.Current.Changed += Invalidate;
-            Invalidate();
-        };
+        Unloaded += OnUnloaded;
+        Loaded += OnLoaded;
+    }
+
+    private void OnLoaded(object sender, RoutedEventArgs args)
+    {
+        _registeredTheme?.UnregisterIcon(this);
+        _registeredTheme = ThemeRuntime.Current;
+        _registeredTheme.RegisterIcon(this);
+        Invalidate();
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs args)
+    {
+        _registeredTheme?.UnregisterIcon(this);
+        _registeredTheme = null;
     }
 
     public string Key
@@ -140,6 +150,54 @@ public sealed class IconView : SKCanvasElement
     }
 }
 
+internal sealed class ViewImageRequest
+{
+    private CancellationTokenSource? _pending;
+    public bool IsPending => _pending is not null;
+
+    public void Cancel()
+    {
+        var request = _pending;
+        _pending = null;
+        request?.Cancel();
+    }
+
+    public void Start(string? identity, string path, int width, Func<ImageLease, bool> accept)
+    {
+        if (_pending is not null) return;
+        var request = new CancellationTokenSource();
+        _pending = request;
+        TaskObserver.Observe(LoadAsync(request, identity, path, width, accept), "ViewImageRequest.LoadAsync");
+    }
+
+    private async Task LoadAsync(CancellationTokenSource request, string? identity, string path, int width,
+        Func<ImageLease, bool> accept)
+    {
+        ImageLease? lease = null;
+        try
+        {
+            lease = string.IsNullOrWhiteSpace(identity)
+                ? await DerivedImageLoader.Shared.LoadAsync(path, width, request.Token).ConfigureAwait(false)
+                : await DerivedImageLoader.Shared.LoadAsync(identity, path, width, request.Token).ConfigureAwait(false);
+            if (lease is null || request.IsCancellationRequested) return;
+            await UiDispatch.InvokeAsync(() =>
+            {
+                if (ReferenceEquals(_pending, request) && !request.IsCancellationRequested
+                    && lease is not null && accept(lease)) lease = null;
+            }).ConfigureAwait(false);
+        }
+        finally
+        {
+            lease?.Dispose();
+            await UiDispatch.InvokeAsync(() =>
+            {
+                if (ReferenceEquals(_pending, request)) _pending = null;
+                request.Dispose();
+            }).ConfigureAwait(false);
+        }
+    }
+}
+
 /// <summary>
 /// A derived image drawn through Skia at its decode width, placed with the canonical normalized media
 /// transform (focal point, zoom, pan, fit). The decoded image lives in the bounded shared cache; this
@@ -154,7 +212,7 @@ public sealed class SkImageView : SKCanvasElement
     private MediaTransformState _transform = MediaTransformState.Default;
     private double _cornerRadius;
     private bool _circle;
-    private int _generation;
+    private readonly ViewImageRequest _imageRequest = new();
     private double _blur;
     private string _placeholderToken = "surface3";
 
@@ -182,7 +240,6 @@ public sealed class SkImageView : SKCanvasElement
             _source = value;
             ReleaseImage();
             SetAnimationFrame(null);
-            ++_generation;
             EnsureImage();
         }
     }
@@ -255,27 +312,6 @@ public sealed class SkImageView : SKCanvasElement
         Invalidate();
     }
 
-    private async Task LoadAsync(ImageRef reference, int generation)
-    {
-        var loaded = string.IsNullOrWhiteSpace(reference.ResourceKey)
-            ? await DerivedImageLoader.Shared.LoadAsync(reference.Path, reference.DecodeWidth).ConfigureAwait(false)
-            : await DerivedImageLoader.Shared.LoadAsync(reference.ResourceKey, reference.Path, reference.DecodeWidth).ConfigureAwait(false);
-        UiDispatch.Run(() =>
-        {
-            if (generation == _generation && loaded?.Image is SKImage image && IsLoaded)
-            {
-                _imageLease?.Dispose();
-                _imageLease = loaded;
-                _image = image;
-                Invalidate();
-            }
-            else
-            {
-                loaded?.Dispose();
-            }
-        });
-    }
-
     private void EnsureImage()
     {
         if (_image is not null || _source is not { } source || !IsLoaded)
@@ -284,7 +320,7 @@ public sealed class SkImageView : SKCanvasElement
             return;
         }
 
-        var generation = _generation;
+        if (_imageRequest.IsPending) return;
         var cached = string.IsNullOrWhiteSpace(source.ResourceKey)
             ? DerivedImageLoader.Shared.TryGetCached(source.Path, source.DecodeWidth)
             : DerivedImageLoader.Shared.TryGetCached(source.ResourceKey, source.Path, source.DecodeWidth);
@@ -298,11 +334,20 @@ public sealed class SkImageView : SKCanvasElement
 
         cached?.Dispose();
         Invalidate();
-        TaskObserver.Observe(LoadAsync(source, generation), "SkImageView.LoadAsync");
+        _imageRequest.Start(source.ResourceKey, source.Path, source.DecodeWidth, loaded =>
+        {
+            if (!IsLoaded || loaded.Image is not SKImage decodedImage) return false;
+            _imageLease?.Dispose();
+            _imageLease = loaded;
+            _image = decodedImage;
+            Invalidate();
+            return true;
+        });
     }
 
     private void ReleaseImage()
     {
+        _imageRequest.Cancel();
         _image = null;
         _imageLease?.Dispose();
         _imageLease = null;
@@ -372,11 +417,10 @@ public sealed class SkImageView : SKCanvasElement
 /// </summary>
 public sealed class CoverFrameView : SKCanvasElement
 {
-    private readonly SkImageView _probe = new();
     private SKImage? _cover;
     private ImageLease? _coverLease;
     private ImageRef? _source;
-    private int _generation;
+    private readonly ViewImageRequest _coverRequest = new();
     private CoverAppearance? _appearance;
     private FramePlan? _plan;
     private MediaTransformState _transform = MediaTransformState.Default;
@@ -387,7 +431,7 @@ public sealed class CoverFrameView : SKCanvasElement
     private bool _animationEligible;
     private SKImage? _overlay;
     private ImageLease? _overlayLease;
-    private int _overlayGeneration;
+    private readonly ViewImageRequest _overlayRequest = new();
     private bool _showPlaceholderPerson = true;
 
     public bool ShowPlaceholderPerson
@@ -420,7 +464,6 @@ public sealed class CoverFrameView : SKCanvasElement
 
             _source = value;
             ReleaseCover();
-            ++_generation;
             EnsureCover();
         }
     }
@@ -501,27 +544,6 @@ public sealed class CoverFrameView : SKCanvasElement
         }
     }
 
-    private async Task LoadAsync(ImageRef reference, int generation)
-    {
-        var loaded = string.IsNullOrWhiteSpace(reference.ResourceKey)
-            ? await DerivedImageLoader.Shared.LoadAsync(reference.Path, reference.DecodeWidth).ConfigureAwait(false)
-            : await DerivedImageLoader.Shared.LoadAsync(reference.ResourceKey, reference.Path, reference.DecodeWidth).ConfigureAwait(false);
-        UiDispatch.Run(() =>
-        {
-            if (generation == _generation && loaded?.Image is SKImage image && IsLoaded)
-            {
-                _coverLease?.Dispose();
-                _coverLease = loaded;
-                _cover = image;
-                Invalidate();
-            }
-            else
-            {
-                loaded?.Dispose();
-            }
-        });
-    }
-
     private void EnsureCover()
     {
         if (_cover is not null || _source is not { } source || !IsLoaded)
@@ -530,6 +552,7 @@ public sealed class CoverFrameView : SKCanvasElement
             return;
         }
 
+        if (_coverRequest.IsPending) return;
         var cached = string.IsNullOrWhiteSpace(source.ResourceKey)
             ? DerivedImageLoader.Shared.TryGetCached(source.Path, source.DecodeWidth)
             : DerivedImageLoader.Shared.TryGetCached(source.ResourceKey, source.Path, source.DecodeWidth);
@@ -541,7 +564,15 @@ public sealed class CoverFrameView : SKCanvasElement
         else
         {
             cached?.Dispose();
-            TaskObserver.Observe(LoadAsync(source, _generation), "CoverFrameView.LoadAsync");
+            _coverRequest.Start(source.ResourceKey, source.Path, source.DecodeWidth, loaded =>
+            {
+                if (!IsLoaded || loaded.Image is not SKImage decodedImage) return false;
+                _coverLease?.Dispose();
+                _coverLease = loaded;
+                _cover = decodedImage;
+                Invalidate();
+                return true;
+            });
         }
 
         Invalidate();
@@ -549,6 +580,7 @@ public sealed class CoverFrameView : SKCanvasElement
 
     private void ReleaseCover()
     {
+        _coverRequest.Cancel();
         _cover = null;
         _coverLease?.Dispose();
         _coverLease = null;
@@ -562,6 +594,7 @@ public sealed class CoverFrameView : SKCanvasElement
             return;
         }
 
+        if (_overlayRequest.IsPending) return;
         var cached = DerivedImageLoader.Shared.TryGetCached(_plan.OverlayAssetIdentity ?? path, path, 512);
         if (cached?.Image is SKImage image)
         {
@@ -572,40 +605,20 @@ public sealed class CoverFrameView : SKCanvasElement
         }
 
         cached?.Dispose();
-        var generation = _overlayGeneration;
-        TaskObserver.Observe(
-            LoadOverlayAsync(path, generation),
-            "CoverFrameView.LoadOverlayAsync");
-    }
-
-    private async Task LoadOverlayAsync(string path, int generation)
-    {
-        var loaded = await DerivedImageLoader.Shared
-            .LoadAsync(_plan?.OverlayAssetIdentity ?? path, path, 512)
-            .ConfigureAwait(false);
-
-        UiDispatch.Run(() =>
+        _overlayRequest.Start(_plan.OverlayAssetIdentity ?? path, path, 512, loaded =>
         {
-            if (generation == _overlayGeneration
-                && IsLoaded
-                && string.Equals(_plan?.OverlayAssetPath, path, StringComparison.OrdinalIgnoreCase)
-                && loaded?.Image is SKImage image)
-            {
-                _overlayLease?.Dispose();
-                _overlayLease = loaded;
-                _overlay = image;
-                Invalidate();
-            }
-            else
-            {
-                loaded?.Dispose();
-            }
+            if (!IsLoaded || loaded.Image is not SKImage decodedImage) return false;
+            _overlayLease?.Dispose();
+            _overlayLease = loaded;
+            _overlay = decodedImage;
+            Invalidate();
+            return true;
         });
     }
 
     private void ReleaseOverlay()
     {
-        ++_overlayGeneration;
+        _overlayRequest.Cancel();
         _overlay = null;
         _overlayLease?.Dispose();
         _overlayLease = null;

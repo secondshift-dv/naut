@@ -173,7 +173,8 @@ public sealed class UpdatePackageValidator
 
         if (!string.Equals(embeddedManifest.ProductId, manifest.ProductId, StringComparison.Ordinal)
             || !string.Equals(embeddedManifest.ProductVersion, manifest.ProductVersion, StringComparison.Ordinal)
-            || !string.Equals(embeddedManifest.RuntimeIdentifier, manifest.RuntimeIdentifier, StringComparison.OrdinalIgnoreCase))
+            || !string.Equals(embeddedManifest.RuntimeIdentifier, manifest.RuntimeIdentifier, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(embeddedManifest.MinimumCompatibleVersion, manifest.MinimumCompatibleVersion, StringComparison.Ordinal))
         {
             return UpdatePackageValidationResult.Reject("Embedded release manifest identity contradicts approved update metadata.");
         }

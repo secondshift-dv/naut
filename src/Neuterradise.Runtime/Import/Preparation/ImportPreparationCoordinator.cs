@@ -316,37 +316,42 @@ public sealed class ImportPreparationCoordinator
             unitId, cancellationToken).ConfigureAwait(false))
             .Where(job => job.Kind == "TransferOriginal")
             .Select(job => job.OwnerId).ToHashSet();
-        foreach (var item in items)
+        foreach (var batch in items.Chunk(64))
         {
             await using var mutation = await _catalog.ImportUnitMutations.EnterAsync(unitId, cancellationToken).ConfigureAwait(false);
-            if (existingTransfers.Contains(item.CandidateMediaId)) continue;
-            var source = new FileInfo(item.SourcePath);
-            JobDefinition? definition = null;
-            if (!source.Exists)
+            var definitions = new List<JobDefinition>(batch.Length);
+            foreach (var item in batch)
             {
-                definition = CandidatePreparationPlan.Create(item.ImportItemId, item.CandidateMediaId, item.SourcePath).HashJob;
-            }
-            else
-            {
-                var needsHash = item.Sha256 is null && (repeatedLengths.Contains(source.Length)
-                    || (source.Length == item.SourceByteLength
-                        ? item.HasActiveWithLength
-                        : await _duplicateDetector.HasActiveWithLengthAsync(
-                            source.Length, item.CandidateMediaId, cancellationToken).ConfigureAwait(false)));
-                if (needsHash)
+                if (existingTransfers.Contains(item.CandidateMediaId)) continue;
+                var source = new FileInfo(item.SourcePath);
+                JobDefinition? definition = null;
+                if (!source.Exists)
                 {
                     definition = CandidatePreparationPlan.Create(item.ImportItemId, item.CandidateMediaId, item.SourcePath).HashJob;
                 }
-                else if (item.Sha256 is null || !(await _duplicateDetector.DetectDuplicateAsync(
-                             item.Sha256, item.ByteLength ?? -1, item.CandidateMediaId,
-                             item.BundleSha256, cancellationToken).ConfigureAwait(false)).IsLibraryReuseEligible)
+                else
                 {
-                    definition = CandidatePreparationPlan.CreateTransfer(item.ImportItemId, item.CandidateMediaId);
+                    var needsHash = item.Sha256 is null && (repeatedLengths.Contains(source.Length)
+                        || (source.Length == item.SourceByteLength
+                            ? item.HasActiveWithLength
+                            : await _duplicateDetector.HasActiveWithLengthAsync(
+                                source.Length, item.CandidateMediaId, cancellationToken).ConfigureAwait(false)));
+                    if (needsHash)
+                    {
+                        definition = CandidatePreparationPlan.Create(item.ImportItemId, item.CandidateMediaId, item.SourcePath).HashJob;
+                    }
+                    else if (item.Sha256 is null || !(await _duplicateDetector.DetectDuplicateAsync(
+                                 item.Sha256, item.ByteLength ?? -1, item.CandidateMediaId,
+                                 item.BundleSha256, cancellationToken).ConfigureAwait(false)).IsLibraryReuseEligible)
+                    {
+                        definition = CandidatePreparationPlan.CreateTransfer(item.ImportItemId, item.CandidateMediaId);
+                    }
                 }
-            }
 
-            if (definition is not null && !await _jobWrites.TryCreateImportAdmissionJobAsync(
-                    unitId, definition, cancellationToken).ConfigureAwait(false))
+                if (definition is not null) definitions.Add(definition);
+            }
+            if (definitions.Count != 0 && !await _jobWrites.TryCreateImportAdmissionJobsAsync(
+                    unitId, definitions, cancellationToken).ConfigureAwait(false))
                 break;
         }
 

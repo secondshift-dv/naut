@@ -76,6 +76,7 @@
     <sys:String x:Key="Import.PreparingCover">Menyiapkan saran Cover…</sys:String>
     <sys:String x:Key="Import.PreviewUnavailable">Pratinjau tidak tersedia</sys:String>
     <sys:String x:Key="Import.Prioritize">Prioritaskan</sys:String>
+    <sys:String x:Key="Import.Normalize">Normal</sys:String>
     <sys:String x:Key="Import.Problems">Perlu ditinjau</sys:String>
     <sys:String x:Key="Import.Problems.Description">Selesaikan masalah ini untuk melanjutkan.</sys:String>
     <sys:String x:Key="Import.ProfileCollision">Dikenali sebagai Profile lain</sys:String>
@@ -706,7 +707,7 @@
     <sys:String x:Key="Import.Detail.OneItem">1 item</sys:String>
     <sys:String x:Key="Import.Detail.ManyItems">{0} item</sys:String>
     <sys:String x:Key="Import.Detail.Added">{0} ditambahkan ke Vault Anda.</sys:String>
-    <sys:String x:Key="Import.Detail.WithDuplicates">{0} · {1} sudah ada di Vault</sys:String>
+    <sys:String x:Key="Import.Detail.PendingReuse">{0} dipilih untuk digunakan kembali</sys:String>
     <sys:String x:Key="Import.Stage.AlreadyInVault">Sudah ada di Vault</sys:String>
     <sys:String x:Key="Import.Progress.CheckingMedia">Memeriksa media</sys:String>
     <sys:String x:Key="Import.Progress.Session">Batch: {0} / {1} diperiksa</sys:String>
@@ -1009,7 +1010,7 @@
     <sys:String x:Key="Import.Pause.Tooltip">Jeda impor</sys:String>
     <sys:String x:Key="Import.Start">Mulai</sys:String>
     <sys:String x:Key="Import.Start.Prioritize">Prioritaskan impor ini</sys:String>
-    <sys:String x:Key="Import.Start.Prioritized">Impor ini diprioritaskan</sys:String>
+    <sys:String x:Key="Import.Start.Normalize">Kembali ke prioritas normal</sys:String>
     <sys:String x:Key="Import.Start.Resume">Mulai impor</sys:String>
     <sys:String x:Key="Import.Preparing">Menyiapkan pratinjau…</sys:String>
     <sys:String x:Key="Import.Priority">Prioritas</sys:String>

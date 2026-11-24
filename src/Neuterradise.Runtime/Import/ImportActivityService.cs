@@ -163,7 +163,7 @@ public sealed class ImportActivityService : IAsyncDisposable
     /// Minimum gap between polls. An import writes to the catalog many times per second; each write
     /// wakes the poll, so without this the "live" list became a tight read loop.
     /// </summary>
-    public static readonly TimeSpan MinimumPollGap = TimeSpan.FromMilliseconds(300);
+    public static readonly TimeSpan MinimumPollGap = TimeSpan.FromMilliseconds(1500);
 
     private const int TrackedUnitCount = 40;
 
@@ -178,6 +178,7 @@ public sealed class ImportActivityService : IAsyncDisposable
 
     private Task? _loop;
     private TaskCompletionSource _wake = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private TaskCompletionSource _urgentWake = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly HashSet<Guid> _cancelling = [];
     private ImportActivitySnapshot _durableSnapshot = ImportActivitySnapshot.Empty;
     private ImportActivitySnapshot _current = ImportActivitySnapshot.Empty;
@@ -224,12 +225,16 @@ public sealed class ImportActivityService : IAsyncDisposable
     }
 
     /// <summary>Wakes the poll soon (coalesced with other wakes).</summary>
-    public void RequestRefresh()
+    public void RequestRefresh() => SignalRefresh(urgent: true);
+
+    public void RequestBackgroundRefresh() => SignalRefresh(urgent: false);
+
+    private void SignalRefresh(bool urgent)
     {
         TaskCompletionSource wake;
         lock (_sync)
         {
-            wake = _wake;
+            wake = urgent ? _urgentWake : _wake;
         }
 
         wake.TrySetResult();
@@ -238,7 +243,7 @@ public sealed class ImportActivityService : IAsyncDisposable
     /// <summary>Refreshes and waits for the result.</summary>
     public async Task<ImportActivitySnapshot> RefreshNowAsync(CancellationToken cancellationToken = default)
     {
-        await PollOnceAsync(cancellationToken).ConfigureAwait(false);
+        await Task.Run(() => PollOnceAsync(cancellationToken), cancellationToken).ConfigureAwait(false);
         return Current;
     }
 
@@ -246,6 +251,16 @@ public sealed class ImportActivityService : IAsyncDisposable
     {
         while (!cancellationToken.IsCancellationRequested)
         {
+            TaskCompletionSource wake;
+            TaskCompletionSource urgentWake;
+            lock (_sync)
+            {
+                _wake = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                wake = _wake;
+                _urgentWake = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                urgentWake = _urgentWake;
+            }
+
             var started = Stopwatch.GetTimestamp();
             try
             {
@@ -263,21 +278,14 @@ public sealed class ImportActivityService : IAsyncDisposable
 
             var interval = Current.ActiveCount > 0 ? ActiveInterval : IdleInterval;
 
-            TaskCompletionSource wake;
-            lock (_sync)
-            {
-                _wake = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                wake = _wake;
-            }
-
             try
             {
-                await Task.WhenAny(wake.Task, Task.Delay(interval, cancellationToken)).ConfigureAwait(false);
+                await Task.WhenAny(wake.Task, urgentWake.Task, Task.Delay(interval, cancellationToken)).ConfigureAwait(false);
 
                 var elapsed = Stopwatch.GetElapsedTime(started);
-                if (elapsed < MinimumPollGap)
+                if (elapsed < MinimumPollGap && !urgentWake.Task.IsCompleted)
                 {
-                    await Task.Delay(MinimumPollGap - elapsed, cancellationToken).ConfigureAwait(false);
+                    await Task.WhenAny(urgentWake.Task, Task.Delay(MinimumPollGap - elapsed, cancellationToken)).ConfigureAwait(false);
                 }
             }
             catch (OperationCanceledException)
@@ -306,7 +314,7 @@ public sealed class ImportActivityService : IAsyncDisposable
             var preparationFailures = await _importReads
                 .ListRequiredPreparationFailuresAsync(unitIds, token)
                 .ConfigureAwait(false);
-            var sessionAccounting = await _importReads.ListSessionAccountingAsync(
+            var sessionAccounting = await _importReads.ListMultiUnitSessionAccountingAsync(
                 units.Select(unit => unit.SessionId).Distinct().ToArray(), token).ConfigureAwait(false);
             var representedSessions = new HashSet<Guid>();
             var focusedImportUnitId = await _priorityOperations
@@ -571,7 +579,7 @@ public sealed class ImportActivityService : IAsyncDisposable
                 && ((isActive && !isReadyToVerify && unit.State != ImportUnitState.Committing) || unit.IsPaused),
             IsPriority: isPriority,
             TransportTooltip: isPriority
-                ? SurfaceText.Get("Import.Start.Prioritized", "This import is prioritized")
+                ? SurfaceText.Get("Import.Start.Normalize", "Return to normal priority")
                 : unit.IsPaused
                     ? SurfaceText.Get("Import.Start.Resume", "Start import")
                     : SurfaceText.Get("Import.Start.Prioritize", "Prioritize this import"),
@@ -686,6 +694,12 @@ public sealed class ImportActivityService : IAsyncDisposable
             || state.Stage != stage
             || state.Total != total
             || completed < state.Completed)
+        {
+            _etaStates[unitId] = new EtaObservationState(stage, total, completed, now);
+            return SurfaceText.Get("Import.Eta.Estimating", "estimating…");
+        }
+
+        if (Stopwatch.GetElapsedTime(state.LastProgressTimestamp, now) >= TimeSpan.FromSeconds(5))
         {
             _etaStates[unitId] = new EtaObservationState(stage, total, completed, now);
             return SurfaceText.Get("Import.Eta.Estimating", "estimating…");
@@ -898,10 +912,12 @@ public sealed class ImportActivityService : IAsyncDisposable
             ? SurfaceText.Get("Import.Detail.OneItem", "1 item")
             : SurfaceText.Format("Import.Detail.ManyItems", "{0} items", unit.TotalItemCount);
 
-        var alreadyInLibrary = progress?.AlreadyInLibraryCount is > 0 ? progress.AlreadyInLibraryCount : unit.ExactDuplicateCount;
-        return alreadyInLibrary > 0
-            ? SurfaceText.Format("Import.Detail.WithDuplicates", "{0} · {1} already in your Vault", media, alreadyInLibrary)
-            : media;
+        var parts = new List<string> { media };
+        if (progress?.Accounting is { DuplicateSkippedCount: > 0 } accounting)
+            parts.Add(SurfaceText.Format("Import.Outcome.Duplicates", "{0} duplicates skipped", accounting.DuplicateSkippedCount));
+        if (progress?.AlreadyInLibraryCount is > 0)
+            parts.Add(SurfaceText.Format("Import.Detail.PendingReuse", "{0} selected for reuse", progress.AlreadyInLibraryCount));
+        return string.Join(" · ", parts);
     }
 
     private static string DescribePreparationFailure(IReadOnlyList<ImportPreparationFailure> failures)
@@ -1033,7 +1049,7 @@ public sealed class ImportActivityService : IAsyncDisposable
     {
         if (invalidation.DomainKind is CatalogInvalidationDomain.Import or CatalogInvalidationDomain.Profile)
         {
-            RequestRefresh();
+            RequestBackgroundRefresh();
         }
     }
 

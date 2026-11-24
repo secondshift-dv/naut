@@ -18,7 +18,8 @@ public sealed class ReplacementEngine
         string expectedManifestSha256,
         int? parentPid,
         bool launchApp,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool recover = false)
     {
         string normalizedHandoffPath;
         string operationDir;
@@ -112,9 +113,9 @@ public sealed class ReplacementEngine
             return ReplacementResult.Failed($"Handoff runtime path authority is invalid: {ex.Message}");
         }
 
-        if (!Directory.Exists(installRoot))
+        if (!recover && !Directory.Exists(installRoot))
             return ReplacementResult.Failed($"Destination InstallRoot does not exist: {installRoot}");
-        if (!Directory.Exists(payloadPath))
+        if (!recover && !Directory.Exists(payloadPath))
             return ReplacementResult.Failed($"Expected extracted payload directory does not exist: {payloadPath}");
 
         var parentDir = Path.GetDirectoryName(installRoot);
@@ -139,33 +140,77 @@ public sealed class ReplacementEngine
                     cancellationToken);
             if (!exited)
             {
-                await PersistRecoveryStepAsync(
-                    recoveryPlanPath,
-                    handoff.OperationId,
-                    installRoot,
-                    stagingRoot,
-                    backupRoot,
-                    payloadPath,
-                    expectedManifestSha256,
-                    "DeferredShutdownDeadlineExpired",
-                    cancellationToken);
                 return ReplacementResult.Failed(
                     $"Parent process (PID {parentPid.Value}) did not exit before the shared update shutdown deadline. Replacement was deferred without mutating InstallRoot.");
             }
         }
 
+        try
+        {
+            UpdatePathGuard.RequireDisjoint(installRoot, appStateRoot, vaultRoot, stagingRoot, backupRoot);
+            UpdatePathGuard.Resolve(payloadPath);
+            UpdatePathGuard.Resolve(normalizedHandoffPath);
+        }
+        catch (IOException exception)
+        {
+            return ReplacementResult.Failed(exception.Message);
+        }
+        await using var updateLease = await UpdateOperationLease.AcquireAsync(appStateRoot, cancellationToken);
         var installMovedToBackup = false;
+        if (recover)
+            return await RecoverBoundOperationAsync(operationDir, handoff, expectedHandoffSha256,
+                expectedManifestSha256, installRoot, stagingRoot, backupRoot, payloadPath, appStateRoot,
+                launchApp, cancellationToken);
 
         try
         {
-            if (Directory.Exists(stagingRoot))
-                Directory.Delete(stagingRoot, recursive: true);
+            // The original backup and any interrupted staging are recovery evidence, not scratch space.
+            if (Path.Exists(stagingRoot) || Path.Exists(backupRoot))
+                return ReplacementResult.Failed("Replacement already has recovery evidence; startup reconciliation is required.");
 
-            CopyDirectory(payloadPath, stagingRoot);
+            // Only the currently published pending operation may consume its handoff.
+            var statePath = Path.Combine(appStateRoot, "updates", "update-state.json");
+            try
+            {
+                using var state = JsonDocument.Parse(await File.ReadAllBytesAsync(statePath, cancellationToken));
+                if (!state.RootElement.TryGetProperty("OperationId", out var operation)
+                    || operation.ValueKind != JsonValueKind.String
+                    || !operation.TryGetGuid(out var approvedOperation)
+                    || approvedOperation != handoff.OperationId
+                    || !state.RootElement.TryGetProperty("Cutoff", out var cutoff)
+                    || cutoff.ValueKind != JsonValueKind.Number
+                    || !cutoff.TryGetInt32(out var cutoffValue)
+                    || cutoffValue != 1) // persisted HandoffPending
+                    return ReplacementResult.Failed("Replacement is not the current pending update operation.");
+                if (state.RootElement.TryGetProperty("HandoffSha256", out var approvedHandoff) &&
+                    approvedHandoff.ValueKind != JsonValueKind.Null &&
+                    (!string.Equals(approvedHandoff.GetString(), expectedHandoffSha256, StringComparison.Ordinal) ||
+                     !state.RootElement.TryGetProperty("ManifestAuthoritySha256", out var approvedManifest) ||
+                     !string.Equals(approvedManifest.GetString(), expectedManifestSha256, StringComparison.Ordinal)))
+                    return ReplacementResult.Failed("Handoff differs from the persisted approval.");
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
+            {
+                return ReplacementResult.Failed("Pending update authority is missing or unreadable.");
+            }
+            // CreateNew is atomic between competing helpers for this operation.
+            // Keep the claim until terminal cleanup, including failures after it is created.
+            try
+            {
+                using var claim = new FileStream(Path.Combine(operationDir, "replacement.claim"),
+                    FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough);
+                claim.Write(handoff.OperationId.ToByteArray());
+                claim.Flush(flushToDisk: true);
+            }
+            catch (IOException)
+            {
+                return ReplacementResult.Failed("Replacement operation has already been claimed or its claim cannot be persisted.");
+            }
+
+            UpdatePathGuard.CopyNewTree(payloadPath, stagingRoot, cancellationToken);
             var stagedValidationError = ValidateStagedPayload(stagingRoot, handoff.Manifest);
             if (stagedValidationError is not null)
             {
-                Directory.Delete(stagingRoot, recursive: true);
                 return ReplacementResult.Failed(stagedValidationError);
             }
 
@@ -180,18 +225,21 @@ public sealed class ReplacementEngine
                 "StagingPrepared",
                 cancellationToken);
 
-            if (Directory.Exists(backupRoot))
-                Directory.Delete(backupRoot, recursive: true);
+            if (Path.Exists(backupRoot))
+                return ReplacementResult.Failed("Original replacement backup must not be overwritten.");
 
             stagedValidationError = ValidateStagedPayload(stagingRoot, handoff.Manifest);
             if (stagedValidationError is not null)
             {
-                Directory.Delete(stagingRoot, recursive: true);
                 return ReplacementResult.Failed(stagedValidationError);
             }
 
-            Directory.Move(installRoot, backupRoot);
+            UpdatePathGuard.RequireDisjoint(installRoot, appStateRoot, vaultRoot, stagingRoot, backupRoot);
+            UpdateBackupIdentity.RecordBeforeMove(operationDir, installRoot, expectedHandoffSha256, cancellationToken);
+            UpdatePathGuard.MoveSibling(installRoot, backupRoot);
             installMovedToBackup = true;
+            if (!UpdateBackupIdentity.Matches(operationDir, backupRoot, expectedHandoffSha256, CancellationToken.None))
+                throw new IOException("Moved backup identity does not match the approved original.");
             await PersistRecoveryStepAsync(
                 recoveryPlanPath,
                 handoff.OperationId,
@@ -205,7 +253,9 @@ public sealed class ReplacementEngine
 
             try
             {
-                Directory.Move(stagingRoot, installRoot);
+                UpdatePathGuard.MoveSibling(stagingRoot, installRoot);
+                if (ValidateStagedPayload(installRoot, handoff.Manifest) is { } installedError)
+                    throw new IOException(installedError);
                 await PersistRecoveryStepAsync(
                     recoveryPlanPath,
                     handoff.OperationId,
@@ -221,9 +271,10 @@ public sealed class ReplacementEngine
             {
                 try
                 {
-                    if (Directory.Exists(backupRoot) && !Directory.Exists(installRoot))
+                    if (Directory.Exists(backupRoot) && !Directory.Exists(installRoot) &&
+                        UpdateBackupIdentity.Matches(operationDir, backupRoot, expectedHandoffSha256, CancellationToken.None))
                     {
-                        Directory.Move(backupRoot, installRoot);
+                        UpdatePathGuard.MoveSibling(backupRoot, installRoot);
                         await PersistRecoveryStepAsync(
                             recoveryPlanPath,
                             handoff.OperationId,
@@ -288,6 +339,120 @@ public sealed class ReplacementEngine
                 installMovedToBackup ? CancellationToken.None : cancellationToken);
             return ReplacementResult.Failed(ex.Message);
         }
+    }
+
+    // The same isolated helper is usable even while InstallRoot is absent. Never
+    // accept command-line authority alone for a recovery that can move directories.
+    public static async Task<ReplacementResult> RecoverAsync(string operationDir, bool launchApp,
+        CancellationToken cancellationToken = default)
+    {
+        operationDir = TrimRoot(Path.GetFullPath(operationDir));
+        var toolsRoot = Directory.GetParent(operationDir);
+        if (toolsRoot is null || !string.Equals(toolsRoot.Name, "update-tools", StringComparison.OrdinalIgnoreCase) ||
+            !Guid.TryParse(Path.GetFileName(operationDir), out var operationId) || operationId == Guid.Empty)
+            return ReplacementResult.Failed("Recovery must run from the isolated update operation directory.");
+        var statePath = Path.Combine(toolsRoot.Parent!.FullName, "updates", "update-state.json");
+        UpdatePathGuard.Resolve(statePath);
+        using var state = JsonDocument.Parse(await File.ReadAllBytesAsync(statePath, cancellationToken));
+        if (state.RootElement.GetProperty("OperationId").GetGuid() != operationId)
+            return ReplacementResult.Failed("This helper does not own the pending update.");
+        return await ExecuteAsync(Path.Combine(operationDir, "handoff.json"),
+            state.RootElement.GetProperty("HandoffSha256").GetString() ?? "",
+            state.RootElement.GetProperty("ManifestAuthoritySha256").GetString() ?? "",
+            null, launchApp, cancellationToken, recover: true);
+    }
+
+    private static async Task<ReplacementResult> RecoverBoundOperationAsync(string operationDir,
+        HandoffData handoff, string handoffSha256, string manifestSha256, string installRoot,
+        string stagingRoot, string backupRoot, string payloadPath, string appStateRoot,
+        bool launchApp, CancellationToken cancellationToken)
+    {
+        var statePath = Path.Combine(appStateRoot, "updates", "update-state.json");
+        UpdatePathGuard.Resolve(statePath);
+        using var state = JsonDocument.Parse(await File.ReadAllBytesAsync(statePath, cancellationToken));
+        var value = state.RootElement;
+        if (value.GetProperty("OperationId").GetGuid() != handoff.OperationId ||
+            value.GetProperty("HandoffSha256").GetString() != handoffSha256 ||
+            value.GetProperty("ManifestAuthoritySha256").GetString() != manifestSha256)
+            return ReplacementResult.Failed("Recovery approval changed.");
+        var cutoff = value.GetProperty("Cutoff").GetInt32();
+        var blockedRecovery = cutoff == 3;
+        if (blockedRecovery && value.TryGetProperty("RecoveryOrigin", out var origin) && origin.ValueKind == JsonValueKind.Number)
+            cutoff = origin.GetInt32();
+        if (cutoff is not (1 or 2))
+            return ReplacementResult.Failed("Update cutoff does not permit external recovery.");
+        UpdatePathGuard.RequireDisjoint(installRoot, appStateRoot, handoff.VaultRoot!, stagingRoot, backupRoot);
+        var planPath = Path.Combine(operationDir, "recovery-plan.json");
+        string step;
+        if (Directory.Exists(backupRoot) &&
+            UpdateBackupIdentity.Matches(operationDir, backupRoot, handoffSha256, cancellationToken))
+        {
+            if (!Directory.Exists(installRoot))
+            {
+                if (cutoff == 1)
+                {
+                    UpdatePathGuard.MoveSibling(backupRoot, installRoot);
+                    step = "RestoredFromBackup";
+                }
+                else
+                {
+                    if (!Path.Exists(stagingRoot))
+                    {
+                        // The original approved payload remains in AppState until terminal cleanup.
+                        // Reconstruct only an absent staging tree; never overwrite recovery evidence.
+                        if (ValidateStagedPayload(payloadPath, handoff.Manifest) is not null)
+                            return ReplacementResult.Failed("No verified forward payload remains after catalog mutation.");
+                        UpdatePathGuard.CopyNewTree(payloadPath, stagingRoot, cancellationToken);
+                    }
+                    if (ValidateStagedPayload(stagingRoot, handoff.Manifest) is not null)
+                        return ReplacementResult.Failed("No verified forward replacement remains after catalog mutation.");
+                    UpdatePathGuard.RequireDisjoint(installRoot, appStateRoot, handoff.VaultRoot!, stagingRoot, backupRoot);
+                    UpdatePathGuard.MoveSibling(stagingRoot, installRoot);
+                    step = "ReplacementCompleted";
+                }
+            }
+            else if (ValidateStagedPayload(installRoot, handoff.Manifest) is null)
+                step = "ReplacementCompleted";
+            else
+                return ReplacementResult.Failed("Installed tree is ambiguous; recovery evidence retained.");
+        }
+        else if (cutoff == 1 && !Path.Exists(backupRoot) && Directory.Exists(installRoot) &&
+            UpdateBackupIdentity.Matches(operationDir, installRoot, handoffSha256, cancellationToken))
+            step = "RestoredFromBackup";
+        else
+            return ReplacementResult.Failed("Verified pre-replacement install identity is unavailable.");
+
+        var restored = step == "RestoredFromBackup";
+        if (restored && !UpdateBackupIdentity.Matches(operationDir, installRoot, handoffSha256, CancellationToken.None))
+            return ReplacementResult.Failed("Restored install does not match the approved original.");
+        if (!restored && ValidateStagedPayload(installRoot, handoff.Manifest) is not null)
+            return ReplacementResult.Failed("Recovered target identity does not match the approved replacement.");
+        var journalStep = blockedRecovery && !restored ? "ExternalReplacementCompleted" : step;
+        await PersistRecoveryStepAsync(planPath, handoff.OperationId, installRoot, stagingRoot,
+            backupRoot, payloadPath, manifestSha256, journalStep, CancellationToken.None);
+        if (restored)
+        {
+            // A restored executable may predate RecoveryOrigin. Publish the established
+            // AbortedNoMutation state under the operation lease after verifying the original.
+            await UpdatePathGuard.WriteAtomicAsync(statePath, JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                OperationId = handoff.OperationId, Cutoff = 5, BackupPath = (string?)null,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+                AbortReason = "Externally restored verified pre-replacement install.",
+                HandoffSha256 = handoffSha256, ManifestAuthoritySha256 = manifestSha256
+            }), CancellationToken.None).ConfigureAwait(false);
+        }
+        if (launchApp)
+        {
+            var launcher = Path.Combine(installRoot, ReleaseLayout.LauncherExecutableName);
+            if (!File.Exists(launcher) && step == "RestoredFromBackup")
+                launcher = Path.Combine(installRoot, ReleaseLayout.LegacyExecutableName);
+            UpdatePathGuard.Resolve(launcher);
+            if (!File.Exists(launcher))
+                return ReplacementResult.Failed("Verified recovery tree has no runnable launcher.");
+            Process.Start(new ProcessStartInfo(launcher) { WorkingDirectory = installRoot, UseShellExecute = true });
+        }
+        return ReplacementResult.Succeeded();
     }
 
     private static string ComputeManifestAuthoritySha256(HandoffManifestData manifest) =>
@@ -468,6 +633,7 @@ public sealed class ReplacementEngine
                 || !string.Equals(control.ProductId, manifest.ProductId, StringComparison.Ordinal)
                 || !string.Equals(control.ProductVersion, manifest.ProductVersion, StringComparison.Ordinal)
                 || !string.Equals(control.RuntimeIdentifier, manifest.RuntimeIdentifier, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(control.MinimumCompatibleVersion, manifest.MinimumCompatibleVersion, StringComparison.Ordinal)
                 || control.Files is null
                 || control.Files.Count != manifest.Files.Count)
             {
@@ -571,31 +737,6 @@ public sealed class ReplacementEngine
         }
     }
 
-    private static void CopyDirectory(string sourceDir, string targetDir)
-    {
-        if ((File.GetAttributes(sourceDir) & FileAttributes.ReparsePoint) != 0)
-            throw new IOException("Update payload root cannot be a reparse point.");
-
-        Directory.CreateDirectory(targetDir);
-        foreach (var file in Directory.GetFiles(sourceDir))
-        {
-            if ((File.GetAttributes(file) & FileAttributes.ReparsePoint) != 0)
-                throw new IOException("Update payload cannot contain reparse-point files.");
-
-            var dest = Path.Combine(targetDir, Path.GetFileName(file));
-            File.Copy(file, dest, overwrite: true);
-        }
-
-        foreach (var sub in Directory.GetDirectories(sourceDir))
-        {
-            if ((File.GetAttributes(sub) & FileAttributes.ReparsePoint) != 0)
-                throw new IOException("Update payload cannot contain reparse-point directories.");
-
-            var destSub = Path.Combine(targetDir, Path.GetFileName(sub));
-            CopyDirectory(sub, destSub);
-        }
-    }
-
     private static async Task PersistRecoveryStepAsync(
         string planPath,
         Guid operationId,
@@ -607,33 +748,19 @@ public sealed class ReplacementEngine
         string step,
         CancellationToken cancellationToken)
     {
-        try
+        var record = new
         {
-            var record = new
-            {
-                operationId,
-                installRoot,
-                stagingRoot,
-                backupRoot,
-                payloadRoot,
-                manifestAuthoritySha256,
-                step,
-                updatedAtUtc = DateTimeOffset.UtcNow
-            };
-            var temp = planPath + ".tmp";
-            var json = JsonSerializer.Serialize(record, JsonOptions);
-            await File.WriteAllTextAsync(temp, json, cancellationToken);
-            File.Move(temp, planPath, overwrite: true);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // The deterministic sibling paths and update-state operation id remain recoverable evidence
-            // even when the best-effort diagnostic journal cannot be persisted.
-        }
+            operationId,
+            installRoot,
+            stagingRoot,
+            backupRoot,
+            payloadRoot,
+            manifestAuthoritySha256,
+            step,
+            updatedAtUtc = DateTimeOffset.UtcNow
+        };
+        await UpdatePathGuard.WriteAtomicAsync(planPath, JsonSerializer.SerializeToUtf8Bytes(record, JsonOptions),
+            cancellationToken).ConfigureAwait(false);
     }
 
     private static string TrimRoot(string path) => Path.TrimEndingDirectorySeparator(path);
@@ -699,4 +826,5 @@ internal sealed record EmbeddedReleaseManifestData(
     string ProductId,
     string ProductVersion,
     string RuntimeIdentifier,
-    IReadOnlyList<HandoffManifestFile> Files);
+    IReadOnlyList<HandoffManifestFile> Files,
+    string? MinimumCompatibleVersion = null);

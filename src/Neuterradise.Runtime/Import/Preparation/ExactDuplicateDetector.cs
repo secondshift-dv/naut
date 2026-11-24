@@ -96,12 +96,21 @@ public sealed class ExactDuplicateDetector
             .ConfigureAwait(false);
 
         await using var command = connection.CreateCommand();
+        // Keep both state classes in one SQLite statement/snapshot. The active branch
+        // uses the existing partial length index; SHA-256 and bundle predicates still decide identity.
         command.CommandText = $"""
+            WITH fingerprint_matches AS NOT MATERIALIZED (
+                SELECT * FROM media INDEXED BY ix_media_active_byte_length
+                WHERE state = 'ACTIVE' AND byte_length = $byteLength AND sha256 = $sha256
+                UNION ALL
+                SELECT * FROM media WHERE state IN ($candidateState, $trashedState)
+                  AND byte_length = $byteLength AND sha256 = $sha256
+            )
             SELECT a.media_id, a.state, a.byte_length, a.sha256,
                    a.current_managed_file_name, a.current_managed_relative_path,
                    pa.profile_id, p.display_name,
                    ii.import_unit_id, ii.source_path
-            FROM media a
+            FROM fingerprint_matches a
             LEFT JOIN profile_media pa ON pa.media_id = a.media_id AND pa.relation_type = $ownerRelation
             LEFT JOIN profiles p ON p.profile_id = pa.profile_id
             LEFT JOIN import_items ii ON ii.candidate_media_id = a.media_id

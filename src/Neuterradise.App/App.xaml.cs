@@ -802,7 +802,7 @@ public partial class App : Application
         _importActivity.Start();
 
         _finalizer = new ImportFinalizer(context.Catalog);
-        _finalizer.Changed += (_, _) => _importActivity.RequestRefresh();
+        _finalizer.Changed += (_, _) => _importActivity.RequestBackgroundRefresh();
         _finalizer.Start();
 
         _placement = new UnoWindowPlacement(_configuration, _windowState);

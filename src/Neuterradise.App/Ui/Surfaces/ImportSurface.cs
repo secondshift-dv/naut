@@ -369,10 +369,10 @@ public sealed class ImportSurface : Surface
                     pause.IsEnabled = _unit.CanPause;
                     _actions.Children.Add(pause);
 
-                    if (_unit.CanPrioritize)
+                    if (_unit.CanPrioritize || _unit.CanNormalize)
                     {
                         _actions.Children.Add(UI.Button(
-                            UI.T("Import.Prioritize", "Prioritize"),
+                            _unit.CanNormalize ? UI.T("Import.Normalize", "Normal") : UI.T("Import.Prioritize", "Prioritize"),
                             null,
                             ButtonKind.Primary,
                             "icon.action.play",
@@ -646,10 +646,18 @@ public sealed class ImportSurface : Surface
             card.MaxHeight = Math.Max(0, Math.Min(640, content.ActualHeight - 24));
             scroll.MaxHeight = Math.Max(0, card.MaxHeight - header.ActualHeight - footerFrame.ActualHeight - error.ActualHeight - 66);
         }
-        content.SizeChanged += (_, _) => UpdateWizardEnvelope();
-        header.SizeChanged += (_, _) => UpdateWizardEnvelope();
-        footerFrame.SizeChanged += (_, _) => UpdateWizardEnvelope();
-        error.SizeChanged += (_, _) => UpdateWizardEnvelope();
+        SizeChangedEventHandler envelopeChanged = (_, _) => UpdateWizardEnvelope();
+        content.SizeChanged += envelopeChanged;
+        header.SizeChanged += envelopeChanged;
+        footerFrame.SizeChanged += envelopeChanged;
+        error.SizeChanged += envelopeChanged;
+        _wizardBag.Add(() =>
+        {
+            content.SizeChanged -= envelopeChanged;
+            header.SizeChanged -= envelopeChanged;
+            footerFrame.SizeChanged -= envelopeChanged;
+            error.SizeChanged -= envelopeChanged;
+        });
         card.HorizontalAlignment = HorizontalAlignment.Center;
         card.VerticalAlignment = VerticalAlignment.Center;
         content.Background = theme.Brush("scrimMedium");

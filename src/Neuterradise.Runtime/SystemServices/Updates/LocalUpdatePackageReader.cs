@@ -33,35 +33,16 @@ public sealed class LocalUpdatePackageReader
             return LocalUpdatePackageReadResult.Rejected("The selected update path is invalid.");
         }
 
-        FileInfo info;
-        try
-        {
-            info = new FileInfo(fullPath);
-            if (!info.Exists)
-            {
-                return LocalUpdatePackageReadResult.Rejected("The selected update ZIP does not exist.");
-            }
-            if (info.Length <= 0 || info.Length > MaxPayloadBytes)
-            {
-                return LocalUpdatePackageReadResult.Rejected("The selected update ZIP exceeds the safe size bound.");
-            }
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            return LocalUpdatePackageReadResult.Rejected("The selected update ZIP could not be inspected.");
-        }
-
         try
         {
             UpdateReleaseManifest embeddedManifest;
-            await using (var stream = new FileStream(
-                fullPath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                1024 * 1024,
-                FileOptions.Asynchronous | FileOptions.SequentialScan))
-            using (var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: false))
+            await using var stream = new FileStream(
+                fullPath, FileMode.Open, FileAccess.Read, FileShare.Read,
+                1024 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
+            var payloadLength = stream.Length;
+            if (payloadLength <= 0 || payloadLength > MaxPayloadBytes)
+                return LocalUpdatePackageReadResult.Rejected("The selected update ZIP exceeds the safe size bound.");
+            using (var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true))
             {
                 var candidates = archive.Entries
                     .Where(entry => string.Equals(
@@ -92,28 +73,19 @@ public sealed class LocalUpdatePackageReader
                 embeddedManifest = UpdateReleaseManifest.Parse(json);
             }
 
-            string payloadSha256;
-            await using (var hashStream = new FileStream(
-                fullPath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                1024 * 1024,
-                FileOptions.Asynchronous | FileOptions.SequentialScan))
-            {
-                payloadSha256 = Convert.ToHexString(
-                        await SHA256.HashDataAsync(hashStream, cancellationToken).ConfigureAwait(false))
-                    .ToLowerInvariant();
-            }
+            // Parse and hash the same open file; deny writes and replacement during inspection.
+            stream.Position = 0;
+            var payloadSha256 = Convert.ToHexStringLower(
+                await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false));
 
             var manifest = new UpdateManifest(
                 embeddedManifest.SchemaVersion,
                 embeddedManifest.ProductId,
                 embeddedManifest.ProductVersion,
                 embeddedManifest.RuntimeIdentifier,
-                info.Length,
+                payloadLength,
                 payloadSha256,
-                MinimumCompatibleVersion: null,
+                embeddedManifest.MinimumCompatibleVersion,
                 embeddedManifest.Files);
             manifest.Validate();
 

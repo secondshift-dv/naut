@@ -59,6 +59,7 @@ if (args.Length > 1 && args[1] == "--replace-package")
         installation.Root, target, vault.Root, DateTimeOffset.UtcNow.AddMinutes(5));
     var encoded = JsonSerializer.SerializeToUtf8Bytes(officialHandoff, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
     await File.WriteAllBytesAsync(handoffFile, encoded);
+    await new UpdateStateStore(appState).PublishHandoffPendingAsync(operation);
     var replacement = await ReplacementEngine.ExecuteAsync(handoffFile, Hash(encoded), target.ComputeAuthoritySha256(), null, launchApp: false);
     Require(replacement.Success && ReadInstalledVersion(installation.Root) == target.ProductVersion,
         "Headless replacement did not install the target version: " + replacement);
@@ -217,6 +218,71 @@ using (var badSignatureHttp = new HttpClient(new FixtureHandler(_ => Encoding.UT
 foreach (var bad in new[] { manifest with { ProductId="wrong" }, manifest with { RuntimeIdentifier="linux-x64" } })
     Require(!new UpdateTrustPolicy().Evaluate(bad, new(feed.AbsoluteUri,false),false,false,true).Accepted, "Product/runtime mismatch accepted");
 
+var bridge = manifest with { ProductVersion = "0.0.40", MinimumCompatibleVersion = "0.0.39" };
+var localZip = Path.Combine(root, "bridge.zip");
+using (var archive = ZipFile.Open(localZip, ZipArchiveMode.Create))
+{
+    using var writer = new StreamWriter(archive.CreateEntry("release-manifest.json").Open());
+    writer.Write(JsonSerializer.Serialize(new UpdateReleaseManifest(bridge.SchemaVersion, bridge.ProductId,
+        bridge.ProductVersion, bridge.RuntimeIdentifier, bridge.Files, bridge.MinimumCompatibleVersion)));
+}
+var localBridge = await new LocalUpdatePackageReader().ReadAsync(localZip);
+Require(localBridge.IsSuccess && localBridge.Manifest?.MinimumCompatibleVersion == bridge.MinimumCompatibleVersion,
+    "Local inspection lost compatibility floor");
+Require(!new UpdateTrustPolicy().Evaluate(localBridge.Manifest!, new(null, true), true, true).Accepted,
+    "Local ZIP bypassed compatibility floor");
+Require(!new UpdatePackageValidator(install).Validate(manifest with { MinimumCompatibleVersion = null }, payload).IsAccepted,
+    "Staged payload compatibility mismatch accepted");
+using (var lease = await UpdateOperationLease.AcquireAsync(state.Root))
+{
+    using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(150));
+    try { using var unexpected = await UpdateOperationLease.AcquireAsync(state.Root, cancel.Token); throw new Exception("Concurrent update lease accepted"); }
+    catch (OperationCanceledException) { }
+}
+using (await UpdateOperationLease.AcquireAsync(state.Root)) { }
+var alias = Path.Combine(root, "vault-alias");
+using (var junction = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe",
+    $"/d /c mklink /J \"{alias}\" \"{vaultRoot}\"") { UseShellExecute = false, CreateNoWindow = true }))
+{
+    await junction!.WaitForExitAsync();
+    Require(junction.ExitCode == 0, "Disposable junction creation failed");
+}
+try { UpdatePathGuard.RequireDisjoint(vaultRoot, alias); throw new Exception("Physical alias accepted"); }
+catch (IOException) { }
+try { UpdatePathGuard.DeleteTree(alias); throw new Exception("Cleanup traversed root junction"); }
+catch (IOException) { }
+var cleanupRoot = Path.Combine(root, "cleanup-handle-probe");
+Directory.CreateDirectory(cleanupRoot);
+Directory.Move(alias, Path.Combine(cleanupRoot, "nested-alias"));
+File.WriteAllText(Path.Combine(cleanupRoot, "disposable.txt"), "owned");
+UpdatePathGuard.DeleteTree(cleanupRoot);
+Require(!Directory.Exists(cleanupRoot) && File.ReadAllText(Path.Combine(vaultRoot, "sentinel")) == "protected", "Handle cleanup traversed junction or failed to delete disposable tree");
+Console.WriteLine("UPDATE_HANDLE_CLEANUP_NO_REPARSE_TRAVERSAL=PASS");
+Console.WriteLine("UPDATE_LOCAL_COMPATIBILITY_AND_ROOT_ALIAS_LEASE=PASS");
+var atomicRoot = Path.Combine(root, "atomic-race");
+Directory.CreateDirectory(atomicRoot);
+var atomicPath = Path.Combine(atomicRoot, "journal.json");
+var sentinelPath = Path.Combine(vaultRoot, "sentinel");
+using (var link = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe",
+    $"/d /c mklink /H \"{atomicPath}.tmp\" \"{sentinelPath}\"") { UseShellExecute = false, CreateNoWindow = true }))
+{
+    await link!.WaitForExitAsync();
+    Require(link.ExitCode == 0, "Temporary hardlink creation failed");
+}
+await UpdatePathGuard.WriteAtomicAsync(atomicPath, Encoding.UTF8.GetBytes("new journal"));
+Require(File.ReadAllText(sentinelPath) == "protected" && File.ReadAllText(atomicPath) == "new journal",
+    "Atomic journal write followed a temporary hardlink");
+using (UpdatePathGuard.PinDirectory(atomicRoot))
+{
+    try { Directory.Move(atomicRoot, atomicRoot + "-moved"); throw new Exception("Pinned ancestor moved"); }
+    catch (IOException) { }
+}
+try { UpdatePathGuard.CopyNewFile(atomicPath, sentinelPath); throw new Exception("Copy overwrote existing target"); }
+catch (IOException) { }
+Require(File.ReadAllText(sentinelPath) == "protected", "Copy touched protected bytes");
+Console.WriteLine("UPDATE_PINNED_ANCESTOR_ATOMIC_HARDLINK_CREATE_NEW=PASS");
+
+
 var handoffRoot = state.GetUpdateToolsPath(op);
 Directory.CreateDirectory(handoffRoot);
 var handoffPath = Path.Combine(handoffRoot, "handoff.json");
@@ -227,6 +293,8 @@ async Task<ReplacementResult> Replace(UpdateHandoff handoff, string? authority =
     return await ReplacementEngine.ExecuteAsync(handoffPath, Hash(bytes), authority ?? manifest.ComputeAuthoritySha256(), null, false);
 }
 var handoff = new UpdateHandoff(op, payload, installRoot, manifest, vaultRoot, DateTimeOffset.UtcNow.AddMinutes(1));
+Require(!(await Replace(handoff)).Success, "Unpublished handoff was accepted");
+await new UpdateStateStore(state).PublishHandoffPendingAsync(op);
 Require(!(await Replace(handoff, new string('1',64))).Success, "Manifest authority mismatch accepted");
 Require(!(await Replace(handoff with { VaultRoot=installRoot })).Success, "Vault overlap replacement accepted");
 var deferredHandoff = handoff with { ShutdownDeadlineUtc = DateTimeOffset.UtcNow.AddMilliseconds(100) };
@@ -241,16 +309,206 @@ Require(File.ReadAllText(Path.Combine(vaultRoot, "sentinel")) == "protected", "D
 Console.WriteLine("UPDATE_SHUTDOWN_DEADLINE_DEFERS_WITHOUT_MUTATION=PASS");
 Require((await Replace(handoff with { ShutdownDeadlineUtc = DateTimeOffset.UtcNow.AddMinutes(1) })).Success, "Replacement failed");
 var backup = installRoot + ".backup." + op.ToString("N");
+var preserved = ReadVaultInventory(backup);
+Require(!(await Replace(handoff)).Success && preserved.SequenceEqual(ReadVaultInventory(backup)),
+    "Pending operation replay changed the original backup");
+await new UpdateStateStore(state).PublishCatalogWriteStartedAsync(op, backup);
+Require(!(await Replace(handoff)).Success && preserved.SequenceEqual(ReadVaultInventory(backup)),
+    "Post-cutoff replay changed the original backup");
+var resumed = await new UpdateStartupRecovery(state, install, vaultRoot).ReconcileAsync();
+Require(resumed.CanContinue && resumed.ReplacementInstalled, "Valid post-cutoff replacement was not verified");
+var launcher = Path.Combine(installRoot, "naut.exe");
+var approvedLauncher = await File.ReadAllBytesAsync(launcher);
+await File.WriteAllTextAsync(launcher, "tampered");
+var tampered = await new UpdateStartupRecovery(state, install, vaultRoot).ReconcileAsync();
+Require(!tampered.CanContinue && preserved.SequenceEqual(ReadVaultInventory(backup)),
+    "Tampered post-cutoff target accepted or backup changed");
+await File.WriteAllBytesAsync(launcher, approvedLauncher);
+Console.WriteLine("UPDATE_REPLAY_BACKUP_AND_POST_CUTOFF_IDENTITY=PASS");
 Require(File.Exists(Path.Combine(backup,"runtime/obsolete.dll")) && !File.Exists(Path.Combine(installRoot,"runtime/obsolete.dll")), "Backup/replacement membership failed");
 Require(File.ReadAllText(Path.Combine(vaultRoot,"sentinel")) == "protected" && Directory.GetFiles(vaultRoot).Length == 1, "Vault touched");
-var recovery = new UpdateRecoveryStore(state);
-await recovery.SaveAsync(new(op, installRoot, installRoot+".staged."+op.ToString("N"), backup, payload,
+try
+{
+    await new UpdateStateStore(state).PublishHandoffPendingAsync(op);
+    throw new Exception("Post-cutoff operation returned to HandoffPending");
+}
+catch (InvalidOperationException) { }
+Require((await new UpdateStateStore(state).LoadAsync())?.Cutoff == UpdateStartupCutoff.RecoveryRequired,
+    "Post-cutoff regression changed durable state");
+var distinct = Guid.NewGuid();
+try
+{
+    await new UpdateStateStore(state).PublishHandoffPendingAsync(distinct);
+    throw new Exception("New operation replaced unresolved recovery authority");
+}
+catch (InvalidOperationException) { }
+Require((await new UpdateStateStore(state).LoadAsync())?.OperationId == op, "New operation displaced recovery authority");
+Console.WriteLine("UPDATE_CUTOFF_MONOTONICITY=PASS");
+
+var recoveryRoot = Path.Combine(root, "pre-cutoff-recovery");
+var recoveryInstall = new InstallPaths(Path.Combine(recoveryRoot, "install"));
+var recoveryState = new AppStatePaths(Path.Combine(recoveryRoot, "state"));
+var recoveryOp = Guid.NewGuid();
+var recoveryBackup = recoveryInstall.Root + ".backup." + recoveryOp.ToString("N");
+Directory.CreateDirectory(Path.Combine(recoveryBackup, "runtime"));
+File.WriteAllText(Path.Combine(recoveryBackup, "runtime/obsolete.dll"), "old");
+await new UpdateStateStore(recoveryState).PublishHandoffPendingAsync(recoveryOp);
+var recovery = new UpdateRecoveryStore(recoveryState);
+await recovery.SaveAsync(new(recoveryOp, recoveryInstall.Root,
+    recoveryInstall.Root + ".staged." + recoveryOp.ToString("N"), recoveryBackup,
+    Path.Combine(recoveryState.UpdateStagingPath, recoveryOp.ToString("D")),
     manifest.ComputeAuthoritySha256(), "InstallMovedToBackup", DateTimeOffset.UtcNow));
-await new UpdateStateStore(state).PublishHandoffPendingAsync(op);
-Directory.Move(installRoot, Path.Combine(root,"interrupted-replacement"));
-var restored = await new UpdateStartupRecovery(state, install, vaultRoot).ReconcileAsync();
-Require(restored.CanContinue && !restored.ReplacementInstalled && File.Exists(Path.Combine(installRoot,"runtime/obsolete.dll")), "Interrupted replacement backup recovery failed");
+var restored = await new UpdateStartupRecovery(recoveryState, recoveryInstall, vaultRoot).ReconcileAsync();
+Require(restored.CanContinue && !restored.ReplacementInstalled &&
+    File.Exists(Path.Combine(recoveryInstall.Root, "runtime/obsolete.dll")), "Interrupted replacement backup recovery failed");
 Require(File.ReadAllText(Path.Combine(vaultRoot,"sentinel"))=="protected", "Recovery touched Vault");
+// Execute the isolated helper as a separate process against operation-bound recovery evidence.
+foreach (var afterCutoff in new[] { false, true })
+{
+    var externalRoot = Path.Combine(root, afterCutoff ? "external-forward" : "external-rollback");
+    var externalInstall = new InstallPaths(Path.Combine(externalRoot, "install"));
+    var externalState = new AppStatePaths(Path.Combine(externalRoot, "state"));
+    var externalOp = Guid.NewGuid();
+    var externalTools = externalState.GetUpdateToolsPath(externalOp);
+    var externalPayload = Path.Combine(externalState.UpdateStagingPath, externalOp.ToString("D"));
+    var externalBackup = externalInstall.Root + ".backup." + externalOp.ToString("N");
+    Directory.CreateDirectory(externalTools);
+    Directory.CreateDirectory(externalInstall.Root);
+    File.WriteAllText(Path.Combine(externalInstall.Root, "old.marker"), "original");
+    foreach (var path in Directory.EnumerateFiles(payload, "*", SearchOption.AllDirectories))
+    {
+        var dest = Path.Combine(externalPayload, Path.GetRelativePath(payload, path));
+        Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+        File.Copy(path, dest);
+    }
+    var externalHandoff = new UpdateHandoff(externalOp, externalPayload, externalInstall.Root, manifest,
+        vaultRoot, DateTimeOffset.UtcNow.AddMinutes(5));
+    var encoded = JsonSerializer.SerializeToUtf8Bytes(externalHandoff, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+    var externalHandoffPath = Path.Combine(externalTools, "handoff.json");
+    File.WriteAllBytes(externalHandoffPath, encoded);
+    var externalStore = new UpdateStateStore(externalState);
+    await externalStore.PublishHandoffPendingAsync(externalOp, handoffSha256: Hash(encoded), manifestAuthoritySha256: manifest.ComputeAuthoritySha256());
+    UpdateBackupIdentity.RecordBeforeMove(externalTools, externalInstall.Root, Hash(encoded), CancellationToken.None);
+    var before = ReadVaultInventory(externalInstall.Root);
+    UpdatePathGuard.MoveSibling(externalInstall.Root, externalBackup);
+    if (afterCutoff) await externalStore.PublishCatalogWriteStartedAsync(externalOp, externalBackup);
+    await externalStore.PublishRecoveryRequiredAsync(externalOp, externalBackup);
+    var blocked = await new UpdateStartupRecovery(externalState, externalInstall, vaultRoot).ReconcileAsync();
+    Require(!blocked.CanContinue, "Recovery barrier opened before verified repair");
+    Require((await externalStore.LoadAsync())?.RecoveryOrigin == (afterCutoff ? UpdateStartupCutoff.CatalogWriteStarted : UpdateStartupCutoff.HandoffPending), "Recovery origin was lost");
+    var executable = Environment.GetEnvironmentVariable("NAUT_TEST_RECOVERY_EXECUTABLE");
+    System.Diagnostics.ProcessStartInfo start;
+    if (!string.IsNullOrWhiteSpace(executable))
+    {
+        var isolatedExe = Path.Combine(externalTools, Path.GetFileName(executable));
+        File.Copy(executable, isolatedExe);
+        start = new(isolatedExe) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = externalTools, CreateNoWindow = true };
+        start.ArgumentList.Add("--recover"); start.ArgumentList.Add("--no-launch");
+    }
+    else
+    {
+        var helper = typeof(ReplacementEngine).Assembly.Location;
+        var helperName = Path.GetFileName(helper);
+        File.Copy(helper, Path.Combine(externalTools, helperName));
+        var contracts = typeof(UpdateBackupIdentity).Assembly.Location;
+        File.Copy(contracts, Path.Combine(externalTools, Path.GetFileName(contracts)));
+        var config = Path.Combine(AppContext.BaseDirectory, "check.runtimeconfig.json");
+        start = new("dotnet") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = externalTools, CreateNoWindow = true };
+        foreach (var arg in new[] { "exec", "--runtimeconfig", config, Path.Combine(externalTools, helperName), "--recover", "--no-launch" })
+            start.ArgumentList.Add(arg);
+    }
+    using var child = System.Diagnostics.Process.Start(start)!;
+    var error = child.StandardError.ReadToEndAsync();
+    await child.WaitForExitAsync();
+    Require(child.ExitCode == 0, "External recovery failed: " + await error);
+    if (afterCutoff)
+    {
+        Require(before.SequenceEqual(ReadVaultInventory(externalBackup)) && !File.Exists(Path.Combine(externalInstall.Root, "old.marker")), "Forward recovery changed backup or restored old binary");
+        var result = await new UpdateStartupRecovery(externalState, externalInstall, vaultRoot).ReconcileAsync();
+        Require(result.CanContinue && result.ReplacementInstalled, "Forward target failed startup verification");
+    }
+    else
+    {
+        Require(before.SequenceEqual(ReadVaultInventory(externalInstall.Root)) && !Directory.Exists(externalBackup), "External rollback restored wrong identity");
+        var result = await new UpdateStartupRecovery(externalState, externalInstall, vaultRoot).ReconcileAsync();
+        Require(result.CanContinue && !result.ReplacementInstalled && (await externalStore.LoadAsync())?.Cutoff == UpdateStartupCutoff.AbortedNoMutation, "Verified rollback did not clear recovery barrier");
+    }
+}
+
+var normalHelper = Environment.GetEnvironmentVariable("NAUT_TEST_RECOVERY_EXECUTABLE");
+var crashHelper = Environment.GetEnvironmentVariable("NAUT_TEST_KILL_EXECUTABLE");
+if (!string.IsNullOrWhiteSpace(normalHelper) && !string.IsNullOrWhiteSpace(crashHelper))
+{
+    foreach (var phase in new[] { "BeforeBackupMove", "AfterBackupMove", "AfterInstallMove", "Concurrent" })
+    {
+        var testRoot = Path.Combine(root, "actual-" + phase);
+        var testInstall = new InstallPaths(Path.Combine(testRoot, "install"));
+        var testState = new AppStatePaths(Path.Combine(testRoot, "state"));
+        var testOp = Guid.NewGuid();
+        var tools = testState.GetUpdateToolsPath(testOp);
+        var testPayload = Path.Combine(testState.UpdateStagingPath, testOp.ToString("D"));
+        var testBackup = testInstall.Root + ".backup." + testOp.ToString("N");
+        Directory.CreateDirectory(tools);
+        Directory.CreateDirectory(testInstall.Root);
+        File.WriteAllText(Path.Combine(testInstall.Root, "old.marker"), "original");
+        foreach (var path in Directory.EnumerateFiles(payload, "*", SearchOption.AllDirectories))
+        {
+            var dest = Path.Combine(testPayload, Path.GetRelativePath(payload, path));
+            Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+            File.Copy(path, dest);
+        }
+        var authority = new UpdateHandoff(testOp, testPayload, testInstall.Root, manifest,
+            vaultRoot, DateTimeOffset.UtcNow.AddMinutes(5));
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(authority, new JsonSerializerOptions { PropertyNamingPolicy=JsonNamingPolicy.CamelCase });
+        var pathToHandoff = Path.Combine(tools, "handoff.json");
+        await File.WriteAllBytesAsync(pathToHandoff, bytes);
+        var store = new UpdateStateStore(testState);
+        await store.PublishHandoffPendingAsync(testOp, handoffSha256: Hash(bytes), manifestAuthoritySha256: manifest.ComputeAuthoritySha256());
+        var original = ReadVaultInventory(testInstall.Root);
+        var recoveryExe = Path.Combine(tools, Path.GetFileName(normalHelper));
+        File.Copy(normalHelper, recoveryExe);
+        System.Diagnostics.ProcessStartInfo Start(string executable, bool recover = false)
+        {
+            var info = new System.Diagnostics.ProcessStartInfo(executable) { UseShellExecute=false, RedirectStandardOutput=true, RedirectStandardError=true, CreateNoWindow=true, WorkingDirectory=tools };
+            if (recover) { info.ArgumentList.Add("--recover"); }
+            else foreach (var a in new[] { "--handoff", pathToHandoff, "--handoff-sha256", Hash(bytes), "--manifest-sha256", manifest.ComputeAuthoritySha256() }) info.ArgumentList.Add(a);
+            info.ArgumentList.Add("--no-launch");
+            return info;
+        }
+        if (phase == "Concurrent")
+        {
+            using var one = System.Diagnostics.Process.Start(Start(recoveryExe))!;
+            using var two = System.Diagnostics.Process.Start(Start(recoveryExe))!;
+            await Task.WhenAll(one.WaitForExitAsync(), two.WaitForExitAsync()).WaitAsync(TimeSpan.FromSeconds(60));
+            Require((one.ExitCode == 0) != (two.ExitCode == 0), "Concurrent helpers did not elect exactly one replacement");
+            Require(original.SequenceEqual(ReadVaultInventory(testBackup)), "Concurrent helper mutated original backup");
+        }
+        else
+        {
+            var info = Start(crashHelper);
+            info.Environment["NAUT_UPDATER_KILL_PHASE"] = phase;
+            using var child = System.Diagnostics.Process.Start(info)!;
+            try
+            {
+                var line = await child.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(30));
+                Require(line == "CRASH_POINT " + phase, "Updater did not reach " + phase + ": " + line);
+                child.Kill(); await child.WaitForExitAsync();
+                Console.WriteLine($"ACTUAL_UPDATER_KILL {phase} exit={child.ExitCode}");
+            }
+            finally { if (!child.HasExited) { child.Kill(); await child.WaitForExitAsync(); } }
+            using var repaired = System.Diagnostics.Process.Start(Start(recoveryExe, true))!;
+            await repaired.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60));
+            Require(repaired.ExitCode == 0, "Actual crash recovery failed: " + await repaired.StandardError.ReadToEndAsync());
+            var result = await new UpdateStartupRecovery(testState, testInstall, vaultRoot).ReconcileAsync();
+            Require(result.CanContinue && result.ReplacementInstalled == (phase == "AfterInstallMove"), "Recovered topology rejected");
+            Require(original.SequenceEqual(ReadVaultInventory(phase == "AfterInstallMove" ? testBackup : testInstall.Root)), "Original bytes lost after actual kill");
+        }
+        Require(File.ReadAllText(sentinelPath) == "protected", "Actual crash or competing helper touched Vault");
+        Console.WriteLine("ACTUAL_UPDATER_RECOVERY " + phase + "=PASS");
+    }
+}
+Console.WriteLine("UPDATE_EXTERNAL_HELPER_MISSING_ROOT_ROLLBACK_FORWARD=PASS");
+Console.WriteLine("UPDATE_RECOVERY_REQUIRED_ORIGIN_AND_VERIFIED_REPAIR=PASS");
 Console.WriteLine("PLANNER_STAGING_DOWNLOAD_FALLBACK_PROGRESS_REPLACEMENT_ISOLATION_MPG_MPEG=PASS");
 
 static string ReadInstalledVersion(string installation)

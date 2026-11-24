@@ -76,6 +76,7 @@
     <sys:String x:Key="Import.PreparingCover">Cover 제안 준비 중…</sys:String>
     <sys:String x:Key="Import.PreviewUnavailable">미리보기를 사용할 수 없습니다.</sys:String>
     <sys:String x:Key="Import.Prioritize">우선순위</sys:String>
+    <sys:String x:Key="Import.Normalize">일반</sys:String>
     <sys:String x:Key="Import.Problems">검토 필요</sys:String>
     <sys:String x:Key="Import.Problems.Description">계속하려면 문제를 해결하세요.</sys:String>
     <sys:String x:Key="Import.ProfileCollision">다른 Profile로 인식됨</sys:String>
@@ -706,7 +707,7 @@
     <sys:String x:Key="Import.Detail.OneItem">항목 1개</sys:String>
     <sys:String x:Key="Import.Detail.ManyItems">{0} 항목</sys:String>
     <sys:String x:Key="Import.Detail.Added">{0}가 Vault에 추가되었습니다.</sys:String>
-    <sys:String x:Key="Import.Detail.WithDuplicates">{0} · {1}는 이미 Vault에 있습니다.</sys:String>
+    <sys:String x:Key="Import.Detail.PendingReuse">{0}개 재사용 선택</sys:String>
     <sys:String x:Key="Import.Stage.AlreadyInVault">이미 Vault에 있습니다</sys:String>
     <sys:String x:Key="Import.Progress.CheckingMedia">미디어 확인 중</sys:String>
     <sys:String x:Key="Import.Progress.Session">일괄 처리: {0} / {1}개 확인</sys:String>
@@ -1009,7 +1010,7 @@
     <sys:String x:Key="Import.Pause.Tooltip">가져오기 일시중지</sys:String>
     <sys:String x:Key="Import.Start">시작</sys:String>
     <sys:String x:Key="Import.Start.Prioritize">이 가져오기 우선순위 지정</sys:String>
-    <sys:String x:Key="Import.Start.Prioritized">이 가져오기가 우선순위입니다.</sys:String>
+    <sys:String x:Key="Import.Start.Normalize">일반 우선순위로 복귀</sys:String>
     <sys:String x:Key="Import.Start.Resume">가져오기 시작</sys:String>
     <sys:String x:Key="Import.Preparing">미리보기 준비 중…</sys:String>
     <sys:String x:Key="Import.Priority">우선순위</sys:String>

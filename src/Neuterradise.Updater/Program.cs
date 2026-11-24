@@ -10,6 +10,22 @@ public static class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        if (args.Length == 0 || string.Equals(args[0], "--recover", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var recovered = await ReplacementEngine.RecoverAsync(AppContext.BaseDirectory,
+                    !args.Contains("--no-launch", StringComparer.OrdinalIgnoreCase));
+                if (!recovered.Success) Console.Error.WriteLine(recovered.Error);
+                return recovered.Success ? 0 : 2;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Recovery refused: {ex.Message}");
+                return 4;
+            }
+        }
+
         string? handoffPath = null;
         int? parentPid = null;
         string? handoffSha256 = null;

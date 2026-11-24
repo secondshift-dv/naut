@@ -22,13 +22,10 @@ public sealed class ThemeRuntime
 
     private readonly Dictionary<string, SolidColorBrush> _brushes = new(StringComparer.Ordinal);
     private readonly ConditionalWeakTable<TextBlock, TypeRegistration> _typed = new();
-    private readonly List<WeakReference<TextBlock>> _typedList = [];
     private LinearGradientBrush? _glass;
     private readonly Dictionary<string, FontFamily> _fonts = new(StringComparer.Ordinal);
     private readonly ConditionalWeakTable<Control, Action<Control>> _controls = new();
-    private readonly List<WeakReference<Control>> _controlList = [];
     private readonly ConditionalWeakTable<Border, Action<Border>> _controlBorders = new();
-    private readonly List<WeakReference<Border>> _controlBorderList = [];
     public ControlSkinPlan? ControlSkin { get; private set; }
     public ControlSkinPlan ControlFamily(string family) => (ControlSkin ?? new ControlSkinPlan(
         Tokens.Number("radiusControl", 8), Tokens.Number("borderWeight", 1), 9, 4,
@@ -188,7 +185,6 @@ public sealed class ThemeRuntime
 
     public void TrackControlBorder(Border border, Action<Border> apply)
     {
-        if (!_controlBorders.TryGetValue(border, out _)) _controlBorderList.Add(new WeakReference<Border>(border));
         _controlBorders.AddOrUpdate(border, apply);
         apply(border);
     }
@@ -218,7 +214,6 @@ public sealed class ThemeRuntime
     {
         if (!_controls.TryGetValue(control, out _))
         {
-            _controlList.Add(new WeakReference<Control>(control));
             control.Loaded += OnTrackedControlLoaded;
         }
         _controls.AddOrUpdate(control, apply);
@@ -251,6 +246,18 @@ public sealed class ThemeRuntime
     public static ThemeRuntime Current => _current;
 
     public static void Install(ThemeRuntime runtime) => _current = runtime;
+
+    private readonly ConditionalWeakTable<IconView, object> _icons = new();
+    private static readonly object IconRegistration = new();
+    internal void RegisterIcon(IconView icon) => _icons.AddOrUpdate(icon, IconRegistration);
+    internal void UnregisterIcon(IconView icon) => _icons.Remove(icon);
+
+    private void NotifyChanged()
+    {
+        foreach (var pair in _icons)
+            pair.Key.Invalidate();
+        Changed?.Invoke();
+    }
 
     public event Action? Changed;
 
@@ -314,10 +321,17 @@ public sealed class ThemeRuntime
             "heading" => "fontHeading",
             _ => "fontBody",
         };
-        return new FontFamily(Tokens.Text(token));
+        return _fonts[role] = new FontFamily(Tokens.Text(token));
     }
 
     public void ApplyType(TextBlock block, string role, string? colorToken = null)
+    {
+        if (!_typed.TryGetValue(block, out var registration) || registration.Role != role || registration.Color != colorToken)
+            _typed.AddOrUpdate(block, new TypeRegistration(role, colorToken));
+        ApplyRegisteredType(block, role, colorToken);
+    }
+
+    private void ApplyRegisteredType(TextBlock block, string role, string? colorToken)
     {
         var style = TokenAuthority.Foundations.TypeStyles.TryGetValue(role, out var s)
             ? s
@@ -338,15 +352,6 @@ public sealed class ThemeRuntime
             block.TextWrapping = TextWrapping.WrapWholeWords;
         }
 
-        if (!_typed.TryGetValue(block, out _))
-        {
-            _typed.Add(block, new TypeRegistration(role, colorToken));
-            _typedList.Add(new WeakReference<TextBlock>(block));
-        }
-        else
-        {
-            _typed.AddOrUpdate(block, new TypeRegistration(role, colorToken));
-        }
     }
 
     // ---------------------------------------------------------------- application
@@ -368,32 +373,22 @@ public sealed class ThemeRuntime
         PushBrushes();
         ReapplyTypography();
         RefreshThemeElements();
-        _controlList.RemoveAll(reference => !reference.TryGetTarget(out _));
-        foreach (var reference in _controlList)
-            if (reference.TryGetTarget(out var control) && _controls.TryGetValue(control, out var apply)) apply(control);
-        _controlBorderList.RemoveAll(reference => !reference.TryGetTarget(out _));
-        foreach (var reference in _controlBorderList)
-            if (reference.TryGetTarget(out var border) && _controlBorders.TryGetValue(border, out var apply)) apply(border);
-        Changed?.Invoke();
+        foreach (var (control, apply) in _controls) apply(control);
+        foreach (var (border, apply) in _controlBorders) apply(border);
+        NotifyChanged();
     }
 
     public void RefreshMotion()
     {
         Tokens = TokenAuthority.Resolve(Theme, Material, ReducedMotion);
         ResourceGovernor.Shared.SetReducedMotion(ReducedMotion);
-        Changed?.Invoke();
+        NotifyChanged();
     }
 
     private void ReapplyTypography()
     {
-        _typedList.RemoveAll(reference => !reference.TryGetTarget(out _));
-        foreach (var reference in _typedList)
-        {
-            if (reference.TryGetTarget(out var block) && _typed.TryGetValue(block, out var registration))
-            {
-                ApplyType(block, registration.Role, registration.Color);
-            }
-        }
+        foreach (var (block, registration) in _typed)
+            ApplyRegisteredType(block, registration.Role, registration.Color);
     }
 
     private Windows.UI.Color ResolveColor(string token)
@@ -633,20 +628,16 @@ public sealed class ThemeRuntime
     }
 
     private readonly ConditionalWeakTable<FrameworkElement, Action<FrameworkElement>> _themeElements = new();
-    private readonly List<WeakReference<FrameworkElement>> _themeElementList = [];
 
     public void TrackThemeElement<T>(T element, Action<T> apply) where T : FrameworkElement
     {
-        if (!_themeElements.TryGetValue(element, out _)) _themeElementList.Add(new WeakReference<FrameworkElement>(element));
         _themeElements.AddOrUpdate(element, value => apply((T)value));
         apply(element);
     }
 
     private void RefreshThemeElements()
     {
-        _themeElementList.RemoveAll(reference => !reference.TryGetTarget(out _));
-        foreach (var reference in _themeElementList)
-            if (reference.TryGetTarget(out var element) && _themeElements.TryGetValue(element, out var apply)) apply(element);
+        foreach (var (element, apply) in _themeElements) apply(element);
     }
 
     private sealed record TypeRegistration(string Role, string? Color);

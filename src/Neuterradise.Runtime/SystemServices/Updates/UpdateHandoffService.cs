@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Neuterradise.Release.Contracts;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -54,6 +55,10 @@ public sealed class UpdateHandoffService
             RootPathRules.EnsureDisjoint("UpdateBackupRoot", replacementBackupRoot, "AppStateRoot", _appState.Root);
             RootPathRules.EnsureDisjoint("UpdateStagingRoot", replacementStagingRoot, "VaultRoot", vaultRoot);
             RootPathRules.EnsureDisjoint("UpdateBackupRoot", replacementBackupRoot, "VaultRoot", vaultRoot);
+            UpdatePathGuard.RequireDisjoint(destinationInstallRoot, _appState.Root, vaultRoot,
+                replacementStagingRoot, replacementBackupRoot);
+            UpdatePathGuard.Resolve(sourcePayloadPath);
+            UpdatePathGuard.Resolve(_appState.GetUpdateToolsPath(handoff.OperationId));
         }
         catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
         {
@@ -85,13 +90,18 @@ public sealed class UpdateHandoffService
         if (!File.Exists(helper))
             return UpdateHandoffResult.Reject("Approved updater helper is unavailable.");
 
+        await using var updateLease = await UpdateOperationLease.AcquireAsync(_appState.Root, cancellationToken).ConfigureAwait(false);
+        var previous = await _stateStore.ReadAsync(cancellationToken).ConfigureAwait(false);
+        if (previous.IsCorrupt || (previous.IsValid && (!previous.Value!.IsTerminal || previous.Value.OperationId == handoff.OperationId)))
+            return UpdateHandoffResult.Reject("Another update operation requires reconciliation.");
+
         var operationRoot = _appState.GetUpdateToolsPath(handoff.OperationId);
-        Directory.CreateDirectory(operationRoot);
+        using var operationPins = UpdatePathGuard.PinDirectory(operationRoot, create: true);
 
         var isolatedHelper = Path.Combine(operationRoot, Path.GetFileName(helper));
         try
         {
-            File.Copy(helper, isolatedHelper, overwrite: true);
+            UpdatePathGuard.CopyNewFile(helper, isolatedHelper);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -115,9 +125,14 @@ public sealed class UpdateHandoffService
         var handoffBytes = Encoding.UTF8.GetBytes(json);
         var handoffSha256 = Convert.ToHexString(SHA256.HashData(handoffBytes)).ToLowerInvariant();
         var manifestAuthoritySha256 = normalizedHandoff.Manifest.ComputeAuthoritySha256();
-        await File.WriteAllBytesAsync(handoffPath, handoffBytes, cancellationToken).ConfigureAwait(false);
+        await using (var stream = new FileStream(handoffPath, FileMode.CreateNew, FileAccess.Write,
+            FileShare.None, 4096, FileOptions.Asynchronous | FileOptions.WriteThrough))
+        {
+            await stream.WriteAsync(handoffBytes, cancellationToken).ConfigureAwait(false);
+            stream.Flush(flushToDisk: true);
+        }
 
-        await _stateStore.PublishHandoffPendingAsync(handoff.OperationId, cancellationToken).ConfigureAwait(false);
+        await _stateStore.PublishHandoffPendingAsync(handoff.OperationId, cancellationToken, handoffSha256, manifestAuthoritySha256).ConfigureAwait(false);
 
         var start = new ProcessStartInfo(isolatedHelper)
         {
@@ -145,6 +160,7 @@ public sealed class UpdateHandoffService
                 handoff.OperationId,
                 $"Helper launch failed: {exception.Message}",
                 cancellationToken).ConfigureAwait(false);
+            operationPins.Dispose();
             await new UpdateTerminalCleanup(_appState, _install, vaultRoot)
                 .CleanupAbortedNoMutationAsync(
                     handoff.OperationId,
@@ -159,6 +175,7 @@ public sealed class UpdateHandoffService
                 handoff.OperationId,
                 "Helper process could not be launched (null process returned).",
                 cancellationToken).ConfigureAwait(false);
+            operationPins.Dispose();
             await new UpdateTerminalCleanup(_appState, _install, vaultRoot)
                 .CleanupAbortedNoMutationAsync(
                     handoff.OperationId,

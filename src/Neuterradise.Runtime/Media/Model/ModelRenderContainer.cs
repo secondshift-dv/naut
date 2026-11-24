@@ -165,20 +165,48 @@ public static class ModelRenderContainer
     public static async Task<byte[]> ReadChunkAsync(string path, ModelRenderFile file, int index,
         CancellationToken ct = default)
     {
-        if (file.PayloadOffset is < 14 or > MaxHeaderBytes + 12 || file.ByteLength > MaxBytes)
-            throw Invalid("file descriptor");
-        ValidateHeader(file.Header, file.ByteLength - file.PayloadOffset);
-        if ((uint)index >= file.Header.Chunks.Length) throw new ArgumentOutOfRangeException(nameof(index));
-        var chunk = file.Header.Chunks[index];
-        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
-            65536, FileOptions.Asynchronous);
-        if (stream.Length != file.ByteLength) throw Invalid("changed file");
-        stream.Position = file.PayloadOffset + chunk.Offset;
-        var bytes = new byte[chunk.Length];
-        await ReadExactlyAsync(stream, bytes, ct).ConfigureAwait(false);
-        if (Convert.ToHexStringLower(SHA256.HashData(bytes)) != chunk.Sha256) throw Invalid("changed chunk");
-        ValidateValues(file.Header, index, bytes);
-        return bytes;
+        await using var reader = OpenChunkReader(path, file);
+        return await reader.ReadAsync(index, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>One read-only file handle and one descriptor validation for a sequential scene load.</summary>
+    public static ChunkReader OpenChunkReader(string path, ModelRenderFile file) => new(path, file);
+
+    public sealed class ChunkReader : IAsyncDisposable
+    {
+        private readonly FileStream _stream;
+        private readonly ModelRenderFile _file;
+
+        internal ChunkReader(string path, ModelRenderFile file)
+        {
+            if (file.PayloadOffset is < 14 or > MaxHeaderBytes + 12 || file.ByteLength > MaxBytes)
+                throw Invalid("file descriptor");
+            ValidateHeader(file.Header, file.ByteLength - file.PayloadOffset);
+            _file = file;
+            _stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+                65536, FileOptions.Asynchronous);
+            if (_stream.Length != file.ByteLength)
+            {
+                _stream.Dispose();
+                throw Invalid("changed file");
+            }
+        }
+
+        // Owned by a single scene load; concurrent calls are not supported.
+        public async Task<byte[]> ReadAsync(int index, CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+            if ((uint)index >= _file.Header.Chunks.Length) throw new ArgumentOutOfRangeException(nameof(index));
+            var chunk = _file.Header.Chunks[index];
+            _stream.Position = _file.PayloadOffset + chunk.Offset;
+            var bytes = GC.AllocateUninitializedArray<byte>(chunk.Length);
+            await ReadExactlyAsync(_stream, bytes, ct).ConfigureAwait(false);
+            if (Convert.ToHexStringLower(SHA256.HashData(bytes)) != chunk.Sha256) throw Invalid("changed chunk");
+            ValidateValues(_file.Header, index, bytes);
+            return bytes;
+        }
+
+        public ValueTask DisposeAsync() => _stream.DisposeAsync();
     }
 
     internal static async Task<ModelRenderFile> ReadTrustedDescriptorAsync(string path, string sourceSha256,

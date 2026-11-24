@@ -1,4 +1,5 @@
 using Neuterradise.App.SystemServices.Storage;
+using Neuterradise.Release.Contracts;
 
 namespace Neuterradise.App.SystemServices.Updates;
 
@@ -60,6 +61,8 @@ public sealed class UpdateStartupRecovery
     public async Task<UpdateStartupRecoveryResult> ReconcileAsync(
         CancellationToken cancellationToken = default)
     {
+        UpdatePathGuard.RequireDisjoint(_vaultRoot is null
+            ? [_install.Root, _appState.Root] : [_install.Root, _appState.Root, _vaultRoot]);
         var stateRead = await _stateStore
             .ReadAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -75,6 +78,16 @@ public sealed class UpdateStartupRecovery
         }
 
         var state = stateRead.Value!;
+        UpdateHandoff? approvedHandoff = null;
+        if (!state.IsTerminal && state.Cutoff != UpdateStartupCutoff.CleanupPending && state.HandoffSha256 is not null)
+        {
+            var read = await _recoveryStore.ReadHandoffAsync(state.OperationId, cancellationToken,
+                state.HandoffSha256, state.ManifestAuthoritySha256).ConfigureAwait(false);
+            if (!read.IsValid)
+                return UpdateStartupRecoveryResult.Blocked(state.OperationId, state.BackupPath,
+                    "Persisted handoff differs from its approved evidence or cannot be read.");
+            approvedHandoff = read.Value!;
+        }
         var persistedBackupError = ValidatePersistedBackupAuthority(state);
         if (persistedBackupError is not null)
         {
@@ -150,9 +163,44 @@ public sealed class UpdateStartupRecovery
 
         if (state.Cutoff == UpdateStartupCutoff.RecoveryRequired)
         {
-            return UpdateStartupRecoveryResult.Blocked(
-                state.OperationId,
-                state.BackupPath,
+            // Only an operation-bound external repair may clear this startup barrier. A legacy
+            // barrier without a durable origin stays blocked; it must never guess rollback safety.
+            if (approvedHandoff is not null && state.RecoveryOrigin is UpdateStartupCutoff.HandoffPending or UpdateStartupCutoff.CatalogWriteStarted)
+            {
+                var repairPaths = GetReplacementPaths(state.OperationId);
+                var repair = await _recoveryStore.ReadAsync(state.OperationId, _install, _vaultRoot, cancellationToken).ConfigureAwait(false);
+                if (repair.IsValid && repair.Value is { } repairPlan &&
+                    repairPlan.ManifestAuthoritySha256 == state.ManifestAuthoritySha256)
+                {
+                    if (repairPlan.Step == "ExternalReplacementCompleted")
+                    {
+                        var verified = await VerifyInstalledReplacementAsync(state, approvedHandoff, repairPaths,
+                            repairPlan.ManifestAuthoritySha256, cancellationToken).ConfigureAwait(false);
+                        if (verified.CanContinue && verified.ReplacementInstalled)
+                            await _stateStore.PublishVerifiedRecoveryAsync(new(state.OperationId,
+                                UpdateStartupCutoff.CatalogWriteStarted, repairPaths.BackupRoot, DateTimeOffset.UtcNow), cancellationToken).ConfigureAwait(false);
+                        return verified;
+                    }
+                    if (repairPlan.Step == "ExternalRestoredFromBackup" && state.RecoveryOrigin == UpdateStartupCutoff.HandoffPending &&
+                        Directory.Exists(_install.Root) && !Path.Exists(repairPaths.BackupRoot))
+                    {
+                        try
+                        {
+                            if (UpdateBackupIdentity.Matches(_appState.GetUpdateToolsPath(state.OperationId), _install.Root,
+                                state.HandoffSha256!, cancellationToken))
+                            {
+                                await _stateStore.PublishVerifiedRecoveryAsync(new(state.OperationId,
+                                    UpdateStartupCutoff.AbortedNoMutation, null, DateTimeOffset.UtcNow,
+                                    "Externally restored verified pre-replacement install."), cancellationToken).ConfigureAwait(false);
+                                var cleanup = await _terminalCleanup.CleanupAbortedNoMutationAsync(state.OperationId, cancellationToken).ConfigureAwait(false);
+                                return UpdateStartupRecoveryResult.NoAction(cleanup.SafeError);
+                            }
+                        }
+                        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) { }
+                    }
+                }
+            }
+            return UpdateStartupRecoveryResult.Blocked(state.OperationId, state.BackupPath,
                 "Update replacement recovery is required before startup can continue.");
         }
 
@@ -168,9 +216,16 @@ public sealed class UpdateStartupRecovery
                     "Update rollback backup is missing before the replacement reached Ready.");
             }
 
-            return UpdateStartupRecoveryResult.ReplacementReady(
-                state.OperationId,
-                catalogWritePaths.BackupRoot);
+            var recovery = await _recoveryStore.ReadAsync(state.OperationId, _install, _vaultRoot, cancellationToken)
+                .ConfigureAwait(false);
+            if (!recovery.IsValid || recovery.Value is not { } catalogWritePlan)
+                return await BlockAsync(state.OperationId, catalogWritePaths.BackupRoot,
+                    recovery.SafeError ?? "Catalog write started without a valid replacement journal.",
+                    cancellationToken).ConfigureAwait(false);
+
+            // After catalog writes begin, never roll back to the old executable.
+            return await VerifyInstalledReplacementAsync(state, approvedHandoff, catalogWritePaths,
+                catalogWritePlan.ManifestAuthoritySha256, cancellationToken).ConfigureAwait(false);
         }
 
         if (state.Cutoff
@@ -252,7 +307,7 @@ public sealed class UpdateStartupRecovery
         if (plan.Step == "ReplacementCompleted")
         {
             return await VerifyInstalledReplacementAsync(
-                state.OperationId,
+                state, approvedHandoff,
                 paths,
                 plan.ManifestAuthoritySha256,
                 cancellationToken).ConfigureAwait(false);
@@ -268,7 +323,11 @@ public sealed class UpdateStartupRecovery
             {
                 try
                 {
-                    Directory.Move(paths.BackupRoot, _install.Root);
+                    if (state.HandoffSha256 is not null && !UpdateBackupIdentity.Matches(
+                        _appState.GetUpdateToolsPath(state.OperationId), paths.BackupRoot,
+                        state.HandoffSha256, cancellationToken))
+                        throw new IOException("Rollback backup identity could not be verified.");
+                    UpdatePathGuard.MoveSibling(paths.BackupRoot, _install.Root);
                     return await PublishAbortedNoMutationAndCleanupAsync(
                         state.OperationId,
                         "Interrupted replacement was restored from its deterministic backup before catalog access.",
@@ -290,7 +349,7 @@ public sealed class UpdateStartupRecovery
                 && Directory.Exists(paths.BackupRoot))
             {
                 return await VerifyInstalledReplacementAsync(
-                    state.OperationId,
+                    state, approvedHandoff,
                     paths,
                     plan.ManifestAuthoritySha256,
                     cancellationToken).ConfigureAwait(false);
@@ -326,14 +385,16 @@ public sealed class UpdateStartupRecovery
 
     private async Task<UpdateStartupRecoveryResult>
         VerifyInstalledReplacementAsync(
-            Guid operationId,
+            UpdateState state,
+            UpdateHandoff? approvedHandoff,
             ReplacementPaths paths,
             string manifestAuthoritySha256,
             CancellationToken cancellationToken)
     {
-        var handoffRead = await _recoveryStore
-            .ReadHandoffAsync(operationId, cancellationToken)
-            .ConfigureAwait(false);
+        var operationId = state.OperationId;
+        var handoffRead = approvedHandoff is null
+            ? await _recoveryStore.ReadHandoffAsync(operationId, cancellationToken).ConfigureAwait(false)
+            : UpdateAuthorityReadResult<UpdateHandoff>.Valid(approvedHandoff);
         if (handoffRead.IsCorrupt)
         {
             return await BlockAsync(
@@ -464,6 +525,19 @@ public sealed class UpdateStartupRecovery
                 cancellationToken).ConfigureAwait(false);
         }
 
+        try
+        {
+            if (state.HandoffSha256 is not null && !UpdateBackupIdentity.Matches(
+                _appState.GetUpdateToolsPath(operationId), paths.BackupRoot,
+                state.HandoffSha256, cancellationToken))
+                throw new IOException("Rollback backup identity differs from approved evidence.");
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return await BlockAsync(operationId, paths.BackupRoot,
+                "Installed replacement backup cannot be verified.", cancellationToken).ConfigureAwait(false);
+        }
+
         return UpdateStartupRecoveryResult.ReplacementReady(
             operationId,
             paths.BackupRoot);
@@ -578,6 +652,10 @@ public sealed class UpdateStartupRecovery
                 _vaultRoot);
         }
 
+        UpdatePathGuard.RequireDisjoint(_vaultRoot is null
+            ? [_install.Root, _appState.Root, staging, backup]
+            : [_install.Root, _appState.Root, staging, backup, _vaultRoot]);
+        UpdatePathGuard.Resolve(payload);
         return new ReplacementPaths(
             staging,
             backup,

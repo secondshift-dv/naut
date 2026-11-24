@@ -76,6 +76,7 @@
     <sys:String x:Key="Import.PreparingCover">正在准备 Cover 建议...</sys:String>
     <sys:String x:Key="Import.PreviewUnavailable">预览不可用</sys:String>
     <sys:String x:Key="Import.Prioritize">确定优先顺序</sys:String>
+    <sys:String x:Key="Import.Normalize">普通</sys:String>
     <sys:String x:Key="Import.Problems">需要审核</sys:String>
     <sys:String x:Key="Import.Problems.Description">请解决这些问题后继续。</sys:String>
     <sys:String x:Key="Import.ProfileCollision">被识别为另一个Profile</sys:String>
@@ -706,7 +707,7 @@
     <sys:String x:Key="Import.Detail.OneItem">1 件</sys:String>
     <sys:String x:Key="Import.Detail.ManyItems">{0} 项目</sys:String>
     <sys:String x:Key="Import.Detail.Added">{0} 已添加到您的 Vault。</sys:String>
-    <sys:String x:Key="Import.Detail.WithDuplicates">{0} · {1} 已在您的 Vault 中</sys:String>
+    <sys:String x:Key="Import.Detail.PendingReuse">已选择 {0} 项重用</sys:String>
     <sys:String x:Key="Import.Stage.AlreadyInVault">已在您的 Vault 中</sys:String>
     <sys:String x:Key="Import.Progress.CheckingMedia">正在检查媒体</sys:String>
     <sys:String x:Key="Import.Progress.Session">批次：已检查 {0} / {1} 项</sys:String>
@@ -1009,7 +1010,7 @@
     <sys:String x:Key="Import.Pause.Tooltip">暂停导入</sys:String>
     <sys:String x:Key="Import.Start">开始</sys:String>
     <sys:String x:Key="Import.Start.Prioritize">优先考虑此导入</sys:String>
-    <sys:String x:Key="Import.Start.Prioritized">此导入已优先</sys:String>
+    <sys:String x:Key="Import.Start.Normalize">恢复普通优先级</sys:String>
     <sys:String x:Key="Import.Start.Resume">开始导入</sys:String>
     <sys:String x:Key="Import.Preparing">正在准备预览...</sys:String>
     <sys:String x:Key="Import.Priority">优先级</sys:String>

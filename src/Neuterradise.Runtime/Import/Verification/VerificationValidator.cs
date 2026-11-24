@@ -220,14 +220,14 @@ public sealed class VerificationValidator
             await using var cmd = connection.CreateCommand();
             cmd.CommandText = $"""
                 SELECT i.import_item_id, i.disposition, i.duplicate_decision,
-                       EXISTS (
+                       CASE WHEN i.duplicate_decision IS NULL THEN EXISTS (
                            SELECT 1
                            FROM media c
-                           JOIN media a ON {ImportReads.ExactMediaIdentitySql}
+                           JOIN media a INDEXED BY ix_media_active_byte_length ON {ImportReads.ExactMediaIdentitySql}
                                         AND a.media_id <> c.media_id
                                         AND a.state = 'ACTIVE'
                            WHERE c.media_id = i.candidate_media_id
-                       ) AS has_active_duplicate,
+                       ) ELSE 0 END AS has_active_duplicate,
                        c.dependency_status
                 FROM import_items i
                 LEFT JOIN media c ON c.media_id = i.candidate_media_id

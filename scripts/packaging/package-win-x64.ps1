@@ -1102,12 +1102,15 @@ $releaseFiles = @(
         Sort-Object { $_.relativePath }
 )
 
+# Shared compatibility floor for the embedded and externally signed manifests.
+$minimumCompatibleVersion = $null
 $releaseManifest = [ordered]@{
     schemaVersion = 1
     productId = $ProductId
     productVersion = $ProductVersion
     runtimeIdentifier = $RuntimeIdentifier
     files = $releaseFiles
+    minimumCompatibleVersion = $minimumCompatibleVersion
 }
 Write-JsonUtf8NoBom -Value $releaseManifest -Path $ReleaseManifestPath -Depth 8
 
@@ -1230,7 +1233,7 @@ $updateManifest = [ordered]@{
     runtimeIdentifier = $RuntimeIdentifier
     payloadByteLength = [long]$zipBytes
     payloadSha256 = $zipSha256
-    minimumCompatibleVersion = $null
+    minimumCompatibleVersion = $minimumCompatibleVersion
     files = $releaseFiles
 }
 Write-JsonUtf8NoBom -Value $updateManifest -Path $UpdateManifestPath -Depth 8

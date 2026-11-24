@@ -547,23 +547,21 @@ public sealed class ImportViewModel : ScreenStateViewModel, IDisposable
         }
 
         var shouldStart = unit.CanStart;
-        unit.BeginPendingControl(shouldStart ? ImportPendingControl.Starting : ImportPendingControl.None);
+        var shouldPrioritize = unit.CanPrioritize;
+        var shouldNormalize = unit.CanNormalize;
+        if (!shouldStart && !shouldPrioritize && !shouldNormalize) return;
+        unit.BeginPendingControl(shouldStart ? ImportPendingControl.Starting : ImportPendingControl.ChangingPriority);
         try
         {
-        if (shouldStart)
-        {
-            // Start/Resume: unpause, focus this import (P1/90), demote previous focus to P3/50,
-            // wake finalizer. Uses persisted state — does not recreate the import graph.
-            await _controlAuthority.StartAsync(unit.UnitId, RouteCancellationToken);
-        }
-        else if (unit.CanPrioritize)
-        {
-            // Prioritize: make this running-but-not-focused import the focused import.
-            // Task E P1=90 authority. Previous focus demoted to P3=50. No failure mutation.
-            await _controlAuthority.PrioritizeAsync(unit.UnitId, RouteCancellationToken);
-        }
+            if (shouldStart)
+                await _controlAuthority.StartAsync(unit.UnitId, RouteCancellationToken);
+            else if (shouldPrioritize)
+                await _controlAuthority.PrioritizeAsync(unit.UnitId, RouteCancellationToken);
+            else
+                await _controlAuthority.NormalizeAsync(unit.UnitId, RouteCancellationToken);
 
-        _activity?.RequestRefresh();
+            if (_activity is not null)
+                await _activity.RefreshNowAsync(RouteCancellationToken);
         }
         finally
         {
@@ -784,6 +782,7 @@ public enum ImportPendingControl
     None,
     Pausing,
     Starting,
+    ChangingPriority,
 }
 
 public sealed class ImportUnitItemViewModel : ObservableObject
@@ -838,6 +837,8 @@ public sealed class ImportUnitItemViewModel : ObservableObject
     public bool CanPause => _pendingControl == ImportPendingControl.None && _item.CanPause;
 
     public bool CanPrioritize => _pendingControl == ImportPendingControl.None && _item.CanPrioritize;
+
+    public bool CanNormalize => CanPause && IsPriority;
 
     public bool CanStart => _pendingControl == ImportPendingControl.None && _item.CanStart;
 
@@ -902,6 +903,8 @@ public sealed class ImportUnitItemViewModel : ObservableObject
         if (previous.CanCancel != item.CanCancel) RaisePropertyChanged(nameof(CanCancel));
         if (previous.CanPause != item.CanPause) RaisePropertyChanged(nameof(CanPause));
         if (previous.CanPrioritize != item.CanPrioritize) RaisePropertyChanged(nameof(CanPrioritize));
+        if (previous.CanPause != item.CanPause || previous.IsPriority != item.IsPriority)
+            RaisePropertyChanged(nameof(CanNormalize));
         if (previous.CanStart != item.CanStart) RaisePropertyChanged(nameof(CanStart));
         if (previous.ShowTransportControls != item.ShowTransportControls) RaisePropertyChanged(nameof(ShowTransportControls));
         if (previous.IsPriority != item.IsPriority) RaisePropertyChanged(nameof(IsPriority));
@@ -925,6 +928,7 @@ public sealed class ImportUnitItemViewModel : ObservableObject
         RaisePropertyChanged(nameof(CanPause));
         RaisePropertyChanged(nameof(CanStart));
         RaisePropertyChanged(nameof(CanPrioritize));
+        RaisePropertyChanged(nameof(CanNormalize));
         RaisePropertyChanged(nameof(ShowTransportControls));
     }
 

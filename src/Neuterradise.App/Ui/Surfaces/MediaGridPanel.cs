@@ -33,7 +33,7 @@ public sealed class MediaGridPanel : IDisposable
         _context = context;
         _resolve = resolve ?? ((slot, current) => _services.Presentation.ResolveCompiled(slot, current));
         _layout = ResolveLayout();
-        _factory = new PooledElementFactory(KindOf, Create, Bind, Recycle);
+        _factory = new PooledElementFactory(KindOf, Create, Bind, Recycle, Discard);
         _repeater = new ItemsRepeater { Name = "ProfileMedia", ItemTemplate = _factory };
         ApplyBrowse();
         var stage = new Grid();
@@ -265,15 +265,22 @@ public sealed class MediaGridPanel : IDisposable
         }
     }
 
+    private void Discard(FrameworkElement element)
+    {
+        if (element is MediaCardView view && _views.Remove(view)) view.Dispose();
+    }
+
     public void Dispose()
     {
         HoverVideoCoordinator.Shared.StopAll();
+        // Uno detaches its loaded collection subscription through ItemsSourceView; keep an empty view available.
+        _repeater.ItemsSource = Array.Empty<MediaGridCardViewModel>();
+        _factory.Clear();
         foreach (var view in _views)
         {
             view.Dispose();
         }
         _views.Clear();
-        _factory.Clear();
         _bag.Dispose();
     }
 }

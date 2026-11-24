@@ -24,6 +24,8 @@ public sealed record UpdateRecoveryPlan(
         "RestoredFromBackup",
         "RestoreFailed",
         "ReplacementFailed",
+        "ExternalRestoredFromBackup",
+        "ExternalReplacementCompleted",
     };
 
     public void Validate(
@@ -188,13 +190,8 @@ public sealed class UpdateRecoveryStore
     {
         ArgumentNullException.ThrowIfNull(plan);
         var path = GetRecoveryPlanPath(plan.OperationId);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var temp = path + ".tmp";
-        await File.WriteAllTextAsync(
-            temp,
-            JsonSerializer.Serialize(plan, JsonOptions),
-            cancellationToken).ConfigureAwait(false);
-        File.Move(temp, path, overwrite: true);
+        await UpdatePathGuard.WriteAtomicAsync(path,
+            JsonSerializer.SerializeToUtf8Bytes(plan, JsonOptions), cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<UpdateAuthorityReadResult<UpdateRecoveryPlan>> ReadAsync(
@@ -273,7 +270,9 @@ public sealed class UpdateRecoveryStore
 
     public async Task<UpdateAuthorityReadResult<UpdateHandoff>> ReadHandoffAsync(
         Guid operationId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? expectedHandoffSha256 = null,
+        string? expectedManifestAuthoritySha256 = null)
     {
         if (operationId == Guid.Empty)
             throw new ArgumentException(
@@ -288,7 +287,15 @@ public sealed class UpdateRecoveryStore
             if (!File.Exists(path))
                 return UpdateAuthorityReadResult<UpdateHandoff>.Missing();
 
+            UpdatePathGuard.Resolve(path);
             await using var stream = File.OpenRead(path);
+            if (expectedHandoffSha256 is not null)
+            {
+                var digest = Convert.ToHexStringLower(await System.Security.Cryptography.SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false));
+                if (!string.Equals(digest, expectedHandoffSha256, StringComparison.Ordinal))
+                    throw new FormatException("Handoff digest does not match approved evidence.");
+                stream.Position = 0;
+            }
             var handoff = await JsonSerializer
                 .DeserializeAsync<UpdateHandoff>(
                     stream,
@@ -312,6 +319,9 @@ public sealed class UpdateRecoveryStore
             }
 
             handoff.Manifest.Validate();
+            if (expectedManifestAuthoritySha256 is not null && !string.Equals(
+                handoff.Manifest.ComputeAuthoritySha256(), expectedManifestAuthoritySha256, StringComparison.Ordinal))
+                throw new FormatException("Manifest authority does not match approved evidence.");
             return UpdateAuthorityReadResult<UpdateHandoff>.Valid(handoff);
         }
         catch (OperationCanceledException)

@@ -454,6 +454,12 @@ public sealed class FigureRuntime : IDisposable
         {
             _viewport = null;
             _renderer?.ClearScene();
+            // Retire deferred D3D destruction after the viewport and scene release their references.
+            if (_context != IntPtr.Zero)
+            {
+                FigureNative.Method<FigureNative.ContextOperation>(_context, 110)(_context);
+                FigureNative.Method<FigureNative.ContextOperation>(_context, 111)(_context);
+            }
         }
     }
 

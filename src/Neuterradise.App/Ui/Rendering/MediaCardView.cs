@@ -28,12 +28,9 @@ public sealed class MediaCardView : Grid, IDisposable
     };
     private readonly Border _innerFrame;
     private readonly Border _selectionOutline = new() { IsHitTestVisible = false, BorderThickness = new Thickness(2), Visibility = Visibility.Collapsed };
-    private readonly Border _metadataOverlay;
-    private readonly Border _metadataBelow;
-    private readonly Border _metadataSide;
-    private readonly StackPanel _overlayText;
-    private readonly StackPanel _belowText;
-    private readonly StackPanel _sideText;
+    private readonly Border _metadata;
+    private readonly TextBlock[] _metadataLines;
+    private MediaMetadataPlacement? _metadataPlacement;
     private readonly StackPanel _badges = UI.H(4);
     private readonly TextBlock _typeText = UI.Text(string.Empty, "caption", "onMediaSecondary");
     private readonly Border _typeBadge;
@@ -88,17 +85,13 @@ public sealed class MediaCardView : Grid, IDisposable
         };
         _mediaHost.Children.Add(_innerFrame);
 
-        _overlayText = MetadataText(onMedia: true);
-        _metadataOverlay = new Border
-        {
-            Child = _overlayText,
-            Padding = new Thickness(8, 6, 8, 6),
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            VerticalAlignment = VerticalAlignment.Bottom,
-            Background = ThemeRuntime.Current.Brush("mediaOverlay"),
-            Visibility = Visibility.Collapsed,
-        };
-        _mediaHost.Children.Add(_metadataOverlay);
+        _metadataLines =
+        [
+            UI.Text(null, "caption", "textSecondary", 1),
+            UI.Text(null, "micro", "textMuted", 1),
+            UI.Text(null, "micro", "textMuted", 1),
+        ];
+        _metadata = new Border { Child = UI.V(1, _metadataLines) };
 
         _badges.HorizontalAlignment = HorizontalAlignment.Right;
         _badges.VerticalAlignment = VerticalAlignment.Top;
@@ -168,27 +161,6 @@ public sealed class MediaCardView : Grid, IDisposable
         };
         Children.Add(_frame.At(0, 0));
 
-        _belowText = MetadataText(onMedia: false);
-        _metadataBelow = new Border
-        {
-            Child = _belowText,
-            Padding = new Thickness(8, 5, 8, 6),
-            Background = ThemeRuntime.Current.Brush("surface2"),
-            Visibility = Visibility.Collapsed,
-        };
-        Children.Add(_metadataBelow.At(1, 0));
-        Grid.SetColumnSpan(_metadataBelow, 2);
-
-        _sideText = MetadataText(onMedia: false);
-        _metadataSide = new Border
-        {
-            Child = _sideText,
-            Padding = new Thickness(10, 8, 8, 8),
-            Background = ThemeRuntime.Current.Brush("surface2"),
-            Visibility = Visibility.Collapsed,
-        };
-        Children.Add(_metadataSide.At(0, 1));
-
         RenderTransform = _scale;
         RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5);
         PointerEntered += OnPointerEntered;
@@ -217,25 +189,16 @@ public sealed class MediaCardView : Grid, IDisposable
 
         Grid.SetColumn(_frame, 0);
         Grid.SetColumnSpan(_frame, side ? 1 : 2);
-        _metadataSide.Visibility = side ? Visibility.Visible : Visibility.Collapsed;
-        _metadataBelow.Visibility = layout.MetadataPlacement == MediaMetadataPlacement.Below
-            ? Visibility.Visible
-            : Visibility.Collapsed;
-
-        var overlayVisible = layout.MetadataPlacement is MediaMetadataPlacement.HoverOverlay or MediaMetadataPlacement.PersistentOverlay;
-        _metadataOverlay.Visibility = overlayVisible ? Visibility.Visible : Visibility.Collapsed;
-        _metadataOverlay.Opacity = layout.MetadataPlacement == MediaMetadataPlacement.HoverOverlay ? 0 : 1;
-        _metadataOverlay.Background = theme.Brush("mediaOverlay");
+        ConfigureMetadata(layout.MetadataPlacement);
         _selectionOutline.CornerRadius = new CornerRadius(Math.Max(0, layout.FrameRadius - layout.FrameThickness));
 
         var below = layout.MetadataPlacement == MediaMetadataPlacement.Below;
         _frame.CornerRadius = below
             ? new CornerRadius(layout.FrameRadius, layout.FrameRadius, 0, 0)
             : new CornerRadius(layout.FrameRadius);
-        _metadataBelow.CornerRadius = below
+        _metadata.CornerRadius = below
             ? new CornerRadius(0, 0, layout.FrameRadius, layout.FrameRadius)
             : new CornerRadius(0);
-        _metadataBelow.Background = theme.Brush("surface2");
         _image.CornerRadiusValue = Math.Max(0, layout.FrameRadius - layout.FrameThickness);
         _innerFrame.CornerRadius = new CornerRadius(Math.Max(0, layout.FrameRadius - 4));
 
@@ -258,9 +221,42 @@ public sealed class MediaCardView : Grid, IDisposable
         UpdateVisual();
     }
 
+    private void ConfigureMetadata(MediaMetadataPlacement placement)
+    {
+        var overlay = placement is MediaMetadataPlacement.HoverOverlay or MediaMetadataPlacement.PersistentOverlay;
+        if (_metadataPlacement != placement)
+        {
+            // Reparent only the single metadata subtree when the presentation placement changes.
+            _mediaHost.Children.Remove(_metadata);
+            Children.Remove(_metadata);
+            _metadataPlacement = placement;
+            if (overlay)
+                _mediaHost.Children.Insert(_mediaHost.Children.IndexOf(_innerFrame) + 1, _metadata);
+            else if (placement != MediaMetadataPlacement.Hidden)
+                Children.Add(_metadata);
+            Grid.SetRow(_metadata, placement == MediaMetadataPlacement.Below ? 1 : 0);
+            Grid.SetColumn(_metadata, placement == MediaMetadataPlacement.Side ? 1 : 0);
+            Grid.SetColumnSpan(_metadata, placement == MediaMetadataPlacement.Below ? 2 : 1);
+            _metadata.HorizontalAlignment = HorizontalAlignment.Stretch;
+            _metadata.VerticalAlignment = overlay ? VerticalAlignment.Bottom : VerticalAlignment.Stretch;
+            _metadata.Padding = placement switch
+            {
+                MediaMetadataPlacement.Side => new Thickness(10, 8, 8, 8),
+                MediaMetadataPlacement.Below => new Thickness(8, 5, 8, 6),
+                _ => new Thickness(8, 6, 8, 6),
+            };
+            for (var i = 0; i < _metadataLines.Length; i++)
+                ThemeRuntime.Current.ApplyType(_metadataLines[i], i == 0 ? "caption" : "micro",
+                    overlay ? i == 0 ? "onMediaPrimary" : "onMediaSecondary" : i == 0 ? "textSecondary" : "textMuted");
+        }
+        _metadata.Background = ThemeRuntime.Current.Brush(overlay ? "mediaOverlay" : "surface2");
+        _metadata.Opacity = placement == MediaMetadataPlacement.HoverOverlay ? 0 : 1;
+    }
+
     public void Bind(MediaGridCardViewModel card)
     {
         ArgumentNullException.ThrowIfNull(card);
+        if (ReferenceEquals(_card, card)) return;
         Unbind();
         _card = card;
         DataContext = card;
@@ -284,6 +280,7 @@ public sealed class MediaCardView : Grid, IDisposable
         }
 
         _observer = null;
+        _image.Source = null;
         _card = null;
         DataContext = null;
     }
@@ -304,15 +301,13 @@ public sealed class MediaCardView : Grid, IDisposable
         var thickness = _layout.FrameStyle == MediaFrameStyle.None ? 0 : _layout.FrameThickness;
         _frame.BorderBrush = theme.Brush(_layout.FrameColor.Replace("token:", string.Empty, StringComparison.Ordinal));
         _frame.BorderThickness = new Thickness(thickness);
-        _metadataBelow.BorderBrush = _frame.BorderBrush;
-        _metadataBelow.BorderThickness = _layout.MetadataPlacement == MediaMetadataPlacement.Below
+        _metadata.BorderBrush = _frame.BorderBrush;
+        _metadata.BorderThickness = _layout.MetadataPlacement == MediaMetadataPlacement.Below
             ? new Thickness(thickness, 0, thickness, thickness) : new Thickness(0);
         _selectionOutline.BorderBrush = theme.Brush(_layout.SelectedFrameColor.Replace("token:", string.Empty, StringComparison.Ordinal));
         _selectionOutline.Visibility = card.IsSelected ? Visibility.Visible : Visibility.Collapsed;
 
-        UpdateMetadata(_overlayText, card);
-        UpdateMetadata(_belowText, card);
-        UpdateMetadata(_sideText, card);
+        if (_layout.MetadataPlacement != MediaMetadataPlacement.Hidden) UpdateMetadata(card);
 
         // Attention is immutable for a bound MediaGridItem; avoid rebuilding its badge
         // on every selection, favorite or thumbnail notification.
@@ -339,13 +334,9 @@ public sealed class MediaCardView : Grid, IDisposable
         ToolTipService.SetToolTip(_favorite, favoriteLabel);
     }
 
-    private void UpdateMetadata(StackPanel panel, MediaGridCardViewModel card)
+    private void UpdateMetadata(MediaGridCardViewModel card)
     {
-        var lines = panel.Children.OfType<TextBlock>().ToList();
-        if (lines.Count < 2)
-        {
-            return;
-        }
+        var lines = _metadataLines;
 
         lines[0].Text = _layout.MetadataFields.Contains("name")
             ? card.DisplayFileName ?? string.Empty
@@ -384,8 +375,8 @@ public sealed class MediaCardView : Grid, IDisposable
 
         var groups = new[] { lines[0].Text, string.Join(" · ", detailParts), string.Join(" · ", stateParts) }
             .Where(text => !string.IsNullOrWhiteSpace(text)).ToList();
-        var budget = Math.Min(_layout.MetadataLines, lines.Count);
-        for (var index = 0; index < lines.Count; index++)
+        var budget = Math.Min(_layout.MetadataLines, lines.Length);
+        for (var index = 0; index < lines.Length; index++)
         {
             lines[index].Text = index < budget && index < groups.Count
                 ? index == budget - 1 ? string.Join(" · ", groups.Skip(index)) : groups[index]
@@ -409,7 +400,7 @@ public sealed class MediaCardView : Grid, IDisposable
 
         if (_layout.MetadataPlacement == MediaMetadataPlacement.HoverOverlay)
         {
-            _metadataOverlay.Opacity = 1;
+            _metadata.Opacity = 1;
         }
 
         if (card.IsVideo && card.HoverPath is { } hoverPath)
@@ -423,7 +414,7 @@ public sealed class MediaCardView : Grid, IDisposable
         _scale.ScaleX = _scale.ScaleY = 1;
         if (_layout.MetadataPlacement == MediaMetadataPlacement.HoverOverlay)
         {
-            _metadataOverlay.Opacity = 0;
+            _metadata.Opacity = 0;
         }
 
         HoverVideoCoordinator.Shared.Release(_playbackHost);
@@ -448,12 +439,6 @@ public sealed class MediaCardView : Grid, IDisposable
             _onOpen(card);
         }
     }
-
-    private static StackPanel MetadataText(bool onMedia) => UI.V(
-        1,
-        UI.Text(null, "caption", onMedia ? "onMediaPrimary" : "textSecondary", 1),
-        UI.Text(null, "micro", onMedia ? "onMediaSecondary" : "textMuted", 1),
-        UI.Text(null, "micro", onMedia ? "onMediaSecondary" : "textMuted", 1));
 
     public new void Dispose() => Unbind();
 }

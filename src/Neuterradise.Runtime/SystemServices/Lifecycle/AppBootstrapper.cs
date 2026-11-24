@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using Neuterradise.Release.Contracts;
 using Neuterradise.App.SystemServices.Database;
 using Neuterradise.App.SystemServices.Diagnostics;
 using Neuterradise.App.SystemServices.Recovery;
@@ -61,6 +62,7 @@ public sealed class AppBootstrapper
         }
 
         VaultLock? vaultLock = null;
+        UpdateOperationLease? updateLease = null;
         BootstrapContext? context = null;
         VaultIdentity? vaultIdentity = null;
         var sessionId = Guid.NewGuid();
@@ -87,6 +89,33 @@ public sealed class AppBootstrapper
             cancellationToken.ThrowIfCancellationRequested();
 
             CompleteStage(StartupStage.ProcessStartToRootResolved);
+            // Update replacement recovery is reconciled before any catalog mutation-capable operation.
+            // HandoffPending is not promoted merely because the application started: filesystem and
+            // recovery-journal evidence must prove that the replacement is installed first.
+            if (_appState is not null)
+            {
+                var install = InstallPaths.CreateProduction();
+                install.EnsureDisjointFrom(_appState, _paths.Root);
+                updateLease = await UpdateOperationLease.AcquireAsync(_appState.Root, cancellationToken).ConfigureAwait(true);
+                updateStore = new UpdateStateStore(_appState);
+                updateTerminalCleanup = new UpdateTerminalCleanup(
+                    _appState,
+                    install,
+                    _paths.Root);
+                var updateRecovery = new UpdateStartupRecovery(
+                    _appState,
+                    install,
+                    _paths.Root,
+                    updateStore,
+                    terminalCleanup: updateTerminalCleanup);
+                updateRecoveryResult = await updateRecovery.ReconcileAsync(cancellationToken).ConfigureAwait(true);
+                if (!updateRecoveryResult.CanContinue)
+                {
+                    throw new InvalidOperationException(
+                        updateRecoveryResult.SafeError ?? "Application startup is blocked because update recovery is required.");
+                }
+            }
+
             _paths.EnsureStructuralDirectories();
 
             TransitionTo(StartupState.OpeningStorage);
@@ -108,31 +137,6 @@ public sealed class AppBootstrapper
                         Array.Empty<Guid>(),
                         cancellationToken)
                     .ConfigureAwait(true);
-            }
-
-            // Update replacement recovery is reconciled before any catalog mutation-capable operation.
-            // HandoffPending is not promoted merely because the application started: filesystem and
-            // recovery-journal evidence must prove that the replacement is installed first.
-            if (_appState is not null)
-            {
-                var install = InstallPaths.CreateProduction();
-                updateStore = new UpdateStateStore(_appState);
-                updateTerminalCleanup = new UpdateTerminalCleanup(
-                    _appState,
-                    install,
-                    _paths.Root);
-                var updateRecovery = new UpdateStartupRecovery(
-                    _appState,
-                    install,
-                    _paths.Root,
-                    updateStore,
-                    terminalCleanup: updateTerminalCleanup);
-                updateRecoveryResult = await updateRecovery.ReconcileAsync(cancellationToken).ConfigureAwait(true);
-                if (!updateRecoveryResult.CanContinue)
-                {
-                    throw new InvalidOperationException(
-                        updateRecoveryResult.SafeError ?? "Application startup is blocked because update recovery is required.");
-                }
             }
 
             TransitionTo(StartupState.InitializingDatabase);
@@ -344,6 +348,10 @@ public sealed class AppBootstrapper
             return preserveWritableAuthority && context is not null
                 ? StartupResult.FailedPreservingAuthority(errorCode, failure, context, timingReport)
                 : StartupResult.Failed(errorCode, failure, timingReport);
+        }
+        finally
+        {
+            updateLease?.Dispose();
         }
     }
 

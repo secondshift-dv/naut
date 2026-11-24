@@ -25,8 +25,31 @@ public sealed class JobWrites
         Guid importUnitId, JobDefinition definition, CancellationToken cancellationToken) =>
         CreateJobCoreAsync(definition, importUnitId, cancellationToken);
 
-    private async Task<bool> CreateJobCoreAsync(
-        JobDefinition definition, Guid? importUnitId, CancellationToken cancellationToken)
+
+    private Task<bool> CreateJobCoreAsync(JobDefinition definition, Guid? importUnitId, CancellationToken cancellationToken) =>
+        CreateJobBatchCoreAsync([definition], importUnitId, cancellationToken);
+    internal Task<bool> TryCreateImportAdmissionJobsAsync(Guid importUnitId, IReadOnlyList<JobDefinition> definitions, CancellationToken cancellationToken) =>
+        CreateJobBatchCoreAsync(definitions, importUnitId, cancellationToken);
+    private async Task<bool> CreateJobBatchCoreAsync(IReadOnlyList<JobDefinition> definitions, Guid? importUnitId, CancellationToken cancellationToken)
+    {
+        if (definitions.Count > 64) throw new ArgumentOutOfRangeException(nameof(definitions));
+        if (definitions.Count == 0) return true;
+        await using var lease = await _writeCoordinator.EnterAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = CatalogTransaction.Begin(connection);
+        var changed = false;
+        foreach (var definition in definitions)
+        {
+            var result = await CreateJobInTransactionAsync(transaction, definition, importUnitId, cancellationToken).ConfigureAwait(false);
+            if (!result.Accepted) return false;
+            changed |= result.Created;
+        }
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        if (changed) JobSignals.Raise();
+        return true;
+    }
+
+    private async Task<(bool Accepted, bool Created)> CreateJobInTransactionAsync(CatalogTransaction transaction, JobDefinition definition, Guid? importUnitId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(definition);
         EnsureNonEmpty(definition.JobId, nameof(definition.JobId));
@@ -47,12 +70,6 @@ public sealed class JobWrites
             OwnerType = definition.OwnerType.Trim(),
         };
 
-        await using var lease = await _writeCoordinator.EnterAsync(cancellationToken)
-            .ConfigureAwait(false);
-        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken)
-            .ConfigureAwait(false);
-        await using var transaction = CatalogTransaction.Begin(connection);
-
         if (importUnitId is { } unitId)
         {
             await using var eligible = transaction.CreateCommand(
@@ -65,7 +82,7 @@ public sealed class JobWrites
                 """);
             eligible.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
             if (await eligible.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not 1L)
-                return false;
+                return (false, false);
         }
 
         var existing = await ReadDefinitionAsync(transaction, definition.JobId, cancellationToken)
@@ -78,8 +95,7 @@ public sealed class JobWrites
                     $"Job {definition.JobId:D} already exists with different durable authority.");
             }
 
-            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-            return true;
+            return (true, false);
         }
 
         // Election and job creation must share the same write transaction. Returning true
@@ -121,8 +137,7 @@ public sealed class JobWrites
             duplicateGate.Parameters.AddWithValue("$candidate", DbGuid.Format(definition.OwnerId));
             if (Convert.ToInt64(await duplicateGate.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 1)
             {
-                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-                return true;
+                return (true, false);
             }
         }
 
@@ -162,9 +177,7 @@ public sealed class JobWrites
             completedAt is null ? DBNull.Value : completedAt.Value);
         await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
 
-        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-        JobSignals.Raise();
-        return true;
+        return (true, true);
     }
 
     /// <summary>
@@ -892,26 +905,6 @@ public sealed class JobWrites
             cancellationToken: cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         return focusedImportUnitId;
-    }
-
-    public async Task<int> SetImportUnitPriorityAsync(
-        Guid importUnitId,
-        int priority,
-        CancellationToken cancellationToken = default)
-    {
-        EnsureNonEmpty(importUnitId, nameof(importUnitId));
-        var clamped = JobPriorityPolicy.Clamp(priority);
-
-        await using var lease = await _writeCoordinator.EnterAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        await using var transaction = CatalogTransaction.Begin(connection);
-        var count = await SetImportUnitPriorityInTransactionAsync(
-            transaction,
-            importUnitId,
-            clamped,
-            cancellationToken).ConfigureAwait(false);
-        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-        return count;
     }
 
     public async Task RegisterImportMediaInterestAsync(

@@ -236,7 +236,7 @@ public sealed class ImportMediaPreparationCoordinator
         await using var mutationLease = await _catalog.ImportUnitMutations
             .EnterAsync(unitId, cancellationToken).ConfigureAwait(false);
 
-        var unit = await _importReads.GetVerificationReadModelAsync(unitId, cancellationToken).ConfigureAwait(false);
+        var unit = await _importReads.GetLifecycleStateAsync(unitId, cancellationToken).ConfigureAwait(false);
         if (unit is null || !unit.LibraryCommitState.HasReachedDomainCommit()
             || unit.State is ImportUnitState.Cancelled or ImportUnitState.FailedTerminal
             || unit.State.IsUnitCommitted())
@@ -273,70 +273,50 @@ public sealed class ImportMediaPreparationCoordinator
     /// </summary>
     internal async Task ReconcilePersistedArtifactsAsync(Guid unitId, CancellationToken cancellationToken)
     {
-        await using var connection = await _catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        await using var command = connection.CreateCommand();
-        command.CommandText =
-            """
-            SELECT DISTINCT a.media_id, cr.capability, cr.job_id
-            FROM import_items ii
-            JOIN media a ON a.media_id = CASE
-                WHEN ii.disposition = 'REUSED' THEN ii.reused_media_id
-                ELSE ii.candidate_media_id
-            END
-            JOIN media_capability_readiness cr ON cr.media_id = a.media_id
-            WHERE ii.import_unit_id = $unitId
-              AND ii.disposition IN ('INCLUDED', 'REUSED')
-              AND cr.state = 'READY';
-            """;
-        command.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
-
-        var missing = new List<(Guid MediaId, MediaCapability Capability, Guid? JobId)>();
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        var artifacts = new List<(Guid MediaId, MediaCapability Capability, Guid? JobId, MediaAssetRecord? Asset, string? SourceHash)>();
+        await using (var connection = await _catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false))
+        await using (var command = connection.CreateCommand())
         {
-            var assetId = DbGuid.Parse(reader.GetString(0));
-            var capability = DbEnum.ParseMediaCapability(reader.GetString(1));
-            var jobId = reader.IsDBNull(2) ? (Guid?)null : DbGuid.Parse(reader.GetString(2));
-
-            if (!await IsPersistedArtifactPresentAsync(assetId, capability, cancellationToken).ConfigureAwait(false))
-            {
-                missing.Add((assetId, capability, jobId));
-            }
+            command.CommandText = """
+                SELECT DISTINCT ma.media_asset_id, ma.media_id, ma.role, ma.contract_version, ma.state,
+                       ma.relative_path, ma.byte_length, ma.sha256, ma.pixel_width,
+                       ma.pixel_height, ma.duration_ms, ma.source_timestamp_ms,
+                       a.media_id, cr.capability, cr.job_id, a.sha256
+                FROM import_items ii
+                JOIN media a ON a.media_id = CASE WHEN ii.disposition = 'REUSED' THEN ii.reused_media_id ELSE ii.candidate_media_id END
+                JOIN media_capability_readiness cr ON cr.media_id = a.media_id
+                LEFT JOIN media_assets ma ON ma.media_id = a.media_id AND ma.role = cr.capability
+                    AND a.state IN ('CANDIDATE','ACTIVE')
+                WHERE ii.import_unit_id = $unitId AND ii.disposition IN ('INCLUDED','REUSED')
+                    AND cr.state = 'READY' AND cr.capability IN ('THUMBNAIL','HOVER','MODEL_RENDER');
+                """;
+            command.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                artifacts.Add((DbGuid.Parse(reader.GetString(12)), DbEnum.ParseMediaCapability(reader.GetString(13)),
+                    reader.IsDBNull(14) ? null : DbGuid.Parse(reader.GetString(14)),
+                    reader.IsDBNull(0) ? null : MediaAssetReads.ReadMedia(reader),
+                    reader.IsDBNull(15) ? null : reader.GetString(15)));
         }
 
-        foreach (var (assetId, capability, jobId) in missing)
+        using var measure = Neuterradise.App.SystemServices.Diagnostics.PerfTrace.Measure("import.readiness.artifacts", 1000);
+        foreach (var (assetId, capability, jobId, asset, sourceHash) in artifacts)
         {
-            await _capabilityWrites.UpsertCapabilityAsync(
-                    assetId,
-                    capability,
-                    MediaCapabilityState.Failed,
-                    jobId,
-                    cancellationToken: cancellationToken)
-                .ConfigureAwait(false);
+            if (await IsPersistedArtifactPresentAsync(asset, sourceHash, cancellationToken).ConfigureAwait(false)) continue;
+            await _capabilityWrites.UpsertCapabilityAsync(assetId, capability, MediaCapabilityState.Failed, jobId,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
         }
     }
 
-    private async Task<bool> IsPersistedArtifactPresentAsync(
-        Guid assetId, MediaCapability capability, CancellationToken ct)
+    private async Task<bool> IsPersistedArtifactPresentAsync(MediaAssetRecord? mediaAsset, string? sourceHash, CancellationToken ct)
     {
-        if (capability is MediaCapability.ManagedOriginal or MediaCapability.Metadata
-            or MediaCapability.FaceDetection or MediaCapability.FaceEmbedding
-            or MediaCapability.SearchProjection or MediaCapability.SimilarityRelated)
-        {
-            return true;
-        }
-
-        if (capability is not (MediaCapability.Thumbnail or MediaCapability.Hover or MediaCapability.ModelRender)) return true;
-        var role = capability switch { MediaCapability.Hover => MediaAssetRole.Hover,
-            MediaCapability.ModelRender => MediaAssetRole.ModelRender, _ => MediaAssetRole.Thumbnail };
-        var mediaAsset = await new MediaAssetReads(_catalog).GetOwnedMediaAssetAsync(assetId, role, ct).ConfigureAwait(false);
         if (mediaAsset?.State != MediaAssetState.Ready) return false;
+        var role = mediaAsset.Role;
         try
         {
             var path = _vaultPaths.ResolveVaultRelativePath(VaultPathArea.MediaAssets, mediaAsset.RelativePath);
-            var sourceHash = role == MediaAssetRole.ModelRender
-                ? (await _catalog.MediaReads.GetMediaSourceAsync(assetId, ct).ConfigureAwait(false))?.Sha256 : null;
-            if (role == MediaAssetRole.ModelRender && sourceHash is null) return false;
+            if (role != MediaAssetRole.ModelRender) sourceHash = null;
+            else if (sourceHash is null) return false;
             var valid = await new MediaAssetFileValidator().ValidateAsync(path, role, ct, sourceHash).ConfigureAwait(false);
             return valid.ByteLength == mediaAsset.ByteLength && valid.Sha256 == mediaAsset.Sha256
                 && valid.PixelWidth == mediaAsset.PixelWidth && valid.PixelHeight == mediaAsset.PixelHeight

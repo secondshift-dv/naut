@@ -282,8 +282,10 @@ public sealed class ImportFinalizer : IAsyncDisposable
                     }
                 }
 
+                var waitStarted = Stopwatch.GetTimestamp();
                 await using var mutationLease = await _catalog.ImportUnitMutations
                     .EnterAsync(unitId, cancellationToken).ConfigureAwait(false);
+                PerfTrace.Record("import.finalizer.mutation-wait", Stopwatch.GetElapsedTime(waitStarted).TotalMilliseconds, 500);
 
                 ImportFinalizeOutcome outcome;
                 try
@@ -324,7 +326,7 @@ public sealed class ImportFinalizer : IAsyncDisposable
         await using var mutationLease = await _catalog.ImportUnitMutations
             .EnterAsync(unitId, cancellationToken).ConfigureAwait(false);
 
-        var model = await _operations.LoadVerificationReadModelAsync(unitId, cancellationToken).ConfigureAwait(false);
+        var model = await _reads.GetLifecycleStateAsync(unitId, cancellationToken).ConfigureAwait(false);
         if (model is null)
         {
             return ImportFinalizeOutcome.Finished;
@@ -336,6 +338,14 @@ public sealed class ImportFinalizer : IAsyncDisposable
             return ImportFinalizeOutcome.Finished;
         }
 
+        if (model.IsPaused || model.State == ImportUnitState.Intake)
+            return ImportFinalizeOutcome.Waiting;
+
+        // COMMITTING is durable publication authority for both manual Save and automatic import.
+        // Resume publication directly even after the source-cleanup checkpoint is terminal.
+        if (model.State == ImportUnitState.Committing)
+            return await ResumePublicationAsync(unitId, cancellationToken).ConfigureAwait(false);
+
         var draft = VerificationDraftV1.FromJson(
             model.VerificationDraftJson,
             _timeProvider.GetUtcNow().ToUnixTimeMilliseconds());
@@ -344,19 +354,15 @@ public sealed class ImportFinalizer : IAsyncDisposable
             return ImportFinalizeOutcome.NotRequested;
         }
 
-        var summary = await _reads.GetUnitSummaryAsync(unitId, cancellationToken).ConfigureAwait(false);
-        if (summary is null || summary.IsPaused || model.State == ImportUnitState.Intake)
-        {
-            return ImportFinalizeOutcome.Waiting;
-        }
-
-        if (summary.LibraryCommitState.HasReachedDomainCommit()
-            && summary.State == ImportUnitState.Preparing
+        if (model.LibraryCommitState.HasReachedDomainCommit()
+            && model.State == ImportUnitState.Preparing
             && await HasActiveDerivativePreparationAsync(unitId, cancellationToken).ConfigureAwait(false))
             return ImportFinalizeOutcome.Waiting;
 
-        if (summary.State == ImportUnitState.ReadyForVerification && !draft.PublishWhenReady)
-            return ImportFinalizeOutcome.Waiting;
+        if (model.State == ImportUnitState.ReadyForVerification)
+            return draft.PublishWhenReady
+                ? await ResumePublicationAsync(unitId, cancellationToken).ConfigureAwait(false)
+                : ImportFinalizeOutcome.Waiting;
 
         if (model.CommitOperationId is null)
         {
@@ -402,13 +408,14 @@ public sealed class ImportFinalizer : IAsyncDisposable
             await ApplyAutomaticDestinationAsync(unitId, cancellationToken).ConfigureAwait(false);
         }
 
-        using var commitMeasure = PerfTrace.Measure("import.commit", 5000);
-        // canonical commit materialization follows settled required Candidate preparation.
-        var result = await _commitFactory().CommitCanonicalMediaAsync(unitId, cancellationToken: cancellationToken).ConfigureAwait(false);
+        // Canonical commit materialization follows settled required Candidate preparation.
+        ImportCommitResult result;
+        using (PerfTrace.Measure("import.commit", 5000))
+            result = await _commitFactory().CommitCanonicalMediaAsync(unitId, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (result.LibraryCommitted)
         {
             if (result.Checkpoint == ImportCommitCheckpoint.Terminal
-                && (await _reads.GetUnitSummaryAsync(unitId, cancellationToken).ConfigureAwait(false))?.State.IsUnitCommitted() == true)
+                && (await _reads.GetLifecycleStateAsync(unitId, cancellationToken).ConfigureAwait(false))?.State.IsUnitCommitted() == true)
                 return ImportFinalizeOutcome.Committed;
 
             // Final managed authority permits optional enrichment and reuses settled Candidate outputs.
@@ -436,23 +443,13 @@ public sealed class ImportFinalizer : IAsyncDisposable
 
             if (draft.PublishWhenReady)
             {
-                var current = await _operations.LoadVerificationReadModelAsync(unitId, cancellationToken).ConfigureAwait(false);
+                var current = await _reads.GetLifecycleStateAsync(unitId, cancellationToken).ConfigureAwait(false);
                 if (current is null) return ImportFinalizeOutcome.Finished;
                 var intent = VerificationDraftV1.FromJson(current.VerificationDraftJson, _timeProvider.GetUtcNowUnixMilliseconds());
                 if (!intent.PublishWhenReady) return ImportFinalizeOutcome.Committed;
                 if (current.State is not (ImportUnitState.ReadyForVerification or ImportUnitState.Committing))
                     return ImportFinalizeOutcome.Waiting;
-                var published = await new ImportPublicationCoordinator(_catalog, _timeProvider)
-                    .PublishDurableAsync(unitId, cancellationToken).ConfigureAwait(false);
-                if (published.IsPublished) return ImportFinalizeOutcome.Committed;
-                if (published.Status == ImportPublicationStatus.Blocked)
-                {
-                    var items = await _reads.GetUnitItemsUnboundedAsync(unitId, cancellationToken).ConfigureAwait(false);
-                    await RecordAttentionAsync(unitId, items.Select(item => item.ItemId).ToArray(), cancellationToken).ConfigureAwait(false);
-                    lock (_sync) _attentionUntil[unitId] = _timeProvider.GetUtcNow().Add(AttentionBackoff);
-                    return ImportFinalizeOutcome.NeedsAttention;
-                }
-                return ImportFinalizeOutcome.Waiting;
+                return await ResumePublicationAsync(unitId, cancellationToken).ConfigureAwait(false);
             }
             return ImportFinalizeOutcome.Committed;
         }
@@ -477,6 +474,24 @@ public sealed class ImportFinalizer : IAsyncDisposable
         return ImportFinalizeOutcome.NeedsAttention;
     }
 
+    private async Task<ImportFinalizeOutcome> ResumePublicationAsync(Guid unitId, CancellationToken cancellationToken)
+    {
+        using var measure = PerfTrace.Measure("import.publication", 5000);
+        var published = await new ImportPublicationCoordinator(_catalog, _timeProvider)
+            .PublishDurableAsync(unitId, cancellationToken).ConfigureAwait(false);
+        if (published.IsPublished) return ImportFinalizeOutcome.Committed;
+        if (published.Status != ImportPublicationStatus.Blocked) return ImportFinalizeOutcome.Waiting;
+
+        var current = await _reads.GetLifecycleStateAsync(unitId, cancellationToken).ConfigureAwait(false);
+        if (current?.State != ImportUnitState.Committing)
+        {
+            var items = await _reads.GetUnitItemsUnboundedAsync(unitId, cancellationToken).ConfigureAwait(false);
+            await RecordAttentionAsync(unitId, items.Select(item => item.ItemId).ToArray(), cancellationToken).ConfigureAwait(false);
+        }
+        lock (_sync) _attentionUntil[unitId] = _timeProvider.GetUtcNow().Add(AttentionBackoff);
+        return ImportFinalizeOutcome.NeedsAttention;
+    }
+
     private async Task<bool> HasActiveCandidateIdentityPreparationAsync(
         Guid unitId,
         CancellationToken cancellationToken)
@@ -485,8 +500,8 @@ public sealed class ImportFinalizer : IAsyncDisposable
         await using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT EXISTS (
-                SELECT 1 FROM jobs j
-                JOIN import_items ii ON ii.candidate_media_id = j.owner_id
+                SELECT 1 FROM import_items ii
+                CROSS JOIN jobs j ON ii.candidate_media_id = j.owner_id
                 WHERE ii.import_unit_id = $unitId
                   AND ii.disposition = 'INCLUDED'
                   AND j.kind IN ('ExtractMetadata', 'FaceAnalysis')
@@ -505,9 +520,9 @@ public sealed class ImportFinalizer : IAsyncDisposable
         command.CommandText = """
             SELECT EXISTS (
                 SELECT 1 FROM import_items i
-                JOIN media_capability_readiness capability
+                CROSS JOIN media_capability_readiness capability
                   ON capability.media_id = COALESCE(i.reused_media_id, i.candidate_media_id)
-                JOIN jobs j ON j.job_id = capability.job_id
+                CROSS JOIN jobs j ON j.job_id = capability.job_id
                 WHERE i.import_unit_id = $unitId AND i.disposition IN ('INCLUDED', 'REUSED')
                   AND capability.capability IN ('THUMBNAIL', 'HOVER', 'MODEL_RENDER')
                   AND j.state IN ('PENDING', 'RUNNABLE', 'RUNNING')
@@ -526,8 +541,8 @@ public sealed class ImportFinalizer : IAsyncDisposable
         await using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT EXISTS (
-                SELECT 1 FROM jobs j
-                JOIN import_items ii ON ii.candidate_media_id = j.owner_id
+                SELECT 1 FROM import_items ii
+                CROSS JOIN jobs j ON ii.candidate_media_id = j.owner_id
                 WHERE ii.import_unit_id = $unitId
                   AND ii.disposition = 'INCLUDED'
                   AND j.kind IN ('ExtractMetadata', 'FaceAnalysis')
@@ -615,6 +630,24 @@ public sealed class ImportFinalizer : IAsyncDisposable
         VerificationDraftV1 draft,
         CancellationToken cancellationToken)
     {
+        // Hash settlement is a durable gate; avoid materializing the entire job graph
+        // on every pending pass. The later in-memory check still validates the snapshot.
+        await using (var connection = await _catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false))
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText = """
+                SELECT EXISTS (
+                    SELECT 1 FROM import_items i
+                    CROSS JOIN jobs j ON j.owner_type = 'Media' AND j.owner_id = i.candidate_media_id
+                    WHERE i.import_unit_id = $unitId AND i.disposition IN ('INCLUDED','REUSED')
+                      AND j.kind = 'HashMedia'
+                      AND j.state NOT IN ('SUCCEEDED','FAILED_TERMINAL','CANCELLED'));
+                """;
+            command.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
+            if (Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 1)
+                return new AdmissionResult(false);
+        }
+
         var items = await _reads.GetUnitItemsUnboundedAsync(unitId, cancellationToken).ConfigureAwait(false);
         var jobs = await _schedulerReads.GetJobsForImportUnitMediasAsync(unitId, cancellationToken).ConfigureAwait(false);
         // The hash worker can have persisted a fingerprint before it settles transfer admission.
@@ -872,10 +905,10 @@ public sealed class ImportFinalizer : IAsyncDisposable
         await using var command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT import_unit_id, verification_draft_json
+            SELECT import_unit_id, verification_draft_json, state
             FROM import_units
             WHERE state NOT IN ('COMMITTED','COMPLETED','COMMITTED_WITH_CLEANUP_ATTENTION','CANCELLED','FAILED_TERMINAL')
-              AND library_commit_state NOT IN ('SOURCE_CLEANUP_PENDING','SOURCE_CLEANUP_COMPLETE','TERMINAL')
+              AND (state = 'COMMITTING' OR library_commit_state NOT IN ('SOURCE_CLEANUP_PENDING','SOURCE_CLEANUP_COMPLETE','TERMINAL'))
               AND is_paused = 0
             ORDER BY created_at_ms, import_unit_id;
             """;
@@ -883,6 +916,11 @@ public sealed class ImportFinalizer : IAsyncDisposable
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             var unitId = DbGuid.Parse(reader.GetString(0));
+            if (reader.GetString(2) == "COMMITTING")
+            {
+                ids.Add(unitId);
+                continue;
+            }
             var draftJson = reader.IsDBNull(1) ? null : reader.GetString(1);
             if (string.IsNullOrWhiteSpace(draftJson))
             {
@@ -903,7 +941,7 @@ public sealed class ImportFinalizer : IAsyncDisposable
                 continue;
             }
 
-            if (draft.IsImportRequested)
+            if (draft.IsImportRequested && (reader.GetString(2) != "READY_FOR_VERIFICATION" || draft.PublishWhenReady))
             {
                 ids.Add(unitId);
             }
@@ -945,6 +983,14 @@ public sealed class ImportFinalizer : IAsyncDisposable
     {
         while (!cancellationToken.IsCancellationRequested)
         {
+            TaskCompletionSource wake;
+            lock (_sync)
+            {
+                _wake = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                wake = _wake;
+            }
+
+            var passStarted = Stopwatch.GetTimestamp();
             IReadOnlyDictionary<Guid, ImportFinalizeOutcome> outcomes;
             try
             {
@@ -964,16 +1010,12 @@ public sealed class ImportFinalizer : IAsyncDisposable
                 ? PendingInterval
                 : IdleInterval;
 
-            TaskCompletionSource wake;
-            lock (_sync)
-            {
-                _wake = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                wake = _wake;
-            }
-
             try
             {
                 await Task.WhenAny(wake.Task, Task.Delay(interval, cancellationToken)).ConfigureAwait(false);
+                var remaining = TimeSpan.FromMilliseconds(250) - Stopwatch.GetElapsedTime(passStarted);
+                if (remaining > TimeSpan.Zero)
+                    await Task.Delay(remaining, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {

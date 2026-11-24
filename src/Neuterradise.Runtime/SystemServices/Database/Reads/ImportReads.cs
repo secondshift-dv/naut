@@ -77,6 +77,32 @@ public sealed class ImportReads
         return state is null ? null : DbEnum.ParseImportCommitCheckpointOrDefault(state);
     }
 
+    // Lifecycle decisions do not require presentation counts or fingerprint joins.
+    internal async Task<ImportLifecycleState?> GetLifecycleStateAsync(
+        Guid unitId, CancellationToken cancellationToken)
+    {
+        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken)
+            .ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT state, library_commit_state, is_paused, verification_draft_json,
+                   commit_operation_id, row_version
+            FROM import_units WHERE import_unit_id = $unitId;
+            """;
+        command.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) return null;
+        return new ImportLifecycleState(
+            DbEnum.ParseImportUnitState(reader.GetString(0)),
+            DbEnum.ParseImportCommitCheckpointOrDefault(reader.GetString(1)),
+            reader.GetBoolean(2), reader.GetString(3),
+            reader.IsDBNull(4) ? null : reader.GetString(4), reader.GetInt64(5));
+    }
+
+    internal sealed record ImportLifecycleState(
+        ImportUnitState State, ImportCommitCheckpoint LibraryCommitState, bool IsPaused,
+        string VerificationDraftJson, string? CommitOperationId, long RowVersion);
+
     public async Task<ImportUnitSummary?> GetUnitSummaryAsync(
         Guid unitId,
         CancellationToken cancellationToken = default)
@@ -97,7 +123,7 @@ public sealed class ImportReads
                    (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id) AS total_items,
                    (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id AND disposition = 'INCLUDED') AS included_count,
                    (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id AND disposition = 'SKIPPED') AS skipped_count,
-                   (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id AND duplicate_decision IS NULL AND EXISTS (SELECT 1 FROM media ca JOIN media aa ON aa.sha256 = ca.sha256 AND aa.byte_length = ca.byte_length AND aa.state = 'ACTIVE' AND aa.media_id <> ca.media_id WHERE ca.media_id = import_items.candidate_media_id)) AS dup_count,
+                   (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id AND duplicate_decision IS NULL AND EXISTS (SELECT 1 FROM media ca JOIN media aa INDEXED BY ix_media_active_byte_length ON aa.sha256 = ca.sha256 AND aa.byte_length = ca.byte_length AND aa.state = 'ACTIVE' AND aa.media_id <> ca.media_id WHERE ca.media_id = import_items.candidate_media_id)) AS dup_count,
                    (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id AND disposition = 'INVALID') AS needs_attn_count,
                    u.created_at_ms, u.updated_at_ms,
                    u.destination_profile_id, u.library_commit_state, u.verification_step,
@@ -185,7 +211,7 @@ public sealed class ImportReads
                    (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id) AS total_items,
                    (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id AND disposition = 'INCLUDED') AS included_count,
                    (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id AND disposition = 'SKIPPED') AS skipped_count,
-                   (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id AND duplicate_decision IS NULL AND EXISTS (SELECT 1 FROM media ca JOIN media aa ON aa.sha256 = ca.sha256 AND aa.byte_length = ca.byte_length AND aa.state = 'ACTIVE' AND aa.media_id <> ca.media_id WHERE ca.media_id = import_items.candidate_media_id)) AS dup_count,
+                   (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id AND duplicate_decision IS NULL AND EXISTS (SELECT 1 FROM media ca JOIN media aa INDEXED BY ix_media_active_byte_length ON aa.sha256 = ca.sha256 AND aa.byte_length = ca.byte_length AND aa.state = 'ACTIVE' AND aa.media_id <> ca.media_id WHERE ca.media_id = import_items.candidate_media_id)) AS dup_count,
                    (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id AND disposition = 'INVALID') AS needs_attn_count,
                    u.created_at_ms, u.updated_at_ms, u.completed_at_ms, u.row_version
             FROM import_units u
@@ -549,7 +575,7 @@ public sealed class ImportReads
                    COUNT(i.import_item_id) AS total_count,
                    SUM(CASE WHEN i.disposition = 'INCLUDED' THEN 1 ELSE 0 END) AS included_count,
                    SUM(CASE WHEN i.disposition = 'SKIPPED' THEN 1 ELSE 0 END) AS skipped_count,
-                   SUM(CASE WHEN i.duplicate_decision IS NULL AND EXISTS (SELECT 1 FROM media ca JOIN media aa ON aa.sha256 = ca.sha256 AND aa.byte_length = ca.byte_length AND aa.state = 'ACTIVE' AND aa.media_id <> ca.media_id WHERE ca.media_id = i.candidate_media_id) THEN 1 ELSE 0 END) AS exact_dup_count,
+                   SUM(CASE WHEN i.duplicate_decision IS NULL AND EXISTS (SELECT 1 FROM media ca JOIN media aa INDEXED BY ix_media_active_byte_length ON aa.sha256 = ca.sha256 AND aa.byte_length = ca.byte_length AND aa.state = 'ACTIVE' AND aa.media_id <> ca.media_id WHERE ca.media_id = i.candidate_media_id) THEN 1 ELSE 0 END) AS exact_dup_count,
                    SUM(CASE WHEN i.disposition = 'INVALID' THEN 1 ELSE 0 END) AS needs_attention_count,
                    u.destination_profile_id,
                    u.library_commit_state,
@@ -613,8 +639,8 @@ public sealed class ImportReads
                    MAX(CASE WHEN j.state = 'FAILED_TERMINAL' THEN 1 ELSE 0 END) AS failed,
                    MAX(CASE WHEN j.state = 'CANCELLED' AND COALESCE(j.error_code,'') <> 'OWNER_RETIRED' THEN 1 ELSE 0 END) AS cancelled
             FROM scoped_units u
-            JOIN import_items i ON i.import_unit_id = u.import_unit_id
-            JOIN jobs j ON j.owner_type = 'Media' AND j.owner_id = i.candidate_media_id
+            CROSS JOIN import_items i ON i.import_unit_id = u.import_unit_id
+            CROSS JOIN jobs j ON j.owner_type = 'Media' AND j.owner_id = i.candidate_media_id
                          AND j.kind IN ('HashMedia','TransferOriginal')
             GROUP BY i.import_item_id
         ),
@@ -676,8 +702,8 @@ public sealed class ImportReads
             reader.GetInt32(start + 3), reader.GetInt32(start + 4), reader.GetInt32(start + 5),
             reader.GetInt32(start + 6));
 
-    /// <summary>Complete durable session totals, independent of the visible activity-row limit.</summary>
-    public async Task<IReadOnlyDictionary<Guid, ImportSessionAccounting>> ListSessionAccountingAsync(
+    /// <summary>Complete durable multi-unit session totals, independent of the visible activity-row limit.</summary>
+    public async Task<IReadOnlyDictionary<Guid, ImportSessionAccounting>> ListMultiUnitSessionAccountingAsync(
         IReadOnlyCollection<Guid> sessionIds, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(sessionIds);
@@ -688,7 +714,10 @@ public sealed class ImportReads
         command.CommandText = $"""
             WITH scoped_units AS (
                 SELECT * FROM import_units
-                WHERE import_session_id IN (SELECT value FROM json_each($sessions))
+                WHERE import_session_id IN (
+                    SELECT import_session_id FROM import_units
+                    WHERE import_session_id IN (SELECT value FROM json_each($sessions))
+                    GROUP BY import_session_id HAVING COUNT(*) > 1)
             ),
             {ItemAccountingCtes}
             SELECT u.import_session_id, COUNT(DISTINCT u.import_unit_id), COUNT(f.import_item_id),
@@ -990,7 +1019,7 @@ public sealed class ImportReads
                    COUNT(i.import_item_id) AS total_count,
                    SUM(CASE WHEN i.disposition = 'INCLUDED' THEN 1 ELSE 0 END) AS included_count,
                    SUM(CASE WHEN i.disposition = 'SKIPPED' THEN 1 ELSE 0 END) AS skipped_count,
-                   SUM(CASE WHEN i.duplicate_decision IS NULL AND EXISTS (SELECT 1 FROM media ca JOIN media aa ON aa.sha256 = ca.sha256 AND aa.byte_length = ca.byte_length AND aa.state = 'ACTIVE' AND aa.media_id <> ca.media_id WHERE ca.media_id = i.candidate_media_id) THEN 1 ELSE 0 END) AS exact_dup_count,
+                   SUM(CASE WHEN i.duplicate_decision IS NULL AND EXISTS (SELECT 1 FROM media ca JOIN media aa INDEXED BY ix_media_active_byte_length ON aa.sha256 = ca.sha256 AND aa.byte_length = ca.byte_length AND aa.state = 'ACTIVE' AND aa.media_id <> ca.media_id WHERE ca.media_id = i.candidate_media_id) THEN 1 ELSE 0 END) AS exact_dup_count,
                    SUM(CASE WHEN i.disposition = 'INVALID' THEN 1 ELSE 0 END) AS needs_attention_count,
                    u.destination_profile_id,
                    u.library_commit_state,
@@ -1099,17 +1128,24 @@ public sealed class ImportReads
         await using var command = connection.CreateCommand();
         command.CommandText =
             $"""
-            SELECT i.import_item_id, a.media_id, a.state, i.duplicate_decision, i.source_file_name
-            FROM import_items i
-            JOIN media c ON c.media_id = i.candidate_media_id
-            JOIN media a ON {ExactMediaIdentitySql}
-                         AND a.media_id <> c.media_id
-                         AND (a.state = 'TRASHED' OR ({PublishedReuseAuthoritySql}))
-            WHERE i.import_unit_id = $unitId
-              AND c.sha256 IS NOT NULL
-              AND c.byte_length IS NOT NULL
-            ORDER BY i.created_at_ms ASC, i.import_item_id ASC,
-                     CASE a.state WHEN 'ACTIVE' THEN 0 ELSE 1 END, a.media_id;
+            SELECT import_item_id, media_id, state, duplicate_decision, source_file_name
+            FROM (
+                SELECT i.import_item_id, a.media_id, a.state, i.duplicate_decision, i.source_file_name, i.created_at_ms
+                FROM import_items i
+                JOIN media c ON c.media_id = i.candidate_media_id
+                JOIN media a INDEXED BY ix_media_active_byte_length ON {ExactMediaIdentitySql}
+                             AND a.media_id <> c.media_id
+                             AND ({PublishedReuseAuthoritySql})
+                WHERE i.import_unit_id = $unitId AND c.sha256 IS NOT NULL AND c.byte_length IS NOT NULL
+                UNION ALL
+                SELECT i.import_item_id, a.media_id, a.state, i.duplicate_decision, i.source_file_name, i.created_at_ms
+                FROM import_items i
+                JOIN media c ON c.media_id = i.candidate_media_id
+                JOIN media a ON {ExactMediaIdentitySql} AND a.media_id <> c.media_id AND a.state = 'TRASHED'
+                WHERE i.import_unit_id = $unitId AND c.sha256 IS NOT NULL AND c.byte_length IS NOT NULL
+            )
+            ORDER BY created_at_ms ASC, import_item_id ASC,
+                     CASE state WHEN 'ACTIVE' THEN 0 ELSE 1 END, media_id;
             """;
         command.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
 

@@ -61,18 +61,8 @@ public sealed class ImportPriorityOperations
         JobSignals.Raise();
     }
 
-    public async Task NormalizeAsync(Guid importUnitId, CancellationToken cancellationToken = default)
-    {
-        if (importUnitId == Guid.Empty)
-        {
-            return;
-        }
-
-        await _jobs
-            .SetImportUnitPriorityAsync(importUnitId, JobPriorityPolicy.DefaultPriority, cancellationToken)
-            .ConfigureAwait(false);
-        JobSignals.Raise();
-    }
+    public Task NormalizeAsync(Guid importUnitId, CancellationToken cancellationToken = default) =>
+        ClearIfFocusedAsync(importUnitId, cancellationToken);
 
     internal static Guid? Parse(string? valueJson)
     {

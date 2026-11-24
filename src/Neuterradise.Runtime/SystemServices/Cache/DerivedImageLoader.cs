@@ -36,6 +36,9 @@ public sealed class SkiaDerivedImageDecoder : IDerivedImageDecoder
             return null;
         }
 
+        // An immutable bitmap permits Skia to share its pixel storage with the image.
+        // The image owns a reference after the bitmap wrapper is disposed.
+        bitmap.SetImmutable();
         var image = SKImage.FromBitmap(bitmap);
         return new DecodedImage(image, bitmap.Width, bitmap.Height, (long)bitmap.Width * bitmap.Height * 4);
     }
@@ -50,7 +53,7 @@ public static class TargetSizeDecoder
     public static SKBitmap? Decode(string path, int decodeWidth, int? decodeHeight = null,
         ExternalToolResolver? tools = null, bool backgroundIo = false)
     {
-        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 64 * 1024);
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, backgroundIo ? 64 * 1024 : 4 * 1024);
         if (backgroundIo) WindowsDiskTelemetry.SetPriority(stream.SafeFileHandle, DiskIoPriority.Low);
         Span<byte> header = stackalloc byte[12];
         var count = stream.ReadAtLeast(header, header.Length, throwOnEndOfStream: false);

@@ -9,7 +9,7 @@ internal enum DiskSeekPenalty { Unknown, Rotational, SolidState }
 internal enum DiskIoPriority { VeryLow = 0, Low = 1, Normal = 2 }
 
 internal readonly record struct DiskCounters(
-    long ReadTime, long WriteTime, long IdleTime, uint Reads, uint Writes, uint QueueDepth, long QueryTime);
+    long ReadBytes, long WriteBytes, long ReadTime, long WriteTime, long IdleTime, uint Reads, uint Writes, uint QueueDepth, long QueryTime);
 
 internal static unsafe partial class WindowsDiskTelemetry
 {
@@ -56,6 +56,7 @@ internal static unsafe partial class WindowsDiskTelemetry
         Span<byte> output = stackalloc byte[96];
         if (!Query(file, DiskPerformance, [], output, out var size) || size < 64) return null;
         return new(
+            BinaryPrimitives.ReadInt64LittleEndian(output), BinaryPrimitives.ReadInt64LittleEndian(output[8..]),
             BinaryPrimitives.ReadInt64LittleEndian(output[16..]), BinaryPrimitives.ReadInt64LittleEndian(output[24..]),
             BinaryPrimitives.ReadInt64LittleEndian(output[32..]), BinaryPrimitives.ReadUInt32LittleEndian(output[40..]),
             BinaryPrimitives.ReadUInt32LittleEndian(output[44..]), BinaryPrimitives.ReadUInt32LittleEndian(output[48..]),

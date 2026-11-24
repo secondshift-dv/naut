@@ -147,7 +147,8 @@ public sealed record UpdateReleaseManifest(
     string ProductId,
     string ProductVersion,
     string RuntimeIdentifier,
-    IReadOnlyList<UpdateManifestFile> Files)
+    IReadOnlyList<UpdateManifestFile> Files,
+    string? MinimumCompatibleVersion = null)
 {
     private const int MaxFiles = 100_000;
 
@@ -170,7 +171,10 @@ public sealed record UpdateReleaseManifest(
         if (!string.Equals(ProductId, ProductIdentity.ProductId, StringComparison.Ordinal))
             throw new FormatException("Embedded release manifest product identity does not match.");
 
-        ArgumentException.ThrowIfNullOrWhiteSpace(ProductVersion);
+        var productVersion = UpdateManifest.ParseStrictVersion(ProductVersion, "Embedded product version");
+        if (MinimumCompatibleVersion is { } minimum &&
+            UpdateManifest.ParseStrictVersion(minimum, "Embedded minimum compatible version") > productVersion)
+            throw new FormatException("Embedded minimum compatible version exceeds the product version.");
         ArgumentException.ThrowIfNullOrWhiteSpace(RuntimeIdentifier);
         UpdateManifest.ValidateFileMembership(Files, MaxFiles, "Embedded release manifest");
     }

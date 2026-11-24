@@ -135,6 +135,16 @@ public sealed class ImportUnitControlAuthority
         await _priority.FocusAsync(unitId, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task NormalizeAsync(Guid unitId, CancellationToken cancellationToken = default)
+    {
+        using var mutationAdmission = _catalog.MutationAdmission.Enter(nameof(NormalizeAsync));
+        if (unitId == Guid.Empty) return;
+
+        await using var mutationLease = await _catalog.ImportUnitMutations
+            .EnterAsync(unitId, cancellationToken).ConfigureAwait(false);
+        await _priority.NormalizeAsync(unitId, cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>
     /// Retries one FAILED_RETRYABLE import under command admission and the per-unit mutation lease.
     /// </summary>

@@ -20,7 +20,10 @@ public sealed record UpdateState(
     UpdateStartupCutoff Cutoff,
     string? BackupPath,
     DateTimeOffset UpdatedAtUtc,
-    string? AbortReason = null)
+    string? AbortReason = null,
+    string? HandoffSha256 = null,
+    string? ManifestAuthoritySha256 = null,
+    UpdateStartupCutoff? RecoveryOrigin = null)
 {
     public bool MayAutoRollbackBinary =>
         Cutoff is UpdateStartupCutoff.None or UpdateStartupCutoff.HandoffPending;
@@ -38,21 +41,64 @@ public sealed class UpdateStateStore
     public UpdateStateStore(AppStatePaths paths) =>
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
 
-    public async Task SaveAsync(
-        UpdateState state,
-        CancellationToken cancellationToken = default)
+    public Task SaveAsync(UpdateState state, CancellationToken cancellationToken = default) =>
+        SaveCoreAsync(state, false, cancellationToken);
+
+    internal Task PublishVerifiedRecoveryAsync(UpdateState state, CancellationToken cancellationToken) =>
+        SaveCoreAsync(state, true, cancellationToken);
+
+    private async Task SaveCoreAsync(UpdateState state, bool verifiedRecovery, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(state);
         ValidateState(state);
 
+        var previous = await LoadAsync(cancellationToken).ConfigureAwait(false);
+        if (previous is not null)
+        {
+            if (previous.OperationId != state.OperationId)
+            {
+                if (!previous.IsTerminal || state.Cutoff != UpdateStartupCutoff.HandoffPending)
+                    throw new InvalidOperationException("A different update operation still owns recovery authority.");
+            }
+            else
+            {
+                var allowed = previous.Cutoff == state.Cutoff ||
+                    ((previous.Cutoff, state.Cutoff) switch
+                    {
+                        (UpdateStartupCutoff.None or UpdateStartupCutoff.HandoffPending,
+                            UpdateStartupCutoff.CatalogWriteStarted or UpdateStartupCutoff.AbortedNoMutation or UpdateStartupCutoff.RecoveryRequired) => true,
+                        (UpdateStartupCutoff.CatalogWriteStarted,
+                            UpdateStartupCutoff.CleanupPending or UpdateStartupCutoff.RecoveryRequired) => true,
+                        (UpdateStartupCutoff.CleanupPending, UpdateStartupCutoff.Completed or UpdateStartupCutoff.RecoveryRequired) => true,
+                        (UpdateStartupCutoff.Completed, UpdateStartupCutoff.CleanupPending) => true,
+                        (UpdateStartupCutoff.AbortedNoMutation, UpdateStartupCutoff.RecoveryRequired) => true,
+                        _ => false
+                    });
+                if (verifiedRecovery && previous.Cutoff == UpdateStartupCutoff.RecoveryRequired && previous.HandoffSha256 is not null)
+                    allowed = (previous.RecoveryOrigin, state.Cutoff) switch
+                    {
+                        (UpdateStartupCutoff.HandoffPending, UpdateStartupCutoff.AbortedNoMutation or UpdateStartupCutoff.CatalogWriteStarted) => true,
+                        (UpdateStartupCutoff.CatalogWriteStarted, UpdateStartupCutoff.CatalogWriteStarted) => true,
+                        _ => false
+                    };
+                if (!allowed)
+                    throw new InvalidOperationException("Update cutoff cannot move backwards.");
+                if ((state.HandoffSha256 is not null && state.HandoffSha256 != previous.HandoffSha256) ||
+                    (state.ManifestAuthoritySha256 is not null && state.ManifestAuthoritySha256 != previous.ManifestAuthoritySha256))
+                    throw new InvalidOperationException("Update approval cannot be changed.");
+                state = state with { HandoffSha256 = previous.HandoffSha256,
+                    ManifestAuthoritySha256 = previous.ManifestAuthoritySha256,
+                    RecoveryOrigin = state.Cutoff == UpdateStartupCutoff.RecoveryRequired
+                        ? previous.Cutoff == UpdateStartupCutoff.RecoveryRequired ? previous.RecoveryOrigin
+                          : previous.Cutoff is UpdateStartupCutoff.HandoffPending or UpdateStartupCutoff.CatalogWriteStarted ? previous.Cutoff : null
+                        : null };
+            }
+        }
+
+        ValidateState(state);
         var path = _paths.UpdateStateFilePath;
-        var temp = path + ".tmp";
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        await File.WriteAllTextAsync(
-            temp,
-            JsonSerializer.Serialize(state),
-            cancellationToken).ConfigureAwait(false);
-        File.Move(temp, path, overwrite: true);
+        await Neuterradise.Release.Contracts.UpdatePathGuard.WriteAtomicAsync(path,
+            JsonSerializer.SerializeToUtf8Bytes(state), cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<UpdateAuthorityReadResult<UpdateState>> ReadAsync(
@@ -108,13 +154,17 @@ public sealed class UpdateStateStore
 
     public Task PublishHandoffPendingAsync(
         Guid operationId,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken = default,
+        string? handoffSha256 = null,
+        string? manifestAuthoritySha256 = null) =>
         SaveAsync(
             new UpdateState(
                 operationId,
                 UpdateStartupCutoff.HandoffPending,
                 null,
-                DateTimeOffset.UtcNow),
+                DateTimeOffset.UtcNow,
+                HandoffSha256: handoffSha256,
+                ManifestAuthoritySha256: manifestAuthoritySha256),
             cancellationToken);
 
     public Task PublishCatalogWriteStartedAsync(
@@ -177,33 +227,16 @@ public sealed class UpdateStateStore
                 reason),
             cancellationToken);
 
-    public async Task RetirePendingStateAsync(
-        Guid operationId,
-        CancellationToken cancellationToken = default)
-    {
-        var read = await ReadAsync(cancellationToken).ConfigureAwait(false);
-        if (!read.IsValid)
-            return;
-
-        var current = read.Value!;
-        if (current.OperationId != operationId || current.IsTerminal)
-            return;
-
-        if (current.Cutoff is UpdateStartupCutoff.HandoffPending or UpdateStartupCutoff.None)
-        {
-            await PublishAbortedNoMutationAsync(
-                operationId,
-                "Handoff retired before replacement began.",
-                cancellationToken).ConfigureAwait(false);
-        }
-
-        // CatalogWriteStarted, CleanupPending, and RecoveryRequired are deliberately
-        // not promoted here. They require startup evidence, cleanup convergence,
-        // or explicit recovery respectively.
-    }
-
     private static void ValidateState(UpdateState state)
     {
+        if ((state.HandoffSha256 is null) != (state.ManifestAuthoritySha256 is null) ||
+            (state.HandoffSha256 is not null &&
+             (!Neuterradise.Release.Contracts.UpdateManifestAuthority.IsLowerSha256(state.HandoffSha256) ||
+              !Neuterradise.Release.Contracts.UpdateManifestAuthority.IsLowerSha256(state.ManifestAuthoritySha256!))))
+            throw new FormatException("Persisted update approval digests are invalid.");
+        if (state.RecoveryOrigin is not null && (state.Cutoff != UpdateStartupCutoff.RecoveryRequired ||
+            state.RecoveryOrigin is not (UpdateStartupCutoff.HandoffPending or UpdateStartupCutoff.CatalogWriteStarted)))
+            throw new FormatException("Persisted update recovery origin is invalid.");
         if (state.OperationId == Guid.Empty)
             throw new FormatException("Persisted update state has an invalid operation id.");
         if (!Enum.IsDefined(state.Cutoff))

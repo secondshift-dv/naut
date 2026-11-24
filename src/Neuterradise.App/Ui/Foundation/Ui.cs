@@ -127,25 +127,31 @@ public static class UI
 
     public static string F(string key, string fallback, params object[] args) => SurfaceText.Format(key, fallback, args);
 
+    private static void ConfigureTextSelection(object sender, RoutedEventArgs args)
+    {
+        if (sender is not TextBlock block) return;
+        var selectable = true;
+        for (var parent = VisualTreeHelper.GetParent(block); parent is not null; parent = VisualTreeHelper.GetParent(parent))
+        {
+            if (parent is Microsoft.UI.Xaml.Controls.Primitives.ButtonBase
+                or Microsoft.UI.Xaml.Controls.Primitives.SelectorItem
+                or ComboBox or AutoSuggestBox or ToggleSwitch or Slider or MenuFlyoutItem or ToolTip or CardVisual or MediaCardView
+                || (bool)parent.GetValue(ActionContentProperty))
+            {
+                selectable = false;
+                break;
+            }
+        }
+
+        if (block.IsTextSelectionEnabled != selectable)
+            block.IsTextSelectionEnabled = selectable;
+    }
+
     public static TextBlock Text(string? text = null, string role = "body", string? color = null, int maxLines = 0)
     {
         var block = new TextBlock { Text = text ?? string.Empty };
         ThemeRuntime.Current.ApplyType(block, role, SemanticTextColor(color));
-        block.Loaded += (_, _) =>
-        {
-            block.IsTextSelectionEnabled = true;
-            for (var parent = VisualTreeHelper.GetParent(block); parent is not null; parent = VisualTreeHelper.GetParent(parent))
-            {
-                if (parent is Microsoft.UI.Xaml.Controls.Primitives.ButtonBase
-                    or Microsoft.UI.Xaml.Controls.Primitives.SelectorItem
-                    or ComboBox or AutoSuggestBox or ToggleSwitch or Slider or MenuFlyoutItem or ToolTip or CardVisual or MediaCardView
-                    || (bool)parent.GetValue(ActionContentProperty))
-                {
-                    block.IsTextSelectionEnabled = false;
-                    break;
-                }
-            }
-        };
+        block.Loaded += ConfigureTextSelection;
         if (maxLines > 0)
         {
             block.MaxLines = maxLines;

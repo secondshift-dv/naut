@@ -282,17 +282,22 @@ internal sealed class ImportCancellationSettlement
         var assetIds = new List<Guid>();
         await using var connection = await _catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
+        // Filter retired duplicates before evaluating correlated consumer and ownership exclusions.
         command.CommandText =
             """
-            SELECT DISTINCT item.candidate_media_id
-            FROM import_items item
-            JOIN media asset ON asset.media_id = item.candidate_media_id
-            JOIN import_units self ON self.import_unit_id = item.import_unit_id
-            WHERE item.import_unit_id = $unitId
-              AND item.candidate_media_id IS NOT NULL
-              AND ($onlySkipped = 0 OR item.disposition = 'SKIPPED')
-              AND asset.state IN ('ACTIVE', 'TRASHED')
-              AND NOT EXISTS (
+            WITH eligible AS MATERIALIZED (
+                SELECT DISTINCT item.candidate_media_id
+                FROM import_items item
+                JOIN media asset ON asset.media_id = item.candidate_media_id
+                JOIN import_units self ON self.import_unit_id = item.import_unit_id
+                WHERE item.import_unit_id = $unitId
+                  AND item.candidate_media_id IS NOT NULL
+                  AND ($onlySkipped = 0 OR item.disposition = 'SKIPPED')
+                  AND asset.state IN ('ACTIVE', 'TRASHED')
+            )
+            SELECT item.candidate_media_id
+            FROM eligible item
+            WHERE NOT EXISTS (
                   SELECT 1
                   FROM import_items other
                   JOIN import_units consumer ON consumer.import_unit_id = other.import_unit_id

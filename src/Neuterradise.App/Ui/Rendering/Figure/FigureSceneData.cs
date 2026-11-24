@@ -50,6 +50,7 @@ public sealed class FigureSceneData
             group.Clear();
         }
 
+        await using var reader = ModelRenderContainer.OpenChunkReader(nfigPath, file);
         var meshes = new List<FigureMeshData>();
         long bytes = 0;
         foreach (var mesh in selected)
@@ -57,8 +58,8 @@ public sealed class FigureSceneData
             ct.ThrowIfCancellationRequested();
             if (bytes + file.Header.Chunks[mesh.VertexChunk].Length + file.Header.Chunks[mesh.IndexChunk].Length > CpuBudget)
                 throw new InvalidDataException("Figure geometry exceeds its resident allocation budget.");
-            var vertices = await ModelRenderContainer.ReadChunkAsync(nfigPath, file, mesh.VertexChunk, ct).ConfigureAwait(false);
-            var indices = await ModelRenderContainer.ReadChunkAsync(nfigPath, file, mesh.IndexChunk, ct).ConfigureAwait(false);
+            var vertices = await reader.ReadAsync(mesh.VertexChunk, ct).ConfigureAwait(false);
+            var indices = await reader.ReadAsync(mesh.IndexChunk, ct).ConfigureAwait(false);
             bytes = checked(bytes + vertices.LongLength + indices.LongLength);
             meshes.Add(new(mesh, vertices, indices));
         }
@@ -80,7 +81,7 @@ public sealed class FigureSceneData
             {
                 if (bytes + file.Header.Chunks[descriptor.MipChunks[mip]].Length > CpuBudget)
                     throw new InvalidDataException("Figure scene exceeds its resident allocation budget.");
-                mips[mip] = await ModelRenderContainer.ReadChunkAsync(nfigPath, file, descriptor.MipChunks[mip], ct).ConfigureAwait(false);
+                mips[mip] = await reader.ReadAsync(descriptor.MipChunks[mip], ct).ConfigureAwait(false);
                 bytes = checked(bytes + mips[mip].LongLength);
             }
             textures.Add(new(index, descriptor, mips));

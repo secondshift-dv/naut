@@ -76,6 +76,7 @@
     <sys:String x:Key="Import.PreparingCover">Preparando sugerencias Cover…</sys:String>
     <sys:String x:Key="Import.PreviewUnavailable">Vista previa no disponible</sys:String>
     <sys:String x:Key="Import.Prioritize">priorizar</sys:String>
+    <sys:String x:Key="Import.Normalize">Normal</sys:String>
     <sys:String x:Key="Import.Problems">Revisión requerida</sys:String>
     <sys:String x:Key="Import.Problems.Description">Resuelve estos problemas para continuar.</sys:String>
     <sys:String x:Key="Import.ProfileCollision">Reconocido como otro Profile</sys:String>
@@ -706,7 +707,7 @@
     <sys:String x:Key="Import.Detail.OneItem">1 artículo</sys:String>
     <sys:String x:Key="Import.Detail.ManyItems">Artículos {0}</sys:String>
     <sys:String x:Key="Import.Detail.Added">{0} agregado a su Vault.</sys:String>
-    <sys:String x:Key="Import.Detail.WithDuplicates">{0} · {1} ya en tu Vault</sys:String>
+    <sys:String x:Key="Import.Detail.PendingReuse">{0} seleccionados para reutilizar</sys:String>
     <sys:String x:Key="Import.Stage.AlreadyInVault">Ya está en tu Vault</sys:String>
     <sys:String x:Key="Import.Progress.CheckingMedia">Comprobando medios</sys:String>
     <sys:String x:Key="Import.Progress.Session">Lote: {0} / {1} comprobados</sys:String>
@@ -1009,7 +1010,7 @@
     <sys:String x:Key="Import.Pause.Tooltip">Pausar importación</sys:String>
     <sys:String x:Key="Import.Start">Empezar</sys:String>
     <sys:String x:Key="Import.Start.Prioritize">Priorizar esta importación</sys:String>
-    <sys:String x:Key="Import.Start.Prioritized">Esta importación tiene prioridad</sys:String>
+    <sys:String x:Key="Import.Start.Normalize">Volver a la prioridad normal</sys:String>
     <sys:String x:Key="Import.Start.Resume">Iniciar importación</sys:String>
     <sys:String x:Key="Import.Preparing">Preparando avances…</sys:String>
     <sys:String x:Key="Import.Priority">Prioridad</sys:String>
