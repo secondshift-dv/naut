@@ -468,7 +468,7 @@ public sealed class ImportFinalizer : IAsyncDisposable
             result.Outcome,
             string.Join(" | ", result.Blockers.Select(blocker => blocker.Code)));
         var retryable = result.Outcome == ImportCommitOutcome.Conflict
-            || result.Blockers.Any(blocker => blocker.Code == "PLACEMENT_RETRYABLE");
+            || result.Blockers.Any(blocker => blocker.Code is "PLACEMENT_RETRYABLE" or "REUSE_AUTHORITY_STALE");
         await MarkFailureAsync(
             unitId,
             retryable,
@@ -631,56 +631,53 @@ public sealed class ImportFinalizer : IAsyncDisposable
         }
 
         var fingerprints = await ReadFingerprintsAsync(unitId, cancellationToken).ConfigureAwait(false);
-        var matches = await _reads.ListExactDuplicateMatchesAsync(unitId, cancellationToken).ConfigureAwait(false);
+        var hashJobs = jobs.Where(job => job.Kind == "HashMedia").GroupBy(job => job.OwnerId)
+            .ToDictionary(group => group.Key, group => group.First());
+        var transferJobs = jobs.Where(job => job.Kind == "TransferOriginal").GroupBy(job => job.OwnerId)
+            .ToDictionary(group => group.Key, group => group.First());
 
-        // Auto-reuse authoritative exact duplicates: if the matched asset is already ACTIVE,
-        // reuse is safe and no duplicate physical authority should be created. The user can
-        // still change this decision in Verify before requesting import.
-        var authoritativeMatches = matches
-            .Where(static match => match is { MatchedMediaState: MediaState.Active, Decision: null })
-            .DistinctBy(static match => match.ImportItemId);
-        foreach (var match in authoritativeMatches)
+        // Revalidate automatic reuse before opening the journal. Never reinterpret explicit
+        // Verify decisions or failed hashes as successful duplicate admissions.
+        foreach (var item in items.Where(item => item.Disposition == ItemDisposition.Reused))
         {
-            try
+            if (item.CandidateMediaId is not { } candidate || item.ReusedMediaId is not { } reused)
+                return new AdmissionResult(false);
+            if (await _catalog.ImportWrites.ValidateReuseAuthorityAsync(candidate, reused, cancellationToken).ConfigureAwait(false))
+                continue;
+            if (!await _catalog.ImportWrites.TryChangeAutomaticReuseAsync(item.ItemId, reused, null, cancellationToken).ConfigureAwait(false))
             {
-                await _catalog.ImportWrites.ApplyDuplicateDecisionAsync(
-                    match.ImportItemId,
-                    ItemDisposition.Reused,
-                    DuplicateDecision.Reuse,
-                    match.MatchedMediaId,
-                    cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                System.Diagnostics.Trace.TraceWarning(
-                    "Auto-reuse of authoritative duplicate {0:D} was not applied: {1}",
-                    match.ImportItemId,
-                    exception.GetType().Name);
+                await RecordAttentionAsync(unitId, [item.ItemId], cancellationToken).ConfigureAwait(false);
+                await MarkFailureAsync(unitId, true, "REUSE_AUTHORITY_STALE", cancellationToken).ConfigureAwait(false);
+                return new AdmissionResult(false);
             }
         }
 
-        // Re-read matches after auto-reuse to get updated decisions.
-        matches = await _reads.ListExactDuplicateMatchesAsync(unitId, cancellationToken).ConfigureAwait(false);
+        items = await _reads.GetUnitItemsUnboundedAsync(unitId, cancellationToken).ConfigureAwait(false);
+        var matches = await _reads.ListExactDuplicateMatchesAsync(unitId, cancellationToken).ConfigureAwait(false);
+        var includedById = items.Where(item => item.Disposition == ItemDisposition.Included && item.DuplicateDecision is null)
+            .ToDictionary(item => item.ItemId);
+        foreach (var match in matches.Where(match => match.MatchedMediaState == MediaState.Active && match.Decision is null)
+                     .DistinctBy(match => match.ImportItemId))
+        {
+            if (!includedById.TryGetValue(match.ImportItemId, out var item) || item.CandidateMediaId is not { } candidate
+                || hashJobs.GetValueOrDefault(candidate)?.State is JobState.FailedTerminal or JobState.Cancelled)
+                continue;
+            if (!await _catalog.ImportWrites.TryChangeAutomaticReuseAsync(item.ItemId, null, match.MatchedMediaId, cancellationToken).ConfigureAwait(false))
+                return new AdmissionResult(false);
+        }
 
-        var hashJobs = jobs
-            .Where(job => string.Equals(job.Kind, "HashMedia", StringComparison.OrdinalIgnoreCase))
-            .GroupBy(job => job.OwnerId)
-            .ToDictionary(group => group.Key, group => group.First());
-        var transferJobs = jobs
-            .Where(job => string.Equals(job.Kind, "TransferOriginal", StringComparison.Ordinal))
-            .GroupBy(job => job.OwnerId)
-            .ToDictionary(group => group.Key, group => group.First());
-
-        var reusedItems = matches
-            .Where(static match => match.RequiresDecision || match.Decision == DuplicateDecision.Reuse)
-            .Select(match => match.ImportItemId)
-            .ToHashSet();
+        // Only a persisted REUSE decision is admission authority, never an unresolved match.
+        items = await _reads.GetUnitItemsUnboundedAsync(unitId, cancellationToken).ConfigureAwait(false);
+        var reusedItems = items.Where(item => item.Disposition == ItemDisposition.Reused
+                && item.DuplicateDecision == DuplicateDecision.Reuse && item.ReusedMediaId.HasValue)
+            .Select(item => item.ItemId).ToHashSet();
         var skippedDuplicates = new HashSet<Guid>();
         var fingerprintGroups = items
             .Where(item => item is { Disposition: ItemDisposition.Included, DuplicateDecision: null, CandidateMediaId: not null }
                 && !reusedItems.Contains(item.ItemId)
                 && fingerprints.TryGetValue(item.CandidateMediaId.Value, out var identity)
-                && identity.Sha256 is not null && identity.ByteLength is not null)
+                && identity.Sha256 is not null && identity.ByteLength is not null
+                && hashJobs.GetValueOrDefault(item.CandidateMediaId.Value)?.State is not (JobState.FailedTerminal or JobState.Cancelled))
             .GroupBy(item => (item.MediaType, fingerprints[item.CandidateMediaId!.Value]));
 
         foreach (var group in fingerprintGroups)
@@ -706,7 +703,7 @@ public sealed class ImportFinalizer : IAsyncDisposable
                 var next = group.FirstOrDefault(item => !transferJobs.ContainsKey(item.CandidateMediaId!.Value)
                     && hashJobs.GetValueOrDefault(item.CandidateMediaId.Value)?.State == JobState.Succeeded);
                 if (next is not null)
-                    await _preparation.ScheduleIncludedTransferAsync(next.ItemId, cancellationToken).ConfigureAwait(false);
+                    await _preparation.ScheduleAutomaticTransferAsync(unitId, next.ItemId, next.CandidateMediaId!.Value, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -756,11 +753,17 @@ public sealed class ImportFinalizer : IAsyncDisposable
 
         if (setAside.Count > 0)
         {
+            await RecordAttentionAsync(unitId, setAside, cancellationToken).ConfigureAwait(false);
+            if (!stillPreparing && !items.Any(item => (item.Disposition is ItemDisposition.Included or ItemDisposition.Reused)
+                    && !setAside.Contains(item.ItemId) && !skippedDuplicates.Contains(item.ItemId)))
+            {
+                await MarkFailureAsync(unitId, false, "IMPORT_ADMISSION_FAILED", cancellationToken).ConfigureAwait(false);
+                return new AdmissionResult(false);
+            }
             await _operations.SetBatchItemDispositionsAsync(
                 setAside,
                 ItemDisposition.Skipped,
                 cancellationToken).ConfigureAwait(false);
-            await RecordAttentionAsync(unitId, setAside, cancellationToken).ConfigureAwait(false);
         }
 
         return new AdmissionResult(!stillPreparing);

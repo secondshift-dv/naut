@@ -176,12 +176,9 @@ public sealed class ImportPreparationCoordinator
         {
             await using var mutation = await _catalog.ImportUnitMutations
                 .EnterAsync(item.UnitId, cancellationToken).ConfigureAwait(false);
-            if (!await HasSiblingTransferAsync(item.UnitId, item.CandidateMediaId.Value, cancellationToken).ConfigureAwait(false))
-            {
-                await _jobWrites.TryCreateImportAdmissionJobAsync(item.UnitId,
-                    CandidatePreparationPlan.CreateTransfer(importItemId, item.CandidateMediaId.Value),
-                    cancellationToken).ConfigureAwait(false);
-            }
+            await _jobWrites.TryCreateImportAdmissionJobAsync(item.UnitId,
+                CandidatePreparationPlan.CreateTransfer(importItemId, item.CandidateMediaId.Value),
+                cancellationToken).ConfigureAwait(false);
         }
 
         return new CandidatePreparationResult(
@@ -191,27 +188,6 @@ public sealed class ImportPreparationCoordinator
             byteLength,
             dupResult.IsExactDuplicate,
             dupResult.Match);
-    }
-
-    private async Task<bool> HasSiblingTransferAsync(Guid unitId, Guid candidateId, CancellationToken cancellationToken)
-    {
-        await using var connection = await _catalog.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        await using var command = connection.CreateCommand();
-        command.CommandText = $"""
-            SELECT EXISTS (
-                SELECT 1 FROM media c
-                JOIN import_items item ON item.import_unit_id = $unit
-                JOIN media a ON a.media_id = item.candidate_media_id AND {ImportReads.ExactMediaIdentitySql}
-                JOIN jobs job ON job.owner_id = a.media_id AND job.owner_type = 'Media' AND job.kind = 'TransferOriginal'
-                WHERE c.media_id = $candidate AND c.media_id <> a.media_id AND c.media_type = a.media_type
-                  AND a.state = 'CANDIDATE' AND item.disposition = 'INCLUDED'
-                  AND (c.media_type <> 'MODEL' OR c.bundle_sha256 IS NOT NULL)
-                  AND job.state NOT IN ('FAILED_TERMINAL', 'CANCELLED')
-            );
-            """;
-        command.Parameters.AddWithValue("$unit", DbGuid.Format(unitId));
-        command.Parameters.AddWithValue("$candidate", DbGuid.Format(candidateId));
-        return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 1;
     }
 
     public async Task RecordTransferredCandidateAsync(
@@ -237,6 +213,12 @@ public sealed class ImportPreparationCoordinator
             throw new InvalidOperationException("Included transfer requires an admitted Candidate item.");
         await _jobWrites.CreateJobAsync(CandidatePreparationPlan.CreateTransfer(
             importItemId, candidateId), cancellationToken).ConfigureAwait(false);
+    }
+
+    internal async Task ScheduleAutomaticTransferAsync(Guid unitId, Guid itemId, Guid candidateId, CancellationToken cancellationToken)
+    {
+        await _jobWrites.TryCreateImportAdmissionJobAsync(unitId,
+            CandidatePreparationPlan.CreateTransfer(itemId, candidateId), cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<string?> SaveModelPackageIdentityAsync(
@@ -357,8 +339,7 @@ public sealed class ImportPreparationCoordinator
                 }
                 else if (item.Sha256 is null || !(await _duplicateDetector.DetectDuplicateAsync(
                              item.Sha256, item.ByteLength ?? -1, item.CandidateMediaId,
-                             item.BundleSha256, cancellationToken).ConfigureAwait(false)).IsLibraryReuseEligible
-                         && !await HasSiblingTransferAsync(unitId, item.CandidateMediaId, cancellationToken).ConfigureAwait(false))
+                             item.BundleSha256, cancellationToken).ConfigureAwait(false)).IsLibraryReuseEligible)
                 {
                     definition = CandidatePreparationPlan.CreateTransfer(item.ImportItemId, item.CandidateMediaId);
                 }
@@ -387,9 +368,23 @@ public sealed class ImportPreparationCoordinator
             """
             SELECT i.import_item_id, i.candidate_media_id, i.source_path, i.source_byte_length,
                    a.sha256, a.byte_length, a.bundle_sha256,
-                   EXISTS (SELECT 1 FROM media active WHERE active.state = 'ACTIVE'
-                       AND active.byte_length = i.source_byte_length AND active.media_id <> a.media_id)
+                   (
+                       EXISTS (SELECT 1 FROM media active WHERE active.state = 'ACTIVE'
+                           AND active.byte_length = i.source_byte_length AND active.media_id <> a.media_id)
+                       OR EXISTS (
+                           SELECT 1 FROM import_units peer JOIN import_items peer_item ON peer_item.import_unit_id = peer.import_unit_id
+                           WHERE peer.import_session_id = own_unit.import_session_id
+                             AND peer.import_unit_id <> own_unit.import_unit_id
+                             AND peer.destination_kind = 'EXISTING_NORMAL' AND own_unit.destination_kind = 'EXISTING_NORMAL'
+                             AND peer.destination_profile_id = own_unit.destination_profile_id
+                             AND json_extract(peer.verification_draft_json, '$.publishWhenReady') = 1
+                             AND json_extract(own_unit.verification_draft_json, '$.publishWhenReady') = 1
+                             AND peer_item.source_byte_length = i.source_byte_length
+                             AND peer_item.disposition = 'INCLUDED'
+                       )
+                   )
             FROM import_items i
+            JOIN import_units own_unit ON own_unit.import_unit_id = i.import_unit_id
             JOIN media a ON a.media_id = i.candidate_media_id
             WHERE i.import_unit_id = $unitId
               AND i.candidate_media_id IS NOT NULL

@@ -708,6 +708,15 @@
     <sys:String x:Key="Import.Detail.Added">{0} 已添加到您的 Vault。</sys:String>
     <sys:String x:Key="Import.Detail.WithDuplicates">{0} · {1} 已在您的 Vault 中</sys:String>
     <sys:String x:Key="Import.Stage.AlreadyInVault">已在您的 Vault 中</sys:String>
+    <sys:String x:Key="Import.Progress.CheckingMedia">正在检查媒体</sys:String>
+    <sys:String x:Key="Import.Progress.Session">批次：已检查 {0} / {1} 项</sys:String>
+    <sys:String x:Key="Import.Outcome.Added">已添加 {0} 项</sys:String>
+    <sys:String x:Key="Import.Outcome.Duplicates">已跳过 {0} 个重复项</sys:String>
+    <sys:String x:Key="Import.Outcome.Reused">已复用 {0} 项</sys:String>
+    <sys:String x:Key="Import.Outcome.Failed">{0} 项失败</sys:String>
+    <sys:String x:Key="Import.Outcome.Cancelled">{0} 项已取消</sys:String>
+    <sys:String x:Key="Import.Outcome.Excluded">{0} 项已排除</sys:String>
+    <sys:String x:Key="Import.Outcome.Pending">{0} 项待处理</sys:String>
     <sys:String x:Key="Import.Detail.AllDuplicatesSkipped">新增 0 项 · 已跳过 {0} 个重复项</sys:String>
     <sys:String x:Key="Import.Detail.DuplicateOnly">已在您的 Vault 中 — 将复用现有媒体，而不会再导入一份副本。</sys:String>
     <sys:String x:Key="Import.ReviewBanner.One">1 条导入已准备好供您审核</sys:String>

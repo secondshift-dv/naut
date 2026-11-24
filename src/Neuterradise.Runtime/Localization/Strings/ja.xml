@@ -708,6 +708,15 @@
     <sys:String x:Key="Import.Detail.Added">{0} が Vault に追加されました。</sys:String>
     <sys:String x:Key="Import.Detail.WithDuplicates">{0} · {1} はすでに Vault にあります</sys:String>
     <sys:String x:Key="Import.Stage.AlreadyInVault">すでに Vault にあります</sys:String>
+    <sys:String x:Key="Import.Progress.CheckingMedia">メディアを確認中</sys:String>
+    <sys:String x:Key="Import.Progress.Session">一括処理: {0} / {1} 件確認済み</sys:String>
+    <sys:String x:Key="Import.Outcome.Added">{0} 件追加</sys:String>
+    <sys:String x:Key="Import.Outcome.Duplicates">重複 {0} 件をスキップ</sys:String>
+    <sys:String x:Key="Import.Outcome.Reused">{0} 件再利用</sys:String>
+    <sys:String x:Key="Import.Outcome.Failed">{0} 件失敗</sys:String>
+    <sys:String x:Key="Import.Outcome.Cancelled">{0} 件キャンセル</sys:String>
+    <sys:String x:Key="Import.Outcome.Excluded">{0} 件除外</sys:String>
+    <sys:String x:Key="Import.Outcome.Pending">{0} 件保留</sys:String>
     <sys:String x:Key="Import.Detail.AllDuplicatesSkipped">新規 0 件 · 重複 {0} 件をスキップ</sys:String>
     <sys:String x:Key="Import.Detail.DuplicateOnly">すでに Vault にあります — 別のコピーをインポートせず、既存のメディアを再利用します。</sys:String>
     <sys:String x:Key="Import.ReviewBanner.One">1 件のインポートがレビューできるようになりました</sys:String>

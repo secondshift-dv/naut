@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Neuterradise.App.SystemServices.Database.Reads;
 using Neuterradise.App.SystemServices.Jobs;
 
 namespace Neuterradise.App.SystemServices.Database.Writes;
@@ -79,6 +80,50 @@ public sealed class JobWrites
 
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return true;
+        }
+
+        // Election and job creation must share the same write transaction. Returning true
+        // here means admission is durably deferred, not that a second transfer was created.
+        // Explicit Include uses CreateJobAsync and does not enter this automatic gate.
+        if (importUnitId is { } admissionUnitId && definition.Kind == "TransferOriginal"
+            && definition.OwnerType == "Media")
+        {
+            await using var duplicateGate = transaction.CreateCommand($"""
+                SELECT EXISTS (
+                    SELECT 1 FROM media c JOIN import_items own_item ON own_item.candidate_media_id = c.media_id
+                    JOIN import_units own_unit ON own_unit.import_unit_id = own_item.import_unit_id
+                    JOIN media a ON a.media_id <> c.media_id AND {ImportReads.ExactMediaIdentitySql}
+                    WHERE c.media_id = $candidate AND own_unit.import_unit_id = $unit
+                      AND own_item.disposition = 'INCLUDED' AND own_item.duplicate_decision IS NULL
+                      AND (({ImportReads.PublishedReuseAuthoritySql}) OR EXISTS (
+                          SELECT 1 FROM import_items peer_item
+                          JOIN import_units peer ON peer.import_unit_id = peer_item.import_unit_id
+                          JOIN jobs j ON j.owner_type = 'Media' AND j.owner_id = a.media_id
+                                     AND j.kind = 'TransferOriginal'
+                          WHERE peer_item.candidate_media_id = a.media_id AND peer_item.disposition = 'INCLUDED'
+                            AND peer_item.duplicate_decision IS NULL
+                            AND j.state NOT IN ('FAILED_TERMINAL','CANCELLED')
+                            AND peer.state NOT IN ('CANCELLED','FAILED_TERMINAL','COMPLETED','COMMITTED','COMMITTED_WITH_CLEANUP_ATTENTION')
+                            AND ((peer.import_unit_id = own_unit.import_unit_id AND a.state = 'CANDIDATE')
+                              OR (peer.import_session_id = own_unit.import_session_id
+                                  AND peer.destination_kind = 'EXISTING_NORMAL'
+                                  AND own_unit.destination_kind = 'EXISTING_NORMAL'
+                                  AND peer.destination_profile_id = own_unit.destination_profile_id
+                                  AND json_extract(peer.verification_draft_json, '$.publishWhenReady') = 1
+                                  AND json_extract(own_unit.verification_draft_json, '$.publishWhenReady') = 1
+                                  AND peer.is_paused = 0 AND peer.state IN ('INTAKE','PREPARING','COMMITTING')
+                                  AND COALESCE(json_array_length(peer.verification_draft_json, '$.attentionItemIds'),0) = 0
+                                  AND a.state IN ('CANDIDATE','ACTIVE')))
+                      ))
+                );
+                """);
+            duplicateGate.Parameters.AddWithValue("$unit", DbGuid.Format(admissionUnitId));
+            duplicateGate.Parameters.AddWithValue("$candidate", DbGuid.Format(definition.OwnerId));
+            if (Convert.ToInt64(await duplicateGate.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 1)
+            {
+                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                return true;
+            }
         }
 
         definition = await ApplyFocusedImportPriorityAsync(transaction, definition, cancellationToken)

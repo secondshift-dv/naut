@@ -602,6 +602,112 @@ public sealed class ImportReads
         return list;
     }
 
+    // A skipped disposition alone is not proof of an exact duplicate. Canonical placement
+    // is not publication. Both the unit and session projection use the same durable evidence.
+    private const string ItemAccountingCtes = """
+        admission_jobs AS (
+            SELECT i.import_item_id,
+                   MAX(CASE WHEN j.kind = 'HashMedia'
+                            AND j.state NOT IN ('SUCCEEDED','FAILED_TERMINAL','CANCELLED') THEN 1 ELSE 0 END) AS hash_pending,
+                   MAX(CASE WHEN j.state IN ('SUCCEEDED','FAILED_TERMINAL','CANCELLED') THEN 1 ELSE 0 END) AS examined,
+                   MAX(CASE WHEN j.state = 'FAILED_TERMINAL' THEN 1 ELSE 0 END) AS failed,
+                   MAX(CASE WHEN j.state = 'CANCELLED' AND COALESCE(j.error_code,'') <> 'OWNER_RETIRED' THEN 1 ELSE 0 END) AS cancelled
+            FROM scoped_units u
+            JOIN import_items i ON i.import_unit_id = u.import_unit_id
+            JOIN jobs j ON j.owner_type = 'Media' AND j.owner_id = i.candidate_media_id
+                         AND j.kind IN ('HashMedia','TransferOriginal')
+            GROUP BY i.import_item_id
+        ),
+        attention_items AS (
+            SELECT DISTINCT u.import_unit_id, lower(attention.value) AS import_item_id
+            FROM scoped_units u
+            JOIN json_each(CASE WHEN json_valid(u.verification_draft_json)
+                                THEN u.verification_draft_json ELSE '{}' END, '$.attentionItemIds') attention
+            WHERE attention.type = 'text'
+        ),
+        item_facts AS (
+            SELECT i.import_item_id, i.import_unit_id,
+                   CASE WHEN COALESCE(j.hash_pending,0) = 0
+                             AND (COALESCE(j.examined,0) = 1
+                                  OR i.disposition IN ('SKIPPED','INVALID','REUSED')
+                                  OR i.source_cleanup_state <> 'SOURCE_PRESENT'
+                                  OR u.state IN ('COMMITTED','COMPLETED','COMMITTED_WITH_CLEANUP_ATTENTION',
+                                                 'FAILED_TERMINAL','CANCELLED'))
+                        THEN 1 ELSE 0 END AS checked,
+                   CASE
+                       WHEN u.state = 'CANCELLED' THEN 'CANCELLED'
+                       WHEN i.disposition = 'INVALID' THEN 'FAILED'
+                       WHEN i.disposition = 'SKIPPED' AND i.duplicate_decision = 'SKIP' THEN 'DUPLICATE'
+                       WHEN i.disposition = 'SKIPPED' AND COALESCE(j.failed,0) = 1 THEN 'FAILED'
+                       WHEN i.disposition = 'SKIPPED' AND COALESCE(j.cancelled,0) = 1 THEN 'CANCELLED'
+                       WHEN i.disposition = 'SKIPPED' AND attention.import_item_id IS NOT NULL THEN 'FAILED'
+                       WHEN i.disposition = 'SKIPPED' THEN 'EXCLUDED'
+                       WHEN u.state IN ('COMMITTED','COMPLETED','COMMITTED_WITH_CLEANUP_ATTENTION')
+                            AND i.source_cleanup_state IN ('LIBRARY_COMMITTED','SOURCE_DELETE_PENDING',
+                                'SOURCE_CONSUMED','SOURCE_DELETE_FAILED','SOURCE_PRESERVED','SOURCE_CHANGED')
+                            AND i.disposition = 'INCLUDED' THEN 'ADDED'
+                       WHEN u.state IN ('COMMITTED','COMPLETED','COMMITTED_WITH_CLEANUP_ATTENTION')
+                            AND i.source_cleanup_state IN ('LIBRARY_COMMITTED','SOURCE_DELETE_PENDING',
+                                'SOURCE_CONSUMED','SOURCE_DELETE_FAILED','SOURCE_PRESERVED','SOURCE_CHANGED')
+                            AND i.disposition = 'REUSED' AND i.reused_media_id IS NOT NULL THEN 'REUSED'
+                       WHEN u.state = 'FAILED_TERMINAL' THEN 'FAILED'
+                       ELSE 'PENDING'
+                   END AS outcome
+            FROM scoped_units u
+            JOIN import_items i ON i.import_unit_id = u.import_unit_id
+            LEFT JOIN admission_jobs j ON j.import_item_id = i.import_item_id
+            LEFT JOIN attention_items attention ON attention.import_unit_id = i.import_unit_id
+                AND attention.import_item_id = lower(i.import_item_id)
+        )
+        """;
+
+    private const string ItemAccountingProjection = """
+        COALESCE(SUM(f.checked),0),
+        COALESCE(SUM(CASE WHEN f.outcome = 'DUPLICATE' THEN 1 ELSE 0 END),0),
+        COALESCE(SUM(CASE WHEN f.outcome = 'FAILED' THEN 1 ELSE 0 END),0),
+        COALESCE(SUM(CASE WHEN f.outcome = 'CANCELLED' THEN 1 ELSE 0 END),0),
+        COALESCE(SUM(CASE WHEN f.outcome = 'EXCLUDED' THEN 1 ELSE 0 END),0),
+        COALESCE(SUM(CASE WHEN f.outcome = 'ADDED' THEN 1 ELSE 0 END),0),
+        COALESCE(SUM(CASE WHEN f.outcome = 'REUSED' THEN 1 ELSE 0 END),0)
+        """;
+
+    private static ImportItemAccounting ReadItemAccounting(SqliteDataReader reader, int start) =>
+        new(reader.GetInt32(start), reader.GetInt32(start + 1), reader.GetInt32(start + 2),
+            reader.GetInt32(start + 3), reader.GetInt32(start + 4), reader.GetInt32(start + 5),
+            reader.GetInt32(start + 6));
+
+    /// <summary>Complete durable session totals, independent of the visible activity-row limit.</summary>
+    public async Task<IReadOnlyDictionary<Guid, ImportSessionAccounting>> ListSessionAccountingAsync(
+        IReadOnlyCollection<Guid> sessionIds, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(sessionIds);
+        var result = new Dictionary<Guid, ImportSessionAccounting>();
+        if (sessionIds.Count == 0) return result;
+        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"""
+            WITH scoped_units AS (
+                SELECT * FROM import_units
+                WHERE import_session_id IN (SELECT value FROM json_each($sessions))
+            ),
+            {ItemAccountingCtes}
+            SELECT u.import_session_id, COUNT(DISTINCT u.import_unit_id), COUNT(f.import_item_id),
+                   {ItemAccountingProjection}
+            FROM scoped_units u LEFT JOIN item_facts f ON f.import_unit_id = u.import_unit_id
+            GROUP BY u.import_session_id;
+            """;
+        command.Parameters.AddWithValue("$sessions",
+            System.Text.Json.JsonSerializer.Serialize(sessionIds.Select(DbGuid.Format)));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var sessionId = DbGuid.Parse(reader.GetString(0));
+            result[sessionId] = new ImportSessionAccounting(sessionId, reader.GetInt32(1),
+                reader.GetInt32(2), ReadItemAccounting(reader, 3));
+        }
+        return result;
+    }
+
     /// <summary>
     /// Import-critical progress for many units in one query: how many admitted media are fully
     /// prepared (all deterministic capabilities terminal) and how many are placed in the library,
@@ -646,8 +752,12 @@ public sealed class ImportReads
 
         command.CommandText =
             $"""
-            WITH eligible_assets AS (
-                SELECT ii.import_unit_id,
+            WITH scoped_units AS (
+                SELECT * FROM import_units WHERE import_unit_id IN ({string.Join(",", names)})
+            ),
+            {ItemAccountingCtes},
+            eligible_assets AS (
+                SELECT ii.import_unit_id, ii.import_item_id,
                        CASE
                            WHEN ii.disposition = 'REUSED' AND ii.reused_media_id IS NOT NULL
                                THEN ii.reused_media_id
@@ -667,8 +777,8 @@ public sealed class ImportReads
                    p.unknown_sequence,
                    COUNT(i.import_item_id),
                    SUM(CASE WHEN i.disposition IN ('INCLUDED','REUSED') THEN 1 ELSE 0 END),
-                   (SELECT COUNT(*) FROM (
-                       SELECT ea2.media_id
+                   (SELECT COALESCE(SUM(prepared_assets.item_count), 0) FROM (
+                       SELECT ea2.media_id, COUNT(DISTINCT ea2.import_item_id) AS item_count
                        FROM eligible_assets ea2
                        JOIN media a2 ON a2.media_id = ea2.media_id
                        LEFT JOIN media_capability_readiness cr2 ON cr2.media_id = ea2.media_id
@@ -677,7 +787,7 @@ public sealed class ImportReads
                        LEFT JOIN jobs capability_job ON capability_job.job_id = cr2.job_id
                        WHERE ea2.import_unit_id = u.import_unit_id
                        GROUP BY ea2.media_id
-                       HAVING COUNT(cr2.capability) >= (
+                       HAVING COUNT(DISTINCT cr2.capability) >= (
                            CASE WHEN u.library_commit_state NOT IN ('DOMAIN_AUTHORITY_COMMITTED','SOURCE_CLEANUP_PENDING','SOURCE_CLEANUP_COMPLETE','TERMINAL')
                                 THEN CASE WHEN a2.media_type = 'VIDEO' THEN $candidateVideoCapabilityCount
                                           WHEN a2.media_type = 'MODEL' THEN $candidateModelCapabilityCount
@@ -694,9 +804,11 @@ public sealed class ImportReads
                    SUM(CASE WHEN i.disposition IN ('INCLUDED','REUSED')
                              AND i.source_cleanup_state <> 'SOURCE_PRESENT' THEN 1 ELSE 0 END),
                    SUM(CASE WHEN i.disposition = 'INVALID' THEN 1 ELSE 0 END),
-                   SUM(CASE WHEN i.disposition = 'REUSED' THEN 1 ELSE 0 END)
-            FROM import_units u
+                   SUM(CASE WHEN i.disposition = 'REUSED' THEN 1 ELSE 0 END),
+                   {ItemAccountingProjection}
+            FROM scoped_units u
             LEFT JOIN import_items i ON i.import_unit_id = u.import_unit_id
+            LEFT JOIN item_facts f ON f.import_item_id = i.import_item_id
             LEFT JOIN profiles p ON p.profile_id = u.destination_profile_id
                 AND (u.commit_operation_id IS NOT NULL OR u.destination_kind <> 'EXISTING_NORMAL'
                      OR (p.kind = 'NORMAL' AND p.visibility = 'PUBLISHED' AND p.trashed_at_ms IS NULL))
@@ -724,7 +836,8 @@ public sealed class ImportReads
                 PreparedItemCount: Int(reader, 6),
                 PlacedItemCount: Int(reader, 7),
                 UnusableItemCount: Int(reader, 8),
-                AlreadyInLibraryCount: Int(reader, 9));
+                AlreadyInLibraryCount: Int(reader, 9),
+                Accounting: ReadItemAccounting(reader, 10));
         }
 
         return result;
@@ -892,7 +1005,13 @@ public sealed class ImportReads
             WHERE u.hidden_from_history = 0
                OR u.state NOT IN ('COMMITTED','COMPLETED','CANCELLED')
             GROUP BY u.import_unit_id
-            ORDER BY u.created_at_ms DESC, u.import_unit_id DESC
+            ORDER BY CASE WHEN u.state IN ('COMMITTED','COMPLETED','CANCELLED')
+                               AND (u.state <> 'CANCELLED' OR u.rollback_settled = 1)
+                               AND SUM(CASE WHEN i.disposition = 'INVALID' THEN 1 ELSE 0 END) = 0
+                               AND COALESCE(json_array_length(CASE WHEN json_valid(u.verification_draft_json)
+                                   THEN u.verification_draft_json ELSE '{}' END, '$.attentionItemIds'), 0) = 0
+                          THEN 1 ELSE 0 END,
+                     u.created_at_ms DESC, u.import_unit_id DESC
             LIMIT $limit;
             """;
         command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 1000));
@@ -938,13 +1057,32 @@ public sealed class ImportReads
     /// whose <c>duplicate_decision</c> is still NULL is a decision the user must make.
     /// </summary>
     internal const string ExactMediaIdentitySql = """
-        a.sha256 = c.sha256 AND a.byte_length = c.byte_length AND (
+        a.media_type = c.media_type AND (c.media_type <> 'MODEL' OR c.bundle_sha256 IS NOT NULL)
+        AND a.sha256 = c.sha256 AND a.byte_length = c.byte_length AND (
             (c.bundle_sha256 IS NULL AND a.bundle_sha256 IS NULL)
             OR (c.bundle_sha256 = a.bundle_sha256
                 AND c.dependency_discovery_state = 'COMPLETE'
                 AND a.dependency_discovery_state = 'COMPLETE'
                 AND c.dependency_status IN ('COMPLETE','SELF_CONTAINED')
                 AND a.dependency_status IN ('COMPLETE','SELF_CONTAINED')))
+        """;
+
+    // An exact fingerprint is not sufficient authority to reuse an unpublished or reserved asset.
+    // All admission and commit paths use this predicate with the reusable media aliased as a.
+    internal const string PublishedReuseAuthoritySql = """
+        a.state = 'ACTIVE' AND a.trashed_at_ms IS NULL AND a.path_state = 'NONE'
+        AND NULLIF(trim(a.current_managed_relative_path), '') IS NOT NULL
+        AND NULLIF(trim(a.current_managed_file_name), '') IS NOT NULL
+        AND EXISTS (
+            SELECT 1 FROM profile_media owner
+            JOIN profiles owner_profile ON owner_profile.profile_id = owner.profile_id
+            WHERE owner.media_id = a.media_id AND owner.relation_type = 'OWNER'
+              AND owner.publication_import_unit_id IS NULL AND owner_profile.visibility = 'PUBLISHED'
+              AND owner_profile.trashed_at_ms IS NULL
+        )
+        AND NOT EXISTS (SELECT 1 FROM import_cancel_media_reservations reservation WHERE reservation.media_id = a.media_id)
+        AND NOT EXISTS (SELECT 1 FROM trash_entries trash WHERE trash.entity_type = 'MEDIA'
+                        AND trash.entity_id = a.media_id AND trash.state IN ('PENDING', 'EXECUTING'))
         """;
 
     public async Task<IReadOnlyList<ImportDuplicateMatch>> ListExactDuplicateMatchesAsync(
@@ -966,7 +1104,7 @@ public sealed class ImportReads
             JOIN media c ON c.media_id = i.candidate_media_id
             JOIN media a ON {ExactMediaIdentitySql}
                          AND a.media_id <> c.media_id
-                         AND a.state IN ('ACTIVE','TRASHED')
+                         AND (a.state = 'TRASHED' OR ({PublishedReuseAuthoritySql}))
             WHERE i.import_unit_id = $unitId
               AND c.sha256 IS NOT NULL
               AND c.byte_length IS NOT NULL

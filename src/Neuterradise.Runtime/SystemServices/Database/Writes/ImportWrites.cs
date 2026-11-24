@@ -571,11 +571,7 @@ public sealed class ImportWrites
             WHERE a.media_id <> c.media_id AND a.media_type = c.media_type AND {ImportReads.ExactMediaIdentitySql}
               AND (c.media_type <> 'MODEL' OR c.bundle_sha256 IS NOT NULL)
               AND owner.relation_type = 'OWNER' AND owner.publication_import_unit_id IS NULL
-              AND a.state = 'ACTIVE' AND a.trashed_at_ms IS NULL AND a.path_state = 'NONE'
-              AND a.current_managed_relative_path IS NOT NULL AND a.current_managed_file_name IS NOT NULL
-              AND NOT EXISTS (SELECT 1 FROM import_cancel_media_reservations reservation WHERE reservation.media_id = a.media_id)
-              AND NOT EXISTS (SELECT 1 FROM trash_entries trash WHERE trash.entity_type = 'MEDIA'
-                              AND trash.entity_id = a.media_id AND trash.state IN ('PENDING', 'EXECUTING'))
+              AND {ImportReads.PublishedReuseAuthoritySql}
         )
         """;
 
@@ -651,7 +647,7 @@ public sealed class ImportWrites
                         SELECT 1 FROM jobs job WHERE job.owner_type = 'Media' AND job.owner_id = c.media_id
                           AND (job.state = 'RUNNING'
                                OR ($op IS NULL AND (job.kind <> 'HashMedia'
-                                   OR job.state NOT IN ('SUCCEEDED', 'CANCELLED', 'FAILED_TERMINAL')))))
+                                   OR job.state <> 'SUCCEEDED'))))
               )
             RETURNING candidate_media_id;
             """);
@@ -1642,80 +1638,68 @@ public sealed class ImportWrites
     /// identity before exact-reuse is allowed.
     /// </summary>
     public async Task<bool> ValidateReuseAuthorityAsync(
-        Guid candidateMediaId,
-        Guid reusedMediaId,
-        CancellationToken cancellationToken = default)
+        Guid candidateMediaId, Guid reusedMediaId, CancellationToken cancellationToken = default)
     {
         EnsureNonEmpty(candidateMediaId, nameof(candidateMediaId));
         EnsureNonEmpty(reusedMediaId, nameof(reusedMediaId));
-        if (candidateMediaId == reusedMediaId)
-        {
-            return false;
-        }
-
-        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken)
-            .ConfigureAwait(false);
+        if (candidateMediaId == reusedMediaId) return false;
+        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
-        command.CommandText =
-            """
-            SELECT candidate.state, candidate.sha256, candidate.byte_length,
-                   candidate.bundle_sha256, candidate.dependency_status,
-                   candidate.dependency_discovery_state,
-                   reused.state, reused.sha256, reused.byte_length,
-                   reused.bundle_sha256, reused.dependency_status,
-                   reused.dependency_discovery_state,
-                   reused.current_managed_relative_path, reused.current_managed_file_name
-            FROM media candidate
-            JOIN media reused ON reused.media_id = $reusedId
-            WHERE candidate.media_id = $candidateId;
+        command.CommandText = $"""
+            SELECT EXISTS (SELECT 1 FROM media c JOIN media a ON a.media_id = $reusedId
+                WHERE c.media_id = $candidateId
+                  AND (c.state = 'CANDIDATE' OR (c.state = 'RETIRED' AND c.retirement_reason = 'DEDUP_REUSED'))
+                  AND {ImportReads.ExactMediaIdentitySql} AND {ImportReads.PublishedReuseAuthoritySql});
             """;
         command.Parameters.AddWithValue("$candidateId", DbGuid.Format(candidateMediaId));
         command.Parameters.AddWithValue("$reusedId", DbGuid.Format(reusedMediaId));
+        return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 1;
+    }
 
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-        {
-            return false;
-        }
-
-        var candidateState = reader.GetString(0);
-        var candidateSha = reader.IsDBNull(1) ? null : reader.GetString(1);
-        var candidateLength = reader.IsDBNull(2) ? (long?)null : reader.GetInt64(2);
-        var candidateBundle = reader.IsDBNull(3) ? null : reader.GetString(3);
-        var candidateDependency = reader.GetString(4);
-        var candidateDiscovery = reader.GetString(5);
-        var reusedState = reader.GetString(6);
-        var reusedSha = reader.IsDBNull(7) ? null : reader.GetString(7);
-        var reusedLength = reader.IsDBNull(8) ? (long?)null : reader.GetInt64(8);
-        var reusedBundle = reader.IsDBNull(9) ? null : reader.GetString(9);
-        var reusedDependency = reader.GetString(10);
-        var reusedDiscovery = reader.GetString(11);
-        var reusedPath = reader.IsDBNull(12) ? null : reader.GetString(12);
-        var reusedName = reader.IsDBNull(13) ? null : reader.GetString(13);
-
-        if (candidateState is not ("CANDIDATE" or "RETIRED")
-            || reusedState != "ACTIVE"
-            || string.IsNullOrWhiteSpace(reusedPath)
-            || string.IsNullOrWhiteSpace(reusedName))
-        {
-            return false;
-        }
-
-        var packageAuthority = candidateBundle is not null || reusedBundle is not null;
-        return packageAuthority
-            ? candidateBundle is not null
-              && reusedBundle is not null
-              && string.Equals(candidateBundle, reusedBundle, StringComparison.Ordinal)
-              && candidateDiscovery == "COMPLETE"
-              && reusedDiscovery == "COMPLETE"
-              && candidateDependency is "COMPLETE" or "SELF_CONTAINED"
-              && reusedDependency is "COMPLETE" or "SELF_CONTAINED"
-            : candidateSha is not null
-              && reusedSha is not null
-              && candidateLength.HasValue
-              && reusedLength.HasValue
-              && candidateLength.Value == reusedLength.Value
-              && string.Equals(candidateSha, reusedSha, StringComparison.Ordinal);
+    // Compare-and-set automatic decisions before a commit journal exists. Explicit Verify
+    // decisions and in-flight workers retain their authority.
+    internal async Task<bool> TryChangeAutomaticReuseAsync(
+        Guid itemId, Guid? previousReuse, Guid? nextReuse, CancellationToken cancellationToken)
+    {
+        if (previousReuse == nextReuse) return false;
+        await using var lease = await _writeCoordinator.EnterAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = CatalogTransaction.Begin(connection);
+        await using var command = transaction.CreateCommand($"""
+            UPDATE import_items AS i
+            SET disposition = CASE WHEN $next IS NULL THEN 'INCLUDED' ELSE 'REUSED' END,
+                duplicate_decision = CASE WHEN $next IS NULL THEN NULL ELSE 'REUSE' END,
+                reused_media_id = $next, updated_at_ms = $now
+            WHERE i.import_item_id = $item
+              AND (($previous IS NULL AND i.disposition = 'INCLUDED' AND i.duplicate_decision IS NULL)
+                OR ($previous IS NOT NULL AND i.disposition = 'REUSED'
+                    AND i.duplicate_decision = 'REUSE' AND i.reused_media_id = $previous))
+              AND EXISTS (
+                SELECT 1 FROM import_units u JOIN media c ON c.media_id = i.candidate_media_id
+                WHERE u.import_unit_id = i.import_unit_id AND u.commit_operation_id IS NULL
+                  AND u.is_paused = 0 AND u.state NOT IN ('CANCELLED','FAILED_TERMINAL','COMMITTED','COMPLETED','COMMITTED_WITH_CLEANUP_ATTENTION')
+                  AND c.state = 'CANDIDATE' AND c.path_state = 'NONE'
+                  AND NOT EXISTS (SELECT 1 FROM json_each(u.verification_draft_json, '$.duplicateDecisions') d
+                                  WHERE lower(json_extract(d.value, '$.importItemId')) = lower(i.import_item_id))
+                  AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.owner_type = 'Media' AND j.owner_id = c.media_id
+                                  AND (j.state = 'RUNNING' OR (j.kind IN ('HashMedia','TransferOriginal')
+                                      AND j.state NOT IN ('SUCCEEDED','FAILED_TERMINAL','CANCELLED'))))
+                  AND ($previous IS NULL OR NOT EXISTS (SELECT 1 FROM media a WHERE a.media_id = $previous
+                            AND {ImportReads.ExactMediaIdentitySql} AND {ImportReads.PublishedReuseAuthoritySql}))
+                  AND ($next IS NULL OR (EXISTS (SELECT 1 FROM media a WHERE a.media_id = $next
+                            AND a.media_id <> c.media_id AND {ImportReads.ExactMediaIdentitySql}
+                            AND {ImportReads.PublishedReuseAuthoritySql})
+                        AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.owner_type = 'Media' AND j.owner_id = c.media_id
+                            AND j.kind = 'HashMedia' AND j.state IN ('FAILED_TERMINAL','CANCELLED'))))
+              );
+            """);
+        command.Parameters.AddWithValue("$item", DbGuid.Format(itemId));
+        command.Parameters.AddWithValue("$previous", previousReuse.HasValue ? (object)DbGuid.Format(previousReuse.Value) : DBNull.Value);
+        command.Parameters.AddWithValue("$next", nextReuse.HasValue ? (object)DbGuid.Format(nextReuse.Value) : DBNull.Value);
+        command.Parameters.AddWithValue("$now", DbTime.Format(_timeProvider.GetUtcNow()));
+        var changed = await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) == 1;
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return changed;
     }
 
     public async Task<bool> RetireCandidateForReuseAsync(
@@ -1893,108 +1877,24 @@ public sealed class ImportWrites
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = CatalogTransaction.Begin(connection);
 
-        await using var read = transaction.CreateCommand(
-            """
-            SELECT candidate.state, candidate.retirement_reason,
-                   candidate.sha256, candidate.byte_length, candidate.bundle_sha256,
-                   candidate.dependency_status, candidate.dependency_discovery_state,
-                   reused.state, reused.sha256, reused.byte_length, reused.bundle_sha256,
-                   reused.dependency_status, reused.dependency_discovery_state,
-                   reused.current_managed_relative_path, reused.current_managed_file_name,
-                   (
-                       EXISTS(
-                           SELECT 1
-                           FROM trash_entries te
-                           WHERE te.entity_type = 'MEDIA'
-                             AND te.entity_id = reused.media_id
-                             AND te.state IN ('PENDING','EXECUTING')
-                       )
-                       OR EXISTS(
-                           SELECT 1
-                           FROM import_cancel_media_reservations reservation
-                           WHERE reservation.media_id = reused.media_id
-                       )
-                   )
-            FROM media candidate
-            JOIN media reused ON reused.media_id = $reusedId
-            WHERE candidate.media_id = $candidateId;
+        await using var read = transaction.CreateCommand($"""
+            SELECT c.state, c.retirement_reason FROM media c
+            JOIN media a ON a.media_id = $reusedId
+            WHERE c.media_id = $candidateId
+              AND {ImportReads.ExactMediaIdentitySql} AND {ImportReads.PublishedReuseAuthoritySql};
             """);
         read.Parameters.AddWithValue("$candidateId", DbGuid.Format(candidateMediaId));
         read.Parameters.AddWithValue("$reusedId", DbGuid.Format(reusedMediaId));
-
         string candidateState;
         string? candidateReason;
-        string? candidateSha;
-        long? candidateLength;
-        string? candidateBundle;
-        string candidateDependency;
-        string candidateDiscovery;
-        string reusedState;
-        string? reusedSha;
-        long? reusedLength;
-        string? reusedBundle;
-        string reusedDependency;
-        string reusedDiscovery;
-        string? reusedPath;
-        string? reusedName;
-        bool reusedTrashReserved;
-
         await using (var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
         {
-            if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            {
-                return false;
-            }
-
+            if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) return false;
             candidateState = reader.GetString(0);
             candidateReason = reader.IsDBNull(1) ? null : reader.GetString(1);
-            candidateSha = reader.IsDBNull(2) ? null : reader.GetString(2);
-            candidateLength = reader.IsDBNull(3) ? null : reader.GetInt64(3);
-            candidateBundle = reader.IsDBNull(4) ? null : reader.GetString(4);
-            candidateDependency = reader.GetString(5);
-            candidateDiscovery = reader.GetString(6);
-            reusedState = reader.GetString(7);
-            reusedSha = reader.IsDBNull(8) ? null : reader.GetString(8);
-            reusedLength = reader.IsDBNull(9) ? null : reader.GetInt64(9);
-            reusedBundle = reader.IsDBNull(10) ? null : reader.GetString(10);
-            reusedDependency = reader.GetString(11);
-            reusedDiscovery = reader.GetString(12);
-            reusedPath = reader.IsDBNull(13) ? null : reader.GetString(13);
-            reusedName = reader.IsDBNull(14) ? null : reader.GetString(14);
-            reusedTrashReserved = reader.GetInt32(15) == 1;
         }
-
-        if (reusedTrashReserved
-            || !string.Equals(reusedState, "ACTIVE", StringComparison.Ordinal)
-            || string.IsNullOrWhiteSpace(reusedPath)
-            || string.IsNullOrWhiteSpace(reusedName))
-        {
+        if (candidateState != "CANDIDATE" && !(candidateState == "RETIRED" && candidateReason == "DEDUP_REUSED"))
             return false;
-        }
-
-        var packageAuthority = candidateBundle is not null || reusedBundle is not null;
-        var identityMatches = packageAuthority
-            ? candidateBundle is not null
-              && reusedBundle is not null
-              && string.Equals(candidateBundle, reusedBundle, StringComparison.Ordinal)
-              && candidateDiscovery == "COMPLETE"
-              && reusedDiscovery == "COMPLETE"
-              && candidateDependency is "COMPLETE" or "SELF_CONTAINED"
-              && reusedDependency is "COMPLETE" or "SELF_CONTAINED"
-            : candidateSha is not null
-              && reusedSha is not null
-              && candidateLength.HasValue
-              && reusedLength.HasValue
-              && candidateLength.Value == reusedLength.Value
-              && string.Equals(candidateSha, reusedSha, StringComparison.Ordinal);
-
-        if (!identityMatches
-            || (candidateState != "CANDIDATE"
-                && !(candidateState == "RETIRED"
-                     && string.Equals(candidateReason, "DEDUP_REUSED", StringComparison.Ordinal))))
-        {
-            return false;
-        }
 
         await using (var destination = transaction.CreateCommand(
             """

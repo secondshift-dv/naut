@@ -306,6 +306,9 @@ public sealed class ImportActivityService : IAsyncDisposable
             var preparationFailures = await _importReads
                 .ListRequiredPreparationFailuresAsync(unitIds, token)
                 .ConfigureAwait(false);
+            var sessionAccounting = await _importReads.ListSessionAccountingAsync(
+                units.Select(unit => unit.SessionId).Distinct().ToArray(), token).ConfigureAwait(false);
+            var representedSessions = new HashSet<Guid>();
             var focusedImportUnitId = await _priorityOperations
                 .GetFocusedImportUnitAsync(token)
                 .ConfigureAwait(false);
@@ -323,6 +326,16 @@ public sealed class ImportActivityService : IAsyncDisposable
                     focusedImportUnitId = null;
                 }
 
+                if (sessionAccounting.TryGetValue(unit.SessionId, out var session)
+                    && session.UnitCount > 1 && representedSessions.Add(unit.SessionId))
+                {
+                    var summary = SurfaceText.Format("Import.Progress.Session", "Batch: {0} / {1} checked",
+                        session.Accounting.CheckedItemCount, session.TotalItemCount);
+                    projected = projected with
+                    {
+                        DetailText = $"{projected.DetailText} · {summary} · {DescribeOutcome(session.Accounting, session.TotalItemCount)}",
+                    };
+                }
                 items.Add(projected);
             }
 
@@ -369,8 +382,9 @@ public sealed class ImportActivityService : IAsyncDisposable
         // publication boundary. After canonical commit, the import is still in preparation and must
         // show as active, not "Done".
         var committed = unit.State.IsUnitCommitted();
+        var accounting = progress?.Accounting;
         var allDuplicatesSkipped = unit.State == ImportUnitState.Completed
-            && unit.TotalItemCount > 0 && unit.SkippedCount == unit.TotalItemCount;
+            && unit.TotalItemCount > 0 && accounting?.DuplicateSkippedCount == unit.TotalItemCount;
         var failed = unit.State is ImportUnitState.FailedRetryable or ImportUnitState.FailedTerminal;
         var cancelled = unit.State == ImportUnitState.Cancelled;
         var cleanupPending = cancelled && unit.RollbackSettled != true;
@@ -385,14 +399,9 @@ public sealed class ImportActivityService : IAsyncDisposable
         var admitted = progress?.AdmittedItemCount ?? unit.IncludedCount;
         var prepared = progress?.PreparedItemCount ?? 0;
         var placed = progress?.PlacedItemCount ?? 0;
-        var alreadyInLibrary = progress?.AlreadyInLibraryCount is > 0
-            ? progress.AlreadyInLibraryCount
-            : unit.ExactDuplicateCount;
-        var duplicateOnly = unit.TotalItemCount > 0
-            && admitted == unit.TotalItemCount
-            && alreadyInLibrary == admitted
-            && (progress?.UnusableItemCount ?? 0) == 0;
-        var setAside = (draft?.AttentionItemIds?.Count ?? 0) + (progress?.UnusableItemCount ?? 0);
+        var checkedCount = progress?.CheckedItemCount ?? 0;
+        var setAside = Math.Max(draft?.AttentionItemIds?.Count ?? 0,
+            accounting?.FailedItemCount ?? progress?.UnusableItemCount ?? 0);
         var attentionCount = setAside + unit.CleanupFailedCount;
         var destinationValid = draft?.Destination.Kind switch
         {
@@ -456,29 +465,43 @@ public sealed class ImportActivityService : IAsyncDisposable
         var timelineStage = stage is ImportActivityStage.Paused or ImportActivityStage.Cancelled or ImportActivityStage.NeedsAttention
             ? committed ? ImportActivityStage.Done : operationalStage
             : stage;
-        var fraction = TimelineProgress(timelineStage, admitted, prepared, placed, unit.TotalItemCount);
-        var duplicateOnlySettled = duplicateOnly
-            && stage is ImportActivityStage.Checking or ImportActivityStage.Saving;
-        var isActive = !duplicateOnlySettled
-            && stage is ImportActivityStage.Reading or ImportActivityStage.Checking or ImportActivityStage.Saving;
+        var checkingIdentity = !unit.LibraryCommitState.HasReachedDomainCommit();
+        var checking = timelineStage == ImportActivityStage.Checking && checkingIdentity
+            && checkedCount < unit.TotalItemCount;
+        var phaseTotal = timelineStage == ImportActivityStage.Checking && checkingIdentity
+            ? unit.TotalItemCount : admitted;
+        var phaseCompleted = timelineStage == ImportActivityStage.Saving ? placed
+            : timelineStage == ImportActivityStage.Reading ? checkedCount
+            : checking ? checkedCount
+            : checkingIdentity ? Math.Clamp(prepared + unit.TotalItemCount - admitted, 0, phaseTotal)
+            : prepared;
+        var fraction = TimelineProgress(timelineStage, checking, checkingIdentity,
+            checkedCount, phaseCompleted, phaseTotal, unit.TotalItemCount);
+        var isActive = stage is ImportActivityStage.Reading or ImportActivityStage.Checking or ImportActivityStage.Saving;
         if (activity is not null)
         {
             isPriority &= isActive;
-            etaText = activity.ObserveEta(unit.UnitId, stage, progress);
+            etaText = activity.ObserveEta(unit.UnitId, stage, checking, phaseTotal, phaseCompleted);
         }
 
-        var progressText = cancelled || duplicateOnlySettled || allDuplicatesSkipped
+        var progressText = cancelled || committed
             ? null
+            : timelineStage == ImportActivityStage.Saving
+                ? DescribeStage(ImportActivityStage.Saving)
             : TimelineProgressText(
                 timelineStage,
-                fraction,
-                admitted,
-                timelineStage == ImportActivityStage.Saving ? placed : prepared,
+                Fraction(phaseCompleted, phaseTotal),
+                phaseTotal,
+                phaseCompleted,
                 stage == ImportActivityStage.Paused
                     ? DescribeStage(ImportActivityStage.Paused)
                     : timelineStage is ImportActivityStage.WaitingForProfile or ImportActivityStage.ReadyToVerify
                         ? SurfaceText.Get("Import.Eta.WaitingForYou", "Waiting for your choice")
-                        : etaText);
+                        : checking
+                            ? etaText ?? SurfaceText.Get("Import.Progress.CheckingMedia", "Checking media")
+                            : timelineStage == ImportActivityStage.Checking
+                                ? SurfaceText.Get("Import.Eta.Preparing", "Preparing remaining media...")
+                                : etaText);
 
         var isTerminal = committed
             || stage == ImportActivityStage.Cancelled
@@ -505,18 +528,15 @@ public sealed class ImportActivityService : IAsyncDisposable
 
         var stageText = cleanupPending
             ? SurfaceText.Get("Import.Stage.CleanupPending", "Cleanup pending")
-            : duplicateOnlySettled || allDuplicatesSkipped
+            : allDuplicatesSkipped
             ? SurfaceText.Get("Import.Stage.AlreadyInVault", "Already in your Vault")
             : DescribeStageWithImportPhase(unit, stage);
         var detailText = cleanupPending
             ? SurfaceText.Get("Import.Detail.CleanupPending", "Import has stopped. Complete cleanup before clearing this entry.")
             : allDuplicatesSkipped
             ? SurfaceText.Format("Import.Detail.AllDuplicatesSkipped", "0 new · {0} duplicates skipped", unit.TotalItemCount)
-            : duplicateOnly
-            && stage is not (ImportActivityStage.Done or ImportActivityStage.NeedsAttention or ImportActivityStage.Cancelled)
-            ? SurfaceText.Get(
-                "Import.Detail.DuplicateOnly",
-                "Already in your Vault — the existing media will be reused instead of importing another copy.")
+            : committed && accounting is not null
+            ? DescribeOutcome(accounting, unit.TotalItemCount)
             : DescribeDetail(unit, stage, destinationName, placed > 0 ? placed : admitted, attentionCount, progress, blockingPreparationFailures);
 
         return new ImportActivityItem(
@@ -525,8 +545,8 @@ public sealed class ImportActivityService : IAsyncDisposable
             stage,
             stageText,
             detailText,
-            cancelled || duplicateOnlySettled || allDuplicatesSkipped || stage is ImportActivityStage.WaitingForProfile or ImportActivityStage.ReadyToVerify ? null : fraction,
-            IsIndeterminate: stage == ImportActivityStage.Reading && unit.TotalItemCount == 0,
+            cancelled || allDuplicatesSkipped || stage is ImportActivityStage.WaitingForProfile or ImportActivityStage.ReadyToVerify ? null : fraction,
+            IsIndeterminate: stage == ImportActivityStage.Saving || (stage == ImportActivityStage.Reading && unit.TotalItemCount == 0),
             IsActive: isActive,
             IsTerminal: isTerminal,
             NeedsAttention: needsAttention,
@@ -546,8 +566,8 @@ public sealed class ImportActivityService : IAsyncDisposable
                         or ImportUnitState.Cancelled)),
             CanPause: isActive && !isReadyToVerify && !unit.IsPaused && unit.State != ImportUnitState.Committing,
             CanPrioritize: isActive && !isReadyToVerify && !isPriority && unit.State != ImportUnitState.Committing,
-            CanStart: unit.IsPaused && !cancelled && !committed && !duplicateOnly,
-            ShowTransportControls: !cancelled && !duplicateOnly
+            CanStart: unit.IsPaused && !cancelled && !committed && !allDuplicatesSkipped,
+            ShowTransportControls: !cancelled && !allDuplicatesSkipped
                 && ((isActive && !isReadyToVerify && unit.State != ImportUnitState.Committing) || unit.IsPaused),
             IsPriority: isPriority,
             TransportTooltip: isPriority
@@ -566,19 +586,45 @@ public sealed class ImportActivityService : IAsyncDisposable
 
     private static double TimelineProgress(
         ImportActivityStage stage,
-        int admitted,
-        int prepared,
-        int placed,
+        bool checking,
+        bool checkingIdentity,
+        int checkedCount,
+        int phaseCompleted,
+        int phaseTotal,
         int totalItemCount) => stage switch
     {
         ImportActivityStage.Reading => totalItemCount > 0 ? 0.10 : 0.02,
         ImportActivityStage.WaitingForProfile => 0.15,
-        ImportActivityStage.Checking => 0.15 + (0.20 * Fraction(prepared, admitted)),
+        ImportActivityStage.Checking when checking => 0.15 + (0.10 * Fraction(checkedCount, totalItemCount)),
+        ImportActivityStage.Checking when checkingIdentity => 0.25 + (0.05 * Fraction(phaseCompleted, phaseTotal)),
+        ImportActivityStage.Checking => 0.30 + (0.05 * Fraction(phaseCompleted, phaseTotal)),
         ImportActivityStage.ReadyToVerify => 0.35,
-        ImportActivityStage.Saving => 0.35 + (0.60 * Fraction(placed, admitted)),
+        ImportActivityStage.Saving => 0.35 + (0.60 * Fraction(phaseCompleted, phaseTotal)),
         ImportActivityStage.Done => 1.0,
         _ => 0,
     };
+
+    private static string DescribeOutcome(ImportItemAccounting accounting, int total)
+    {
+        var parts = new List<string>
+        {
+            SurfaceText.Format("Import.Outcome.Added", "{0} added", accounting.AddedItemCount),
+        };
+        if (accounting.DuplicateSkippedCount > 0)
+            parts.Add(SurfaceText.Format("Import.Outcome.Duplicates", "{0} duplicates skipped", accounting.DuplicateSkippedCount));
+        if (accounting.ReusedItemCount > 0)
+            parts.Add(SurfaceText.Format("Import.Outcome.Reused", "{0} reused", accounting.ReusedItemCount));
+        if (accounting.FailedItemCount > 0)
+            parts.Add(SurfaceText.Format("Import.Outcome.Failed", "{0} failed", accounting.FailedItemCount));
+        if (accounting.CancelledItemCount > 0)
+            parts.Add(SurfaceText.Format("Import.Outcome.Cancelled", "{0} cancelled", accounting.CancelledItemCount));
+        if (accounting.ExcludedItemCount > 0)
+            parts.Add(SurfaceText.Format("Import.Outcome.Excluded", "{0} excluded", accounting.ExcludedItemCount));
+        var pending = Math.Max(0, total - accounting.SettledItemCount);
+        if (pending > 0)
+            parts.Add(SurfaceText.Format("Import.Outcome.Pending", "{0} pending", pending));
+        return string.Join(" · ", parts);
+    }
 
     private static string TimelineProgressText(
         ImportActivityStage stage,
@@ -617,25 +663,18 @@ public sealed class ImportActivityService : IAsyncDisposable
             : SurfaceText.Format("Import.Progress.WithStatus", "{0} · {1}", count, suffix);
     }
 
-    private string? ObserveEta(Guid unitId, ImportActivityStage stage, ImportUnitProgress? progress)
+    private string? ObserveEta(Guid unitId, ImportActivityStage stage, bool checking, int total, int completed)
     {
-        // Item counts do not price heterogeneous image, video and model preparation work.
-        if (stage == ImportActivityStage.Checking)
+        // Estimate only observed checking throughput. Preparation and atomic publication do not
+        // have a uniform per-file cost and must not claim a fabricated remaining time.
+        if (stage != ImportActivityStage.Checking || !checking)
         {
             _etaStates.Remove(unitId);
-            return SurfaceText.Get("Import.Eta.Preparing", "Preparing remaining media...");
-        }
-        if (stage is not (ImportActivityStage.Checking or ImportActivityStage.Saving)
-            || progress is null)
-        {
-            _etaStates.Remove(unitId);
-            return null;
+            return stage == ImportActivityStage.Checking
+                ? SurfaceText.Get("Import.Eta.Preparing", "Preparing remaining media...")
+                : null;
         }
 
-        var total = progress.AdmittedItemCount;
-        var completed = stage == ImportActivityStage.Checking
-            ? progress.PreparedItemCount
-            : progress.PlacedItemCount;
         if (total <= 0 || completed < 0 || completed >= total)
         {
             _etaStates.Remove(unitId);

@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using Neuterradise.App.Media;
 using Neuterradise.App.Profiles;
 using Neuterradise.App.SystemServices.Database;
+using Neuterradise.App.SystemServices.Database.Reads;
 
 namespace Neuterradise.App.Import.Preparation;
 
@@ -95,7 +96,7 @@ public sealed class ExactDuplicateDetector
             .ConfigureAwait(false);
 
         await using var command = connection.CreateCommand();
-        command.CommandText = """
+        command.CommandText = $"""
             SELECT a.media_id, a.state, a.byte_length, a.sha256,
                    a.current_managed_file_name, a.current_managed_relative_path,
                    pa.profile_id, p.display_name,
@@ -106,6 +107,7 @@ public sealed class ExactDuplicateDetector
             LEFT JOIN import_items ii ON ii.candidate_media_id = a.media_id
             WHERE (
                     ($bundleSha IS NOT NULL AND a.bundle_sha256 = $bundleSha
+                        AND a.sha256 = $sha256 AND a.byte_length = $byteLength
                         AND a.dependency_discovery_state = 'COMPLETE'
                         AND a.dependency_status IN ('COMPLETE','SELF_CONTAINED'))
                     OR
@@ -113,7 +115,10 @@ public sealed class ExactDuplicateDetector
                         AND a.sha256 = $sha256 AND a.byte_length = $byteLength)
                   )
               AND a.state IN ($activeState, $candidateState, $trashedState)
-              AND ($excludeMediaId IS NULL OR a.media_id <> $excludeMediaId)
+              AND (a.state <> $activeState OR ({ImportReads.PublishedReuseAuthoritySql}))
+              AND ($excludeMediaId IS NULL OR (a.media_id <> $excludeMediaId AND EXISTS (
+                    SELECT 1 FROM media c WHERE c.media_id = $excludeMediaId
+                    AND {ImportReads.ExactMediaIdentitySql})))
             ORDER BY 
               (CASE 
                  WHEN a.state = $activeState THEN 0 

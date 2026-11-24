@@ -708,6 +708,15 @@
     <sys:String x:Key="Import.Detail.Added">{0}가 Vault에 추가되었습니다.</sys:String>
     <sys:String x:Key="Import.Detail.WithDuplicates">{0} · {1}는 이미 Vault에 있습니다.</sys:String>
     <sys:String x:Key="Import.Stage.AlreadyInVault">이미 Vault에 있습니다</sys:String>
+    <sys:String x:Key="Import.Progress.CheckingMedia">미디어 확인 중</sys:String>
+    <sys:String x:Key="Import.Progress.Session">일괄 처리: {0} / {1}개 확인</sys:String>
+    <sys:String x:Key="Import.Outcome.Added">{0}개 추가</sys:String>
+    <sys:String x:Key="Import.Outcome.Duplicates">중복 {0}개 건너뜀</sys:String>
+    <sys:String x:Key="Import.Outcome.Reused">{0}개 재사용</sys:String>
+    <sys:String x:Key="Import.Outcome.Failed">{0}개 실패</sys:String>
+    <sys:String x:Key="Import.Outcome.Cancelled">{0}개 취소</sys:String>
+    <sys:String x:Key="Import.Outcome.Excluded">{0}개 제외</sys:String>
+    <sys:String x:Key="Import.Outcome.Pending">{0}개 대기</sys:String>
     <sys:String x:Key="Import.Detail.AllDuplicatesSkipped">새 미디어 0개 · 중복 {0}개 건너뜀</sys:String>
     <sys:String x:Key="Import.Detail.DuplicateOnly">이미 Vault에 있습니다 — 다른 사본을 가져오지 않고 기존 미디어를 다시 사용합니다.</sys:String>
     <sys:String x:Key="Import.ReviewBanner.One">검토할 수 있는 가져오기 1개가 준비되었습니다.</sys:String>

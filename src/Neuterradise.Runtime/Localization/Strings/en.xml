@@ -708,6 +708,15 @@
     <sys:String x:Key="Import.Detail.Added">{0} added to your Vault.</sys:String>
     <sys:String x:Key="Import.Detail.WithDuplicates">{0} · {1} already in your Vault</sys:String>
     <sys:String x:Key="Import.Stage.AlreadyInVault">Already in your Vault</sys:String>
+    <sys:String x:Key="Import.Progress.CheckingMedia">Checking media</sys:String>
+    <sys:String x:Key="Import.Progress.Session">Batch: {0} / {1} checked</sys:String>
+    <sys:String x:Key="Import.Outcome.Added">{0} added</sys:String>
+    <sys:String x:Key="Import.Outcome.Duplicates">{0} duplicates skipped</sys:String>
+    <sys:String x:Key="Import.Outcome.Reused">{0} reused</sys:String>
+    <sys:String x:Key="Import.Outcome.Failed">{0} failed</sys:String>
+    <sys:String x:Key="Import.Outcome.Cancelled">{0} cancelled</sys:String>
+    <sys:String x:Key="Import.Outcome.Excluded">{0} excluded</sys:String>
+    <sys:String x:Key="Import.Outcome.Pending">{0} pending</sys:String>
     <sys:String x:Key="Import.Detail.AllDuplicatesSkipped">0 new · {0} duplicates skipped</sys:String>
     <sys:String x:Key="Import.Detail.DuplicateOnly">Already in your Vault — the existing media will be reused instead of importing another copy.</sys:String>
     <sys:String x:Key="Import.ReviewBanner.One">1 import is ready for you to review</sys:String>

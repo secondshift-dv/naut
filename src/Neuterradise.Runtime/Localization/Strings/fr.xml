@@ -708,6 +708,15 @@
     <sys:String x:Key="Import.Detail.Added">{0} ajouté à votre Vault.</sys:String>
     <sys:String x:Key="Import.Detail.WithDuplicates">{0} · {1} déjà dans votre Vault</sys:String>
     <sys:String x:Key="Import.Stage.AlreadyInVault">Déjà dans votre Vault</sys:String>
+    <sys:String x:Key="Import.Progress.CheckingMedia">Vérification des médias</sys:String>
+    <sys:String x:Key="Import.Progress.Session">Lot : {0} / {1} vérifiés</sys:String>
+    <sys:String x:Key="Import.Outcome.Added">{0} ajoutés</sys:String>
+    <sys:String x:Key="Import.Outcome.Duplicates">{0} doublons ignorés</sys:String>
+    <sys:String x:Key="Import.Outcome.Reused">{0} réutilisés</sys:String>
+    <sys:String x:Key="Import.Outcome.Failed">{0} en échec</sys:String>
+    <sys:String x:Key="Import.Outcome.Cancelled">{0} annulés</sys:String>
+    <sys:String x:Key="Import.Outcome.Excluded">{0} exclus</sys:String>
+    <sys:String x:Key="Import.Outcome.Pending">{0} en attente</sys:String>
     <sys:String x:Key="Import.Detail.AllDuplicatesSkipped">0 nouveau · {0} doublons ignorés</sys:String>
     <sys:String x:Key="Import.Detail.DuplicateOnly">Déjà dans votre Vault — le média existant sera réutilisé au lieu d’importer une autre copie.</sys:String>
     <sys:String x:Key="Import.ReviewBanner.One">1 importation est prête à être examinée</sys:String>

@@ -202,7 +202,7 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
     private bool _candidatesLoaded;
     private int _totalCount;
     private int _alreadyInLibraryCount;
-    private int _preparedCount;
+    private int _checkedCount;
     private int _admittedCount;
     private bool _hasPreparationPending;
     private bool _isImporting;
@@ -385,11 +385,11 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
     // Reused Media has no new Candidate work count; Verify follows the required capability gate.
     public string PreparationText => IsVerifyMode
         ? HasPreparationPending ? SurfaceText.Get("Import.Stage.Preparing", "Preparing media") : string.Empty
-        : _totalCount > 0 && _preparedCount < _totalCount
-        ? SurfaceText.Format("ImportWizard.Preparing", "Preparing in the background… {0} of {1} checked. You can carry on.", _preparedCount, _totalCount)
+        : _totalCount > 0 && _checkedCount < _totalCount
+        ? SurfaceText.Format("ImportWizard.Preparing", "Preparing in the background… {0} of {1} checked. You can carry on.", _checkedCount, _totalCount)
         : string.Empty;
 
-    public bool IsPreparing => IsVerifyMode ? !_candidatesLoaded || HasPreparationPending : _totalCount == 0 || _preparedCount < _totalCount;
+    public bool IsPreparing => IsVerifyMode ? !_candidatesLoaded || HasPreparationPending : _totalCount == 0 || _checkedCount < _totalCount;
 
     public ImportDestinationChoice Choice
     {
@@ -1108,7 +1108,7 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
     {
         if (_disposed || progress is null) return;
         _totalCount = progress.TotalItemCount;
-        _preparedCount = progress.PreparedItemCount;
+        _checkedCount = progress.CheckedItemCount;
         _admittedCount = progress.AdmittedItemCount;
         RaisePropertyChanged(nameof(MediaSummaryText));
         RaisePropertyChanged(nameof(TransferText));

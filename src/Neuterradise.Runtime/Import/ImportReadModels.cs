@@ -138,7 +138,29 @@ public sealed record ImportUnitProgress(
     int PreparedItemCount,
     int PlacedItemCount,
     int UnusableItemCount,
-    int AlreadyInLibraryCount);
+    int AlreadyInLibraryCount,
+    ImportItemAccounting? Accounting = null)
+{
+    public int CheckedItemCount => Accounting?.CheckedItemCount
+        ?? Math.Clamp(Math.Max(PreparedItemCount, PlacedItemCount), 0, TotalItemCount);
+}
+
+/// <summary>Mutually exclusive source-item outcomes, independent of storage disposition.</summary>
+public sealed record ImportItemAccounting(
+    int CheckedItemCount,
+    int DuplicateSkippedCount,
+    int FailedItemCount,
+    int CancelledItemCount,
+    int ExcludedItemCount,
+    int AddedItemCount,
+    int ReusedItemCount)
+{
+    public int SettledItemCount => DuplicateSkippedCount + FailedItemCount + CancelledItemCount
+        + ExcludedItemCount + AddedItemCount + ReusedItemCount;
+}
+
+public sealed record ImportSessionAccounting(
+    Guid SessionId, int UnitCount, int TotalItemCount, ImportItemAccounting Accounting);
 
 /// <summary>
 /// Bounded user-facing provenance for a Required media preparation capability that ended in durable failure.

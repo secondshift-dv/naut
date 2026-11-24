@@ -708,6 +708,15 @@
     <sys:String x:Key="Import.Detail.Added">{0} ditambahkan ke Vault Anda.</sys:String>
     <sys:String x:Key="Import.Detail.WithDuplicates">{0} · {1} sudah ada di Vault</sys:String>
     <sys:String x:Key="Import.Stage.AlreadyInVault">Sudah ada di Vault</sys:String>
+    <sys:String x:Key="Import.Progress.CheckingMedia">Memeriksa media</sys:String>
+    <sys:String x:Key="Import.Progress.Session">Batch: {0} / {1} diperiksa</sys:String>
+    <sys:String x:Key="Import.Outcome.Added">{0} ditambahkan</sys:String>
+    <sys:String x:Key="Import.Outcome.Duplicates">{0} duplikat dilewati</sys:String>
+    <sys:String x:Key="Import.Outcome.Reused">{0} digunakan kembali</sys:String>
+    <sys:String x:Key="Import.Outcome.Failed">{0} gagal</sys:String>
+    <sys:String x:Key="Import.Outcome.Cancelled">{0} dibatalkan</sys:String>
+    <sys:String x:Key="Import.Outcome.Excluded">{0} dikecualikan</sys:String>
+    <sys:String x:Key="Import.Outcome.Pending">{0} tertunda</sys:String>
     <sys:String x:Key="Import.Detail.AllDuplicatesSkipped">0 baru · {0} duplikat dilewati</sys:String>
     <sys:String x:Key="Import.Detail.DuplicateOnly">Sudah ada di Vault — media yang ada akan digunakan kembali tanpa mengimpor salinan lain.</sys:String>
     <sys:String x:Key="Import.ReviewBanner.One">1 impor siap Anda tinjau</sys:String>

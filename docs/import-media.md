@@ -21,7 +21,7 @@ Naut does not send every media type through every processor. Depending on the in
 - [local face analysis](face-intelligence.md) for applicable image/video content;
 - durable Figure preparation for [GLB, FBX, OBJ, STL and 3MF models](model-formats.md).
 
-Naut skips exact duplicates already owned by the destination Profile. If every item is a duplicate, the import shows the skipped count and finishes without Review. Identical files in the same batch share one transfer. A duplicate owned by a different Profile retains its original ownership.
+Naut skips exact duplicates already owned by the destination Profile. If every item is a duplicate, the import shows the skipped count and finishes without Review. Identical files in the same batch share one transfer when a valid representative is available. Profile Add media keeps independent publication per item while sharing eligible transfers within its session. A duplicate owned by a different Profile retains its original ownership. Only published managed media with valid ownership can suppress a new transfer.
 
 The import review can suggest presentation media, but **Cover and Banner can always be changed later**.
 
@@ -29,7 +29,7 @@ The import review can suggest presentation media, but **Cover and Banner can alw
 
 After reopening Naut, select **Continue** in Import Activity to restore the saved choices. If the destination is missing or unavailable, select a Profile again before Review. Once Vault placement locks the destination, the batch follows its saved recovery steps.
 
-Import Activity shows elapsed time during **Stage 1 – Preparing media** and Stage 2. The clock stops while preparation is paused or waiting for a retry.
+Import Activity shows elapsed time during **Stage 1 – Preparing media** and Stage 2. The clock stops while preparation is paused or waiting for a retry. Duplicate checking uses the original admitted input total, including direct transfers. Batch summaries distinguish added, reused, duplicate-skipped, failed, cancelled and excluded items. Add media shows session totals without requiring Review for normal imports.
 
 Transfers retain a staged copy and incremental SHA-256, with durable Resume and safe Cancel. Cancel settles an active copy at a checkpoint before cleaning interrupted staging; **Settings → Vault → Vault Health** can help resume, retry or finish interrupted cleanup. The copied originals in the Vault and original files outside the Vault are not silently removed by cancelling.
 
