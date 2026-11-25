@@ -58,10 +58,16 @@ $signaturePath = Join-Path $output 'checksums-signature.json'
 New-UpdatePublisherSignature -ManifestPath (Join-Path $output 'checksums.json') -SignaturePath $signaturePath `
     -ContractPath (Join-Path $repositoryRoot 'release-contract.json') -PrivateKeyPem $signingKey
 $signingKey = $null
+$files += $signaturePath
+$expectedNames = @($source.packs | ForEach-Object { "$($_.slug)-$($_.version).ntpack" }) + @('checksums.json', 'checksums-signature.json')
+$actualNames = @($files | ForEach-Object { [IO.Path]::GetFileName($_) })
+if (@(Compare-Object $expectedNames $actualNames -CaseSensitive).Count -ne 0) {
+    throw 'Signed publication payload is incomplete.'
+}
 function Invoke-GitHubJson([string]$Endpoint, [object]$Body, [string]$Method = 'POST') {
     $inputPath = Join-Path $output 'github-request.json'
     [IO.File]::WriteAllText($inputPath, ($Body | ConvertTo-Json -Depth 20))
-        try { $response = & gh api $Endpoint --method $Method --input $inputPath }
+    try { $response = & gh api $Endpoint --method $Method --input $inputPath }
     finally { Remove-Item -LiteralPath $inputPath -Force }
     if ($LASTEXITCODE -ne 0) { throw "GitHub request failed: $Endpoint" }
     return ($response | ConvertFrom-Json)
@@ -88,6 +94,15 @@ foreach ($file in $files) {
 }
 if ($treeEntries.Count -eq 0) { Write-Host 'PACK_DOWNLOADS_ALREADY_CURRENT=YES'; return }
 $tree = Invoke-GitHubJson 'repos/secondshift-dv/naut/git/trees' @{ base_tree = $baseTree; tree = $treeEntries }
+$publicationTree = & gh api "repos/secondshift-dv/naut/git/trees/$($tree.sha)?recursive=1" | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0 -or $publicationTree.truncated) { throw 'Cannot verify publication tree.' }
+foreach ($file in $files) {
+    $path = 'packs/' + [IO.Path]::GetFileName($file)
+    $expectedBlob = (& git -C $repositoryRoot hash-object --no-filters $file).Trim()
+    if ($LASTEXITCODE -ne 0 -or @($publicationTree.tree | Where-Object { $_.path -ceq $path -and $_.sha -ceq $expectedBlob }).Count -ne 1) {
+        throw "Publication tree does not contain the exact signed payload: $path"
+    }
+}
 $commit = Invoke-GitHubJson 'repos/secondshift-dv/naut/git/commits' @{
     message = "Publish reviewed optional packs from $head"; tree = $tree.sha; parents = @($parent)
 }
