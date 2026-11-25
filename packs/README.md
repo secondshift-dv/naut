@@ -1,6 +1,6 @@
 # Official optional presentation packs
 
-The 4.0.0 source collection requires **Naut v0.0.39 or later** (Presentation Contract 4). At the v0.0.39 release, published downloads remain at 3.0.0 and require **Naut v0.0.29 or later** (Presentation Contract 3). Install 4.0.0 from a source folder until the signed registry and archives are published. See [pack installation and update availability](../docs/pack-collection.md).
+The published 4.0.0 collection requires **Naut v0.0.39 or later** (Presentation Contract 4). Earlier 3.0.0 downloads require **Naut v0.0.29 or later** (Presentation Contract 3). See [installation and signed updates](../docs/pack-collection.md).
 Use the 2.1.0 archive links below for older Naut versions that support the Contract 1 collection.
 
 In **Settings → Presentation → Packs / Advanced**, install the downloaded file.
@@ -15,7 +15,7 @@ Customize and Card layouts in Customize Card. Themes, Typography and Controls ar
 Attention and imports lead the Operations Desk. The separate reconnaissance image, subject and pagination stay grouped on the right on wide layouts.
 The dossier puts identity, overview and related records beside a clipped Banner and an independent Figure. Media and review form the evidence section below.
 
-[Download 3.0.0](https://secondshift-dv.github.io/naut/packs/black-dossier-3.0.0.ntpack) · [Components and setup](black-dossier/README.md) · [2.1.0 archive](https://secondshift-dv.github.io/naut/packs/black-dossier-2.1.0.ntpack)
+[Download 4.0.0](https://secondshift-dv.github.io/naut/packs/black-dossier-4.0.0.ntpack) · [3.0.0 archive](https://secondshift-dv.github.io/naut/packs/black-dossier-3.0.0.ntpack) · [Components and setup](black-dossier/README.md) · [2.1.0 archive](https://secondshift-dv.github.io/naut/packs/black-dossier-2.1.0.ntpack)
 
 ## Nightfall Murim - 4.0.0 source
 
@@ -24,7 +24,7 @@ The dossier puts identity, overview and related records beside a clipped Banner 
 Sect Hall reads top to bottom as an opening scene, a row of disciple portraits, and the record of recent activity.
 A wide ink-cut Banner opens the chronicle. Identity and overview pair with an independent Figure, followed by media and related records.
 
-[Download 3.0.0](https://secondshift-dv.github.io/naut/packs/celestial-3.0.0.ntpack) · [Components and setup](celestial/README.txt) · [2.1.0 archive](https://secondshift-dv.github.io/naut/packs/celestial-2.1.0.ntpack)
+[Download 4.0.0](https://secondshift-dv.github.io/naut/packs/celestial-4.0.0.ntpack) · [3.0.0 archive](https://secondshift-dv.github.io/naut/packs/celestial-3.0.0.ntpack) · [Components and setup](celestial/README.txt) · [2.1.0 archive](https://secondshift-dv.github.io/naut/packs/celestial-2.1.0.ntpack)
 
 ## Voxel Playground - 4.0.0 source
 
@@ -33,7 +33,7 @@ A wide ink-cut Banner opens the chronicle. Identity and overview pair with an in
 Creative Hub puts the projects you can resume first. Below, World Portal sits beside the activity and statistics panels, with a stacked arrangement in a narrow window.
 The Figure is the main work surface on wide layouts, with the project identity and a compact Banner alongside it. Media follows as a shelf of builds.
 
-[Download 3.0.0](https://secondshift-dv.github.io/naut/packs/overworld-expedition-3.0.0.ntpack) · [Components and setup](overworld-expedition/README.md) · [2.1.0 archive](https://secondshift-dv.github.io/naut/packs/overworld-expedition-2.1.0.ntpack)
+[Download 4.0.0](https://secondshift-dv.github.io/naut/packs/overworld-expedition-4.0.0.ntpack) · [3.0.0 archive](https://secondshift-dv.github.io/naut/packs/overworld-expedition-3.0.0.ntpack) · [Components and setup](overworld-expedition/README.md) · [2.1.0 archive](https://secondshift-dv.github.io/naut/packs/overworld-expedition-2.1.0.ntpack)
 
 ## Conceal - 4.0.0 source
 
@@ -42,7 +42,7 @@ The Figure is the main work surface on wide layouts, with the project identity a
 Tracing Index presents a short summary and activity first. The artwork is secondary and the Spotlight omits Cover and Overview.
 The folio puts identity above a narrow Banner and overview. The media index follows, with Figure and review farther down the page.
 
-[Download 3.0.0](https://secondshift-dv.github.io/naut/packs/conceal-3.0.0.ntpack) · [Components and setup](conceal/README.md) · [2.1.0 archive](https://secondshift-dv.github.io/naut/packs/conceal-2.1.0.ntpack)
+[Download 4.0.0](https://secondshift-dv.github.io/naut/packs/conceal-4.0.0.ntpack) · [3.0.0 archive](https://secondshift-dv.github.io/naut/packs/conceal-3.0.0.ntpack) · [Components and setup](conceal/README.md) · [2.1.0 archive](https://secondshift-dv.github.io/naut/packs/conceal-2.1.0.ntpack)
 
 ## Compatibility and attribution
 
@@ -56,5 +56,5 @@ and [Voxel Playground 2.0.0](https://secondshift-dv.github.io/naut/packs/overwor
 
 Original artwork and definitions by **secondshift-dv**, CC BY 4.0. Bundled fonts retain their SIL OFL notices.
 
-[Checksums](https://secondshift-dv.github.io/naut/packs/checksums.json) ·
+[Signed registry](https://secondshift-dv.github.io/naut/packs/checksums.json) · [Signature](https://secondshift-dv.github.io/naut/packs/checksums-signature.json) ·
 [Installation and updates](../docs/pack-collection.md) · [Contribute a pack](../docs/contributing-packs.md)

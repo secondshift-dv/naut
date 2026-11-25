@@ -5,7 +5,7 @@ Packs can customize themes, fonts, controls, Home, Gallery, Profile Cards,
 Profiles, media layouts, spotlight presentation, frames, backdrops and effects.
 They use the existing Presentation Pack contract and contain data/art only.
 
-The 4.0.0 source collection requires Presentation Contract 4 (Naut v0.0.39 or later) and preserves pack and component IDs. At the v0.0.39 release, GitHub Pages still distributes 3.0.0 (Contract 3, Naut v0.0.29 or later) and earlier 2.1.0 archives. To use the 4.0.0 collection before archive publication, install from a source folder as described below.
+The published 4.0.0 collection requires Presentation Contract 4 (Naut v0.0.39 or later) and preserves pack and component IDs. Earlier 3.0.0 (Contract 3, Naut v0.0.29 or later) and 2.1.0 archives remain available.
 
 ## Install and choose
 
@@ -47,7 +47,7 @@ demo. They are separate from application Releases. In-app updates require a sign
 
 ### In-app official updates
 
-**Availability at the v0.0.39 release:** the application supports signed official pack updates, but the Pages registry is still unsigned and the 4.0.0 archives are not yet published. Update checks fail closed until both the signed registry and matching archives are available. Manual installation from the available downloads or source folders remains supported.
+The 4.0.0 collection and its signed registry are available on GitHub Pages. Manual installation from the collection page or source folders remains supported.
 
 Settings → Presentation → Packs / Advanced exposes **Check official pack updates**, per-pack Update and Update all. Checks are explicit, not background polling. Only installed, usable official generations matching a signed predecessor version and directory content hash are offered; local modifications, private packs and standalone assets are excluded. The public Pages registry `checksums.json` must be accompanied by `checksums-signature.json`, signed with the existing pinned update publisher key. Download length and SHA-256, Contract compatibility, manifest identity and exact old/new content hashes are checked before transactional replacement by the existing pack store. Bindings retain their IDs; missing definitions follow the normal fallback policy. A failed replacement preserves the prior generation. The app sends only public registry and archive GET requests.
 

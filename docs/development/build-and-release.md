@@ -15,7 +15,7 @@ The canonical build writes the portable application and verified release inputs 
 
 ## GitHub Actions
 
-**Source Verify** runs on pushes and pull requests to `main`. It checks public hygiene, documentation, workflow policy and all shipped projects. **Build (Manual)** checks the canonical package, updater and release layout. Its Actions artifact is opt-in. **Optional Packs** checks pack sources and their presentation engine dependencies. It uploads generated packs only on manual runs.
+**Source Verify** runs on pushes and pull requests to `main`. It checks public hygiene, documentation, workflow policy and all shipped projects. **Build (Manual)** checks the canonical package, updater and release layout. Its Actions artifact is opt-in. **Optional Packs** validates pack sources and their presentation engine dependencies using read-only CI. Manual dispatch can prepare archives or, with publish=true on public main, invoke the dedicated signing and Pages publication job. Publication checks the exact archive inventory, digests and signature, preserves older downloads, and removes the consumed handoff. Confirm the Pages deployment separately when a rebuild is required.
 
 ## Release authority
 

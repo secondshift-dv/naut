@@ -47,7 +47,7 @@ This validates catalog/manifest identity, assets, the real Naut compiler,
 archive installation, resolved plans, replacement, restart loading and export.
 Official entries require at least two distinct Cover Frame artworks and two
 Backdrops available in both Home and Profile Customize.
-The GitHub pack check uses read-only permissions on fork PRs. It does not publish
+The automatic GitHub pack check uses read-only permissions on fork PRs and pushes. It does not publish
 downloads. Do not commit `.ntpack`/ZIP output, build artifacts or local Vault data.
 
 ## Maintainer acceptance and publication
@@ -67,7 +67,7 @@ pwsh ./scripts/utilities/package-packs.ps1
 pwsh ./scripts/utilities/publish-packs.ps1 -Publish
 ```
 
-Only a maintainer with public repository write access publishes. There is no
+The public Optional Packs workflow also supports explicit manual publication from main (publish=true). The validation job packages without signing credentials; the separate publication job verifies and signs the exact prepared archives and registry using the pinned publisher secret. Confirm the Pages deployment and verify the live signed registry and archive checksums before updating download links. Only a maintainer with public repository write access publishes. There is no
 automatic acceptance or publication from a contributor PR. Accepted sources,
 preview, author credit and notices remain visible in the repository.
 
