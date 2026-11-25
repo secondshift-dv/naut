@@ -71,7 +71,7 @@ Open **Import → Activity / Needs attention** to review exceptional items. A ca
 
 ## Can I use an older Naut build after a Vault schema upgrade?
 
-Naut can upgrade recognized Catalog v1 and v2 Vaults to schema v3, preserving existing collection data. Older builds may reject the upgraded database or be unable to write it safely. To downgrade, restore a complete pre-upgrade Vault backup; do not replace individual catalog files independently. See [Vault compatibility](vault.md#compatibility-and-text-files).
+Naut v0.0.39 upgrades recognized older Vaults to Catalog Schema 4. Older binaries reject catalogs beyond their supported schema. To downgrade, restore a complete pre-upgrade Vault backup; do not replace individual catalog files independently. See [Vault compatibility](vault.md#catalog-compatibility-and-upgrades).
 
 ## Why does a Profile Overview or Private Note report an external edit?
 

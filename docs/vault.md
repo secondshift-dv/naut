@@ -26,15 +26,25 @@ This is why the portable app package and the Vault can be handled separately: re
 
 Use **Settings → Vault** to rename the active Vault or choose a custom icon (PNG, JPEG or WebP, up to 8 MB). Each Vault stores its icon inside its own folder; switching, moving or reopening Vaults restores their individual identities. Resetting the icon affects only that Vault.
 
-## Compatibility and text files
+<a id="compatibility-and-text-files"></a>
 
-Naut v0.0.7 upgrades recognized Catalog Schema v1 Vaults atomically to v2 without resetting existing rows. Older v1 binaries cannot open an upgraded catalog; back up the Vault before upgrading if you may need to downgrade.
+## Catalog compatibility and upgrades
 
-Naut v0.0.9 atomically advances recognized Catalog v1/v2 Vaults to schema v3, preserving existing media identities, Profile selections and Banner membership. Profile manifests use schema 2 while compatible readers still accept schema 1. Older Naut versions cannot safely write an upgraded v3 Catalog. For a downgrade, restore a complete pre-upgrade Vault backup; do not delete or reset the upgraded Catalog.
+Naut v0.0.39 uses Catalog Schema 4. Opening a recognized older Vault automatically applies the necessary migrations in order; each transition commits atomically and preserves existing collection identities, associations and presentation selections. Unknown or incompatible catalogs are rejected, not reset.
+
+| Catalog transition | Introduced in |
+| --- | --- |
+| Schema 1 to 2 | [v0.0.7](releases/v0.0.7.md) |
+| Schema 2 to 3 | [v0.0.9](releases/v0.0.9.md) |
+| Schema 3 to 4 (canonical-original health) | [v0.0.39](releases/v0.0.39.md) |
+
+Profile manifests use schema 2 and retain schema 1 read compatibility; their schema is separate from the catalog.
+
+Close Naut and back up the entire Vault before opening it with a newer version. Older binaries reject catalogs upgraded beyond their supported schema. To downgrade, restore a complete pre-upgrade Vault backup; never delete or reset the catalog to bypass compatibility checks.
+
+## Profile text files
 
 Managed NORMAL Profiles can mirror Overview and Private Note into UTF-8 text files inside the Vault. These files are **plaintext**; anyone with filesystem access can read them. If edited outside Naut, the application asks how to resolve the conflict before adopting or replacing the content. Keep the entire Vault together when backing it up or moving it.
-
-Naut v0.0.39 atomically upgrades recognized catalogs to schema 4. The migration retains existing Media identities, Profile relations and presentation selections. Back up the complete Vault before opening it with the new version. Earlier binaries cannot open schema 4; downgrade requires restoring the complete pre-upgrade Vault.
 
 ## Review original integrity
 

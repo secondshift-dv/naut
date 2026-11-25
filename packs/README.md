@@ -1,6 +1,6 @@
 # Official optional presentation packs
 
-The 4.0.0 source collection requires Presentation Contract 4. Published 3.0.0 downloads require **Naut v0.0.29 or later** (Presentation Contract 3).
+The 4.0.0 source collection requires **Naut v0.0.39 or later** (Presentation Contract 4). At the v0.0.39 release, published downloads remain at 3.0.0 and require **Naut v0.0.29 or later** (Presentation Contract 3). Install 4.0.0 from a source folder until the signed registry and archives are published. See [pack installation and update availability](../docs/pack-collection.md).
 Use the 2.1.0 archive links below for older Naut versions that support the Contract 1 collection.
 
 In **Settings → Presentation → Packs / Advanced**, install the downloaded file.
