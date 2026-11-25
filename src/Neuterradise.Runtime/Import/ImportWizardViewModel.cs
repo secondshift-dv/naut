@@ -23,6 +23,15 @@ public enum ImportWizardStep
     Details = 2,
 }
 
+public enum ReviewResolutionAction
+{
+    RetryPreparation,
+    Remove,
+    ReuseDuplicate,
+    KeepDestination,
+    MoveToRecognizedProfile,
+}
+
 public enum ImportDestinationChoice
 {
     New,
@@ -206,6 +215,7 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
     private int _admittedCount;
     private bool _hasPreparationPending;
     private bool _isImporting;
+    private bool _isReviewResolving;
     private bool _importRequested;
     private bool _publishWhenReady;
     private bool _initialized;
@@ -252,7 +262,7 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
 
         ContinueCommand = new AsyncRelayCommand(ContinueAsync, () => CanContinue, onError: ReportImportFailure);
         ImportCommand = new AsyncRelayCommand(ImportAsync, () => CanImport, onError: ReportImportFailure);
-        CloseCommand = new AsyncRelayCommand(CloseAsync, onError: exception => Trace.TraceWarning("Import overlay close: {0}", exception));
+        CloseCommand = new AsyncRelayCommand(CloseAsync, canExecute: () => !_isReviewResolving, onError: exception => Trace.TraceWarning("Import overlay close: {0}", exception));
         ChooseNewCommand = new RelayCommand(_ => Choice = ImportDestinationChoice.New);
         ChooseExistingCommand = new RelayCommand(_ => Choice = ImportDestinationChoice.Existing);
         UseHintCommand = new RelayCommand(parameter =>
@@ -287,27 +297,17 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         SelectBannerCommand = new RelayCommand(parameter => SelectBanner(parameter as ImportVisualOption, byUser: true));
         ClearCoverCommand = new RelayCommand(_ => SelectCover(null, byUser: true));
         ClearBannerCommand = new RelayCommand(_ => SelectBanner(null, byUser: true));
-        ResolveDuplicateReuseCommand = new AsyncRelayCommand(
-            parameter => parameter is VerificationDuplicateProblem problem ? ResolveDuplicateReuseAsync(problem) : Task.CompletedTask,
-            onError: ReportImportFailure);
-        ResolveDuplicateSkipCommand = new AsyncRelayCommand(
-            parameter => parameter is VerificationDuplicateProblem problem ? ResolveDuplicateSkipAsync(problem) : Task.CompletedTask,
-            onError: ReportImportFailure);
-        KeepCollisionCommand = new AsyncRelayCommand(
-            parameter => parameter is VerificationProfileCollisionProblem problem ? ResolveCollisionAsync(problem, ProfileCollisionAction.KeepDestination) : Task.CompletedTask,
-            onError: ReportImportFailure);
-        MoveCollisionCommand = new AsyncRelayCommand(
-            parameter => parameter is VerificationProfileCollisionProblem problem ? ResolveCollisionAsync(problem, ProfileCollisionAction.MoveToProfile) : Task.CompletedTask,
-            onError: ReportImportFailure);
-        SkipCollisionCommand = new AsyncRelayCommand(
-            parameter => parameter is VerificationProfileCollisionProblem problem ? ResolveCollisionAsync(problem, ProfileCollisionAction.Skip) : Task.CompletedTask,
-            onError: ReportImportFailure);
-        RetryPreparationCommand = new AsyncRelayCommand(
-            parameter => parameter is VerificationPreparationProblem problem ? RetryPreparationAsync(problem) : Task.CompletedTask,
-            onError: ReportImportFailure);
-        RemovePreparationItemCommand = new AsyncRelayCommand(
-            parameter => parameter is VerificationPreparationProblem problem ? SkipReviewItemAsync(problem.ImportItemId) : Task.CompletedTask,
-            onError: ReportImportFailure);
+        ResolveDuplicateReuseCommand = ReviewCommand<VerificationDuplicateProblem>(ReviewResolutionAction.ReuseDuplicate, problem => problem.ImportItemId);
+        ResolveDuplicateSkipCommand = ReviewCommand<VerificationDuplicateProblem>(ReviewResolutionAction.Remove, problem => problem.ImportItemId);
+        KeepCollisionCommand = ReviewCommand<VerificationProfileCollisionProblem>(ReviewResolutionAction.KeepDestination, problem => problem.ImportItemId);
+        MoveCollisionCommand = ReviewCommand<VerificationProfileCollisionProblem>(ReviewResolutionAction.MoveToRecognizedProfile, problem => problem.ImportItemId);
+        SkipCollisionCommand = ReviewCommand<VerificationProfileCollisionProblem>(ReviewResolutionAction.Remove, problem => problem.ImportItemId);
+        RetryPreparationCommand = ReviewCommand<VerificationPreparationProblem>(ReviewResolutionAction.RetryPreparation, problem => problem.ImportItemId);
+        RemovePreparationItemCommand = ReviewCommand<VerificationPreparationProblem>(ReviewResolutionAction.Remove, problem => problem.ImportItemId);
+        ResolveAllReviewCommand = new AsyncRelayCommand(
+            parameter => parameter is ReviewResolutionAction action ? ResolveReviewAsync(action, null) : Task.CompletedTask,
+            parameter => parameter is ReviewResolutionAction && CanResolveReview,
+            ReportImportFailure);
         CreateCategoryCommand = new AsyncRelayCommand(CreateCategoryAsync, onError: ReportImportFailure);
     }
 
@@ -335,6 +335,7 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
     public ICommand SkipCollisionCommand { get; }
     public ICommand RetryPreparationCommand { get; }
     public ICommand RemovePreparationItemCommand { get; }
+    public ICommand ResolveAllReviewCommand { get; }
     public ICommand CreateCategoryCommand { get; }
 
     public bool IsInitialized => _initialized;
@@ -540,6 +541,8 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
     public ObservableCollection<VerificationProfileCollisionProblem> ProfileCollisionProblems { get; } = [];
     public ObservableCollection<VerificationPreparationProblem> PreparationProblems { get; } = [];
     public bool HasPreparationPending => _hasPreparationPending;
+    public bool IsReviewResolving => _isReviewResolving;
+    private bool CanResolveReview => _operations is not null && IsVerifyMode && !_disposed && !_isImporting && !_isReviewResolving;
     public bool HasProblems => DuplicateProblems.Count > 0
         || ProfileCollisionProblems.Count > 0
         || PreparationProblems.Count > 0
@@ -837,7 +840,7 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
     public bool CanContinue => _initialized && IsChooseProfileMode && IsProfileChoiceComplete && !_isImporting && _finalizer is not null;
     public bool CanImport => _initialized && IsVerifyMode && !IsPreparing
         && (_lockedDestination is not null || IsProfileChoiceComplete)
-        && !HasProblems && _admittedCount > 0 && !_isImporting && _publication is not null;
+        && !HasProblems && _admittedCount > 0 && !_isImporting && !_isReviewResolving && _publication is not null;
 
     public bool IsProfileChoiceComplete => _choice switch
     {
@@ -1652,111 +1655,190 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
         NewCategoryName = string.Empty;
     }
 
-    private async Task ResolveDuplicateReuseAsync(VerificationDuplicateProblem problem)
+    private AsyncRelayCommand ReviewCommand<T>(ReviewResolutionAction action, Func<T, Guid> itemId) where T : class =>
+        new(parameter => parameter is T problem ? ResolveReviewAsync(action, itemId(problem)) : Task.CompletedTask,
+            parameter => parameter is T && CanResolveReview, ReportImportFailure);
+
+    private void SetReviewResolving(bool value)
     {
-        if (_operations is null) return;
-        await _operations.ApplyDuplicateDecisionAsync(problem.ImportItemId, DuplicateDecision.Reuse, problem.MatchedMediaId, _lifetime.Token).ConfigureAwait(true);
-        ReplaceDuplicateDecision(new StagedDuplicateDecision(problem.ImportItemId, DuplicateDecisionAction.Reuse));
-        DuplicateProblems.Remove(problem);
-        await PersistCurrentDraftAsync().ConfigureAwait(true);
-        RaiseProblemsChanged();
+        if (!SetProperty(ref _isReviewResolving, value, nameof(IsReviewResolving))) return;
+        foreach (var command in new[] { ResolveDuplicateReuseCommand, ResolveDuplicateSkipCommand, KeepCollisionCommand,
+                     MoveCollisionCommand, SkipCollisionCommand, RetryPreparationCommand, RemovePreparationItemCommand,
+                     ResolveAllReviewCommand, CloseCommand })
+            (command as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+        RaiseValidity();
     }
 
-    private Task ResolveDuplicateSkipAsync(VerificationDuplicateProblem problem) => SkipReviewItemAsync(problem.ImportItemId);
-
-    private async Task SkipReviewItemAsync(Guid itemId)
+    private async Task ResolveReviewAsync(ReviewResolutionAction action, Guid? itemId)
     {
-        if (_operations is null) return;
-        await _operations.ApplyDuplicateDecisionAsync(itemId, DuplicateDecision.Skip, cancellationToken: _lifetime.Token).ConfigureAwait(true);
-        _admittedCount = Math.Max(0, _admittedCount - 1);
-        ReplaceDuplicateDecision(new StagedDuplicateDecision(itemId, DuplicateDecisionAction.Skip));
-        if (_selectedCover?.Cover?.ImportItemId == itemId)
+        if (!CanResolveReview || _operations is null) return;
+        SetReviewResolving(true);
+        ErrorMessage = null;
+        var token = _lifetime.Token;
+        try
+        {
+            var duplicates = DuplicateProblems.ToArray();
+            var collisions = ProfileCollisionProblems.ToArray();
+            var ids = (action switch
+            {
+                ReviewResolutionAction.RetryPreparation => PreparationProblems.Where(problem => !problem.MissingDependencies)
+                    .Select(problem => problem.ImportItemId),
+                ReviewResolutionAction.ReuseDuplicate => duplicates.Select(problem => problem.ImportItemId),
+                ReviewResolutionAction.KeepDestination or ReviewResolutionAction.MoveToRecognizedProfile =>
+                    collisions.Select(problem => problem.ImportItemId),
+                ReviewResolutionAction.Remove => PreparationProblems.Select(problem => problem.ImportItemId)
+                    .Concat(duplicates.Select(problem => problem.ImportItemId))
+                    .Concat(collisions.Select(problem => problem.ImportItemId)),
+                _ => Enumerable.Empty<Guid>(),
+            }).Where(id => itemId is null || itemId == id).ToHashSet();
+            if (ids.Count == 0) return;
+
+            if (action == ReviewResolutionAction.RetryPreparation)
+            {
+                foreach (var id in ids)
+                {
+                    var result = await _operations.RetryRequiredPreparationAsync(UnitId, id, token).ConfigureAwait(true);
+                    if (!result.IsStarted && result.Code != "PREPARATION_ALREADY_RECOVERED")
+                        ErrorMessage = result.UserMessage
+                            ?? SurfaceText.Get("Import.PreparationRetryUnavailable", "Media preparation could not be retried.");
+                }
+                return;
+            }
+
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                var model = await _operations.LoadVerificationReadModelAsync(UnitId, token).ConfigureAwait(true);
+                if (model is null || !model.State.CanCancelUnpublished())
+                    throw new CatalogConcurrencyConflictException("The import is no longer available for Review.");
+
+                var persisted = VerificationDraftV1.FromJson(model.VerificationDraftJson, _timeProvider.GetUtcNow().ToUnixTimeMilliseconds());
+                var current = await _operations.GetGateProblemsAsync(UnitId, BuildDraft(), token).ConfigureAwait(true);
+                var currentDuplicates = current.Duplicates.ToDictionary(problem => problem.ImportItemId);
+                var currentCollisions = current.ProfileCollisions.ToDictionary(problem => problem.ImportItemId);
+                var currentProblems = current.PreparationFailures.Select(problem => problem.ImportItemId)
+                    .Concat(currentDuplicates.Keys).Concat(currentCollisions.Keys).ToHashSet();
+                if (!ids.IsSubsetOf(currentProblems)
+                    || action == ReviewResolutionAction.ReuseDuplicate && duplicates.Where(problem => ids.Contains(problem.ImportItemId))
+                        .Any(problem => !currentDuplicates.TryGetValue(problem.ImportItemId, out var match) || match.MatchedMediaId != problem.MatchedMediaId)
+                    || (action is ReviewResolutionAction.KeepDestination or ReviewResolutionAction.MoveToRecognizedProfile)
+                        && collisions.Where(problem => ids.Contains(problem.ImportItemId))
+                        .Any(problem => !currentCollisions.TryGetValue(problem.ImportItemId, out var match)
+                            || match.CandidateProfileId != problem.CandidateProfileId || match.MediaId != problem.MediaId))
+                    throw new CatalogConcurrencyConflictException("One or more Review items have changed. Refresh and try again.");
+
+                var draft = BuildDraft();
+                var duplicateDecisions = (draft.DuplicateDecisions ?? []).ToDictionary(decision => decision.ImportItemId);
+                var collisionDecisions = (draft.ProfileCollisionDecisions ?? []).ToDictionary(decision => decision.ImportItemId);
+                var changes = new List<VerificationOperations.ReviewItemMutation>(ids.Count);
+                draft = BuildReviewDecisionDraft(action, ids, draft, duplicateDecisions, collisionDecisions,
+                    currentDuplicates, currentCollisions, changes) with
+                {
+                    CurrentStep = Math.Max(model.VerificationStep, draft.CurrentStep),
+                    ImportRequested = persisted.IsImportRequested,
+                    PublishWhenReady = persisted.PublishWhenReady,
+                };
+                try
+                {
+                    await _operations.UpdateReviewDraftAsync(UnitId, draft, model.RowVersion, changes, token).ConfigureAwait(true);
+                }
+                catch (CatalogConcurrencyConflictException) when (attempt < 2)
+                {
+                    continue;
+                }
+
+                ApplyResolvedReviewDraft(action, ids, draft);
+                return;
+            }
+        }
+        finally
+        {
+            try
+            {
+                await RefreshHintsAsync(token).ConfigureAwait(true);
+            }
+            finally
+            {
+                SetReviewResolving(false);
+                ScheduleDraftSave();
+            }
+        }
+    }
+
+    private static VerificationDraftV1 BuildReviewDecisionDraft(
+        ReviewResolutionAction action, HashSet<Guid> ids, VerificationDraftV1 draft,
+        Dictionary<Guid, StagedDuplicateDecision> duplicateDecisions,
+        Dictionary<Guid, StagedProfileCollisionDecision> collisionDecisions,
+        Dictionary<Guid, VerificationDuplicateProblem> currentDuplicates,
+        Dictionary<Guid, VerificationProfileCollisionProblem> currentCollisions,
+        List<VerificationOperations.ReviewItemMutation> changes)
+    {
+        if (action == ReviewResolutionAction.Remove)
+        {
+            foreach (var id in ids)
+            {
+                var isDuplicate = currentDuplicates.ContainsKey(id) || duplicateDecisions.ContainsKey(id);
+                changes.Add(new(id, isDuplicate ? DuplicateDecision.Skip : null));
+                if (isDuplicate) duplicateDecisions[id] = new(id, DuplicateDecisionAction.Skip);
+                collisionDecisions.Remove(id);
+            }
+            var appearance = draft.Appearance;
+            if (appearance.CoverImportItemId is { } cover && ids.Contains(cover))
+                appearance = appearance with { CoverMediaId = null, CoverImportItemId = null, CoverSourceKind = null,
+                    CoverMediaAssetId = null, CoverVideoTimestampMilliseconds = null, CoverIntent = VerificationAppearanceIntent.Unchanged };
+            if (appearance.BannerImportItemId is { } banner && ids.Contains(banner))
+                appearance = appearance with { BannerMediaId = null, BannerImportItemId = null, BannerMediaAssetId = null,
+                    BannerIntent = VerificationAppearanceIntent.Unchanged };
+            draft = draft with
+            {
+                Appearance = appearance,
+                FaceDecisions = draft.FaceDecisions.Where(decision => decision.SourceImportItemId is not { } id || !ids.Contains(id)).ToArray(),
+            };
+        }
+        else if (action == ReviewResolutionAction.ReuseDuplicate)
+        {
+            foreach (var id in ids)
+            {
+                changes.Add(new(id, DuplicateDecision.Reuse, currentDuplicates[id].MatchedMediaId));
+                duplicateDecisions[id] = new(id, DuplicateDecisionAction.Reuse);
+            }
+        }
+        else
+        {
+            foreach (var id in ids)
+            {
+                var move = action == ReviewResolutionAction.MoveToRecognizedProfile;
+                collisionDecisions[id] = new(id, move ? ProfileCollisionAction.MoveToProfile : ProfileCollisionAction.KeepDestination,
+                    move ? currentCollisions[id].CandidateProfileId : null);
+            }
+        }
+
+        return draft with
+        {
+            DuplicateDecisions = duplicateDecisions.Values.ToArray(),
+            ProfileCollisionDecisions = collisionDecisions.Values.ToArray(),
+        };
+    }
+
+    private void ApplyResolvedReviewDraft(ReviewResolutionAction action, HashSet<Guid> ids, VerificationDraftV1 draft)
+    {
+        _duplicateDecisions.Clear();
+        _duplicateDecisions.AddRange(draft.DuplicateDecisions ?? []);
+        _collisionDecisions.Clear();
+        _collisionDecisions.AddRange(draft.ProfileCollisionDecisions ?? []);
+        _faceDecisions = draft.FaceDecisions;
+        if (action != ReviewResolutionAction.Remove) return;
+        if (_selectedCover?.Cover?.ImportItemId is { } cover && ids.Contains(cover))
         {
             SelectCover(null, byUser: true);
             _coverTouched = false;
             _coverIntent = VerificationAppearanceIntent.Unchanged;
         }
-        if (_selectedBanner?.Banner?.ImportItemId == itemId)
+        if (_selectedBanner?.Banner?.ImportItemId is { } banner && ids.Contains(banner))
         {
             SelectBanner(null, byUser: true);
             _bannerTouched = false;
             _bannerIntent = VerificationAppearanceIntent.Unchanged;
         }
-        _collisionDecisions.RemoveAll(decision => decision.ImportItemId == itemId);
-        _faceDecisions = _faceDecisions.Where(decision => decision.SourceImportItemId != itemId).ToArray();
-        if (DuplicateProblems.FirstOrDefault(problem => problem.ImportItemId == itemId) is { } duplicate)
-            DuplicateProblems.Remove(duplicate);
-        if (ProfileCollisionProblems.FirstOrDefault(problem => problem.ImportItemId == itemId) is { } collision)
-            ProfileCollisionProblems.Remove(collision);
-        if (PreparationProblems.FirstOrDefault(problem => problem.ImportItemId == itemId) is { } preparation)
-            PreparationProblems.Remove(preparation);
-        RaiseProblemsChanged();
-        await PersistCurrentDraftAsync().ConfigureAwait(true);
-        SignalHints(HintSection.Progress | HintSection.Review | HintSection.Appearance);
-    }
-
-    private async Task RetryPreparationAsync(VerificationPreparationProblem problem)
-    {
-        if (_operations is null)
-        {
-            return;
-        }
-
-        ErrorMessage = null;
-        var result = await _operations
-            .RetryRequiredPreparationAsync(UnitId, problem.ImportItemId, _lifetime.Token)
-            .ConfigureAwait(true);
-        if (!result.IsStarted)
-        {
-            ErrorMessage = result.UserMessage
-                ?? SurfaceText.Get("Import.PreparationRetryUnavailable", "Media preparation could not be retried.");
-        }
-
-        await RefreshHintsAsync(_lifetime.Token).ConfigureAwait(true);
-    }
-
-    private async Task ResolveCollisionAsync(VerificationProfileCollisionProblem problem, ProfileCollisionAction action)
-    {
-        if (_operations is null) return;
-        var targetProfileId = action == ProfileCollisionAction.MoveToProfile ? problem.CandidateProfileId : (Guid?)null;
-        ReplaceCollisionDecision(new StagedProfileCollisionDecision(problem.ImportItemId, action, targetProfileId));
-        if (action == ProfileCollisionAction.Skip)
-        {
-            var duplicate = DuplicateProblems.FirstOrDefault(existing => existing.ImportItemId == problem.ImportItemId);
-            if (duplicate is not null)
-            {
-                await _operations.ApplyDuplicateDecisionAsync(problem.ImportItemId, DuplicateDecision.Skip, cancellationToken: _lifetime.Token).ConfigureAwait(true);
-                ReplaceDuplicateDecision(new StagedDuplicateDecision(problem.ImportItemId, DuplicateDecisionAction.Skip));
-                DuplicateProblems.Remove(duplicate);
-            }
-            else
-            {
-                await _operations.SetItemDispositionAsync(problem.ImportItemId, ItemDisposition.Skipped, cancellationToken: _lifetime.Token).ConfigureAwait(true);
-            }
-            _admittedCount = Math.Max(0, _admittedCount - 1);
-        }
-
-        ProfileCollisionProblems.Remove(problem);
-        await PersistCurrentDraftAsync().ConfigureAwait(true);
-        RaiseProblemsChanged();
-    }
-
-    private void ReplaceDuplicateDecision(StagedDuplicateDecision decision)
-    {
-        _duplicateDecisions.RemoveAll(existing => existing.ImportItemId == decision.ImportItemId);
-        _duplicateDecisions.Add(decision);
-    }
-
-    private void ReplaceCollisionDecision(StagedProfileCollisionDecision decision)
-    {
-        _collisionDecisions.RemoveAll(existing => existing.ImportItemId == decision.ImportItemId);
-        _collisionDecisions.Add(decision);
-    }
-
-    private void RaiseProblemsChanged()
-    {
-        RaisePropertyChanged(nameof(HasProblems));
-        RaiseValidity();
     }
 
     private void ScheduleDraftSave()
@@ -1793,7 +1875,7 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
             bool clearInvalidConfirmation = false;
             await UiDispatch.InvokeAsync(() =>
             {
-                if (_initialized && !_disposed && !_isImporting)
+                if (_initialized && !_disposed && !_isImporting && !_isReviewResolving)
                 {
                     clearInvalidConfirmation = _invalidConfirmedDraftJson == model.VerificationDraftJson
                         && model.CommitOperationId is null && !model.LibraryCommitState.HasReachedDomainCommit();
@@ -1963,6 +2045,7 @@ public sealed class ImportWizardViewModel : ObservableObject, IDisposable
 
     public async Task CloseAsync()
     {
+        if (_isReviewResolving) return;
         if (_operations is not null && !_isImporting)
         {
             try

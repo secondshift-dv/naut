@@ -57,12 +57,7 @@ public static class IntakeMapper
 
             var isDirectory = Directory.Exists(fullPath);
             var isFile = !isDirectory && File.Exists(fullPath);
-            if (!isDirectory && !isFile)
-            {
-                continue;
-            }
-
-            fullPath = CanonicalizeExistingPathCasing(fullPath);
+            if (isDirectory || isFile) fullPath = CanonicalizeExistingPathCasing(fullPath);
             if (!uniquePaths.Add(fullPath))
             {
                 continue;

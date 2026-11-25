@@ -51,7 +51,7 @@
         }
       ]
     },
-    "surface": {
+    "scene": {
       "type": "columns",
       "columns": [
         "320",

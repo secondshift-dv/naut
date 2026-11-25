@@ -1,4 +1,5 @@
 using System.Text.Json;
+using SkiaSharp;
 
 namespace Neuterradise.App.Presentation;
 
@@ -10,12 +11,28 @@ public sealed record SurfaceNode(string Kind, string? Semantic, double Spacing, 
     public NodeLayout Placement { get; init; } = new();
     public SurfaceNode? Narrow { get; init; }
     public double Breakpoint { get; init; } = 800;
+    public ArtworkPlacement? CanvasPlacement { get; init; }
+    public double CanvasAspect { get; init; } = 1;
+    public string? AssetPath { get; init; }
+    public string? Fill { get; init; }
+    public double Opacity { get; init; } = 1;
+    public SceneMotionPlan? Motion { get; init; }
 
     public bool HasRegion(string id) => Semantic == id || Children.Any(child => child.HasRegion(id));
 }
 
+public sealed record SceneKeyframe(double Time, double X, double Y, double Scale, double Rotation, double Opacity);
+public sealed record SceneMotionPlan(double Seconds, bool Loop, IReadOnlyList<SceneKeyframe> Keyframes);
+
 public sealed record TypographyFace(string Family, string? AssetPath);
-public sealed record TypographyPlan(TypographyFace Display, TypographyFace Heading, TypographyFace Body, TypographyFace Mono);
+public sealed record TypographyPlan(TypographyFace Display, TypographyFace Heading, TypographyFace Body, TypographyFace Mono)
+{
+    public IReadOnlyDictionary<string, TypeStyle> Styles { get; init; } = new Dictionary<string, TypeStyle>();
+}
+
+public sealed record SemanticIconSkin(string Path, string? SelectedPath, double StrokeWidth);
+
+public sealed record NavigationScenePlan(SurfaceNode Scene, string Dock, double Extent, bool Immersive);
 
 public sealed record ControlSkinPlan(double Radius, double BorderWidth, double HorizontalPadding, double VerticalPadding,
     double Height, double ScrollbarWidth, string Fill, string HoverFill, string PressedFill, string Border, string Focus)
@@ -26,6 +43,11 @@ public sealed record ControlSkinPlan(double Radius, double BorderWidth, double H
     public double ThumbWidth { get; init; } = 20;
     public double ThumbHeight { get; init; } = 20;
     public IReadOnlyDictionary<string, ControlSkinPlan> Families { get; init; } = new Dictionary<string, ControlSkinPlan>();
+    public IReadOnlyDictionary<string, SemanticIconSkin> Icons { get; init; } = new Dictionary<string, SemanticIconSkin>();
+    public double? PassiveChipHeight { get; init; }
+    public double? IconButtonSize { get; init; }
+    public string? SelectedFill { get; init; }
+    public NavigationScenePlan? Navigation { get; init; }
     public ControlSkinPlan For(string family) => Families.TryGetValue(family, out var plan) ? plan : this;
 }
 
@@ -38,9 +60,24 @@ public sealed partial class PresentationCompiler
 {
     private static SurfaceNode? CompileSurface(JsonElement spec, SpecContext context, string kind)
     {
-        if (!spec.TryGetProperty("surface", out var root)) return null;
+        var hasScene = spec.TryGetProperty("scene", out var root);
+        if (hasScene)
+        {
+            if (context.ContractVersion < 4)
+                context.Error("scene", "Scene graphs require Presentation Contract 4.");
+            if (spec.TryGetProperty("surface", out _))
+                context.Error("scene", "Declare scene or legacy surface, not both.");
+        }
+        else if (!spec.TryGetProperty("surface", out root)) return null;
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            context.Error("scene", "A composition root must be an object.");
+            return null;
+        }
+        var world = context.ContractVersion >= 4;
         var spotlight = kind == DefinitionKinds.SpotlightStyle;
-        var modular = spotlight || context.Bool(root, "modular", false);
+        var navigation = kind == DefinitionKinds.ControlSkin;
+        var modular = spotlight || navigation || context.Bool(root, "modular", false);
         if (spotlight && context.ContractVersion < 3)
             context.Error("surface", "Independent Spotlight regions require Presentation Contract 3.");
         if (modular && context.ContractVersion < 2)
@@ -49,11 +86,13 @@ public sealed partial class PresentationCompiler
             ? ["featured", "recent", "favorites", "profiles", "activity", "statistics", "attention", "imports", "discovery", "local-navigation"]
             : ["identity", "overview", "related", "faces", "recent-media", "media", "actions", "review", "statistics"];
         if (spotlight) semantics = ["artwork", "identity", "pagination"];
+        if (navigation) semantics = ["vault", "home", "gallery", "import", "settings", "activity", "customize"];
         if (modular && kind == DefinitionKinds.ProfileLayout)
             semantics = [.. semantics, "banner", "cover", "figure"];
 
         var used = new HashSet<string>(StringComparer.Ordinal);
         var count = 0;
+        var animatedCount = 0;
         SurfaceNode? Read(JsonElement node, int depth)
         {
             if (++count > MaxCompositionNodes || depth > MaxCompositionDepth)
@@ -64,6 +103,7 @@ public sealed partial class PresentationCompiler
             string[] types = modular
                 ? ["stack", "grid", "columns", "panel", "overlay", "spacer", "divider", "semantic"]
                 : ["stack", "columns", "panel", "overlay", "spacer", "divider", "semantic"];
+            if (world && modular) types = [.. types, "canvas", "image", "shape"];
             var type = context.Enum(node, "type", types, "stack");
             string? semantic = null;
             if (type == "semantic")
@@ -74,7 +114,7 @@ public sealed partial class PresentationCompiler
             var children = new List<SurfaceNode>();
             if (node.TryGetProperty("children", out var array) && array.ValueKind == JsonValueKind.Array)
             {
-                if (type is "semantic" or "spacer" or "divider")
+                if (type is "semantic" or "spacer" or "divider" or "image" or "shape")
                     context.Error("surface.children", "A leaf region cannot contain children.");
                 foreach (var child in array.EnumerateArray())
                     if (Read(child, depth + 1) is { } parsed) children.Add(parsed);
@@ -87,6 +127,18 @@ public sealed partial class PresentationCompiler
                 || child.Placement.Column + child.Placement.ColumnSpan > columns.Count)))
                 context.Error("surface.grid", "A grid must declare tracks and contain all child placements.");
 
+            if (node.TryGetProperty("position", out _) && (!world || !modular))
+                context.Error("position", "Canvas placement requires a modular Contract 4 surface.");
+            var motion = ReadSceneMotion(node, context, type);
+            if (motion is not null) animatedCount++;
+            if (type == "canvas" && (children.Count == 0 || children.Any(child => child.CanvasPlacement is null)))
+                context.Error("surface.canvas", "Canvas children require explicit normalized position.");
+            if (type != "canvas" && children.Any(child => child.CanvasPlacement is not null))
+                context.Error("surface.position", "Position belongs to a direct canvas child.");
+            // Scrollable collections retain their native scrolling and virtualization boundary.
+            if (type == "canvas" && children.Any(child => child.HasRegion("media") || child.HasRegion("faces")
+                || child.HasRegion("recent-media")))
+                context.Error("surface.canvas", "Scrollable Profile collections belong outside finite canvas stages.");
             var hasSize = node.TryGetProperty("width", out _) || node.TryGetProperty("height", out _);
             if (hasSize && (context.ContractVersion < 3 || !modular))
                 context.Error("surface", "Region dimensions require a modular Presentation Contract 3 surface.");
@@ -95,6 +147,12 @@ public sealed partial class PresentationCompiler
             {
                 Modular = modular,
                 Rows = rows,
+                CanvasPlacement = world && modular ? ReadArtworkPlacement(node, "position", context, 0, canvas: true) : null,
+                CanvasAspect = type == "canvas" ? context.Number(node, "aspect", 1.6, 0.25, 6) : 1,
+                AssetPath = type == "image" ? context.Asset(context.String(node, "asset", ""), PackAssetKind.Image, "surface.image") : null,
+                Fill = type == "shape" ? context.Color(node, "fill", "token:surface2") : null,
+                Opacity = type is "image" or "shape" ? context.Number(node, "opacity", 1, 0, 1) : 1,
+                Motion = motion,
                 Placement = modular ? new NodeLayout(
                     Width: node.TryGetProperty("width", out _) ? context.Number(node, "width", 320, semantic == "figure" ? 200 : 48, 1440) : null,
                     Height: node.TryGetProperty("height", out _) ? context.Number(node, "height", 320, semantic == "figure" ? 240 : 24, 960) : null,
@@ -108,8 +166,12 @@ public sealed partial class PresentationCompiler
         SurfaceNode? ReadArrangement(JsonElement source)
         {
             used.Clear();
+            animatedCount = 0;
             var result = Read(source, 0);
-            string[] required = spotlight ? ["artwork", "identity"] : kind == DefinitionKinds.HomeLayout
+            if (animatedCount > Math.Min(MaxBackdropLayers, context.Definition.Performance.MaxAnimatedLayers))
+                context.Error("scene.motion", "Scene animation exceeds its declared layer budget.");
+            if (result?.CanvasPlacement is not null) context.Error("surface.position", "The arrangement root cannot be a positioned child.");
+            string[] required = navigation ? semantics : spotlight ? ["artwork", "identity"] : kind == DefinitionKinds.HomeLayout
                 ? modular ? ["featured"] : ["featured", "activity", "statistics"]
                 : modular ? ["identity", "media"] : ["identity", "overview", "media", "related", "faces", "actions", "review"];
             foreach (var semantic in required.Where(s => !used.Contains(s)))
@@ -132,6 +194,43 @@ public sealed partial class PresentationCompiler
         };
     }
 
+    private static SceneMotionPlan? ReadSceneMotion(JsonElement node, SpecContext context, string type)
+    {
+        if (!node.TryGetProperty("motion", out var motion)) return null;
+        if (context.ContractVersion < 4 || type is not ("image" or "shape") || motion.ValueKind != JsonValueKind.Object)
+        {
+            context.Error("scene.motion", "Contract 4 motion is limited to decorative image and shape leaves.");
+            return null;
+        }
+        if (!motion.TryGetProperty("keyframes", out var frames) || frames.ValueKind != JsonValueKind.Array
+            || frames.GetArrayLength() is < 2 or > 32)
+        {
+            context.Error("scene.motion", "A timeline requires 2 to 32 keyframes.");
+            return null;
+        }
+        var loop = context.Bool(motion, "loop", false);
+        if (loop && !context.Definition.Performance.ContinuousAnimation)
+            context.Error("scene.motion", "Looping motion requires declared continuousAnimation.");
+        var keyframes = new List<SceneKeyframe>();
+        foreach (var frame in frames.EnumerateArray())
+        {
+            if (frame.ValueKind != JsonValueKind.Object || !frame.TryGetProperty("time", out _))
+            {
+                context.Error("scene.motion", "Each keyframe requires normalized time.");
+                continue;
+            }
+            var time = context.Number(frame, "time", 0, 0, 1);
+            if (keyframes.Count > 0 && time <= keyframes[^1].Time)
+                context.Error("scene.motion", "Keyframe times must strictly increase.");
+            keyframes.Add(new(time, context.Number(frame, "x", 0, -1, 1),
+                context.Number(frame, "y", 0, -1, 1), context.Number(frame, "scale", 1, 0.1, 3),
+                context.Number(frame, "rotation", 0, -720, 720), context.Number(frame, "opacity", 1, 0, 1)));
+        }
+        if (keyframes.Count < 2 || keyframes[0].Time != 0 || keyframes[^1].Time != 1)
+            context.Error("scene.motion", "Timeline endpoints must be 0 and 1.");
+        return new(context.Number(motion, "seconds", 4, 0.25, 120), loop, keyframes);
+    }
+
     private static string ReadIdentityPlacement(JsonElement spec, SpecContext context)
     {
         if (!spec.TryGetProperty("identityPlacement", out _)) return "legacy";
@@ -140,7 +239,7 @@ public sealed partial class PresentationCompiler
         return context.Enum(spec, "identityPlacement", ["beside", "below", "overlay"], "below");
     }
 
-    private static ArtworkPlacement? ReadArtworkPlacement(JsonElement layer, string property, SpecContext context, int order)
+    private static ArtworkPlacement? ReadArtworkPlacement(JsonElement layer, string property, SpecContext context, int order, bool canvas = false)
     {
         if (!layer.TryGetProperty(property, out var value)) return null;
         if (context.ContractVersion < 3 || value.ValueKind != JsonValueKind.Object)
@@ -155,7 +254,7 @@ public sealed partial class PresentationCompiler
             context.Number(value, "height", 1, 0.05, 2),
             context.Enum(value, "horizontal", ["left", "center", "right"], "left"),
             context.Enum(value, "vertical", ["top", "center", "bottom"], "top"),
-            (int)context.Number(value, "order", order, 0, MaxBackdropLayers - 1));
+            (int)context.Number(value, "order", order, 0, canvas ? MaxCompositionNodes - 1 : MaxBackdropLayers - 1));
     }
 
     private static ArtworkPlan? CompileArtwork(JsonElement spec, SpecContext context, string name)
@@ -199,6 +298,8 @@ public sealed partial class PresentationCompiler
 
         var plans = new List<ArtworkLayer>();
         var roles = new HashSet<string>(StringComparer.Ordinal);
+        var banners = new HashSet<int>();
+        var bannerSlots = new HashSet<string>(StringComparer.Ordinal);
         foreach (var layer in layers.EnumerateArray())
         {
             if (layer.ValueKind != JsonValueKind.Object)
@@ -206,13 +307,22 @@ public sealed partial class PresentationCompiler
                 context.Error(name, "An artwork layer must be an object.");
                 continue;
             }
-            var kind = context.Enum(layer, "type", ["artwork", "image", "scrim", "effect"], "artwork");
-            if (kind != "image" && !roles.Add(kind))
+            var kind = context.Enum(layer, "type", context.ContractVersion >= 4
+                ? ["artwork", "image", "scrim", "effect", "banner"] : ["artwork", "image", "scrim", "effect"], "artwork");
+            if (kind is not ("image" or "banner") && !roles.Add(kind))
                 context.Error(name, $"Artwork layer '{kind}' appears more than once.");
             var path = kind == "image" ? context.Asset(context.String(layer, "asset", ""), PackAssetKind.Image, name) : null;
+            var index = kind == "banner" ? (int)context.Number(layer, "sourceIndex", 1, 1, MaxBackdropLayers - 1) : 0;
+            string? slotId = null;
+            if (kind == "banner")
+            {
+                slotId = context.OptionalString(layer, "slotId") ?? $"banner-{index}";
+                if (!banners.Add(index) || !BannerSlotState.IsValidSlotId(slotId) || !bannerSlots.Add(slotId))
+                    context.Error(name, "Additional Banner layers require distinct source indices and valid, distinct slot IDs.");
+            }
             plans.Add(new(kind, path, Rotation(layer),
                 ReadArtworkPlacement(layer, "placement", context, plans.Count),
-                ReadArtworkPlacement(layer, "narrow", context, plans.Count)));
+                ReadArtworkPlacement(layer, "narrow", context, plans.Count), index, slotId));
         }
         if (!roles.Contains("artwork")) context.Error(name, "The artwork layer is required.");
         var groupRotation = Rotation(artwork);
@@ -241,7 +351,34 @@ public sealed partial class PresentationCompiler
                 ? context.Asset(asset.GetString()!, PackAssetKind.Font, name) : null;
             return new(family, path);
         }
-        return new(Face("display", "Segoe UI"), Face("heading", "Segoe UI"), Face("body", "Segoe UI"), Face("mono", "Consolas"));
+        var plan = new TypographyPlan(Face("display", "Segoe UI"), Face("heading", "Segoe UI"), Face("body", "Segoe UI"), Face("mono", "Consolas"));
+        if (!spec.TryGetProperty("styles", out var styles)) return plan;
+        if (context.ContractVersion < 4 || styles.ValueKind != JsonValueKind.Object)
+        {
+            context.Error("styles", "Semantic typography styles require Contract 4.");
+            return plan;
+        }
+        var overrides = new Dictionary<string, TypeStyle>(StringComparer.Ordinal);
+        foreach (var property in styles.EnumerateObject())
+        {
+            if (!TokenAuthority.Foundations.TypeStyles.TryGetValue(property.Name, out var basis)
+                || property.Value.ValueKind != JsonValueKind.Object)
+            {
+                context.Error("styles", $"Unknown or invalid typography style '{property.Name}'.");
+                continue;
+            }
+            var value = property.Value;
+            overrides[property.Name] = basis with
+            {
+                FontRole = context.Enum(value, "font", ["display", "heading", "body", "mono"], basis.FontRole),
+                Size = context.Number(value, "size", basis.Size, 8, 96),
+                Weight = (int)context.Number(value, "weight", basis.Weight, 100, 900),
+                LineHeight = context.Number(value, "lineHeight", basis.LineHeight, 8, 144),
+                ColorRole = context.Color(value, "color", basis.ColorRole.StartsWith("token:") ? basis.ColorRole : "token:" + basis.ColorRole),
+
+            };
+        }
+        return plan with { Styles = overrides };
     }
 
     private static ControlSkinPlan CompileControlSkin(JsonElement spec, SpecContext context)
@@ -253,20 +390,64 @@ public sealed partial class PresentationCompiler
             if (source.ValueKind != JsonValueKind.Object) context.Error("families", "Control families must be an object.");
             else foreach (var property in source.EnumerateObject())
             {
-                if (property.Name is not ("button" or "icon-button" or "chip" or "tab" or "input" or "toggle" or "slider" or "scrollbar"))
+                if (property.Name is not ("button" or "icon-button" or "chip" or "tab" or "input" or "toggle" or "slider" or "scrollbar")
+                    && !(context.ContractVersion >= 4 && property.Name is ("chrome" or "navigation" or "breadcrumb")))
                     context.Error("families", $"Unknown control family '{property.Name}'.");
                 else if (property.Value.ValueKind != JsonValueKind.Object)
                     context.Error("families", "A control family must declare an object.");
                 else families[property.Name] = ReadControlSkin(property.Value, context, fallback);
             }
         }
-        return fallback with { Families = families };
+        var icons = new Dictionary<string, SemanticIconSkin>(StringComparer.Ordinal);
+        if (spec.TryGetProperty("icons", out var iconSource))
+        {
+            if (context.ContractVersion < 4 || iconSource.ValueKind != JsonValueKind.Object)
+                context.Error("icons", "Semantic icon skinning requires Contract 4.");
+            else foreach (var property in iconSource.EnumerateObject())
+            {
+                if (!IconCatalog.IsKnownKey(property.Name) || property.Value.ValueKind != JsonValueKind.Object)
+                {
+                    context.Error("icons", $"Unknown or invalid icon '{property.Name}'.");
+                    continue;
+                }
+                var data = context.String(property.Value, "path", "");
+                var selected = context.OptionalString(property.Value, "selectedPath");
+                if (!ValidIcon(data) || (selected is not null && !ValidIcon(selected)))
+                {
+                    context.Error("icons", $"Invalid or unbounded vector path for '{property.Name}'.");
+                    continue;
+                }
+                icons[property.Name] = new(data, selected, context.Number(property.Value, "strokeWidth", IconCatalog.StrokeWidth, 0.25, 6));
+            }
+        }
+        NavigationScenePlan? navigation = null;
+        if (spec.TryGetProperty("navigation", out var nav))
+        {
+            if (context.ContractVersion < 4 || nav.ValueKind != JsonValueKind.Object)
+                context.Error("navigation", "Navigation scenes require Contract 4.");
+            else if (CompileSurface(nav, context, DefinitionKinds.ControlSkin) is { } scene)
+                navigation = new(scene, context.Enum(nav, "dock", ["top", "bottom", "left", "right"], "top"),
+                    context.Number(nav, "extent", 120, 48, 240), context.Bool(nav, "immersive", false));
+            else context.Error("navigation", "Navigation requires a scene.");
+        }
+        return fallback with { Families = families, Icons = icons, Navigation = navigation };
+
+        static bool ValidIcon(string data)
+        {
+            if (data.Length is < 1 or > 4096 || !IconCatalog.IsSafePathData(data)) return false;
+            using var path = SKPath.ParseSvgPathData(data);
+            if (path is null || path.IsEmpty || path.PointCount > 256) return false;
+            var bounds = path.Bounds;
+            return float.IsFinite(bounds.Left) && float.IsFinite(bounds.Right)
+                && float.IsFinite(bounds.Top) && float.IsFinite(bounds.Bottom)
+                && bounds.Left >= 0 && bounds.Top >= 0 && bounds.Right <= 24 && bounds.Bottom <= 24;
+        }
     }
 
     private static ControlSkinPlan ReadControlSkin(JsonElement spec, SpecContext context, ControlSkinPlan? fallback = null) => new ControlSkinPlan(
-        context.Number(spec, "radius", fallback?.Radius ?? 6, 0, 24), context.Number(spec, "borderWidth", fallback?.BorderWidth ?? 1, 0, 3),
+        context.Number(spec, "radius", fallback?.Radius ?? 6, 0, context.ContractVersion >= 4 ? 64 : 24), context.Number(spec, "borderWidth", fallback?.BorderWidth ?? 1, 0, 3),
         context.Number(spec, "horizontalPadding", fallback?.HorizontalPadding ?? 10, 4, 24), context.Number(spec, "verticalPadding", fallback?.VerticalPadding ?? 5, 2, 12),
-        context.Number(spec, "height", fallback?.Height ?? 30, 24, 48), context.Number(spec, "scrollbarWidth", fallback?.ScrollbarWidth ?? 8, 6, 16),
+        context.Number(spec, "height", fallback?.Height ?? 30, 24, context.ContractVersion >= 4 ? 96 : 48), context.Number(spec, "scrollbarWidth", fallback?.ScrollbarWidth ?? 8, 6, 16),
         context.Color(spec, "fill", fallback?.Fill ?? "token:surface3"), context.Color(spec, "hoverFill", fallback?.HoverFill ?? "token:surfaceHover"),
         context.Color(spec, "pressedFill", fallback?.PressedFill ?? "token:surfacePressed"), context.Color(spec, "border", fallback?.Border ?? "token:borderDefault"),
         context.Color(spec, "focus", fallback?.Focus ?? "token:focus"))
@@ -276,6 +457,12 @@ public sealed partial class PresentationCompiler
         Relief = context.Number(spec, "relief", fallback?.Relief ?? 0, 0, 0.45),
         ThumbWidth = context.Number(spec, "thumbWidth", fallback?.ThumbWidth ?? 20, 12, 28),
         ThumbHeight = context.Number(spec, "thumbHeight", fallback?.ThumbHeight ?? 20, 12, 28),
+        PassiveChipHeight = context.ContractVersion >= 4 && spec.TryGetProperty("passiveHeight", out _)
+            ? context.Number(spec, "passiveHeight", 20, 12, 96) : fallback?.PassiveChipHeight,
+        IconButtonSize = context.ContractVersion >= 4 && spec.TryGetProperty("iconButtonSize", out _)
+            ? context.Number(spec, "iconButtonSize", 28, 24, 96) : fallback?.IconButtonSize,
+        SelectedFill = context.ContractVersion >= 4 && spec.TryGetProperty("selectedFill", out _)
+            ? context.Color(spec, "selectedFill", "token:surfaceSelected") : fallback?.SelectedFill,
     };
 
     private static EffectPlan? CompileEffect(JsonElement spec, SpecContext context)

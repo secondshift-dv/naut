@@ -39,6 +39,19 @@ foreach ($file in $files | Where-Object { $_ } | Sort-Object -Unique) {
         [void]$issues.Add("filename rejected (path SHA-256 prefix $id)")
         continue
     }
+    # Only the reviewed, source-owned example may be committed as an NTPack.
+    # Changed archive bytes require a new content/metadata review; all other packs remain forbidden.
+    if ($file -ceq 'docs/examples/presentation-pack-contract4.ntpack') {
+        $examplePath = Join-Path $root $file
+        if (-not (Test-Path -LiteralPath $examplePath -PathType Leaf)) {
+            [void]$issues.Add("$($file): reviewed example is missing")
+        } elseif ((Get-FileHash -LiteralPath $examplePath -Algorithm SHA256).Hash -ine '4046b5bcd5b994892e961e8745030940cca7b28b247af5c4a5856467d5bf52bc') {
+            [void]$issues.Add("$($file): reviewed example content changed; privacy review required")
+        } else {
+            $checkedFiles++
+        }
+        continue
+    }
     if ($file -match '(?i)(?:^|/)\.env(?:$|\.(?!(?:example|sample|template)$)[^/]+$)|(?:^|/)(?:id_rsa|id_ed25519)(?:$|/)|\.(?:pem|pfx|p12|key|db|sqlite3?|db-wal|db-shm|sqlite3?-(?:wal|shm)|dmp|log|zip|7z|rar|ntpack)$') {
         [void]$issues.Add("$($file): private or generated file type")
         continue

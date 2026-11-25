@@ -528,6 +528,9 @@ public sealed class CardVisual : Grid
             label.Text = badge.Slot == SemanticSlots.ProfileFavorite
                 ? UI.T("Card.Favorite", "Favorite") : data.TextFor(badge.Slot);
             if (badgeIcon is not null)
+            {
+                badgeIcon.Selected = badge.Slot == SemanticSlots.ProfileFavorite ? data.IsFavorite
+                    : badge.Slot == SemanticSlots.ProfileRating && data.Rating is > 0;
                 badgeIcon.ColorToken = badge.Slot switch
                 {
                     SemanticSlots.ProfileFavorite when data.IsFavorite => "danger",
@@ -535,6 +538,7 @@ public sealed class CardVisual : Grid
                     SemanticSlots.ProfileRating when data.Rating is > 0 => "warning",
                     _ => textColor,
                 };
+            }
         });
         if (badge.Slot == SemanticSlots.ProfileFavorite)
         {

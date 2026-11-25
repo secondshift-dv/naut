@@ -2,7 +2,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Neuterradise.App.Media;
 using Neuterradise.App.Presentation;
-using Neuterradise.App.SystemServices.Resources;
 
 namespace Neuterradise.App.Ui;
 
@@ -17,21 +16,19 @@ public sealed class HomePreviewView : Grid
     private readonly CardData? _data;
     private readonly HomeLayoutPlan _layout;
     private readonly SpotlightPlan _spotlight;
-    private readonly string? _videoPath;
 
     public HomePreviewView(
         HomeLayoutPlan layout,
         BackdropPlan backdropPlan,
         SpotlightPlan spotlight,
         CardData? data,
-        bool compact, bool showRecently = true, string? videoPath = null)
+        bool compact, bool showRecently = true)
     {
         _layout = layout;
         _spotlight = spotlight;
         _data = data;
         _compact = compact;
         _showRecently = showRecently;
-        _videoPath = videoPath;
         Background = ThemeRuntime.Current.Brush("canvas");
         IsHitTestVisible = false;
         MinHeight = compact ? 118 : 340;
@@ -209,38 +206,7 @@ public sealed class HomePreviewView : Grid
         var height = image.Height;
         image.Height = double.NaN;
         var media = new Grid { Children = { image } };
-        if (!_compact && _videoPath is { } path)
-        {
-            var video = new SkVideoView { Visibility = Visibility.Collapsed };
-            video.SetPresentation(_data?.BannerTransform ?? MediaTransformState.Default);
-            video.FrameReady += () => video.Visibility = Visibility.Visible;
-            video.Failed += () => video.Visibility = Visibility.Collapsed;
-            media.Children.Add(video);
-            void Update()
-            {
-                var active = media.IsLoaded && !ReducedMotionAuthority.IsReduced
-                    && ResourceGovernor.Shared.IsPrimaryVideoAllowed;
-                video.SetActive(active);
-                if (active) video.Play(path, loop: true);
-                else video.Visibility = Visibility.Collapsed;
-            }
-            void OnChanged(object? sender, EventArgs args) => UiDispatch.Run(Update);
-            media.Loaded += (_, _) =>
-            {
-                ResourceGovernor.Shared.Changed += OnChanged;
-                ReducedMotionAuthority.Changed += OnChanged;
-                Update();
-            };
-            media.Unloaded += (_, _) =>
-            {
-                ResourceGovernor.Shared.Changed -= OnChanged;
-                ReducedMotionAuthority.Changed -= OnChanged;
-                video.Stop();
-                video.Visibility = Visibility.Collapsed;
-            };
-        }
-
-        return new ArtworkCompositionView(plan, role => role switch
+        var artwork = new ArtworkCompositionView(plan, role => role switch
         {
             "artwork" => media,
             "scrim" => HomeSurface.ArtworkScrim(_spotlight.ScrimStrength),
@@ -248,6 +214,7 @@ public sealed class HomePreviewView : Grid
                 () => new PresentationContext("home", data.ProfileId)),
             _ => null,
         }) { Height = height };
+        return artwork;
     }
 
     private FrameworkElement EmptyHero()

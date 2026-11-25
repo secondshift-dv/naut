@@ -129,7 +129,8 @@ public sealed class JobWrites
                                   AND json_extract(own_unit.verification_draft_json, '$.publishWhenReady') = 1
                                   AND peer.is_paused = 0 AND peer.state IN ('INTAKE','PREPARING','COMMITTING')
                                   AND COALESCE(json_array_length(peer.verification_draft_json, '$.attentionItemIds'),0) = 0
-                                  AND a.state IN ('CANDIDATE','ACTIVE')))
+                                  AND a.state IN ('CANDIDATE','ACTIVE')
+                                  AND NOT EXISTS (SELECT 1 FROM canonical_original_health health WHERE health.media_id = a.media_id)))
                       ))
                 );
                 """);

@@ -205,7 +205,17 @@ internal sealed class LivingNavigationButton : Button
         _compact = compact;
         _label.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
         if (_secondaryLabel is not null) _secondaryLabel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        Padding = compact ? new Thickness(8, 0, 8, 0) : _role switch
+        ApplyPadding();
+    }
+
+    private void ApplyPadding()
+    {
+        if (ThemeRuntime.Current.ControlSkin?.Families.GetValueOrDefault("navigation") is { } skin)
+        {
+            Padding = new Thickness(skin.HorizontalPadding, skin.VerticalPadding, skin.HorizontalPadding, skin.VerticalPadding);
+            return;
+        }
+        Padding = _compact ? new Thickness(8, 0, 8, 0) : _role switch
         {
             LivingNavigationRole.Vault => new Thickness(8, 0, 10, 0),
             LivingNavigationRole.Customize => new Thickness(10, 0, 10, 0),
@@ -235,7 +245,11 @@ internal sealed class LivingNavigationButton : Button
     private void ApplyVisualState()
     {
         var theme = ThemeRuntime.Current;
-        CornerRadius = new CornerRadius(theme.Tokens.Number(
+        var skin = theme.ControlSkin?.Families.GetValueOrDefault("navigation");
+        Height = skin is null ? theme.Tokens.Number(_role is LivingNavigationRole.Vault ? "chromeHeight" : "topNavHeight", 40) - 4
+            : Math.Max(skin.Height, 28 + 2 * skin.VerticalPadding);
+        ApplyPadding();
+        CornerRadius = new CornerRadius(skin?.Radius ?? theme.Tokens.Number(
             _role is LivingNavigationRole.Vault ? "radiusHero" : "navCornerRadius", _role is LivingNavigationRole.Vault ? 18 : 6));
         foreach (var bubble in _bubbles)
         {
@@ -278,6 +292,13 @@ internal sealed class LivingNavigationButton : Button
                 selected ? Math.Max(outline, theme.Tokens.Number("navIndicatorHeight", 0)) : 0);
         }
 
+        if (skin is not null)
+        {
+            Background = theme.ControlFill(skin, selected ? skin.SelectedFill ?? "token:navSelectedBackground" : hover ? skin.HoverFill : skin.Fill);
+            BorderBrush = theme.Brush(selected ? skin.Focus : skin.Border);
+            BorderThickness = ThemeRuntime.ControlEdge(skin);
+        }
+        _baseIcon.Selected = _detailIcon.Selected = selected;
         _baseIcon.ColorToken = selected ? "accent" : "textSecondary";
         _detailIcon.ColorToken = selected || hover ? "accent" : "textMuted";
         _label.Foreground = theme.Brush(_role is LivingNavigationRole.Vault

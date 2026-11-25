@@ -528,6 +528,19 @@ public sealed class ManagedMoveExecutor
             }
             else
             {
+                // Package dependencies must remain within their declared source directory.
+                try
+                {
+                    var expectedSource = RootPathRules.ResolveContainedPath(primaryDir, primaryDir,
+                        c.ComponentRelativePath, nameof(c.ComponentRelativePath));
+                    if (!string.Equals(Path.GetFullPath(compSourcePath), expectedSource, StringComparison.OrdinalIgnoreCase))
+                        return new StorageOperationResult(StorageOperationStatus.PathOutsideVault);
+                    RootPathRules.RejectExistingReparsePoints(Path.GetPathRoot(expectedSource)!, expectedSource);
+                }
+                catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException)
+                {
+                    return new StorageOperationResult(StorageOperationStatus.PathOutsideVault);
+                }
                 if (!File.Exists(compSourcePath))
                     return new StorageOperationResult(StorageOperationStatus.SourceMissing,
                         SafeErrorDetail: $"Model component source '{c.ComponentRelativePath}' does not exist.");
@@ -652,6 +665,8 @@ public sealed class ManagedMoveExecutor
                 FileShare.Read,
                 _copyBufferSize,
                 FileOptions.Asynchronous | FileOptions.SequentialScan);
+            if (!SourceIdentityHelper.MatchesOpenedPath(source.SafeFileHandle, sourcePath))
+                throw new IOException("The opened package dependency resolves outside its declared path.");
             await using var destination = new FileStream(
                 stagingPath,
                 FileMode.CreateNew,

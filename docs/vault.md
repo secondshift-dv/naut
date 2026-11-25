@@ -34,6 +34,14 @@ Naut v0.0.9 atomically advances recognized Catalog v1/v2 Vaults to schema v3, pr
 
 Managed NORMAL Profiles can mirror Overview and Private Note into UTF-8 text files inside the Vault. These files are **plaintext**; anyone with filesystem access can read them. If edited outside Naut, the application asks how to resolve the conflict before adopting or replacing the content. Keep the entire Vault together when backing it up or moving it.
 
+Naut v0.0.39 atomically upgrades recognized catalogs to schema 4. The migration retains existing Media identities, Profile relations and presentation selections. Back up the complete Vault before opening it with the new version. Earlier binaries cannot open schema 4; downgrade requires restoring the complete pre-upgrade Vault.
+
+## Review original integrity
+
+In **Settings > Vault > Vault Health**, Standard checks placement and file length; Deep also verifies SHA-256, complete model packages, SQLite integrity and foreign keys. A scan is diagnostic. Confirm an original-integrity reconciliation to record missing or mismatched originals in the catalog and exclude them from exact duplicate reuse. A recorded exclusion persists across restarts. Unrecorded originals are not certified healthy.
+
+When available, choose Restore original to supply a matching source file (or model-package folder). Naut verifies the original fingerprint and preserves both the selected source and any displaced damaged bytes. It can also reconcile an unambiguous verified canonical placement. These actions preserve Media identity, associations and appearance. Known invalid originals must be recovered or reverified before new Trash operations. Do not delete the catalog or reset its fingerprints to repair corruption.
+
 ## Review Profile text findings
 
 Run **Check Vault** in **Settings → Vault → Vault Health** to identify the Profile and file associated with each text finding. **Open Profile** takes you to that Profile, where **Review changed text files** lets you inspect the file, restore catalog text, or review a pending imported overview as appropriate.

@@ -11,7 +11,6 @@ public static class HealthFindingCode
 
     public const string ProfileFolderNameMismatch = "PROFILE_FOLDER_NAME_MISMATCH";
 
-    public const string ManagedFileNameMismatch = "MANAGED_FILE_NAME_MISMATCH";
 
     public const string ManagedPathMismatch = "MANAGED_PATH_MISMATCH";
 
@@ -40,6 +39,14 @@ public static class HealthFindingCode
     public const string SourceChanged = "SOURCE_CHANGED";
 
     public const string ContentMismatch = "CONTENT_MISMATCH";
+    public const string CanonicalPlacementStale = "CANONICAL_PLACEMENT_STALE";
+    public const string CanonicalOriginalMissing = "CANONICAL_ORIGINAL_MISSING";
+    public const string CanonicalOriginalMismatch = "CANONICAL_ORIGINAL_MISMATCH";
+    public const string CanonicalOriginalReverify = "CANONICAL_ORIGINAL_REVERIFY";
+    public const string CanonicalOriginalRepairPending = "CANONICAL_ORIGINAL_REPAIR_PENDING";
+    public const string CanonicalOriginalUnreadable = "CANONICAL_ORIGINAL_UNREADABLE";
+    public const string SqliteStructuralIntegrity = "SQLITE_STRUCTURAL_INTEGRITY";
+    public const string SqliteForeignKeyIntegrity = "SQLITE_FOREIGN_KEY_INTEGRITY";
 
     public const string OwnerCountInvalid = "OWNER_COUNT_INVALID";
 

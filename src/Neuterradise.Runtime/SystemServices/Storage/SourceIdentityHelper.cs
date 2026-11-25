@@ -7,9 +7,8 @@ using Microsoft.Win32.SafeHandles;
 namespace Neuterradise.App.SystemServices.Storage;
 
 /// <summary>
-/// Windows file-object identity used for transfer resume and destructive source cleanup.
-/// A pathname, timestamp, hash, or length is not an object identity; destructive cleanup therefore
-/// requires the volume serial + file index obtained from the same open handle that is deleted.
+/// Windows file-object identity used for intake, hashing, and transfer resume.
+/// The volume serial and file index distinguish a replacement from the admitted source.
 /// </summary>
 public static class SourceIdentityHelper
 {
@@ -29,9 +28,7 @@ public static class SourceIdentityHelper
                 FileAccess.Read,
                 FileShare.ReadWrite | FileShare.Delete);
 
-            return TryReadIdentity(handle, fullPath, out var identity)
-                ? JsonSerializer.Serialize(identity, SourceFileIdentityContext.Default.SourceFileIdentity)
-                : null;
+            return ReadIdentity(handle, fullPath) is { } identity ? SerializeIdentity(identity) : null;
         }
         catch
         {
@@ -39,45 +36,32 @@ public static class SourceIdentityHelper
         }
     }
 
-    public static bool TryOpenForVerifiedDelete(
-        string filePath,
-        out SafeFileHandle? handle,
-        out int win32Error)
-    {
-        handle = null;
-        win32Error = 0;
-        if (!OperatingSystem.IsWindows())
-        {
-            return false;
-        }
+    internal static SourceFileIdentity? ReadIdentity(SafeFileHandle handle, string path) =>
+        OperatingSystem.IsWindows() && !handle.IsInvalid
+            && TryReadIdentity(handle, Path.GetFullPath(path), out var identity) ? identity : null;
 
+    internal static string SerializeIdentity(SourceFileIdentity identity) =>
+        JsonSerializer.Serialize(identity, SourceFileIdentityContext.Default.SourceFileIdentity);
+
+    internal static bool SameIdentity(string? first, string? second)
+    {
+        if (first is null || second is null) return false;
         try
         {
-            var fullPath = Path.GetFullPath(filePath);
-            var opened = CreateFileW(
-                fullPath,
-                GenericRead | DeleteAccess,
-                FileShareRead | FileShareDelete,
-                IntPtr.Zero,
-                OpenExisting,
-                FileAttributeNormal,
-                IntPtr.Zero);
-
-            if (opened.IsInvalid)
-            {
-                win32Error = Marshal.GetLastWin32Error();
-                opened.Dispose();
-                return false;
-            }
-
-            handle = opened;
-            return true;
+            var a = JsonSerializer.Deserialize(first, SourceFileIdentityContext.Default.SourceFileIdentity);
+            var b = JsonSerializer.Deserialize(second, SourceFileIdentityContext.Default.SourceFileIdentity);
+            return a is not null && b is not null && MatchesIdentity(a, b);
         }
-        catch
-        {
-            return false;
-        }
+        catch (JsonException) { return false; }
     }
+
+    private static bool MatchesIdentity(SourceFileIdentity captured, SourceFileIdentity current) =>
+        string.Equals(captured.FullPath, current.FullPath, StringComparison.OrdinalIgnoreCase)
+        && captured.VolumeSerialNumber == current.VolumeSerialNumber
+        && captured.FileIndex == current.FileIndex
+        && captured.ByteLength == current.ByteLength
+        && captured.LastWriteTimeUtcTicks == current.LastWriteTimeUtcTicks
+        && (captured.ChangeTime is null || captured.ChangeTime == current.ChangeTime);
 
     public static bool VerifyIdentity(string? capturedJson, string currentFilePath)
     {
@@ -122,38 +106,12 @@ public static class SourceIdentityHelper
                 return false;
             }
 
-            return string.Equals(captured.FullPath, current.FullPath, StringComparison.OrdinalIgnoreCase)
-                && captured.VolumeSerialNumber == current.VolumeSerialNumber
-                && captured.FileIndex == current.FileIndex
-                && captured.ByteLength == current.ByteLength
-                && captured.LastWriteTimeUtcTicks == current.LastWriteTimeUtcTicks;
+            return MatchesIdentity(captured, current);
         }
         catch
         {
             return false;
         }
-    }
-
-    public static bool TryDeleteOpenedFile(SafeFileHandle handle, out int win32Error)
-    {
-        win32Error = 0;
-        if (!OperatingSystem.IsWindows() || handle.IsInvalid)
-        {
-            return false;
-        }
-
-        var disposition = new FileDispositionInfo { DeleteFile = 1 };
-        if (SetFileInformationByHandle(
-                handle,
-                FileInfoByHandleClass.FileDispositionInfo,
-                ref disposition,
-                (uint)Marshal.SizeOf<FileDispositionInfo>()))
-        {
-            return true;
-        }
-
-        win32Error = Marshal.GetLastWin32Error();
-        return false;
     }
 
     private static bool TryReadIdentity(
@@ -177,26 +135,36 @@ public static class SourceIdentityHelper
             info.VolumeSerialNumber,
             fileIndex,
             byteLength,
-            lastWrite);
+            lastWrite,
+            ReadChangeTime(handle));
         return true;
     }
 
-    private const uint GenericRead = 0x80000000;
-    private const uint DeleteAccess = 0x00010000;
-    private const uint FileShareRead = 0x00000001;
-    private const uint FileShareDelete = 0x00000004;
-    private const uint OpenExisting = 3;
-    private const uint FileAttributeNormal = 0x00000080;
+    // Check the opened file rather than trusting the preceding path-based reparse scan.
+    internal static bool MatchesOpenedPath(SafeFileHandle handle, string expectedPath)
+    {
+        if (!OperatingSystem.IsWindows() || handle.IsInvalid) return false;
+        var buffer = new System.Text.StringBuilder(512);
+        var length = GetFinalPathNameByHandle(handle, buffer, (uint)buffer.Capacity, 0);
+        if (length == 0 || length >= 32768) return false;
+        if (length >= buffer.Capacity)
+        {
+            buffer.EnsureCapacity((int)length + 1);
+            length = GetFinalPathNameByHandle(handle, buffer, (uint)buffer.Capacity, 0);
+            if (length == 0 || length >= buffer.Capacity) return false;
+        }
+        var finalPath = buffer.ToString();
+        if (finalPath.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase))
+            finalPath = @"\\" + finalPath[8..];
+        else if (finalPath.StartsWith(@"\\?\", StringComparison.Ordinal))
+            finalPath = finalPath[4..];
+        return string.Equals(Path.GetFullPath(finalPath), Path.GetFullPath(expectedPath),
+            StringComparison.OrdinalIgnoreCase);
+    }
 
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern SafeFileHandle CreateFileW(
-        string lpFileName,
-        uint dwDesiredAccess,
-        uint dwShareMode,
-        IntPtr lpSecurityAttributes,
-        uint dwCreationDisposition,
-        uint dwFlagsAndAttributes,
-        IntPtr hTemplateFile);
+    [DllImport("kernel32.dll", EntryPoint = "GetFinalPathNameByHandleW", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern uint GetFinalPathNameByHandle(SafeFileHandle handle,
+        System.Text.StringBuilder path, uint capacity, uint flags);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -204,27 +172,24 @@ public static class SourceIdentityHelper
         SafeFileHandle hFile,
         out ByHandleFileInformation lpFileInformation);
 
+    // ChangeTime detects in-place modification even if LastWriteTime is restored.
+    private static long? ReadChangeTime(SafeFileHandle handle) =>
+        GetFileInformationByHandleEx(handle, 0, out var basic, (uint)Marshal.SizeOf<FileBasicInfo>())
+            && basic.ChangeTime > 0 ? basic.ChangeTime : null;
+
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool SetFileInformationByHandle(
-        SafeFileHandle hFile,
-        FileInfoByHandleClass fileInformationClass,
-        ref FileDispositionInfo fileInformation,
-        uint bufferSize);
-
-    private enum FileInfoByHandleClass
-    {
-        FileBasicInfo = 0,
-        FileStandardInfo = 1,
-        FileNameInfo = 2,
-        FileRenameInfo = 3,
-        FileDispositionInfo = 4,
-    }
+    private static extern bool GetFileInformationByHandleEx(
+        SafeFileHandle handle, int infoClass, out FileBasicInfo info, uint size);
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct FileDispositionInfo
+    private struct FileBasicInfo
     {
-        public byte DeleteFile;
+        public long CreationTime;
+        public long LastAccessTime;
+        public long LastWriteTime;
+        public long ChangeTime;
+        public uint FileAttributes;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -248,7 +213,8 @@ internal sealed record SourceFileIdentity(
     uint VolumeSerialNumber,
     ulong FileIndex,
     long ByteLength,
-    long LastWriteTimeUtcTicks);
+    long LastWriteTimeUtcTicks,
+    long? ChangeTime = null);
 
 [System.Text.Json.Serialization.JsonSerializable(typeof(SourceFileIdentity))]
 internal sealed partial class SourceFileIdentityContext : System.Text.Json.Serialization.JsonSerializerContext

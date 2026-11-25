@@ -61,7 +61,11 @@ public sealed record HealthMediaItem(
     Guid? OwnerProfileId,
     string? OwnerDisplayName,
     string? OwnerStorageToken,
-    string? CurrentManagedFileName = null);
+    string? CurrentManagedFileName = null,
+    long RowVersion = 0,
+    string? BundleSha256 = null,
+    string? OriginalHealthStatus = null,
+    bool HasStablePublishedOwner = false, string? OwnerManagedRelativePath = null);
 
 public sealed record HealthSourceCleanupItem(
     Guid ImportItemId,

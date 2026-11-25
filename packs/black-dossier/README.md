@@ -1,6 +1,6 @@
-# Black Dossier 3.0.0
+# Black Dossier 4.0.0
 
-Requires Naut v0.0.29 or later (Presentation Contract 3).
+Source requires Presentation Contract 4. Published 3.0.0 downloads require Naut v0.0.29 or later (Contract 3).
 
 Attention and imports lead the Operations Desk. The separate reconnaissance image, subject and pagination stay grouped on the right on wide layouts.
 

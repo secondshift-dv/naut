@@ -4,34 +4,74 @@
     {
       "slug": "celestial",
       "packId": "neuterradise.celestial",
-      "version": "3.0.0",
+      "version": "4.0.0",
       "name": "Nightfall Murim",
       "author": "secondshift-dv",
-      "preview": "preview.png"
+      "preview": "preview.png",
+      "predecessors": [
+        {
+          "version": "3.0.0",
+          "contentHash": "21c6c8beae0d803b41110e8cf4a5f2ce6c727a040cec4fe9f90d8cb894011c5d"
+        },
+        {
+          "version": "2.1.0",
+          "contentHash": "bb82a6845501e02a2d6042043491293a41150a32026d02297e3d3326a7a55dae"
+        }
+      ]
     },
     {
-      "version": "3.0.0",
+      "version": "4.0.0",
       "author": "secondshift-dv",
       "name": "Voxel Playground",
       "packId": "naut.overworld-expedition",
       "preview": "preview.png",
-      "slug": "overworld-expedition"
+      "slug": "overworld-expedition",
+      "predecessors": [
+        {
+          "version": "3.0.0",
+          "contentHash": "223807dafb1259e5266440e5e2e7403125d98795c357dbfc46f8df859f129f4d"
+        },
+        {
+          "version": "2.1.0",
+          "contentHash": "952cfaf0e301c84f0c1ad01bc7fe29aa384ef8b5d7ee980e4c85542b42f713c8"
+        }
+      ]
     },
     {
       "slug": "black-dossier",
       "packId": "naut.black-dossier",
-      "version": "3.0.0",
+      "version": "4.0.0",
       "name": "Black Dossier",
       "author": "secondshift-dv",
-      "preview": "preview.png"
+      "preview": "preview.png",
+      "predecessors": [
+        {
+          "version": "3.0.0",
+          "contentHash": "bb08503e78edc9604b315cad3aa25fa0dd4e2ac25a6c109c8375ed5712064313"
+        },
+        {
+          "version": "2.1.0",
+          "contentHash": "311543a947a676077710b441e3e934b6a55a5ff9c2a29b821e2a186e9fe4c749"
+        }
+      ]
     },
     {
       "slug": "conceal",
       "packId": "conceal",
-      "version": "3.0.0",
+      "version": "4.0.0",
       "name": "Conceal",
       "author": "secondshift-dv",
-      "preview": "preview.png"
+      "preview": "preview.png",
+      "predecessors": [
+        {
+          "version": "3.0.0",
+          "contentHash": "f353b1aba31fc3f19c9a347152061932a4c5b8d361503a92d80db12fba0de08f"
+        },
+        {
+          "version": "2.1.0",
+          "contentHash": "e85ed1aa3b1f8f167ba07e1cbad6d1006e266cd7ca3d4b3732fd3b85f0a20763"
+        }
+      ]
     }
   ]
 }

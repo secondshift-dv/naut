@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Neuterradise.App.Presentation;
+using Neuterradise.Release.Contracts;
 using SkiaSharp;
 
 var repository = Path.GetFullPath(args[0]);
@@ -98,7 +99,16 @@ foreach (var entry in catalog.RootElement.GetProperty("packs").EnumerateArray())
     if (!roundtrip.Succeeded || roundtrip.Pack?.ContentHash != loaded.ContentHash) throw new InvalidDataException("Export roundtrip mismatch.");
     using var input = File.OpenRead(archive);
     var sha = Convert.ToHexString(SHA256.HashData(input)).ToLowerInvariant();
-    downloads.Add(new { slug, packId = manifest.PackId, version = manifest.Version, file = Path.GetFileName(archive), sha256 = sha, bytes = new FileInfo(archive).Length });
+    var predecessors = entry.TryGetProperty("predecessors", out var previous)
+        ? previous.EnumerateArray().Select(item => new { version = item.GetProperty("version").GetString(),
+            contentHash = item.GetProperty("contentHash").GetString() }).ToArray() : [];
+    if (predecessors.Any(item => !Version.TryParse(item.version, out var old)
+            || old >= Version.Parse(manifest.Version) || !UpdateManifestAuthority.IsLowerSha256(item.contentHash))
+        || predecessors.Select(item => item.version).Distinct(StringComparer.Ordinal).Count() != predecessors.Length)
+        throw new InvalidDataException("Invalid official pack predecessor: " + slug);
+    downloads.Add(new { slug, packId = manifest.PackId, version = manifest.Version, file = Path.GetFileName(archive),
+        sha256 = sha, bytes = new FileInfo(archive).Length, contentHash = loaded.ContentHash,
+        minContractVersion = manifest.MinContractVersion, predecessors });
     Console.WriteLine($"PACK={manifest.PackId}; VERSION={manifest.Version}; DEFINITIONS={manifest.Definitions.Count}; ASSETS={manifest.Assets.Count}; PASS");
 }
 if (downloads.Count == 0) throw new InvalidDataException("The collection is empty.");

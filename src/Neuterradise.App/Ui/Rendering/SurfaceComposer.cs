@@ -42,7 +42,16 @@ public static class SurfaceComposer
             var element = semantic(node.Semantic!);
             if (element is null) return null;
             Detach(element);
-            return RegionHost(node.Semantic!, element, node.Placement);
+            return node.CanvasPlacement is not null ? element : RegionHost(node.Semantic!, element, node.Placement);
+        }
+        if (node.Kind is "image" or "shape")
+        {
+            FrameworkElement visual = node.Kind == "image"
+                ? new SkImageView { Source = ImageRef.FromPath(node.AssetPath, 1600), PlaceholderToken = "transparent" }
+                : new Border { Background = ThemeRuntime.Current.Brush(node.Fill ?? "transparent") };
+            visual.Opacity = node.Opacity;
+            visual.IsHitTestVisible = false;
+            return node.Motion is { } motion ? new SceneMotionView(visual, motion, node.Opacity) : visual;
         }
         if (node.Kind == "divider") return UI.Divider();
         if (node.Kind == "spacer") return new Grid { Height = node.Spacing + node.Padding };
@@ -51,6 +60,13 @@ public static class SurfaceComposer
             .Where(cell => cell.View is not null).ToArray();
         if (cells.Length == 0) return null;
         var children = cells.Select(cell => cell.View!).ToArray();
+        if (node.Kind == "canvas")
+        {
+            var canvas = new AdaptiveCanvas(node.CanvasAspect, width);
+            foreach (var (plan, _, view) in cells.OrderBy(cell => cell.Plan.CanvasPlacement!.Order))
+                canvas.Add(view!, plan.CanvasPlacement!);
+            return node.Padding > 0 ? new Border { Child = canvas, Padding = new Thickness(node.Padding) } : canvas;
+        }
         if (node.Kind == "grid")
         {
             var rows = Occupied(node.Rows.Count, cells.Select(cell => (cell.Plan.Placement.Row, cell.Plan.Placement.RowSpan)));
@@ -113,6 +129,60 @@ public static class SurfaceComposer
         var used = new bool[count];
         foreach (var (start, span) in placements) Array.Fill(used, true, start, span);
         return Enumerable.Range(0, count).Where(index => used[index]).ToArray();
+    }
+
+    private sealed class AdaptiveCanvas(double aspect, double fallbackWidth) : Panel
+    {
+        private readonly Dictionary<UIElement, ArtworkPlacement> _placements = [];
+
+        public void Add(FrameworkElement child, ArtworkPlacement placement)
+        {
+            Children.Add(child);
+            _placements.Add(child, placement);
+        }
+
+        private Size Extent(Size available)
+        {
+            var width = double.IsFinite(available.Width) ? available.Width : fallbackWidth;
+            width = Math.Clamp(width, 0, 4096);
+            var height = width / aspect;
+            if (double.IsFinite(available.Height))
+                height = Math.Min(height, Math.Max(0, available.Height));
+            return new Size(width, Math.Min(height, 4096));
+        }
+
+        private static Rect Bounds(Size size, ArtworkPlacement placement)
+        {
+            var width = size.Width * placement.Width;
+            var height = size.Height * placement.Height;
+            var horizontal = placement.Horizontal switch { "center" => 0.5, "right" => 1, _ => 0 };
+            var vertical = placement.Vertical switch { "center" => 0.5, "bottom" => 1, _ => 0 };
+            return new Rect((size.Width - width) * horizontal + size.Width * placement.X,
+                (size.Height - height) * vertical + size.Height * placement.Y, width, height);
+        }
+
+        protected override Size MeasureOverride(Size availableSize)
+        {
+            var size = Extent(availableSize);
+            for (var index = 0; index < Children.Count; index++)
+            {
+                var bounds = Bounds(size, _placements[Children[index]]);
+                Children[index].Measure(new Size(bounds.Width, bounds.Height));
+            }
+            return size;
+        }
+
+        protected override Size ArrangeOverride(Size finalSize)
+        {
+            var size = Extent(finalSize);
+            for (var index = 0; index < Children.Count; index++)
+                Children[index].Arrange(Bounds(size, _placements[Children[index]]));
+            if (Clip is not Microsoft.UI.Xaml.Media.RectangleGeometry geometry)
+                Clip = geometry = new Microsoft.UI.Xaml.Media.RectangleGeometry();
+            var clip = new Rect(0, 0, size.Width, size.Height);
+            if (!geometry.Rect.Equals(clip)) geometry.Rect = clip;
+            return finalSize;
+        }
     }
 
     private sealed class ResponsiveSurface(SurfaceNode plan, Func<string, FrameworkElement?> region, double fallbackWidth,

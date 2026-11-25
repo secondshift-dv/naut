@@ -15,6 +15,11 @@ $output = Join-Path $repositoryRoot 'out/pack-downloads'
 $catalog = Get-Content -LiteralPath (Join-Path $output 'checksums.json') -Raw | ConvertFrom-Json
 $files = @($catalog.packs | ForEach-Object { Join-Path $output $_.file }) + @(Join-Path $output 'checksums.json')
 if (-not $Publish) { Write-Host "Prepared $($catalog.packs.Count) packs. Use -Publish after maintainer review."; return }
+. (Join-Path $PSScriptRoot 'publisher-signature.ps1')
+$signaturePath = Join-Path $output 'checksums-signature.json'
+New-UpdatePublisherSignature -ManifestPath (Join-Path $output 'checksums.json') -SignaturePath $signaturePath `
+    -ContractPath (Join-Path $repositoryRoot 'release-contract.json') -PrivateKeyPem $env:NEUTERRADISE_UPDATE_SIGNING_KEY_PEM
+$files += $signaturePath
 function Invoke-GitHubJson([string]$Endpoint, [object]$Body, [string]$Method = 'POST') {
     $inputPath = Join-Path $output 'github-request.json'
     [IO.File]::WriteAllText($inputPath, ($Body | ConvertTo-Json -Depth 20))

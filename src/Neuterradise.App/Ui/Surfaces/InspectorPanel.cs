@@ -121,6 +121,7 @@ public sealed class InspectorPanel : IDisposable
         if (_favorite.Content is IconView favoriteIcon)
         {
             favoriteIcon.ColorToken = _vm.IsFavorite ? "#FF9A45" : "textMuted";
+            favoriteIcon.Selected = _vm.IsFavorite;
         }
         foreach (var (name, button) in _tabs)
         {

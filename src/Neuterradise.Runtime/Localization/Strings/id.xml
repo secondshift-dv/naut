@@ -79,6 +79,11 @@
     <sys:String x:Key="Import.Normalize">Normal</sys:String>
     <sys:String x:Key="Import.Problems">Perlu ditinjau</sys:String>
     <sys:String x:Key="Import.Problems.Description">Selesaikan masalah ini untuk melanjutkan.</sys:String>
+    <sys:String x:Key="Import.Review.RetryAll">Coba ulang semua ({0})</sys:String>
+    <sys:String x:Key="Import.Review.ReuseAll">Gunakan ulang semua duplikat ({0})</sys:String>
+    <sys:String x:Key="Import.Review.KeepAll">Pertahankan semua di tujuan ({0})</sys:String>
+    <sys:String x:Key="Import.Review.MoveAll">Pindahkan semua ke Profil yang dikenali ({0})</sys:String>
+    <sys:String x:Key="Import.Review.RemoveAll">Keluarkan semua media yang perlu ditinjau ({0})</sys:String>
     <sys:String x:Key="Import.ProfileCollision">Dikenali sebagai Profile lain</sys:String>
     <sys:String x:Key="Import.ProfilePicker.CurrentSelection">Media akan ditambahkan ke Profile ini.</sys:String>
     <sys:String x:Key="Import.ProfilePicker.ExistingResult">Profile yang sudah ada</sys:String>
@@ -887,6 +892,14 @@
     <sys:String x:Key="Customize.FromPack">Paket</sys:String>
     <sys:String x:Key="Customize.InstallFailed">Paket ini tidak dapat dipasang</sys:String>
     <sys:String x:Key="Customize.InstallFile">Pasang dari berkas…</sys:String>
+    <sys:String x:Key="Customize.Banner.Rotation">Rotasi</sys:String>
+    <sys:String x:Key="Customize.Banner.Automatic">Sumber otomatis</sys:String>
+    <sys:String x:Key="Customize.Packs.CheckUpdates">Periksa pembaruan pack resmi</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateAll">Perbarui semua</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateVersion">Perbarui ke {0}</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateFailed">Pembaruan pack resmi gagal</sys:String>
+    <sys:String x:Key="Customize.Packs.NoUpdates">Tidak ada pembaruan pack resmi yang kompatibel.</sys:String>
+    <sys:String x:Key="Customize.Packs.Updated">{0} diperbarui ke {1}</sys:String>
     <sys:String x:Key="Customize.InstallFolder">Pasang dari folder…</sys:String>
     <sys:String x:Key="Customize.Installed">Terpasang</sys:String>
     <sys:String x:Key="Customize.NoChanges">Tidak ada perubahan.</sys:String>
@@ -1041,6 +1054,12 @@
     <sys:String x:Key="Nav.Home">Beranda</sys:String>
     <sys:String x:Key="Nav.Import">Impor</sys:String>
     <sys:String x:Key="Nav.Settings">Pengaturan</sys:String>
+    <sys:String x:Key="Nav.Recovery">Navigasi native</sys:String>
+    <sys:String x:Key="Nav.CustomNavigation">Navigasi kustom</sys:String>
+    <sys:String x:Key="Banner.SceneEffects">Efek Scene</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset">Preset Global</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset.Desc">Terapkan tampilan global terkoordinasi tanpa mengubah override dan media setiap Profile.</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset.Confirm">Terapkan {0} pada tampilan global, Home, Gallery, dan default Profile?</sys:String>
     <sys:String x:Key="Breadcrumb.System">Sistem</sys:String>
     <sys:String x:Key="Breadcrumb.LibraryHealth">Kesehatan Vault</sys:String>
     <sys:String x:Key="Breadcrumb.People">Orang</sys:String>
@@ -1202,6 +1221,7 @@
     <sys:String x:Key="Import.Intake.NoneSupported">Tidak satu pun dari {0} berkas tersebut merupakan foto, video, atau model 3D yang didukung. Berkas dibiarkan apa adanya.</sys:String>
     <sys:String x:Key="Import.Intake.PrepareFailed">naut tidak dapat menyiapkan impor ini. Berkas asli dibiarkan apa adanya; coba lagi dari daftar.</sys:String>
     <sys:String x:Key="Import.Intake.Starting">Mencari media di berkas Anda…</sys:String>
+    <sys:String x:Key="Import.Intake.WithFailures">{0} siap; {1} tidak didukung; {2} hilang; {3} terkunci; {4} akses ditolak; {5} tidak terbaca; {6} folder tidak dapat diakses. Original tidak diubah.</sys:String>
     <sys:String x:Key="Import.Intake.WithUnsupported">{0} media siap · {1} berkas tidak didukung dibiarkan apa adanya</sys:String>
     <sys:String x:Key="Import.Progress.Percent">{0}%</sys:String>
     <sys:String x:Key="Import.Stage.Checking">Menyiapkan media</sys:String>
@@ -2213,4 +2233,9 @@
     <sys:String x:Key="Inspector.MoveToTrashFailed">Media tidak dapat dipindahkan ke Sampah.</sys:String>
     <sys:String x:Key="Inspector.MoveToTrashTitle">Pindahkan media ke Sampah?</sys:String>
     <sys:String x:Key="Inspector.MoveToTrashBody">Pindahkan {0} ke Sampah? Tautan Profil dan pilihan Cover, Banner, serta Figure akan dilepas. Data Face tetap bersama rekaman media yang dapat dipulihkan. Pulihkan melalui Pengaturan → Tong Sampah dalam 30 hari.</sys:String>
+    <sys:String x:Key="Health.RestoreOriginal">Pulihkan original</sys:String>
+    <sys:String x:Key="Health.BulkIntegrity">Rekonsiliasi original</sys:String>
+    <sys:String x:Key="Health.BulkConfirm">Konfirmasi {0} catatan integritas original. Setiap original diperiksa ulang; tidak ada file yang diubah.</sys:String>
+    <sys:String x:Key="Health.BulkOutcome">Rekonsiliasi integritas: {0} selesai, {1} belum terselesaikan, {2} belum diproses.</sys:String>
+    <sys:String x:Key="Health.PlacementStale">Ditemukan kemungkinan lokasi canonical. Verifikasi sebelum memperbarui path katalog.</sys:String>
 </ResourceDictionary>

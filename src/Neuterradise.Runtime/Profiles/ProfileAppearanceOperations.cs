@@ -1,4 +1,5 @@
 using Neuterradise.App.Localization;
+using Neuterradise.App.Presentation;
 using Neuterradise.App.Media.Model;
 using System.IO;
 using System.Text;
@@ -170,6 +171,27 @@ public sealed class ProfileAppearanceOperations
         }
 
         var stored = await ReadOverridesInTransactionAsync(transaction, request.ProfileId, cancellationToken).ConfigureAwait(false);
+        if (stored.BannerSlotsJson != overrides.BannerSlotsJson)
+        {
+            var previousSlots = BannerSlotState.Read(stored.BannerSlotsJson);
+            foreach (var (slotId, slot) in BannerSlotState.Read(overrides.BannerSlotsJson))
+            {
+                if (slot.MediaId is not { } mediaId || previousSlots.GetValueOrDefault(slotId)?.MediaId == mediaId) continue;
+                await using var membership = transaction.CreateCommand("""
+                    SELECT 1 FROM profile_banner_entries e
+                    JOIN media m ON m.media_id=e.media_id
+                    JOIN profile_media pm ON pm.profile_id=e.profile_id AND pm.media_id=e.media_id
+                    JOIN media_assets a ON a.media_id=e.media_id AND a.role='HOVER' AND a.state='READY'
+                    WHERE e.profile_id=$profile AND e.media_id=$media AND m.state='ACTIVE'
+                        AND m.trashed_at_ms IS NULL AND pm.publication_import_unit_id IS NULL LIMIT 1;
+                    """);
+                membership.Parameters.AddWithValue("$profile", DbGuid.Format(request.ProfileId));
+                membership.Parameters.AddWithValue("$media", DbGuid.Format(mediaId));
+                if (await membership.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is null)
+                    return new(OperationResult<ProfileAppearanceOutcome>.Validation(OperationErrorCode.ProfileAppearanceInvalid,
+                        "Additional Banner must be a ready member of this Profile's Banner collection."));
+            }
+        }
         if (request.Sources is not null)
         {
             var applied = await ApplySourcesInTransactionAsync(
@@ -246,6 +268,8 @@ public sealed class ProfileAppearanceOperations
             return OperationResult<ProfileAppearanceOutcome>.Validation(OperationErrorCode.ProfileCardInvalid, $"The Profile card variant '{variant}' is not recognized.");
         if (overrides.MediaLayoutId is { } mediaLayoutId && !MediaLayoutCatalog.IsBuiltInId(mediaLayoutId))
             return OperationResult<ProfileAppearanceOutcome>.Validation(OperationErrorCode.ProfileAppearanceInvalid, "That Media Layout is not recognized.");
+        if (!BannerSlotState.TryRead(overrides.BannerSlotsJson, out _))
+            return OperationResult<ProfileAppearanceOutcome>.Validation(OperationErrorCode.ProfileAppearanceInvalid, "Invalid additional Banner slots.");
         if (overrides.BannerEffect is not ("none" or "film" or "glitter" or "shimmer")
             || !double.IsFinite(overrides.BannerEffectIntensity) || overrides.BannerEffectIntensity is < 0 or > 1)
             return OperationResult<ProfileAppearanceOutcome>.Validation(OperationErrorCode.ProfileAppearanceInvalid, "Invalid Banner effect.");
@@ -712,7 +736,7 @@ public sealed record ProfileAppearanceOverrides(
     double CoverRotation = 0,
     string? MediaLayoutId = null,
     bool ShowRecentMedia = false,
-    string BannerEffect = "none", double BannerEffectIntensity = .2)
+    string BannerEffect = "none", double BannerEffectIntensity = .2, string? BannerSlotsJson = null)
 {
     // First canonical Profile appearance contract. The fresh v1 catalog has no appearance migrations.
     public const int SchemaVersion = 1;
@@ -793,6 +817,12 @@ public sealed record ProfileAppearanceOverrides(
             writer.WriteBoolean("showRecentMedia", ShowRecentMedia);
             writer.WriteString("bannerEffect", BannerEffect);
             writer.WriteNumber("bannerEffectIntensity", BannerEffectIntensity);
+            if (BannerSlotsJson is not null)
+            {
+                writer.WritePropertyName("bannerSlots");
+                using var slots = JsonDocument.Parse(BannerSlotsJson);
+                slots.RootElement.WriteTo(writer);
+            }
             writer.WriteEndObject();
         }
 
@@ -844,7 +874,9 @@ public sealed record ProfileAppearanceOverrides(
                 ReadNumber(root, "coverRotation", 0),
                 MediaLayoutCatalog.Normalize(ReadString(root, "mediaLayoutId")),
                 ReadBoolean(root, "showRecentMedia", Default.ShowRecentMedia),
-                ReadString(root, "bannerEffect") ?? "none", ReadNumber(root, "bannerEffectIntensity", .2));
+                ReadString(root, "bannerEffect") ?? "none", ReadNumber(root, "bannerEffectIntensity", .2),
+                root.TryGetProperty("bannerSlots", out var slots) && BannerSlotState.TryRead(slots.GetRawText(), out _)
+                    ? slots.GetRawText() : null);
         }
         catch (JsonException)
         {

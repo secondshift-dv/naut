@@ -727,26 +727,7 @@ public sealed class MediaWrites
             .ConfigureAwait(false);
         await using var transaction = CatalogTransaction.Begin(connection, _writeCoordinator);
 
-        int advanced;
-        await using (var update = transaction.CreateCommand(
-            """
-            UPDATE media
-            SET current_managed_relative_path = target_managed_relative_path,
-                current_managed_file_name = target_managed_file_name,
-                path_state = 'NONE',
-                reconciliation_operation_id = NULL,
-                row_version = row_version + 1
-            WHERE media_id = $assetId
-              AND reconciliation_operation_id = $operationId
-              AND path_state = 'PENDING'
-              AND target_managed_relative_path IS NOT NULL
-              AND target_managed_file_name IS NOT NULL;
-            """))
-        {
-            update.Parameters.AddWithValue("$assetId", DbGuid.Format(assetId));
-            update.Parameters.AddWithValue("$operationId", DbGuid.Format(operationId));
-            advanced = await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        }
+        var advanced = await AdvanceReconciledPlacementAsync(transaction, assetId, operationId, cancellationToken).ConfigureAwait(false);
 
         if (advanced != 1)
         {
@@ -779,6 +760,32 @@ public sealed class MediaWrites
         transaction.QueueInvalidation(CatalogInvalidationDomain.Media, assetId);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         return true;
+    }
+
+    internal static async Task<int> AdvanceReconciledPlacementAsync(CatalogTransaction transaction, Guid assetId, Guid operationId, CancellationToken cancellationToken)
+    {
+        int advanced;
+        await using (var update = transaction.CreateCommand(
+            """
+            UPDATE media
+            SET current_managed_relative_path = target_managed_relative_path,
+                current_managed_file_name = target_managed_file_name,
+                path_state = 'NONE',
+                reconciliation_operation_id = NULL,
+                row_version = row_version + 1
+            WHERE media_id = $assetId
+              AND reconciliation_operation_id = $operationId
+              AND path_state = 'PENDING'
+              AND target_managed_relative_path IS NOT NULL
+              AND target_managed_file_name IS NOT NULL;
+            """))
+        {
+            update.Parameters.AddWithValue("$assetId", DbGuid.Format(assetId));
+            update.Parameters.AddWithValue("$operationId", DbGuid.Format(operationId));
+            advanced = await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        return advanced;
     }
 
     public async Task MarkPlacementNeedsAttentionAsync(

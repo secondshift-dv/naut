@@ -91,6 +91,30 @@ public sealed class MaintenanceWrites
         return proposed;
     }
 
+    internal async Task<IReadOnlyList<RepairPlan>> ReadPendingOriginalRepairsAsync(
+        Guid? mediaId, CancellationToken ct)
+    {
+        var result = new List<RepairPlan>();
+        await using var connection = await _connectionFactory.OpenConnectionAsync(ct).ConfigureAwait(false);
+        await using var read = connection.CreateCommand();
+        read.CommandText = """
+            SELECT checkpoint_json FROM storage_operations o
+            WHERE o.kind='LIBRARY_REPAIR' AND o.entity_type='MEDIA'
+              AND o.state IN ('PREPARED','EXECUTING','FAILED_RETRYABLE')
+              AND ($id IS NULL OR o.entity_id=$id)
+              AND EXISTS(SELECT 1 FROM media m WHERE m.media_id=o.entity_id);
+            """;
+        read.Parameters.AddWithValue("$id", mediaId is Guid id ? (object)DbGuid.Format(id) : DBNull.Value);
+        await using var reader = await read.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        while (await reader.ReadAsync(ct).ConfigureAwait(false))
+        {
+            var plan = RepairPlan.FromJson(reader.GetString(0));
+            if (plan?.Kind is RepairKind.ReconcileOriginalIntegrity or RepairKind.RestoreCanonicalOriginal or RepairKind.ReconcileOriginalPlacement)
+                result.Add(plan);
+        }
+        return result;
+    }
+
     public async Task<PersistedRepairOperation?> ReadRepairOperationAsync(
         Guid operationId,
         CancellationToken cancellationToken = default)
@@ -210,6 +234,132 @@ public sealed class MaintenanceWrites
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    internal async Task<bool> CompleteOriginalIntegrityAsync(
+        RepairPlan plan, HealthMediaItem media, IReadOnlyList<MediaComponentRecord> components, string? status, CancellationToken ct, Func<CatalogTransaction, CancellationToken, Task>? publish = null)
+    {
+        if (plan.Kind is not (RepairKind.ReconcileOriginalIntegrity or RepairKind.RestoreCanonicalOriginal or RepairKind.ReconcileOriginalPlacement) || plan.MediaId is not Guid mediaId || media.MediaId != mediaId || media.OwnerProfileId is not Guid owner)
+            throw new ArgumentException("Original integrity requires a persisted repair plan.", nameof(plan));
+        await using var lease = await _writeCoordinator.EnterAsync(ct).ConfigureAwait(false);
+        await using var connection = await _connectionFactory.OpenConnectionAsync(ct).ConfigureAwait(false);
+        await using var transaction = CatalogTransaction.Begin(connection, _writeCoordinator);
+        var id = DbGuid.Format(mediaId);
+        var op = DbGuid.Format(plan.OperationId);
+        var now = DbTime.Format(_timeProvider.GetUtcNow());
+        await using (var check = transaction.CreateCommand("""
+            UPDATE media AS a SET row_version = row_version + 1
+            WHERE a.media_id = $id AND a.row_version = $version
+              AND a.state = 'ACTIVE' AND a.trashed_at_ms IS NULL AND a.path_state = 'NONE'
+              AND a.sha256 = $sha AND a.byte_length = $length AND a.bundle_sha256 IS $bundle
+              AND a.current_managed_relative_path || '/' || a.current_managed_file_name = $path
+              AND EXISTS (SELECT 1 FROM profile_media pm JOIN profiles p ON p.profile_id = pm.profile_id
+                  WHERE pm.media_id = a.media_id AND pm.relation_type = 'OWNER' AND pm.profile_id = $owner
+                    AND pm.publication_import_unit_id IS NULL AND p.visibility = 'PUBLISHED'
+                    AND p.trashed_at_ms IS NULL AND p.path_state = 'NONE' AND p.current_managed_relative_path IS $ownerFolder)
+              AND (SELECT COUNT(*) FROM profile_media pm WHERE pm.media_id = a.media_id AND pm.relation_type = 'OWNER') = 1
+              AND NOT EXISTS (SELECT 1 FROM trash_entries t WHERE t.state IN ('PENDING','EXECUTING')
+                    AND ((t.entity_type = 'MEDIA' AND t.entity_id = $id)
+                      OR (t.entity_type = 'PROFILE' AND t.entity_id = $owner)))
+              AND NOT EXISTS (SELECT 1 FROM import_cancel_media_reservations r WHERE r.media_id = $id)
+              AND $authority = $owner || '|' || COALESCE(
+                    (SELECT status FROM canonical_original_health h WHERE h.media_id = $id), 'UNRECORDED')
+              AND EXISTS (SELECT 1 FROM storage_operations o WHERE o.operation_id = $op
+                    AND o.kind = 'LIBRARY_REPAIR' AND o.entity_id = $id
+                    AND o.state IN ('PREPARED','EXECUTING','FAILED_RETRYABLE') AND o.checkpoint_json = $plan);
+            """))
+        {
+            check.Parameters.AddWithValue("$id", id);
+            check.Parameters.AddWithValue("$version", plan.ExpectedRowVersion);
+            check.Parameters.AddWithValue("$sha", plan.ExpectedPhysicalSha256!);
+            check.Parameters.AddWithValue("$length", plan.ExpectedPhysicalByteLength!.Value);
+            check.Parameters.AddWithValue("$path", plan.Kind == RepairKind.ReconcileOriginalPlacement ? plan.SourcePathOrRelative : plan.TargetPathOrRelative);
+            check.Parameters.AddWithValue("$owner", DbGuid.Format(owner));
+            check.Parameters.AddWithValue("$ownerFolder", (object?)media.OwnerManagedRelativePath ?? DBNull.Value);
+            check.Parameters.AddWithValue("$bundle", (object?)media.BundleSha256 ?? DBNull.Value);
+            check.Parameters.AddWithValue("$authority", plan.ExpectedAuthorityState);
+            check.Parameters.AddWithValue("$op", op);
+            check.Parameters.AddWithValue("$plan", plan.ToJson());
+            if (await check.ExecuteNonQueryAsync(ct).ConfigureAwait(false) != 1) return false;
+        }
+        if (media.MediaType == Neuterradise.App.Media.MediaType.Model)
+        {
+            // Component identity, unlike source cleanup metadata, must still match the inspected package.
+            await using var read = transaction.CreateCommand("""
+                SELECT component_relative_path,component_role,sha256,byte_length
+                FROM media_components WHERE media_id=$id;
+                """);
+            read.Parameters.AddWithValue("$id", id);
+            var expected = components.ToDictionary(c => c.ComponentRelativePath, StringComparer.Ordinal);
+            await using var reader = await read.ExecuteReaderAsync(ct).ConfigureAwait(false);
+            while (await reader.ReadAsync(ct).ConfigureAwait(false))
+            {
+                if (!expected.Remove(reader.GetString(0), out var component)
+                    || reader.GetString(1) != DbEnum.Format(component.ComponentRole)
+                    || reader.GetString(2) != component.Sha256
+                    || reader.GetInt64(3) != component.ByteLength) return false;
+            }
+            if (expected.Count != 0) return false;
+        }
+        if (publish is not null) await publish(transaction, ct).ConfigureAwait(false);
+        if (plan.Kind == RepairKind.ReconcileOriginalPlacement)
+        {
+            var separator = plan.TargetPathOrRelative.LastIndexOf('/');
+            if (separator <= 0) throw new CatalogInvariantException("Placement repair has an invalid target.");
+            var directory = plan.TargetPathOrRelative[..separator];
+            var name = plan.TargetPathOrRelative[(separator + 1)..];
+            await using var target = transaction.CreateCommand("""
+                UPDATE media SET target_managed_relative_path=$directory,target_managed_file_name=$name,
+                    path_state='PENDING',reconciliation_operation_id=$op
+                WHERE media_id=$id AND path_state='NONE'
+                    AND NOT EXISTS (SELECT 1 FROM media other WHERE other.media_id<>$id AND (
+                        (other.current_managed_relative_path=$directory COLLATE NOCASE
+                            AND other.current_managed_file_name=$name COLLATE NOCASE)
+                        OR (other.target_managed_relative_path=$directory COLLATE NOCASE
+                            AND other.target_managed_file_name=$name COLLATE NOCASE)));
+                """);
+            target.Parameters.AddWithValue("$directory", directory);
+            target.Parameters.AddWithValue("$name", name);
+            target.Parameters.AddWithValue("$id", id);
+            target.Parameters.AddWithValue("$op", op);
+            if (await target.ExecuteNonQueryAsync(ct).ConfigureAwait(false) != 1
+                || await MediaWrites.AdvanceReconciledPlacementAsync(transaction, mediaId, plan.OperationId, ct).ConfigureAwait(false) != 1)
+                return false;
+            transaction.QueueInvalidation(CatalogInvalidationDomain.Media, mediaId);
+        }
+        await using (var record = transaction.CreateCommand(status is null
+            ? "DELETE FROM canonical_original_health WHERE media_id = $id;"
+            : """
+              INSERT INTO canonical_original_health(media_id,status,operation_id,checked_at_ms)
+              VALUES($id,$status,$op,$now)
+              ON CONFLICT(media_id) DO UPDATE SET status=excluded.status,
+                  operation_id=excluded.operation_id,checked_at_ms=excluded.checked_at_ms;
+              """))
+        {
+            record.Parameters.AddWithValue("$id", id);
+            if (status is not null)
+            {
+                record.Parameters.AddWithValue("$status", status);
+                record.Parameters.AddWithValue("$op", op);
+                record.Parameters.AddWithValue("$now", now);
+            }
+            await record.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+        await using (var complete = transaction.CreateCommand("""
+            UPDATE storage_operations SET state='COMPLETED',updated_at_ms=$now,completed_at_ms=$now,
+                error_code=NULL,error_detail_safe=NULL,row_version=row_version+1
+            WHERE operation_id=$op AND kind='LIBRARY_REPAIR';
+            """))
+        {
+            complete.Parameters.AddWithValue("$op", op);
+            complete.Parameters.AddWithValue("$now", now);
+            if (await complete.ExecuteNonQueryAsync(ct).ConfigureAwait(false) != 1)
+                throw new CatalogConcurrencyConflictException("The original integrity receipt changed.");
+        }
+        transaction.QueueInvalidation(CatalogInvalidationDomain.Health, mediaId);
+        transaction.QueueInvalidation(CatalogInvalidationDomain.Import, mediaId);
+        await transaction.CommitAsync(ct).ConfigureAwait(false);
+        return true;
+    }
+
     private static (string EntityType, string EntityId) GetRepairSubject(RepairPlan plan)
     {
         if (plan.ImportItemId is Guid importItemId)
@@ -222,6 +372,9 @@ public sealed class MaintenanceWrites
             return ("PROFILE", DbGuid.Format(profileId));
         }
 
+        if (plan.Kind is RepairKind.ReconcileOriginalIntegrity or RepairKind.RestoreCanonicalOriginal or RepairKind.ReconcileOriginalPlacement
+            && plan.MediaId is Guid originalId)
+            return ("MEDIA", DbGuid.Format(originalId));
         if (plan.MediaId is Guid assetId)
         {
             return ("ASSET", DbGuid.Format(assetId));
@@ -237,7 +390,12 @@ public sealed class MaintenanceWrites
             return false;
         }
 
-        return string.Equals(existing.FindingCode, proposed.FindingCode, StringComparison.Ordinal);
+        return string.Equals(existing.FindingCode, proposed.FindingCode, StringComparison.Ordinal)
+            && (existing.Kind is not (RepairKind.ReconcileOriginalIntegrity or RepairKind.RestoreCanonicalOriginal or RepairKind.ReconcileOriginalPlacement)
+                || (existing.ExpectedRowVersion == proposed.ExpectedRowVersion
+                    && existing.ExpectedAuthorityState == proposed.ExpectedAuthorityState
+                    && existing.SourcePathOrRelative == proposed.SourcePathOrRelative
+                    && existing.TargetPathOrRelative == proposed.TargetPathOrRelative));
     }
 
     private static bool IsAllowedRepairTransition(string currentState, string targetState) =>

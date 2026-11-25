@@ -1577,6 +1577,8 @@ public sealed class ImportSurface : Surface
         const int reviewPageSize = 24;
         var problems = UI.V(8);
         var cards = UI.V(8);
+        var bulk = UI.Wrap(6);
+        (int Retry, int Duplicate, int Collision, int Remove)? bulkCounts = null;
         var pageLabel = UI.Text(string.Empty, "caption");
         var page = 0;
         var previous = UI.Button(UI.T("Common.Previous", "Previous"), null);
@@ -1595,6 +1597,7 @@ public sealed class ImportSurface : Surface
             UI.Text(UI.T("Import.Problems", "Review required"), "body-strong"),
             UI.Text(UI.T("Import.Problems.Description", "Fix these issues to continue."), "caption", "textSecondary", 3)));
         problems.Children.Add(pending);
+        problems.Children.Add(bulk);
         problems.Children.Add(cards);
         problems.Children.Add(pager);
 
@@ -1619,6 +1622,28 @@ public sealed class ImportSurface : Surface
             var duplicates = wizard.DuplicateProblems;
             var collisions = wizard.ProfileCollisionProblems;
             var total = preparations.Count + duplicates.Count + collisions.Count;
+            var counts = (Retry: preparations.Count(problem => !problem.MissingDependencies),
+                Duplicate: duplicates.Count, Collision: collisions.Count,
+                Remove: preparations.Select(problem => problem.ImportItemId)
+                    .Concat(duplicates.Select(problem => problem.ImportItemId))
+                    .Concat(collisions.Select(problem => problem.ImportItemId)).Distinct().Count());
+            if (bulkCounts != counts)
+            {
+                bulkCounts = counts;
+                bulk.Children.Clear();
+                void AddBulk(int count, ReviewResolutionAction action, string key, string fallback, ButtonKind kind = ButtonKind.Secondary)
+                {
+                    if (count == 0) return;
+                    bulk.Children.Add(UI.Button(UI.F(key, fallback, count), null, kind,
+                        command: wizard.ResolveAllReviewCommand, parameter: action));
+                }
+                AddBulk(counts.Retry, ReviewResolutionAction.RetryPreparation, "Import.Review.RetryAll", "Retry all ({0})");
+                AddBulk(counts.Duplicate, ReviewResolutionAction.ReuseDuplicate, "Import.Review.ReuseAll", "Reuse all duplicates ({0})");
+                AddBulk(counts.Collision, ReviewResolutionAction.KeepDestination, "Import.Review.KeepAll", "Keep all in destination ({0})");
+                AddBulk(counts.Collision, ReviewResolutionAction.MoveToRecognizedProfile, "Import.Review.MoveAll", "Move all to recognized Profiles ({0})");
+                AddBulk(counts.Remove, ReviewResolutionAction.Remove, "Import.Review.RemoveAll", "Remove all review items ({0})", ButtonKind.Ghost);
+            }
+            bulk.Visibility = total > 0 ? Visibility.Visible : Visibility.Collapsed;
             var pageCount = Math.Max(1, (total + reviewPageSize - 1) / reviewPageSize);
             page = Math.Clamp(page, 0, pageCount - 1);
             previous.IsEnabled = page > 0;

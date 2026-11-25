@@ -30,6 +30,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     private readonly SkImageView _heroImage = new() { PlaceholderToken = "surface1" };
     private readonly CompositeTransform _heroMotion = new();
     private readonly SkVideoView _heroVideo = new() { Visibility = Visibility.Collapsed };
+    private PrimaryBannerEffect? _heroPrimaryEffect;
     private readonly Grid _identityHost = new();
     private readonly Grid _heroFrame = new();
     private readonly Grid _heroFooter = new();
@@ -61,8 +62,6 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     private int _mediaGeneration;
     private HomeSpotlightViewModel? _displayedSpotlight;
 
-    public string? SampleSpotlightVideo => _vm.CurrentSpotlight?.BannerVideoPath;
-
     public CardData? SampleCard()
     {
         var spotlight = _vm.CurrentSpotlight ?? _vm.SpotlightCandidates.FirstOrDefault();
@@ -72,6 +71,9 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         }
 
         var overrides = _appearance.GetValueOrDefault(spotlight.ProfileId) ?? ProfileAppearanceOverrides.Default;
+        _heroArtwork?.SetBannerContext(Services.Runtime.MediaResources, spotlight.ProfileId, spotlight.BannerVideoPath,
+            appearance: overrides);
+        _heroPrimaryEffect?.Update(overrides);
         var state = new ProfilePresentationState(spotlight.ProfileId, 0, null, overrides);
         var media = Services.Presentation.ResolveMedia(state);
         var frame = ResolvePresentation(
@@ -307,6 +309,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         };
         art.Children.Add(_heroImage);
         art.Children.Add(_heroVideo);
+        _heroPrimaryEffect = new PrimaryBannerEffect(art);
         var effect = PresentationEffects.View(PresentationSlots.BannerEffect, () =>
             _vm.CurrentSpotlight is { } current ? PresentationContext.ForProfile(new ProfilePresentationState(current.ProfileId, 0, null,
                 _appearance.GetValueOrDefault(current.ProfileId) ?? ProfileAppearanceOverrides.Default), "home") : Context);
@@ -602,7 +605,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         if (_heroName is not null)
         {
             _heroName.FontSize = compact ? 20 : Math.Clamp(
-                TokenAuthority.Foundations.TypeStyles["hero"].Size * (_spotlight.Composition == "editorial" ? 1.12 : 1),
+                ThemeRuntime.Current.TypeStyle("hero").Size * (_spotlight.Composition == "editorial" ? 1.12 : 1),
                 _spotlight.Composition == "editorial" ? 30 : 24,
                 _spotlight.Composition == "editorial" ? 42 : 36);
             _heroName.Foreground = theme.Brush(separated ? "textPrimary" : "onHeroPrimary");
@@ -661,6 +664,10 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     {
         var generation = ++_mediaGeneration;
         var spotlight = _vm.CurrentSpotlight;
+        var knownAppearance = spotlight is null ? null : _appearance.GetValueOrDefault(spotlight.ProfileId);
+        _heroArtwork?.SetBannerContext(Services.Runtime.MediaResources, spotlight?.ProfileId, spotlight?.BannerVideoPath,
+            appearance: knownAppearance);
+        _heroPrimaryEffect?.Update(knownAppearance);
         var previous = _displayedSpotlight;
         var changedSource = previous?.ProfileId != spotlight?.ProfileId
             || !string.Equals(previous?.HeroImagePath, spotlight?.HeroImagePath,
@@ -862,10 +869,10 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
 
         var tags = TagCapsules.Create(spotlight.AssignedTags, 4);
         var rating = UI.H(4,
-            new IconView("icon.profile.rating", 16, spotlight.Rating is > 0 ? "warning" : "textMuted"),
+            new IconView("icon.profile.rating", 16, spotlight.Rating is > 0 ? "warning" : "textMuted") { Selected = spotlight.Rating is > 0 },
             UI.Text(spotlight.Rating is { } value ? $"{value}/5" : "-/5", "caption", "onHeroPrimary"));
         var favorite = new IconView("icon.profile.favorite", 18,
-            spotlight.IsFavorite ? "danger" : "onHeroSecondary");
+            spotlight.IsFavorite ? "danger" : "onHeroSecondary") { Selected = spotlight.IsFavorite };
         favorite.Tip(UI.T("Card.Favorite", "Favorite"));
         var indicators = UI.H(12, rating, favorite);
         var details = _spotlight.Composition switch

@@ -134,7 +134,10 @@ public sealed record ArtworkRotation(double Seconds, double PivotX, double Pivot
 public sealed record ArtworkPlacement(double X, double Y, double Width, double Height,
     string Horizontal, string Vertical, int Order);
 public sealed record ArtworkLayer(string Kind, string? AssetPath, ArtworkRotation? Rotation,
-    ArtworkPlacement? Placement = null, ArtworkPlacement? Narrow = null);
+    ArtworkPlacement? Placement = null, ArtworkPlacement? Narrow = null, int BannerIndex = 0, string? SlotId = null)
+{
+    public string BannerSlotId => SlotId ?? $"banner-{BannerIndex}";
+}
 public sealed record ArtworkPlan(string? MaskPath, ArtworkRotation? Rotation, IReadOnlyList<ArtworkLayer> Layers,
     double? Aspect, double Breakpoint = 800);
 
@@ -199,13 +202,38 @@ public sealed record GalleryLayoutPlan(
     double RowHeight,
     int MaxColumns,
     string Toolbar = "standard",
-    IReadOnlyList<double>? HeightPattern = null);
+    IReadOnlyList<double>? HeightPattern = null, GalleryScenePlan? Scene = null);
+
+public sealed record GalleryScenePlan(BackdropPlan? Background, BackdropPlan? Foreground,
+    string? ItemOverlay, double ItemInset, string CardSizing,
+    double CardRotation = 0, double CardSkew = 0, string OverlayPlacement = "front")
+{
+    public (double Width, double Height) FitCard(double width, double height, double aspect)
+    {
+        aspect = Math.Max(0.3, aspect);
+        var rotation = CardRotation * Math.PI / 180;
+        var skew = Math.Tan(CardSkew * Math.PI / 180);
+        var cos = Math.Cos(rotation);
+        var sin = Math.Sin(rotation);
+        // Unit-height transformed bounds, before uniform scale. Contain preserves the entire
+        // authored Card, while crop deliberately clips it inside the owned item envelope.
+        var projectedWidth = Math.Abs(cos) * aspect + Math.Abs(cos * skew - sin);
+        var projectedHeight = Math.Abs(sin) * aspect + Math.Abs(sin * skew + cos);
+        var scale = CardSizing == "crop"
+            ? Math.Max(width / aspect, height)
+            : Math.Min(width / projectedWidth, height / projectedHeight);
+        return (Math.Max(0, scale * aspect), Math.Max(0, scale));
+    }
+}
 
 public sealed record ProfileLayoutPlan(ProfileLayoutDefinition Layout, SurfaceNode? Surface = null, ArtworkPlan? BannerArtwork = null);
 
 public sealed record FramePlan(CoverFrameDefinition Frame, string? OverlayAssetPath, double? CoverInsetFraction = null, string? OverlayAssetIdentity = null);
 
-public sealed record ProfileMediaLayoutPlan(Neuterradise.App.Design.MediaLayouts.MediaLayoutDefinition Layout, string Browse = "wall");
+public sealed record MediaCollectionPlan(string Layout, int MaxColumns, double RowSpacing, double ColumnSpacing);
+
+public sealed record ProfileMediaLayoutPlan(Neuterradise.App.Design.MediaLayouts.MediaLayoutDefinition Layout, string Browse = "wall",
+    MediaCollectionPlan? Collection = null);
 
 // ------------------------------------------------------------------ card composition language (v1)
 

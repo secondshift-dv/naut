@@ -19,7 +19,7 @@ internal static class SkiaColor
         From(ThemeRuntime.Current.Tokens.Resolve(reference.StartsWith('#') || reference.StartsWith("token:", StringComparison.Ordinal) ? reference : "token:" + reference), opacity);
 }
 
-/// <summary>A semantic icon drawn from Naut's fixed Neu Line icon system.</summary>
+/// <summary>A semantic icon using the active control skin or the built-in Neu Line fallback.</summary>
 public sealed class IconView : SKCanvasElement
 {
     private const int MaxCachedPaths = 128;
@@ -29,6 +29,7 @@ public sealed class IconView : SKCanvasElement
     private string _key;
     private string _color;
     private bool _filled;
+    private bool _selected;
     private ThemeRuntime? _registeredTheme;
 
     private sealed record CachedPath(string Data, SKPath Path);
@@ -95,6 +96,17 @@ public sealed class IconView : SKCanvasElement
         }
     }
 
+    public bool Selected
+    {
+        get => _selected;
+        set
+        {
+            if (_selected == value) return;
+            _selected = value;
+            Invalidate();
+        }
+    }
+
     private static SKPath AcquirePathCopy(string data)
     {
         lock (PathCacheLock)
@@ -123,7 +135,9 @@ public sealed class IconView : SKCanvasElement
 
     protected override void RenderOverride(SKCanvas canvas, Size area)
     {
-        var data = IconCatalog.PathFor(_key);
+        var skin = ThemeRuntime.Current.ControlSkin?.Icons.GetValueOrDefault(_key);
+        var data = skin is null ? IconCatalog.PathFor(_key)
+            : _selected && skin.SelectedPath is { } selected ? selected : skin.Path;
         var scale = (float)(Math.Min(area.Width, area.Height) / 24.0);
 
         using var path = AcquirePathCopy(data);
@@ -132,7 +146,7 @@ public sealed class IconView : SKCanvasElement
             IsAntialias = true,
             Color = SkiaColor.Token(_color),
             Style = SKPaintStyle.Stroke,
-            StrokeWidth = IconCatalog.StrokeWidth,
+            StrokeWidth = (float)(skin?.StrokeWidth ?? IconCatalog.StrokeWidth),
             StrokeCap = SKStrokeCap.Round,
             StrokeJoin = SKStrokeJoin.Round,
         };

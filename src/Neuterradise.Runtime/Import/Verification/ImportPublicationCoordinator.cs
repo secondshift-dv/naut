@@ -453,6 +453,18 @@ public sealed class ImportPublicationCoordinator
             }
         }
 
+        // An explicit health reconciliation may have invalidated an earlier reuse decision.
+        await using (var check = transaction.CreateCommand("""
+            SELECT EXISTS (SELECT 1 FROM import_items item
+                JOIN canonical_original_health health ON health.media_id = COALESCE(item.reused_media_id, item.candidate_media_id)
+                WHERE item.import_unit_id = $unitId AND item.disposition IN ('INCLUDED','REUSED'));
+            """))
+        {
+            check.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
+            if (Convert.ToInt32(await check.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) != 0)
+                throw new CatalogInvariantException("A retained original has unresolved integrity findings.");
+        }
+
         // This UPDATE is the media-delta publication boundary for existing Profiles. Every public
         // profile/media read excludes rows carrying this marker.
         const string retainedMedia = """

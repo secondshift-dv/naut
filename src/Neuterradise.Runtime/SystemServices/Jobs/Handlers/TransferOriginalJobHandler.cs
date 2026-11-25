@@ -73,12 +73,13 @@ internal sealed class TransferOriginalOperation : IAuthorizedJobOperation
             RootPathRules.RejectExistingReparsePoints(_catalog.Paths.Root, partialPath);
             await using var source = new FileStream(item.SourcePath, FileMode.Open, FileAccess.Read,
                 FileShare.Read, _bufferSize, FileOptions.Asynchronous | FileOptions.SequentialScan);
-            var identity = SourceIdentityHelper.CaptureIdentity(item.SourcePath);
+            // A legacy in-flight transfer can already have durable source-object authority.
+            var identity = item.SourceIdentityJson ?? checkpoint.SourceIdentity;
             if (identity is null || !SourceIdentityHelper.VerifyIdentity(identity, source.SafeFileHandle, item.SourcePath))
-                return Failed("SOURCE_IDENTITY_UNAVAILABLE", "The source file object could not be identified.");
+                return Failed("SOURCE_CHANGED", "The source file differs from its intake identity or that identity is unavailable. Select the source again.");
             var length = source.Length;
             if (checkpoint.SourceIdentity is not null
-                && (!string.Equals(checkpoint.SourceIdentity, identity, StringComparison.Ordinal)
+                && (!SourceIdentityHelper.VerifyIdentity(checkpoint.SourceIdentity, source.SafeFileHandle, item.SourcePath)
                     || checkpoint.ExpectedLength != length))
                 return Failed("SOURCE_CHANGED", "The source file object changed since the safe checkpoint.");
 

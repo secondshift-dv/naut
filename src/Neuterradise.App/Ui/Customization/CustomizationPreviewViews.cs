@@ -22,6 +22,8 @@ namespace Neuterradise.App.Ui;
 
 public sealed partial class CustomizationCenter
 {
+    private CoverFrameView? _focusedCover;
+
     // ---------------------------------------------------------------- live preview
 
     private void UpdatePreviewHeight(double rootHeight)
@@ -32,14 +34,18 @@ public sealed partial class CustomizationCenter
             _preview.Height = _session.ProfileWorking?.Sources?.FigureMediaId is null ? 160 : 336;
             return;
         }
-        var framingPreview = _category == CustomizationCategories.Profile
-            && (_figureEditorOpen || _slot is PresentationSlots.ProfileCover or PresentationSlots.ProfileBanner);
-        _preview.MinHeight = framingPreview ? 360 : 180;
-        _preview.Height = framingPreview ? double.NaN : Math.Clamp(rootHeight * 0.36, 180, 280);
+        var focusedArtwork = _slot is PresentationSlots.ProfileCover or PresentationSlots.ProfileBanner or PresentationSlots.ProfileFrame;
+        _preview.MinHeight = focusedArtwork ? 220 : 180;
+        _preview.Height = focusedArtwork
+            ? Math.Clamp(rootHeight * 0.44, 220, 440)
+            : Math.Clamp(rootHeight * 0.36, 180, 280);
     }
 
     private void RenderPreview()
     {
+        if ((!_dedicatedEditor || _slot is not (PresentationSlots.ProfileCover or PresentationSlots.ProfileFrame))
+            && _focusedCover is not null)
+            _focusedCover.Source = null;
         if (!_dedicatedEditor)
         {
             _profilePreviewHeader.SetActive(false);
@@ -56,44 +62,93 @@ public sealed partial class CustomizationCenter
         frame.Child = stage;
         _preview.Children.Add(frame);
         var profileHeaderActive = false;
-        switch (_category)
+        if (_figureEditorOpen)
+            profileHeaderActive = ProfileHeaderPreview(stage);
+        else if (_slot is PresentationSlots.ProfileCard or PresentationSlots.CardEffect)
         {
-            case CustomizationCategories.Home:
-                stage.Children.Add(new HomePreviewView(_session.ResolveCompiled(PresentationSlots.HomeLayout).PlanAs<HomeLayoutPlan>(),
-                    _session.ResolveCompiled(PresentationSlots.HomeBackdrop).PlanAs<BackdropPlan>(),
-                    _session.ResolveCompiled(PresentationSlots.HomeSpotlight).PlanAs<SpotlightPlan>(), SampleData(), compact: false,
-                    showRecently: _session.Resolve(PresentationSlots.HomeLayout).ShowRecently,
-                    videoPath: _services.Root?.SampleHomeVideo()));
-                break;
-            case CustomizationCategories.Gallery:
-                stage.Children.Add(GalleryLayoutOptionPreview(_session.ResolveCompiled(PresentationSlots.GalleryLayout).PlanAs<GalleryLayoutPlan>()));
-                break;
-            case CustomizationCategories.Profile:
-                if (!_figureEditorOpen && _slot is (PresentationSlots.ProfileCard or PresentationSlots.CardEffect))
-                {
-                    if (_subject is null)
-                        stage.Children.Add(UI.Text(UI.T("Customize.Loading.ProfileCard", "Loading this Profile's card…"), "body-muted").Align(HorizontalAlignment.Center, VerticalAlignment.Center));
-                    else AddCard(stage, 340, HorizontalAlignment.Center);
-                }
-                else if (!_figureEditorOpen && _slot is (PresentationSlots.ProfileMediaLayout or PresentationSlots.MediaEffect)
-                    && _subject?.PreviewMediaCard is { } mediaCard)
-                {
-                    var layout = _session.ResolveCompiled(PresentationSlots.ProfileMediaLayout).PlanAs<ProfileMediaLayoutPlan>().Layout;
-                    var visual = new MediaCardView(layout);
-                    visual.Bind(mediaCard);
-                    visual.Width = Math.Min(layout.CardWidth, 420);
-                    visual.Height = visual.Width * layout.CardHeight / Math.Max(1, layout.CardWidth);
-                    var host = new Grid { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-                    host.Children.Add(visual);
-                    stage.Children.Add(host);
-                }
-                else if (!_figureEditorOpen && _slot == PresentationSlots.ProfileFrame)
-                    stage.Children.Add(DefinitionOptionPreview(PresentationSlots.Get(_slot), _session.ResolveCompiled(_slot))!);
-                else profileHeaderActive = ProfilePreview(stage);
-                break;
+            if (_subject is null)
+                stage.Children.Add(UI.Text(UI.T("Customize.Loading.ProfileCard", "Loading this Profile's card…"), "body-muted").Align(HorizontalAlignment.Center, VerticalAlignment.Center));
+            else AddCard(stage, 340, HorizontalAlignment.Center);
         }
+        else if (_slot == PresentationSlots.ProfileMediaLayout)
+        {
+            if (_subject?.PreviewMediaCard is { } mediaCard)
+            {
+                var layout = _session.ResolveCompiled(PresentationSlots.ProfileMediaLayout).PlanAs<ProfileMediaLayoutPlan>().Layout;
+                var visual = new MediaCardView(layout);
+                visual.Bind(mediaCard);
+                visual.Width = Math.Min(layout.CardWidth, 420);
+                visual.Height = visual.Width * layout.CardHeight / Math.Max(1, layout.CardWidth);
+                var host = new Grid { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+                host.Children.Add(visual);
+                stage.Children.Add(host);
+            }
+            else profileHeaderActive = ProfileHeaderPreview(stage);
+        }
+        else if (_slot is PresentationSlots.ProfileCover or PresentationSlots.ProfileFrame)
+            FocusedCoverPreview(stage);
+        else if (_slot == PresentationSlots.ProfileBanner)
+            profileHeaderActive = FocusedBannerPreview(stage);
 
         if (!profileHeaderActive) _profilePreviewHeader.SetActive(false);
+    }
+
+    private void FocusedCoverPreview(Grid stage)
+    {
+        var plan = _session.ResolveCompiled(PresentationSlots.ProfileFrame).PlanAs<FramePlan>();
+        var appearance = _session.ProfileWorking?.Overrides ?? ProfileAppearanceOverrides.Default;
+        var cover = _focusedCover ??= new CoverFrameView();
+        cover.Source = _coverSource;
+        cover.Transform = MediaTransformState.FromCover(appearance);
+        cover.Plan = plan;
+        cover.Appearance = CardDataFactory.AppearanceFor(appearance, plan, ReducedMotionAuthority.IsReduced) with
+        {
+            DetailLevel = CoverFrameDetailLevel.Full,
+        };
+        cover.FrameMode = "full";
+        cover.HorizontalAlignment = HorizontalAlignment.Center;
+        cover.VerticalAlignment = VerticalAlignment.Center;
+        SurfaceComposer.Detach(cover);
+        AttachFraming(cover, false);
+        void Fit()
+        {
+            var size = Math.Max(1, Math.Min(stage.ActualWidth, stage.ActualHeight) - 16);
+            cover.Width = cover.Height = size;
+        }
+        cover.Width = cover.Height = Math.Max(1, _preview.Height - 16);
+        stage.SizeChanged += (_, _) => Fit();
+        stage.Children.Add(cover);
+    }
+
+    private bool FocusedBannerPreview(Grid stage)
+    {
+        if (_session.ProfileWorking is not { } profile) return false;
+        SyncBannerPreviewFromWorkingSource();
+        var plan = _session.ResolveCompiled(PresentationSlots.ProfileLayout).PlanAs<ProfileLayoutPlan>();
+        var layout = plan.Layout with { BannerMode = ProfileLayoutBannerMode.Contained };
+        var frame = _session.ResolveCompiled(PresentationSlots.ProfileFrame).PlanAs<FramePlan>();
+        SurfaceComposer.Detach(_profilePreviewHeader);
+        var additional = ActiveAdditionalBanner();
+        if (additional is null) _additionalBannerSlotId = null;
+        var candidate = additional is null ? null : ActiveBannerCandidate();
+        var slotAppearance = additional is null ? null : ActiveBannerAppearance();
+        var focusedArtwork = plan.BannerArtwork;
+        if (focusedArtwork?.Layers.Any(layer => layer.Kind == "banner") == true)
+            focusedArtwork = focusedArtwork with { Layers = focusedArtwork.Layers.Where(layer => layer.Kind != "banner").ToArray() };
+        _profilePreviewHeader.Apply(new ProfileHeaderViewState(layout, null,
+            additional is null ? _bannerVideoPath : candidate?.PlaybackPath, profile.Overrides,
+            frame, () => new Grid(), ReducedMotionAuthority.IsReduced, _session.LiveContext,
+            BannerPoster: additional is null ? _bannerSource : ImageRef.FromPath(candidate?.PreviewPath, 1600),
+            BannerArtwork: additional is null ? focusedArtwork : null,
+            BannerPrimaryMediaId: profile.Sources?.BannerMediaId,
+            FocusedBanner: true, FocusedTransform: slotAppearance?.Transform,
+            FocusedEffect: slotAppearance is null ? null : _services.Presentation.ResolveBannerSlotEffect(slotAppearance)));
+        _profilePreviewHeader.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _profilePreviewHeader.VerticalAlignment = VerticalAlignment.Stretch;
+        stage.Children.Add(_profilePreviewHeader);
+        AttachFraming(_profilePreviewHeader.BannerFramingSurface, true);
+        _profilePreviewHeader.SetActive(true);
+        return true;
     }
 
     private CardData? SampleData()
@@ -174,7 +229,7 @@ public sealed partial class CustomizationCenter
         stage.Children.Add(visual);
     }
 
-    private bool ProfilePreview(Grid stage)
+    private bool ProfileHeaderPreview(Grid stage)
     {
         if (_session.ProfileWorking is not { } profile)
         {
@@ -186,8 +241,13 @@ public sealed partial class CustomizationCenter
 
         SyncBannerPreviewFromWorkingSource();
         var profilePlan = _session.ResolveCompiled(PresentationSlots.ProfileLayout).PlanAs<ProfileLayoutPlan>();
-        var resolvedLayout = profilePlan.Layout;
-        var layout = PreviewLayoutForActiveSlot(resolvedLayout);
+        var layout = _figureEditorOpen ? profilePlan.Layout with
+        {
+            BannerMode = ProfileLayoutBannerMode.None,
+            CoverPlacement = ProfileLayoutCoverPlacement.InlineLeft,
+            CoverSize = ProfileLayoutCoverSize.Small,
+            IdentityAlignment = ProfileLayoutIdentityAlignment.Left,
+        } : profilePlan.Layout;
         var framePlan = _session.ResolveCompiled(PresentationSlots.ProfileFrame)
             .PlanAs<FramePlan>();
         FrameworkElement IdentityPreview()
@@ -204,12 +264,6 @@ public sealed partial class CustomizationCenter
         }
 
         var figurePreview = UpdateFigurePreviewSource();
-        var showSurface = !_figureEditorOpen && _slot == PresentationSlots.ProfileLayout;
-        var modular = showSurface && profilePlan.Surface?.Modular == true;
-        if (figurePreview is ProfileFigureView figure)
-        {
-            if (modular) figure.SetActive(true);
-        }
         _profilePreviewHeader.Apply(new ProfileHeaderViewState(
             layout,
             _coverSource,
@@ -218,9 +272,12 @@ public sealed partial class CustomizationCenter
             framePlan,
             IdentityPreview,
             ReducedMotionAuthority.IsReduced, _session.LiveContext,
-            FigureView: modular ? null : figurePreview,
+            FigureView: figurePreview,
             FigureSize: _figureEditorOpen ? 240 : 300, Tags: _subject?.Detail.AssignedTags, BannerPoster: _bannerSource,
-            IndependentModules: modular, BannerArtwork: profilePlan.BannerArtwork));
+            BannerArtwork: profilePlan.BannerArtwork,
+            BannerAuthority: !_figureEditorOpen && profilePlan.BannerArtwork?.Layers.Any(layer => layer.Kind == "banner") == true
+                ? _services.Runtime.MediaResources : null,
+            BannerPrimaryMediaId: _session.ProfileWorking?.Sources?.BannerMediaId));
         _profilePreviewHeader.SetActive(true);
         AttachFraming(_profilePreviewHeader.CoverFramingSurface, false);
         AttachFraming(_profilePreviewHeader.BannerFramingSurface, true);
@@ -235,78 +292,8 @@ public sealed partial class CustomizationCenter
         });
         stage.Children.Add(PresentationEffects.View(PresentationSlots.ProfileEffect, () => Context, stage,
             () => _session.ResolveCompiled(PresentationSlots.ProfileEffect).PlanAs<EffectPlan>()));
-        if (showSurface && profilePlan.Surface is { } surface)
-        {
-            FrameworkElement? Region(string id)
-            {
-                if (id == "identity") return _profilePreviewHeader;
-                if (id == "banner") return _profilePreviewHeader.BannerModule;
-                if (id == "cover") return _profilePreviewHeader.CoverModule;
-                if (id == "figure") return figurePreview;
-                if (id == "recent-media" && !profile.Overrides.ShowRecentMedia) return null;
-                return UI.Surface(UI.Text(id.Replace('-', ' '), "caption"), Material.Raised, 8, 12);
-            }
-            var body = SurfaceComposer.WithoutSemantic(surface, "actions");
-            if (body is not null)
-            {
-                var composition = SurfaceComposer.Build(body, Region, 1100, fallbackRegion: "figure");
-                if (modular) stage.Children.Add(UI.Scroll(composition));
-                else
-                {
-                    composition.Width = 1100;
-                    stage.Children.Add(new Viewbox { Stretch = Stretch.Uniform, Child = composition });
-                }
-            }
-            else return false;
-        }
-        else if (_figureEditorOpen)
-            stage.Children.Add(UI.Scroll(_profilePreviewHeader));
-        else if (_slot is PresentationSlots.ProfileCover or PresentationSlots.ProfileBanner)
-            stage.Children.Add(_profilePreviewHeader);
-        else stage.Children.Add(UI.Scroll(_profilePreviewHeader));
+        stage.Children.Add(UI.Scroll(_profilePreviewHeader));
         return true;
-    }
-
-    private ProfileLayoutDefinition PreviewLayoutForActiveSlot(ProfileLayoutDefinition layout)
-    {
-        if (_figureEditorOpen)
-        {
-            return layout with
-            {
-                BannerMode = ProfileLayoutBannerMode.None,
-                CoverPlacement = ProfileLayoutCoverPlacement.InlineLeft,
-                CoverSize = ProfileLayoutCoverSize.Small,
-                IdentityAlignment = ProfileLayoutIdentityAlignment.Left,
-            };
-        }
-        if (_slot is not (PresentationSlots.ProfileCover or PresentationSlots.ProfileBanner))
-        {
-            return layout;
-        }
-
-        if (layout.BannerMode == ProfileLayoutBannerMode.None)
-        {
-            layout = layout with { BannerMode = ProfileLayoutBannerMode.Contained };
-        }
-
-        if (_slot == PresentationSlots.ProfileBanner) return layout;
-
-        if (layout.CoverDetailLevel == CoverFrameDetailLevel.Hidden
-            || layout.CoverPlacement == ProfileLayoutCoverPlacement.None)
-        {
-            layout = layout with
-            {
-                CoverPlacement = layout.CoverPlacement == ProfileLayoutCoverPlacement.None
-                    ? ProfileLayoutCoverPlacement.InlineLeft
-                    : layout.CoverPlacement,
-                CoverSize = layout.CoverPlacement == ProfileLayoutCoverPlacement.None
-                    ? ProfileLayoutCoverSize.Medium
-                    : layout.CoverSize,
-                CoverDetailLevel = CoverFrameDetailLevel.Full,
-            };
-        }
-
-        return layout;
     }
 
     private string? HiddenSlotPreviewNotice()

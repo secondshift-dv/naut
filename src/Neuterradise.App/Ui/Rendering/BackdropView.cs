@@ -398,7 +398,7 @@ public sealed class BackdropView : Grid
                 if ((layer.AssetPath ?? (layer.Source == "media-banner" ? AmbientVideoPath : null)) is { } videoPath)
                 {
                     var video = previousVideos.FirstOrDefault(candidate => string.Equals(candidate.SourcePath, videoPath, StringComparison.OrdinalIgnoreCase));
-                    if (video is null) video = new SkVideoView();
+                    if (video is null) video = new SkVideoView { Purpose = VideoPurpose.Backdrop };
                     else previousVideos.Remove(video);
                     video.Opacity = layer.Opacity;
                     video.Play(videoPath, loop: true, still: _tier != VisualTier.Full || variant.Static);
@@ -498,7 +498,7 @@ public sealed class BackdropView : Grid
         if (allowed && !_clockRunning)
         {
             _clockRunning = true;
-            CompositionTarget.Rendering += OnFrame;
+            PresentationVisualScheduler.StartClock(OnFrame);
         }
         else if (!allowed)
         {
@@ -515,15 +515,14 @@ public sealed class BackdropView : Grid
         if (_clockRunning)
         {
             _clockRunning = false;
-            CompositionTarget.Rendering -= OnFrame;
+            PresentationVisualScheduler.StopClock(OnFrame);
         }
     }
 
-    private void OnFrame(object? sender, object e)
+    private void OnFrame(long now)
     {
         // Scroll reduces drawing frequency without rebuilding layers or changing particle trajectories.
         var interval = _tier == VisualTier.Full && !ResourceGovernor.Shared.IsScrolling ? 33 : 66;
-        var now = Environment.TickCount64;
         if (now - _lastFrame < interval)
         {
             return;

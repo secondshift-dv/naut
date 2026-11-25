@@ -87,6 +87,11 @@ public sealed class CandidateHashJobOperation : IHashMediaJobOperation
         {
             return JobExecutionResult.Cancelled("Candidate hashing reached a safe cancellation boundary.");
         }
+        catch (ImportSourceChangedException)
+        {
+            return JobExecutionResult.Failed(JobFailureClassification.ContentMismatch, "SOURCE_CHANGED",
+                "The source file differs from its intake identity or that identity is unavailable. Select the source again.");
+        }
         catch (FileNotFoundException)
         {
             return JobExecutionResult.Failed(

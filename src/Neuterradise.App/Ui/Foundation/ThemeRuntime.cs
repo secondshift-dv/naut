@@ -22,11 +22,17 @@ public sealed class ThemeRuntime
 
     private readonly Dictionary<string, SolidColorBrush> _brushes = new(StringComparer.Ordinal);
     private readonly ConditionalWeakTable<TextBlock, TypeRegistration> _typed = new();
+    private int _appearanceRevision;
     private LinearGradientBrush? _glass;
     private readonly Dictionary<string, FontFamily> _fonts = new(StringComparer.Ordinal);
     private readonly ConditionalWeakTable<Control, Action<Control>> _controls = new();
     private readonly ConditionalWeakTable<Border, Action<Border>> _controlBorders = new();
     public ControlSkinPlan? ControlSkin { get; private set; }
+    private TypographyPlan? _typography;
+    public TypeStyle TypeStyle(string role) =>
+        _typography?.Styles.GetValueOrDefault(role)
+        ?? TokenAuthority.Foundations.TypeStyles.GetValueOrDefault(role)
+        ?? TokenAuthority.Foundations.TypeStyles["body"];
     public ControlSkinPlan ControlFamily(string family) => (ControlSkin ?? new ControlSkinPlan(
         Tokens.Number("radiusControl", 8), Tokens.Number("borderWeight", 1), 9, 4,
         Tokens.Number("densityControlHeight", 30), 8, "token:surface3", "token:surfaceHover",
@@ -34,6 +40,10 @@ public sealed class ThemeRuntime
 
     public void TrackControlFamily(Control control, string family, bool neutral = true, bool compact = false, ButtonKind kind = ButtonKind.Secondary, ControlSkinPlan? preview = null)
     {
+        var originalWidth = control.Width;
+        var originalHeight = control.Height;
+        var originalIconSize = control is Button { Content: IconView initialIcon } ? initialIcon.Width : double.NaN;
+        var originalWeight = control.FontWeight;
         TrackControl(control, value =>
         {
             var skin = preview?.For(family) ?? ControlFamily(family);
@@ -64,8 +74,17 @@ public sealed class ThemeRuntime
                 if (family is not ("slider" or "toggle" or "scrollbar"))
                     value.Padding = new Thickness(skin.HorizontalPadding, skin.VerticalPadding, skin.HorizontalPadding, skin.VerticalPadding);
             }
-            value.FontFamily = Font("body");
-            value.FontSize = TokenAuthority.Foundations.TypeStyles["control"].Size;
+            var type = TypeStyle("control");
+            value.FontFamily = Font(type.FontRole);
+            value.FontSize = type.Size;
+            value.FontWeight = _typography?.Styles.ContainsKey("control") == true
+                ? new Windows.UI.Text.FontWeight((ushort)type.Weight) : originalWeight;
+            if (compact && value is Button { Content: IconView icon } && double.IsFinite(originalIconSize))
+            {
+                value.Width = skin.IconButtonSize ?? originalWidth;
+                value.Height = skin.IconButtonSize ?? originalHeight;
+                icon.Width = icon.Height = skin.IconButtonSize is { } iconSize ? Math.Round(iconSize * 0.5) : originalIconSize;
+            }
             if (family == "slider")
             {
                 value.Resources["SliderTrackFill"] = ControlFill(skin, skin.Fill);
@@ -185,8 +204,15 @@ public sealed class ThemeRuntime
 
     public void TrackControlBorder(Border border, Action<Border> apply)
     {
+        if (!_controlBorders.TryGetValue(border, out _))
+            border.Loaded += OnTrackedBorderLoaded;
         _controlBorders.AddOrUpdate(border, apply);
         apply(border);
+    }
+
+    private void OnTrackedBorderLoaded(object sender, RoutedEventArgs args)
+    {
+        if (sender is Border border && _controlBorders.TryGetValue(border, out var apply)) apply(border);
     }
 
     public void TrackNativeControls(DependencyObject root)
@@ -326,22 +352,30 @@ public sealed class ThemeRuntime
 
     public void ApplyType(TextBlock block, string role, string? colorToken = null)
     {
-        if (!_typed.TryGetValue(block, out var registration) || registration.Role != role || registration.Color != colorToken)
-            _typed.AddOrUpdate(block, new TypeRegistration(role, colorToken));
-        ApplyRegisteredType(block, role, colorToken);
+        if (!_typed.TryGetValue(block, out var registration))
+            block.Loaded += OnTrackedTextLoaded;
+        if (registration is null || registration.Role != role || registration.Color != colorToken)
+            _typed.AddOrUpdate(block, registration = new TypeRegistration(role, colorToken));
+        ApplyRegisteredType(block, registration);
     }
 
-    private void ApplyRegisteredType(TextBlock block, string role, string? colorToken)
+    private void OnTrackedTextLoaded(object sender, RoutedEventArgs args)
     {
-        var style = TokenAuthority.Foundations.TypeStyles.TryGetValue(role, out var s)
-            ? s
-            : TokenAuthority.Foundations.TypeStyles["body"];
+        if (sender is TextBlock block && _typed.TryGetValue(block, out var registration)
+            && registration.AppliedRevision != _appearanceRevision)
+            ApplyRegisteredType(block, registration);
+    }
+
+    private void ApplyRegisteredType(TextBlock block, TypeRegistration registration)
+    {
+        var style = TypeStyle(registration.Role);
         block.FontFamily = Font(style.FontRole);
         block.FontSize = style.Size;
         block.LineHeight = style.LineHeight;
         block.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
         block.FontWeight = new Windows.UI.Text.FontWeight((ushort)style.Weight);
-        block.Foreground = Brush(colorToken ?? style.ColorRole);
+        block.Foreground = Brush(registration.Color ?? style.ColorRole);
+        registration.AppliedRevision = _appearanceRevision;
         if (style.Trim)
         {
             block.TextTrimming = TextTrimming.CharacterEllipsis;
@@ -359,10 +393,12 @@ public sealed class ThemeRuntime
     /// <summary>Applies a resolved presentation (called on start, Apply, and during live preview).</summary>
     public void Apply(ThemePlan theme, TypographyPlan? typography = null, ControlSkinPlan? controls = null)
     {
+        _appearanceRevision++;
         Theme = theme.Theme;
         Material = theme.Material;
         Tokens = TokenAuthority.Resolve(Theme, Material, ReducedMotion);
         ControlSkin = controls;
+        _typography = typography;
         _fonts.Clear();
         LocalPresentationFonts.Current.BeginSelection();
         if (typography is not null)
@@ -373,8 +409,10 @@ public sealed class ThemeRuntime
         PushBrushes();
         ReapplyTypography();
         RefreshThemeElements();
-        foreach (var (control, apply) in _controls) apply(control);
-        foreach (var (border, apply) in _controlBorders) apply(border);
+        foreach (var (control, apply) in _controls)
+            if (control.IsLoaded) apply(control);
+        foreach (var (border, apply) in _controlBorders)
+            if (border.IsLoaded) apply(border);
         NotifyChanged();
     }
 
@@ -387,8 +425,10 @@ public sealed class ThemeRuntime
 
     private void ReapplyTypography()
     {
+        // Weak registrations include detached or retired native elements. Updating those
+        // dependency stores can fail; cached surfaces receive the current type on Loaded.
         foreach (var (block, registration) in _typed)
-            ApplyRegisteredType(block, registration.Role, registration.Color);
+            if (block.IsLoaded) ApplyRegisteredType(block, registration);
     }
 
     private Windows.UI.Color ResolveColor(string token)
@@ -576,7 +616,7 @@ public sealed class ThemeRuntime
                 Tokens.Number("densityControlPaddingVertical", 3),
                 Tokens.Number("densityControlPaddingHorizontal", 9),
                 Tokens.Number("densityControlPaddingVertical", 3));
-            resources["CompactControlFontSize"] = TokenAuthority.Foundations.TypeStyles["control"].Size;
+            resources["CompactControlFontSize"] = TypeStyle("control").Size;
             resources["CompactControlFontFamily"] = Font("body");
             resources["ControlCornerRadius"] = new CornerRadius(Tokens.Number("radiusControl", 8));
             resources["OverlayCornerRadius"] = new CornerRadius(Tokens.Number("radiusCard", 12));
@@ -631,14 +671,25 @@ public sealed class ThemeRuntime
 
     public void TrackThemeElement<T>(T element, Action<T> apply) where T : FrameworkElement
     {
+        if (!_themeElements.TryGetValue(element, out _))
+            element.Loaded += OnTrackedThemeElementLoaded;
         _themeElements.AddOrUpdate(element, value => apply((T)value));
         apply(element);
     }
 
-    private void RefreshThemeElements()
+    private void OnTrackedThemeElementLoaded(object sender, RoutedEventArgs args)
     {
-        foreach (var (element, apply) in _themeElements) apply(element);
+        if (sender is FrameworkElement element && _themeElements.TryGetValue(element, out var apply)) apply(element);
     }
 
-    private sealed record TypeRegistration(string Role, string? Color);
+    private void RefreshThemeElements()
+    {
+        foreach (var (element, apply) in _themeElements)
+            if (element.IsLoaded) apply(element);
+    }
+
+    private sealed record TypeRegistration(string Role, string? Color)
+    {
+        public int AppliedRevision { get; set; } = -1;
+    }
 }

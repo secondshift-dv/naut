@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "packId": "neuterradise.celestial",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "name": "Nightfall Murim",
   "author": "secondshift-dv",
   "description": "A nocturnal mountain sect told in sequential panels.",
   "license": "CC-BY-4.0",
-  "minContractVersion": 3,
+  "minContractVersion": 4,
   "assets": [
     {
       "id": "citadel",
@@ -73,6 +73,12 @@
       "kind": "Image",
       "path": "assets/moon-seal.png",
       "bytes": 1894
+    },
+    {
+      "kind": "Image",
+      "bytes": 5262,
+      "path": "assets/gallery-architecture.png",
+      "id": "gallery-architecture"
     }
   ],
   "definitions": [
@@ -296,7 +302,7 @@
             "maxItems": 4
           }
         ],
-        "surface": {
+        "scene": {
           "type": "stack",
           "spacing": 27,
           "children": [
@@ -455,7 +461,7 @@
       "previewAccent": "#FFA78BFA",
       "spec": {
         "preset": "editorial",
-        "surface": {
+        "scene": {
           "type": "grid",
           "columns": [
             "3*",
@@ -787,8 +793,8 @@
         "showCover": true,
         "showOverview": false,
         "pagination": "counter-rail",
-        "scrimStrength": 0.30,
-        "surface": {
+        "scrimStrength": 0.3,
+        "scene": {
           "type": "grid",
           "columns": [
             "4*",
@@ -983,6 +989,65 @@
             "thumbWidth": 18,
             "thumbHeight": 22
           }
+        },
+        "navigation": {
+          "dock": "top",
+          "extent": 86,
+          "immersive": false,
+          "scene": {
+            "type": "grid",
+            "rows": [
+              "*"
+            ],
+            "columns": [
+              "1.5*",
+              "*",
+              "*",
+              "*",
+              "*",
+              "1.4*",
+              "*"
+            ],
+            "spacing": 5,
+            "padding": 6,
+            "children": [
+              {
+                "type": "semantic",
+                "id": "vault",
+                "column": 0
+              },
+              {
+                "type": "semantic",
+                "id": "home",
+                "column": 1
+              },
+              {
+                "type": "semantic",
+                "id": "gallery",
+                "column": 2
+              },
+              {
+                "type": "semantic",
+                "id": "import",
+                "column": 3
+              },
+              {
+                "type": "semantic",
+                "id": "settings",
+                "column": 4
+              },
+              {
+                "type": "semantic",
+                "id": "activity",
+                "column": 5
+              },
+              {
+                "type": "semantic",
+                "id": "customize",
+                "column": 6
+              }
+            ]
+          }
         }
       }
     },
@@ -1054,6 +1119,94 @@
         "scale": 1,
         "tint": false,
         "animated": false
+      }
+    },
+    {
+      "id": "neuterradise.celestial.gallery",
+      "kind": "gallery-layout",
+      "name": "Jade Archive",
+      "description": "Virtualized collection with a world-specific static architectural frame.",
+      "spec": {
+        "primitive": "VirtualizedGrid",
+        "itemMinWidth": 220,
+        "itemMaxWidth": 300,
+        "itemAspect": 1.25,
+        "spacing": 14,
+        "maxColumns": 8,
+        "scene": {
+          "background": {
+            "variants": {
+              "full": {
+                "layers": [
+                  {
+                    "kind": "image",
+                    "asset": "citadel",
+                    "opacity": 1
+                  },
+                  {
+                    "kind": "scrim",
+                    "color": "#FF151024",
+                    "opacity": 0.62
+                  }
+                ]
+              },
+              "reduced": {
+                "layers": [
+                  {
+                    "kind": "image",
+                    "asset": "citadel",
+                    "opacity": 1
+                  },
+                  {
+                    "kind": "scrim",
+                    "color": "#FF151024",
+                    "opacity": 0.62
+                  }
+                ]
+              },
+              "fallback": {
+                "layers": [
+                  {
+                    "kind": "image",
+                    "asset": "citadel",
+                    "opacity": 1
+                  },
+                  {
+                    "kind": "scrim",
+                    "color": "#FF151024",
+                    "opacity": 0.62
+                  }
+                ]
+              }
+            }
+          },
+          "itemOverlay": "gallery-architecture",
+          "itemInset": 0.1,
+          "cardSizing": "intrinsic",
+          "cardRotation": 0,
+          "cardSkew": 0,
+          "overlayPlacement": "behind"
+        }
+      }
+    },
+    {
+      "id": "neuterradise.celestial.typography",
+      "kind": "typography",
+      "name": "Sect Chronicle Type",
+      "description": "System typography with no additional font payload.",
+      "spec": {
+        "display": {
+          "family": "Georgia"
+        },
+        "heading": {
+          "family": "Georgia"
+        },
+        "body": {
+          "family": "Segoe UI"
+        },
+        "mono": {
+          "family": "Consolas"
+        }
       }
     }
   ]

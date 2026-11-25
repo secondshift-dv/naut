@@ -71,6 +71,27 @@ Matched ABBA comparison of 500 WebP decodes per pass, same input set and target 
 
 Both variants decoded all 500 images. Dimensions and decoded pixel SHA-256 matched on 20 comparison images. The first pass had a substantially different cache state; no decode wall-time speedup is claimed.
 
+### Shared video decoder (Contract 4)
+
+25 November 2026: matched ABBA comparison of the packaged v0.0.38 baseline and uncommitted pre-release development source. The baseline assembly hashes were verified against its release inventory. The same synthetic 640 x 360, 24 fps video (SHA-256 `10f20cf94c3731109dbc0f7488861a6163dd4657bf2ea0354622dbc0c3066275`) looped in two 480 x 270 native viewports for approximately 12 s per pass, followed by 6 s idle after stopping. Each variant ran twice. UI delay is the excess over the 50 ms dispatcher heartbeat.
+
+| Playback metric | Baseline 1 | Candidate 1 | Candidate 2 | Baseline 2 |
+|---|---:|---:|---:|---:|
+| App CPU (ms) | 5625.000 | 4906.250 | 3234.375 | 6578.125 |
+| Decoder CPU (ms) | 1250.000 | 546.875 | 500.000 | 953.125 |
+| Active decoders | 2 | 1 | 1 | 2 |
+| App peak Private Bytes | 180793344 | 178667520 | 178610176 | 180076544 |
+| Decoder peak Private Bytes | 55173120 | 27648000 | 27439104 | 55197696 |
+| Managed allocated bytes | 8013424 | 4468456 | 4533232 | 8061720 |
+| GC collections (Gen 0/1/2) | 4/4/2 | 2/2/2 | 2/2/2 | 4/1/0 |
+| GC committed bytes | 19431424 | 19202048 | 19206144 | 21635072 |
+| UI delay P95 (ms) | 23.889 | 20.721 | 16.867 | 18.031 |
+| UI delay max (ms) | 82.247 | 92.745 | 19.586 | 26.022 |
+| Post-stop idle app CPU (ms) | 531.250 | 484.375 | 453.125 | 281.250 |
+
+The mean combined playback CPU decreased 36.2%, decoder peak Private Bytes decreased 50.1%, managed allocation decreased 44.0%, and mean P95 delay decreased 10.3%. App peak Private Bytes decreased 1.0%. Mean maximum delay increased 3.8%; idle app CPU increased 15.4% and both idle samples had zero active decoders. These are matched component measurements with run-to-run variation, not an application-wide speedup or proof of idle improvement. App and decoder peaks are not necessarily simultaneous.
+
+
 ## Navigation and memory
 
 25 November 2026, isolated native shell, 1,100 x 720 window, 30 Profile-to-Import cycles per pass. The Figure-free run traversed 30 distinct profiles cold, warm and repeated, then the same profile 30 times; the Figure run traversed distinct cold, warm and same-profile passes. The Face service reported Available at startup; navigation was not an inference benchmark. These runs measured the navigation workload, not production idle.
@@ -107,5 +128,9 @@ The historical 96.146 s pipeline measured 37.03 MiB physical reads and 835.66 Mi
 ## Reproduction and limits
 
 The private development benchmark suite includes dispatcher, duplicate, bulk and transfer probes. See the public [build and release reference](development/build-and-release.md) for shipped source verification and canonical package reproduction. The native benchmark harness and synthetic inputs are retained as private development evidence, not distributed with the application.
+
+### v0.0.39 importer component verification
+
+25 November 2026, SDK 10.0.401, synthetic local fixtures, canonical benchmark scenario All. The duplicate matrix matched all expected counts (80 files, 0/25/50/100% duplicate ratios); hash-and-lookup P95 was 17.9/15.8/17.7/48.7 ms respectively. All 27 transfer matrix samples passed byte-integrity checks. Median throughput at the existing 1 MiB buffer/64 MiB checkpoint configuration was 285.04 MiB/s; median standalone hashing was 873.47 MiB/s. The bulk probe transferred 6,476,005,376 bytes across 100 files at a weighted 288.04 MiB/s, with 169 durable checkpoints, matching staged hashes, unchanged sources and successful cancellation cleanup. The mixed-batch probe published 910 of 1,000 candidates (90 owned duplicates) in 130.097 s and 92 of 2,934 candidates (2,842 owned duplicates) in 102.125 s. These are component and synthetic lifecycle observations, not a matched comparison against the previous revision; throughput varied across runs and no zero-regression claim is established.
 
 Native measurements use synthetic sources, a disposable catalog, and a locally compiled test harness. Keep exact input hashes, starting fixture inventory, harness/source identity, logs and integrity checks in private evidence storage outside the repository. Generated media, raw traces, dumps and binaries are not source artifacts. The preserved measurement summaries do not certify production Vault performance, exhaustive CPU/native ownership, an HDD throughput forecast, a signed upgrade, or canonical packaging of uncommitted source.

@@ -24,16 +24,16 @@ public sealed class ModelRenderValidationReceipts(CatalogDb catalog)
         string SourceHash, string AssetHash, NtfsChangeStamp Stamp);
 
     public async Task<ModelRenderFile> ValidateAsync(string path, string sourceHash,
-        CancellationToken ct = default, bool deep = false, bool backgroundIo = false)
+        CancellationToken ct = default, bool deep = false, bool backgroundIo = false, bool persistReceipt = true)
     {
         var gates = Gates.GetValue(catalog, _ => Enumerable.Range(0, 16).Select(_ => new SemaphoreSlim(1, 1)).ToArray());
         var gate = gates[StringComparer.OrdinalIgnoreCase.GetHashCode(Path.GetFullPath(path)) & 15];
         await gate.WaitAsync(ct).ConfigureAwait(false);
-        try { return await ValidateCoreAsync(path, sourceHash, ct, deep, backgroundIo).ConfigureAwait(false); }
+        try { return await ValidateCoreAsync(path, sourceHash, ct, deep, backgroundIo, persistReceipt).ConfigureAwait(false); }
         finally { gate.Release(); }
     }
 
-    private async Task<ModelRenderFile> ValidateCoreAsync(string path, string sourceHash, CancellationToken ct, bool deep, bool backgroundIo)
+    private async Task<ModelRenderFile> ValidateCoreAsync(string path, string sourceHash, CancellationToken ct, bool deep, bool backgroundIo, bool persistReceipt)
     {
         var relative = Path.GetRelativePath(catalog.Paths.Root, Path.GetFullPath(path)).Replace('\\', '/');
         path = catalog.Paths.ResolveVaultRelativePath(VaultPathArea.MediaAssets, relative);
@@ -76,7 +76,7 @@ public sealed class ModelRenderValidationReceipts(CatalogDb catalog)
         if (valid.Sha256 != assetHash || valid.ByteLength != length)
             throw new InvalidDataException("NFIG SHA-256 differs from its catalog fingerprint.");
         var after = NtfsChangeStamp.TryRead(file, path);
-        if (vault is not null && stamp is not null && after is not null && stamp.ProvesUnchanged(after))
+        if (persistReceipt && vault is not null && stamp is not null && after is not null && stamp.ProvesUnchanged(after))
         {
             try { await SaveAsync(new Receipt(1, vault.VaultId, mediaId, assetId, sourceHash, assetHash, after), ct).ConfigureAwait(false); }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException

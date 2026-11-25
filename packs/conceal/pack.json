@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "packId": "conceal",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "name": "Conceal",
   "description": "A quiet index with deliberately limited information at rest.",
-  "minContractVersion": 3,
+  "minContractVersion": 4,
   "assets": [
     {
       "id": "backdrop-paper",
@@ -59,6 +59,12 @@
       "kind": "Image",
       "path": "assets/banner-edge.png",
       "bytes": 5662
+    },
+    {
+      "kind": "Image",
+      "bytes": 7600,
+      "path": "assets/gallery-architecture.png",
+      "id": "gallery-architecture"
     }
   ],
   "definitions": [
@@ -487,7 +493,7 @@
             "maxItems": 4
           }
         ],
-        "surface": {
+        "scene": {
           "type": "stack",
           "spacing": 14,
           "children": [
@@ -543,7 +549,7 @@
         "showOverview": false,
         "pagination": "counter",
         "scrimStrength": 0.5,
-        "surface": {
+        "scene": {
           "type": "grid",
           "columns": [
             "2*",
@@ -628,7 +634,7 @@
       "description": "The folio puts identity above a narrow Banner and overview. The media index follows, with Figure and review farther down the page.",
       "spec": {
         "preset": "portrait",
-        "surface": {
+        "scene": {
           "type": "stack",
           "spacing": 11,
           "children": [
@@ -780,6 +786,235 @@
         "hoverStyle": "lift",
         "showTypeBadge": false,
         "browse": "editorial"
+      }
+    },
+    {
+      "id": "conceal.gallery",
+      "kind": "gallery-layout",
+      "name": "Folded Folio",
+      "description": "Virtualized collection with a world-specific static architectural frame.",
+      "spec": {
+        "primitive": "VirtualizedGrid",
+        "itemMinWidth": 240,
+        "itemMaxWidth": 360,
+        "spacing": 14,
+        "maxColumns": 6,
+        "scene": {
+          "background": {
+            "variants": {
+              "full": {
+                "layers": [
+                  {
+                    "kind": "image",
+                    "asset": "backdrop-paper",
+                    "opacity": 1
+                  },
+                  {
+                    "kind": "scrim",
+                    "color": "#FFE5DCC9",
+                    "opacity": 0.35
+                  }
+                ]
+              },
+              "reduced": {
+                "layers": [
+                  {
+                    "kind": "image",
+                    "asset": "backdrop-paper",
+                    "opacity": 1
+                  },
+                  {
+                    "kind": "scrim",
+                    "color": "#FFE5DCC9",
+                    "opacity": 0.35
+                  }
+                ]
+              },
+              "fallback": {
+                "layers": [
+                  {
+                    "kind": "image",
+                    "asset": "backdrop-paper",
+                    "opacity": 1
+                  },
+                  {
+                    "kind": "scrim",
+                    "color": "#FFE5DCC9",
+                    "opacity": 0.35
+                  }
+                ]
+              }
+            }
+          },
+          "itemOverlay": "gallery-architecture",
+          "itemInset": 0.055,
+          "cardSizing": "intrinsic",
+          "cardRotation": -2,
+          "cardSkew": 0,
+          "overlayPlacement": "front"
+        }
+      }
+    },
+    {
+      "id": "conceal.controls",
+      "kind": "control-skin",
+      "name": "Tracing Controls",
+      "description": "Coordinated native control skin.",
+      "spec": {
+        "radius": 3,
+        "borderWidth": 1.2,
+        "horizontalPadding": 10,
+        "verticalPadding": 4,
+        "height": 32,
+        "scrollbarWidth": 7,
+        "fill": "token:surface2",
+        "hoverFill": "token:surfaceHover",
+        "pressedFill": "token:surfacePressed",
+        "border": "token:borderDefault",
+        "focus": "token:focus",
+        "material": "inset",
+        "relief": 0.16,
+        "families": {
+          "button": {
+            "radius": 3
+          },
+          "chip": {
+            "radius": 2
+          },
+          "input": {
+            "material": "inset"
+          },
+          "tab": {
+            "edge": "bottom"
+          }
+        },
+        "navigation": {
+          "dock": "top",
+          "extent": 86,
+          "immersive": true,
+          "scene": {
+            "type": "grid",
+            "rows": [
+              "*"
+            ],
+            "columns": [
+              "1.5*",
+              "*",
+              "*",
+              "*",
+              "*",
+              "1.4*",
+              "*"
+            ],
+            "spacing": 5,
+            "padding": 6,
+            "children": [
+              {
+                "type": "semantic",
+                "id": "vault",
+                "column": 0
+              },
+              {
+                "type": "semantic",
+                "id": "home",
+                "column": 1
+              },
+              {
+                "type": "semantic",
+                "id": "gallery",
+                "column": 2
+              },
+              {
+                "type": "semantic",
+                "id": "import",
+                "column": 3
+              },
+              {
+                "type": "semantic",
+                "id": "settings",
+                "column": 4
+              },
+              {
+                "type": "semantic",
+                "id": "activity",
+                "column": 5
+              },
+              {
+                "type": "semantic",
+                "id": "customize",
+                "column": 6
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "conceal.typography",
+      "kind": "typography",
+      "name": "Folio Type",
+      "description": "System typography with no additional font payload.",
+      "spec": {
+        "display": {
+          "family": "Georgia"
+        },
+        "heading": {
+          "family": "Georgia"
+        },
+        "body": {
+          "family": "Segoe UI"
+        },
+        "mono": {
+          "family": "Consolas"
+        }
+      }
+    },
+    {
+      "id": "conceal.effect",
+      "kind": "effect",
+      "name": "Paper Light",
+      "description": "Static light on tracing paper.",
+      "spec": {
+        "channel": "lighting",
+        "targets": [
+          "effect.home",
+          "effect.profile",
+          "effect.card",
+          "effect.profile.banner"
+        ],
+        "interactionOnly": false,
+        "variants": {
+          "full": {
+            "layers": [
+              {
+                "kind": "radial-glow",
+                "color": "token:accentSecondary",
+                "opacity": 0.07,
+                "radius": 0.9
+              }
+            ]
+          },
+          "reduced": {
+            "layers": [
+              {
+                "kind": "radial-glow",
+                "color": "token:accentSecondary",
+                "opacity": 0.07,
+                "radius": 0.9
+              }
+            ]
+          },
+          "fallback": {
+            "layers": [
+              {
+                "kind": "radial-glow",
+                "color": "token:accentSecondary",
+                "opacity": 0.07,
+                "radius": 0.9
+              }
+            ]
+          }
+        }
       }
     }
   ],

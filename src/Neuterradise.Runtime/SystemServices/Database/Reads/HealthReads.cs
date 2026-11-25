@@ -212,8 +212,18 @@ public sealed class HealthReads
                    pa.profile_id AS owner_profile_id,
                    CASE WHEN p.kind = 'UNKNOWN' THEN 'Unknown ' || p.unknown_sequence ELSE p.display_name END AS owner_display_name,
                    p.profile_storage_token AS owner_storage_token,
-                   a.current_managed_file_name
+                   a.current_managed_file_name, a.row_version, a.bundle_sha256, health.status,
+                   (a.path_state = 'NONE' AND a.state = 'ACTIVE' AND a.trashed_at_ms IS NULL
+                       AND p.visibility = 'PUBLISHED' AND p.trashed_at_ms IS NULL
+                       AND p.path_state = 'NONE' AND pa.publication_import_unit_id IS NULL
+                       AND (SELECT COUNT(*) FROM profile_media own WHERE own.media_id = a.media_id
+                            AND own.relation_type = 'OWNER') = 1
+                       AND NOT EXISTS (SELECT 1 FROM trash_entries t WHERE t.state IN ('PENDING','EXECUTING')
+                           AND ((t.entity_type = 'MEDIA' AND t.entity_id = a.media_id)
+                             OR (t.entity_type = 'PROFILE' AND t.entity_id = p.profile_id)))
+                       AND NOT EXISTS (SELECT 1 FROM import_cancel_media_reservations reservation WHERE reservation.media_id = a.media_id)), p.current_managed_relative_path
             FROM media a
+            LEFT JOIN canonical_original_health health ON health.media_id = a.media_id
             LEFT JOIN profile_media pa ON pa.media_id = a.media_id AND pa.relation_type = $ownerRelation
             LEFT JOIN profiles p ON p.profile_id = pa.profile_id
             WHERE 1=1
@@ -255,7 +265,11 @@ public sealed class HealthReads
                 OwnerProfileId: reader.IsDBNull(9) ? null : DbGuid.Parse(reader.GetString(9)),
                 OwnerDisplayName: reader.IsDBNull(10) ? null : reader.GetString(10),
                 OwnerStorageToken: reader.IsDBNull(11) ? null : reader.GetString(11),
-                CurrentManagedFileName: reader.IsDBNull(12) ? null : reader.GetString(12)));
+                CurrentManagedFileName: reader.IsDBNull(12) ? null : reader.GetString(12),
+                RowVersion: reader.GetInt64(13),
+                BundleSha256: reader.IsDBNull(14) ? null : reader.GetString(14),
+                OriginalHealthStatus: reader.IsDBNull(15) ? null : reader.GetString(15),
+                HasStablePublishedOwner: !reader.IsDBNull(16) && reader.GetBoolean(16), OwnerManagedRelativePath: reader.IsDBNull(17) ? null : reader.GetString(17)));
         }
 
         return results;
@@ -317,6 +331,62 @@ public sealed class HealthReads
         }
 
         return results;
+    }
+
+    public async Task<IReadOnlyList<HealthFinding>> GetSqliteIntegrityFindingsAsync(CancellationToken ct = default)
+    {
+        var findings = new List<HealthFinding>();
+        await using var connection = await _connectionFactory.OpenConnectionAsync(ct).ConfigureAwait(false);
+        var handle = connection.Handle!;
+        // Microsoft.Data.Sqlite executes native statements synchronously. The native
+        // progress callback interrupts long integrity statements even before the first row.
+        SQLitePCL.raw.sqlite3_progress_handler(handle, 4096,
+            state => ((CancellationToken)state).IsCancellationRequested ? 1 : 0, ct);
+        try
+        {
+            ct.ThrowIfCancellationRequested();
+            await using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "PRAGMA integrity_check(100);";
+                await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                while (await reader.ReadAsync(ct).ConfigureAwait(false))
+                {
+                    ct.ThrowIfCancellationRequested();
+                    if (!string.Equals(reader.GetString(0), "ok", StringComparison.Ordinal))
+                        findings.Add(new HealthFinding(HealthFindingCode.SqliteStructuralIntegrity, HealthSeverity.Critical,
+                            null, null, null, null, "SQLite reported structural integrity errors.", false));
+                }
+            }
+            if (findings.Count > 0) return findings;
+            await using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "PRAGMA foreign_key_check;";
+                await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                var counts = new Dictionary<string,long>(StringComparer.Ordinal);
+                while (await reader.ReadAsync(ct).ConfigureAwait(false))
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var table = reader.GetString(0);
+                    counts[table] = counts.GetValueOrDefault(table) + 1;
+                }
+                foreach (var (table,count) in counts)
+                    findings.Add(new HealthFinding(HealthFindingCode.SqliteForeignKeyIntegrity, HealthSeverity.Critical,
+                        null, null, null, null, $"SQLite foreign-key violations in {table}: {count}.", false));
+            }
+            return findings;
+        }
+        catch (SqliteException ex) when (ex.SqliteErrorCode == 9 && ct.IsCancellationRequested)
+        { throw new OperationCanceledException(ct); }
+        catch (SqliteException ex) when (ex.SqliteErrorCode is 11 or 26)
+        {
+            return [new HealthFinding(HealthFindingCode.SqliteStructuralIntegrity, HealthSeverity.Critical,
+                null, null, null, null, "SQLite reported structural integrity errors.", false)];
+        }
+        finally
+        {
+            // Do not return a pooled connection with another scan's cancellation handler.
+            SQLitePCL.raw.sqlite3_progress_handler(handle, 0, null, null);
+        }
     }
 
     public async Task<IReadOnlyList<HealthFinding>> GetDatabaseIntegrityFindingsAsync(

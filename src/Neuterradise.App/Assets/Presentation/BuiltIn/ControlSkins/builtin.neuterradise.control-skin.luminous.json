@@ -22,6 +22,7 @@
         "radius": 6
       },
       "chip": {
+        "passiveHeight": 20,
         "radius": 12,
         "height": 24,
         "horizontalPadding": 7,

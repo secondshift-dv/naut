@@ -1,6 +1,6 @@
-# Conceal 3.0.0
+# Conceal 4.0.0
 
-Requires Naut v0.0.29 or later (Presentation Contract 3).
+Source requires Presentation Contract 4. Published 3.0.0 downloads require Naut v0.0.29 or later (Contract 3).
 
 Tracing Index presents a short summary and activity first. The artwork is secondary and the Spotlight omits Cover and Overview.
 

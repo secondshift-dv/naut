@@ -1,4 +1,5 @@
 using Neuterradise.App.Presentation;
+using Microsoft.UI.Xaml.Media;
 
 namespace Neuterradise.App.Ui;
 
@@ -8,6 +9,40 @@ internal static class PresentationVisualScheduler
     private static long _sequence;
     private static bool _updating;
     private static bool _dirty;
+
+    private static readonly List<SceneMotionView> SceneHosts = [];
+    private const int MaxActiveSceneLayers = 8;
+
+    public static void SetSceneActive(SceneMotionView host, bool active)
+    {
+        if (active)
+        {
+            if (SceneHosts.Contains(host)) return;
+            SceneHosts.Add(host);
+        }
+        else
+        {
+            if (!SceneHosts.Remove(host)) return;
+            host.ApplyAdmission(false);
+        }
+        for (var index = 0; index < SceneHosts.Count; index++)
+            SceneHosts[index].ApplyAdmission(index < MaxActiveSceneLayers);
+    }
+
+    private static event Action<long>? Frame;
+    public static void StartClock(Action<long> handler)
+    {
+        if (Frame is null) CompositionTarget.Rendering += OnFrame;
+        Frame += handler;
+    }
+
+    public static void StopClock(Action<long> handler)
+    {
+        Frame -= handler;
+        if (Frame is null) CompositionTarget.Rendering -= OnFrame;
+    }
+
+    private static void OnFrame(object? sender, object args) => Frame?.Invoke(Environment.TickCount64);
 
     public static void Update(BackdropView host, bool active)
     {

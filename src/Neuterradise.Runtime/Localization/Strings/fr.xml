@@ -79,6 +79,11 @@
     <sys:String x:Key="Import.Normalize">Normale</sys:String>
     <sys:String x:Key="Import.Problems">Examen requis</sys:String>
     <sys:String x:Key="Import.Problems.Description">Résolvez ces problèmes pour continuer.</sys:String>
+    <sys:String x:Key="Import.Review.RetryAll">Tout réessayer ({0})</sys:String>
+    <sys:String x:Key="Import.Review.ReuseAll">Réutiliser tous les doublons ({0})</sys:String>
+    <sys:String x:Key="Import.Review.KeepAll">Tout conserver dans la destination ({0})</sys:String>
+    <sys:String x:Key="Import.Review.MoveAll">Tout déplacer vers les profils reconnus ({0})</sys:String>
+    <sys:String x:Key="Import.Review.RemoveAll">Retirer tous les éléments à vérifier ({0})</sys:String>
     <sys:String x:Key="Import.ProfileCollision">Reconnu comme un autre Profile</sys:String>
     <sys:String x:Key="Import.ProfilePicker.CurrentSelection">Les médias seront ajoutés à ce Profile.</sys:String>
     <sys:String x:Key="Import.ProfilePicker.ExistingResult">Profile existant</sys:String>
@@ -887,6 +892,14 @@
     <sys:String x:Key="Customize.FromPack">Emballer</sys:String>
     <sys:String x:Key="Customize.InstallFailed">Ce pack ne peut pas être installé</sys:String>
     <sys:String x:Key="Customize.InstallFile">Installer à partir du fichier…</sys:String>
+    <sys:String x:Key="Customize.Banner.Rotation">Rotation</sys:String>
+    <sys:String x:Key="Customize.Banner.Automatic">Source automatique</sys:String>
+    <sys:String x:Key="Customize.Packs.CheckUpdates">Rechercher les mises à jour des packs officiels</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateAll">Tout mettre à jour</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateVersion">Mettre à jour vers {0}</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateFailed">Échec de la mise à jour du pack officiel</sys:String>
+    <sys:String x:Key="Customize.Packs.NoUpdates">Aucune mise à jour compatible de pack officiel trouvée.</sys:String>
+    <sys:String x:Key="Customize.Packs.Updated">{0} mis à jour vers {1}</sys:String>
     <sys:String x:Key="Customize.InstallFolder">Installer à partir du dossier…</sys:String>
     <sys:String x:Key="Customize.Installed">Installé</sys:String>
     <sys:String x:Key="Customize.NoChanges">Aucun changement.</sys:String>
@@ -1041,6 +1054,12 @@
     <sys:String x:Key="Nav.Home">Accueil</sys:String>
     <sys:String x:Key="Nav.Import">Importer</sys:String>
     <sys:String x:Key="Nav.Settings">Paramètres</sys:String>
+    <sys:String x:Key="Nav.Recovery">Navigation native</sys:String>
+    <sys:String x:Key="Nav.CustomNavigation">Navigation personnalisée</sys:String>
+    <sys:String x:Key="Banner.SceneEffects">Effets de scène</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset">Préréglages globaux</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset.Desc">Applique des réglages d’apparence globaux tout en conservant les réglages individuels et les médias des profils.</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset.Confirm">Appliquer {0} à l’apparence globale, à l’accueil, à la galerie et aux valeurs de profil ?</sys:String>
     <sys:String x:Key="Breadcrumb.System">Système</sys:String>
     <sys:String x:Key="Breadcrumb.LibraryHealth">Vault Santé</sys:String>
     <sys:String x:Key="Breadcrumb.People">Les gens</sys:String>
@@ -1202,6 +1221,7 @@
     <sys:String x:Key="Import.Intake.NoneSupported">Aucun des fichiers {0} n'est une photo, une vidéo ou un modèle 3D pris en charge. Ils sont restés intacts.</sys:String>
     <sys:String x:Key="Import.Intake.PrepareFailed">naut n'a pas pu préparer cet import. Vos fichiers originaux sont restés intacts ; réessayez à partir de la liste.</sys:String>
     <sys:String x:Key="Import.Intake.Starting">En parcourant vos fichiers…</sys:String>
+    <sys:String x:Key="Import.Intake.WithFailures">{0} prêts ; {1} non pris en charge ; {2} manquants ; {3} verrouillés ; {4} accès refusé ; {5} illisibles ; {6} dossiers inaccessibles. Originaux inchangés.</sys:String>
     <sys:String x:Key="Import.Intake.WithUnsupported">Support {0} prêt · Fichier(s) non pris en charge {1} laissé(s) intact(s)</sys:String>
     <sys:String x:Key="Import.Progress.Percent">{0}%</sys:String>
     <sys:String x:Key="Import.Stage.Checking">Préparation des médias</sys:String>
@@ -2213,4 +2233,9 @@
     <sys:String x:Key="Inspector.MoveToTrashFailed">Impossible de déplacer le média dans la corbeille.</sys:String>
     <sys:String x:Key="Inspector.MoveToTrashTitle">Déplacer le média dans la corbeille ?</sys:String>
     <sys:String x:Key="Inspector.MoveToTrashBody">Déplacer {0} dans la corbeille ? Ses liens de profil et sélections de couverture, bannière et figure seront retirés. Les données de visage restent liées au média récupérable. Restaurez-le via Paramètres → Corbeille dans les 30 jours.</sys:String>
+    <sys:String x:Key="Health.RestoreOriginal">Restaurer l’original</sys:String>
+    <sys:String x:Key="Health.BulkIntegrity">Réconcilier les originaux</sys:String>
+    <sys:String x:Key="Health.BulkConfirm">Confirmer {0} enregistrements d’intégrité. Chaque original est revérifié ; aucun fichier ne sera modifié.</sys:String>
+    <sys:String x:Key="Health.BulkOutcome">Réconciliation : {0} terminés, {1} non résolus, {2} non traités.</sys:String>
+    <sys:String x:Key="Health.PlacementStale">Un emplacement canonique possible existe. Vérifiez-le avant d’adopter le chemin dans le catalogue.</sys:String>
 </ResourceDictionary>

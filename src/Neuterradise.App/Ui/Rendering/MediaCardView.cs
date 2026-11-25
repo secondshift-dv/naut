@@ -325,6 +325,7 @@ public sealed class MediaCardView : Grid, IDisposable
         if (_favorite.Content is IconView icon)
         {
             icon.ColorToken = card.IsFavorite ? "#FF9A45" : "onMediaSecondary";
+            icon.Selected = card.IsFavorite;
         }
         _favorite.Opacity = card.IsFavorite ? 1 : 0.72;
         var favoriteLabel = card.IsFavorite

@@ -12,7 +12,7 @@ public sealed class HoverVideoCoordinator
 {
     private static HoverVideoCoordinator? _shared;
 
-    private readonly SkVideoView _surface = new();
+    private readonly SkVideoView _surface = new() { Purpose = VideoPurpose.Hover };
     private Panel? _host;
     private string? _path;
     private IMotionLease? _lease;

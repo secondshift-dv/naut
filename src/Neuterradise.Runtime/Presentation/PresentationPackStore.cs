@@ -33,6 +33,9 @@ public sealed record InstalledPack(
 
 public sealed record PackInstallResult(bool Succeeded, InstalledPack? Pack, IReadOnlyList<PackDiagnostic> Diagnostics, string? Message = null);
 
+internal sealed record OfficialPackReplacement(string PackId, string PreviousVersion, string PreviousHash,
+    string Version, string ContentHash, int ContractVersion);
+
 /// <summary>
 /// Presentation resolves assets only as (packId, assetId). It never receives or concatenates an
 /// arbitrary Vault path; the store owns the mapping and re-validates containment on every lookup.
@@ -235,7 +238,7 @@ public sealed class PresentationPackStore : IPresentationAssetStore
         string sourcePath, bool replaceExisting,
         Func<InstalledPack, CancellationToken, Task> publish,
         CancellationToken cancellationToken = default,
-        bool standaloneAsset = false)
+        bool standaloneAsset = false, OfficialPackReplacement? official = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
         Directory.CreateDirectory(_userPacksRoot);
@@ -312,7 +315,17 @@ public sealed class PresentationPackStore : IPresentationAssetStore
 
             var destination = Path.Combine(_userPacksRoot, packId);
             var hash = HashDirectory(root);
-            var transaction = new PackTransaction(packId, Guid.NewGuid().ToString("N"), "install", hash, Directory.Exists(destination), Directory.Exists(destination) ? HashDirectory(destination) : null);
+            var hadPrevious = Directory.Exists(destination);
+            var previousHash = hadPrevious ? HashDirectory(destination) : null;
+            if (official is not null
+                && (!replaceExisting || standaloneAsset || packId != official.PackId
+                    || read.Manifest.Version != official.Version || read.Manifest.MinContractVersion != official.ContractVersion
+                    || hash != official.ContentHash || previousHash != official.PreviousHash
+                    || !TryGetPack(packId, out var previous) || previous is null || previous.Origin != PackOrigin.User
+                    || previous.IsStandaloneAsset || previous.Manifest.Version != official.PreviousVersion
+                    || previous.ContentHash != official.PreviousHash))
+                return new(false, null, [], "Official pack identity or installed generation changed; the previous pack was preserved.");
+            var transaction = new PackTransaction(packId, Guid.NewGuid().ToString("N"), "install", hash, hadPrevious, previousHash);
             WriteTransaction(transaction);
             var backup = TransactionPayloadPath(transaction);
             var installed = new InstalledPack(read.Manifest, PackOrigin.User, destination, hash, diagnostics);

@@ -45,7 +45,7 @@ public sealed partial class CustomizationCenter
                 descriptor.Default == reference, definition.Origin == PackOrigin.User,
                 () =>
                 {
-                    _session.Select(descriptor.Id, descriptor.Scopes.Single(), reference);
+                    _session.Select(descriptor.Id, DefaultScope(descriptor), reference);
                 },
                 DefinitionDescription(descriptor, definition),
                 squarePreview: descriptor.Id == PresentationSlots.ProfileFrame));
@@ -230,6 +230,8 @@ public sealed partial class CustomizationCenter
             Height = 132,
             Background = ThemeRuntime.Current.Brush("canvas"),
         };
+        if (layout.Scene?.Background is { } background)
+            stage.Children.Add(BackdropView.Preview(background, 132, PresentationVisualPriority.VisiblePreview));
         var sample = _services.Root?.SampleCard(null);
         if (sample is null)
         {
@@ -262,14 +264,41 @@ public sealed partial class CustomizationCenter
                 IsFavorite = index == 0 ? data.IsFavorite : index % 2 == 0,
             });
 
-            var targetHeight = layout.HeightPattern is { } pattern ? 210 / pattern[index % pattern.Count] : isSingleColumn ? 180 : isShelf ? 220 : 260;
-            visual.Width = Math.Max(280, targetHeight * aspect);
-            visual.Height = layout.HeightPattern is null ? visual.Width / aspect : targetHeight;
+            var slotHeight = layout.HeightPattern is { } pattern && layout.Scene?.CardSizing != "intrinsic"
+                ? 280 / pattern[index % pattern.Count] : layout.Scene?.CardSizing == "intrinsic" ? 280 / aspect : isSingleColumn ? 180 : isShelf ? 220 : 260;
+            var slot = new Grid { Width = 280, Height = slotHeight };
+            var inset = layout.Scene?.ItemInset ?? 0;
+            var scene = layout.Scene;
+            if (scene is not null)
+            {
+                var (width, height) = scene.FitCard(280 * (1 - 2 * inset), slotHeight * (1 - 2 * inset), aspect);
+                visual.Width = width;
+                visual.Height = height;
+                visual.RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5);
+                visual.RenderTransform = new CompositeTransform { Rotation = scene.CardRotation, SkewX = scene.CardSkew };
+                if (scene.CardSizing == "crop")
+                    slot.Clip = new RectangleGeometry { Rect = new Windows.Foundation.Rect(0, 0, 280, slotHeight) };
+            }
+            else
+            {
+                visual.Width = Math.Min(280, slotHeight * aspect);
+                visual.Height = visual.Width / aspect;
+            }
+            visual.HorizontalAlignment = HorizontalAlignment.Center;
+            visual.VerticalAlignment = VerticalAlignment.Center;
             visual.IsHitTestVisible = false;
-            collection.Children.Add(visual);
+            SkImageView? ornament = scene?.ItemOverlay is { } overlay
+                ? new SkImageView { Source = ImageRef.FromPath(overlay, 960), PlaceholderToken = "transparent", IsHitTestVisible = false }
+                : null;
+            if (ornament is not null && scene?.OverlayPlacement == "behind") slot.Children.Add(ornament);
+            slot.Children.Add(visual);
+            if (ornament is not null && scene?.OverlayPlacement != "behind") slot.Children.Add(ornament);
+            collection.Children.Add(slot);
         }
 
         stage.Children.Add(new Viewbox { Width = 198, Height = 120, Stretch = Stretch.Uniform, Child = collection });
+        if (layout.Scene?.Foreground is { } foreground)
+            stage.Children.Add(BackdropView.Preview(foreground, 132, PresentationVisualPriority.VisiblePreview));
         return stage;
     }
 

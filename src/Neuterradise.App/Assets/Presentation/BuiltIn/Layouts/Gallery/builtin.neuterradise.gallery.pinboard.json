@@ -19,7 +19,11 @@
       1.05,
       1.17,
       0.91
-    ]
+    ],
+    "scene": {
+      "cardSizing": "contain",
+      "itemInset": 0
+    }
   },
   "description": "Larger staggered cards with a varied pinboard rhythm."
 }

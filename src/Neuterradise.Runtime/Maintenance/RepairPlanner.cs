@@ -17,7 +17,9 @@ public sealed class RepairPlanner
         HealthFindingCode.ProfileManifestMissing or HealthFindingCode.ProfileManifestMalformed
         or HealthFindingCode.ProfileManifestStale or HealthFindingCode.MediaAssetMissing
         or HealthFindingCode.MediaAssetFingerprintMismatch or HealthFindingCode.MediaAssetNeedsRepair
-        or HealthFindingCode.ArtifactContractObsolete or HealthFindingCode.RetiredProfileDirectory;
+        or HealthFindingCode.ArtifactContractObsolete or HealthFindingCode.RetiredProfileDirectory
+        or HealthFindingCode.CanonicalOriginalMissing or HealthFindingCode.CanonicalOriginalMismatch
+        or HealthFindingCode.CanonicalOriginalReverify or HealthFindingCode.CanonicalOriginalRepairPending or HealthFindingCode.CanonicalPlacementStale;
 
     private readonly CatalogDb _catalog;
     private readonly ManagedPathPlanner _pathPlanner;
@@ -59,6 +61,18 @@ public sealed class RepairPlanner
         CancellationToken cancellationToken)
     {
 
+        using var admission = _catalog.MutationAdmission.Enter(PrepareRepairKind);
+        if (finding.Code == HealthFindingCode.CanonicalOriginalRepairPending
+            && Guid.TryParse(finding.OperationId, out var operation))
+        {
+            var pending = await _catalog.MaintenanceWrites.ReadRepairOperationAsync(operation, cancellationToken)
+                .ConfigureAwait(false);
+            if (pending is not null && pending.Plan.MediaId == finding.MediaId
+                && pending.State is "PREPARED" or "EXECUTING" or "FAILED_RETRYABLE"
+                && pending.Plan.Kind is RepairKind.ReconcileOriginalIntegrity or RepairKind.RestoreCanonicalOriginal or RepairKind.ReconcileOriginalPlacement)
+                return OperationResult<RepairPlan>.Success(pending.Plan, operation);
+            return Unsupported(finding.Code);
+        }
         OperationResult<RepairPlan> prepared;
         if (finding.Code is HealthFindingCode.ProfileManifestMissing
             or HealthFindingCode.ProfileManifestMalformed
@@ -72,6 +86,15 @@ public sealed class RepairPlanner
                  or HealthFindingCode.ArtifactContractObsolete)
         {
             prepared = await PrepareMediaAssetRepairAsync(finding, cancellationToken).ConfigureAwait(false);
+        }
+        else if (finding.Code is HealthFindingCode.CanonicalOriginalMissing
+                 or HealthFindingCode.CanonicalOriginalMismatch or HealthFindingCode.CanonicalOriginalReverify)
+        {
+            prepared = await PrepareOriginalIntegrityAsync(finding, cancellationToken).ConfigureAwait(false);
+        }
+        else if (finding.Code == HealthFindingCode.CanonicalPlacementStale)
+        {
+            prepared = await PreparePlacementRepairAsync(finding, cancellationToken).ConfigureAwait(false);
         }
         else if (finding.Code == HealthFindingCode.RetiredProfileDirectory)
         {
@@ -105,6 +128,127 @@ public sealed class RepairPlanner
                 OperationErrorCode.RepairPlanStale,
                 "A different repair operation already owns this subject.");
         }
+    }
+
+    private async Task<OperationResult<RepairPlan>> PreparePlacementRepairAsync(HealthFinding finding, CancellationToken ct)
+    {
+        if (finding.MediaId is not Guid id) return Unsupported(finding.Code);
+        var media = (await _catalog.HealthReads.GetHealthMediaItemsAsync(id, cancellationToken: ct).ConfigureAwait(false)).SingleOrDefault();
+        if (media is not { HasStablePublishedOwner: true, OwnerProfileId: Guid owner,
+            CurrentManagedRelativePath: { Length: > 0 } directory, CurrentManagedFileName: { Length: > 0 } name,
+            Sha256: { Length: 64 } sha }) return Unsupported(finding.Code);
+        var components = media.MediaType == Neuterradise.App.Media.MediaType.Model
+            ? await _catalog.MediaWrites.GetMediaComponentsAsync(id, ct).ConfigureAwait(false) : [];
+        using var permit = await Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.AcquireAsync(
+            Neuterradise.App.SystemServices.Resources.ResourceClass.DiskHeavy, ct).ConfigureAwait(false);
+        var target = await new CanonicalOriginalRecovery(_catalog).FindPlacementAsync(media, components, true, ct).ConfigureAwait(false);
+        if (target is null || target != finding.ManagedRelativePath)
+            return OperationResult<RepairPlan>.Conflict(OperationErrorCode.RepairPlanStale,
+                "There is no unique verified canonical placement.");
+        var plan = new RepairPlan(RepairPlan.CurrentSchemaVersion, Guid.NewGuid(), finding.Code,
+            RepairKind.ReconcileOriginalPlacement, null, id, null, media.RowVersion,
+            $"{owner:D}|{media.OriginalHealthStatus ?? "UNRECORDED"}", $"{directory}/{name}",
+            target, sha, media.ByteLength, RepairPhysicalFact.OriginalMissing,
+            "Adopt the verified existing canonical placement; preserve every file, fingerprint and Media relation.",
+            true, Guid.NewGuid(), _timeProvider.GetUtcNow());
+        return OperationResult<RepairPlan>.Success(plan, plan.OperationId);
+    }
+
+    public Task<OperationResult<RepairPlan>> PrepareOriginalRecoveryAsync(
+        HealthFinding finding, string sourcePath, CancellationToken ct = default)
+        => _execution.RunAsync<RepairPlan>(OperationContext.Start(PrepareRepairKind, _timeProvider, ct)
+            with { MediaId = finding.MediaId }, async context =>
+        {
+            using var admission = _catalog.MutationAdmission.Enter(PrepareRepairKind);
+            var token = context.CancellationToken;
+            if (!finding.RecoveryAvailable || finding.MediaId is not Guid mediaId)
+                return Unsupported(finding.Code);
+            var media = (await _catalog.HealthReads.GetHealthMediaItemsAsync(mediaId, cancellationToken: token)
+                .ConfigureAwait(false)).SingleOrDefault();
+            if (media is not { HasStablePublishedOwner: true, OwnerProfileId: Guid owner,
+                CurrentManagedRelativePath: { Length: > 0 } directory,
+                CurrentManagedFileName: { Length: > 0 } name, Sha256: { Length: 64 } sha,
+                OriginalHealthStatus: not null })
+                return Unsupported(finding.Code);
+            var components = media.MediaType == Neuterradise.App.Media.MediaType.Model
+                ? await _catalog.MediaWrites.GetMediaComponentsAsync(mediaId, token).ConfigureAwait(false) : [];
+            var files = CanonicalOriginalInspection.Files(media, components);
+            using var disk = await Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.AcquireAsync(
+                Neuterradise.App.SystemServices.Resources.ResourceClass.DiskHeavy, token).ConfigureAwait(false);
+            if (files is null || !await new CanonicalOriginalRecovery(_catalog)
+                    .ValidateSelectionAsync(media, files, sourcePath, token).ConfigureAwait(false))
+                return OperationResult<RepairPlan>.Conflict(OperationErrorCode.RepairPlanStale,
+                    "The selected recovery source is not a verified, unambiguous match.");
+            var plan = new RepairPlan(RepairPlan.CurrentSchemaVersion, Guid.NewGuid(), finding.Code,
+                RepairKind.RestoreCanonicalOriginal, null, mediaId, null, media.RowVersion,
+                $"{owner:D}|{media.OriginalHealthStatus}", Path.GetFullPath(sourcePath),
+                $"{directory}/{name}", sha, media.ByteLength, RepairPhysicalFact.OriginalMismatch,
+                DescribeRecoveryAction(media, sourcePath),
+                true, Guid.NewGuid(), _timeProvider.GetUtcNow());
+            try
+            {
+                var persisted = await _catalog.MaintenanceWrites.BeginOrReadRepairOperationAsync(plan, token).ConfigureAwait(false);
+                return OperationResult<RepairPlan>.Success(persisted, persisted.OperationId);
+            }
+            catch (CatalogInvariantException)
+            {
+                return OperationResult<RepairPlan>.Conflict(OperationErrorCode.RepairPlanStale,
+                    "An existing repair owns this Media. Resume or resolve that operation first.");
+            }
+        });
+
+    private string DescribeRecoveryAction(HealthMediaItem media, string source)
+    {
+        var selected = Path.GetFullPath(source);
+        var directory = _catalog.Paths.ResolveVaultRelativePath(media.CurrentManagedRelativePath!);
+        var action = RootPathRules.IsStrictDescendant(_catalog.Paths.ProfilesPath, selected)
+            ? (RootPathRules.AreSameRoot(Path.GetDirectoryName(selected)!, directory)
+                ? "Recover a physically renamed original." : "Recover a physically relocated original.")
+            : "Recover from the selected replacement.";
+        return action + " Copy verified bytes to the recorded placement and preserve the selected source and damaged evidence.";
+    }
+
+    private async Task<OperationResult<RepairPlan>> PrepareOriginalIntegrityAsync(
+        HealthFinding finding, CancellationToken ct)
+    {
+        if (finding.MediaId is not Guid mediaId) return Unsupported(finding.Code);
+        var media = (await _catalog.HealthReads.GetHealthMediaItemsAsync(mediaId, cancellationToken: ct)
+            .ConfigureAwait(false)).SingleOrDefault();
+        if (media is not { HasStablePublishedOwner: true, OwnerProfileId: Guid owner,
+            CurrentManagedRelativePath: { Length: > 0 } directory,
+            CurrentManagedFileName: { Length: > 0 } name, Sha256: { Length: 64 } sha })
+            return OperationResult<RepairPlan>.Conflict(OperationErrorCode.RepairPlanStale,
+                "The original no longer has stable published ownership and fingerprint authority.");
+        var components = media.MediaType == Neuterradise.App.Media.MediaType.Model
+            ? await _catalog.MediaWrites.GetMediaComponentsAsync(mediaId, ct).ConfigureAwait(false) : [];
+        using var disk = await Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.AcquireAsync(
+            Neuterradise.App.SystemServices.Resources.ResourceClass.DiskHeavy, ct).ConfigureAwait(false);
+        var inspected = await CanonicalOriginalInspection.InspectAsync(_catalog, media, components, true, ct).ConfigureAwait(false);
+        var expected = finding.Code switch
+        {
+            HealthFindingCode.CanonicalOriginalMissing => OriginalInspectionStatus.Missing,
+            HealthFindingCode.CanonicalOriginalMismatch => OriginalInspectionStatus.Mismatch,
+            _ => OriginalInspectionStatus.Match,
+        };
+        if (inspected != expected || (expected == OriginalInspectionStatus.Match && media.OriginalHealthStatus is null))
+            return OperationResult<RepairPlan>.Conflict(OperationErrorCode.RepairPlanStale,
+                "The original no longer matches the selected integrity finding.");
+        var relative = $"{directory}/{name}";
+        var fact = expected switch
+        {
+            OriginalInspectionStatus.Missing => RepairPhysicalFact.OriginalMissing,
+            OriginalInspectionStatus.Mismatch => RepairPhysicalFact.OriginalMismatch,
+            _ => RepairPhysicalFact.SourcePresent,
+        };
+        var plan = new RepairPlan(RepairPlan.CurrentSchemaVersion, Guid.NewGuid(), finding.Code,
+            RepairKind.ReconcileOriginalIntegrity, null, mediaId, null, media.RowVersion,
+            $"{owner:D}|{media.OriginalHealthStatus ?? "UNRECORDED"}",
+            relative, relative, sha, media.ByteLength, fact,
+            expected == OriginalInspectionStatus.Match
+                ? "Restore duplicate reuse eligibility after verifying the original and all required components."
+                : "Record the original integrity problem and exclude it from duplicate reuse. Preserve every file and Media relation.",
+            true, Guid.NewGuid(), _timeProvider.GetUtcNow());
+        return OperationResult<RepairPlan>.Success(plan, plan.OperationId);
     }
 
     private async Task<OperationResult<RepairPlan>> PrepareDirectoryRepairAsync(

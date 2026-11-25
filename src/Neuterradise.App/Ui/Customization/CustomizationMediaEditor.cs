@@ -24,6 +24,42 @@ public sealed partial class CustomizationCenter
     private TextBlock? _framingFeedback;
     private bool _framingFeedbackBanner;
     private uint? _framingPointerId;
+    private string? _additionalBannerSlotId;
+
+    private IReadOnlyList<ArtworkLayer> AdditionalBannerLayers()
+    {
+        var profile = _session.ResolveCompiled(PresentationSlots.ProfileLayout).PlanAs<ProfileLayoutPlan>().BannerArtwork;
+        var home = _services.Presentation.ResolveCompiled(PresentationSlots.HomeSpotlight, new PresentationContext("home"))
+            .PlanAs<SpotlightPlan>().Artwork;
+        return (profile?.Layers ?? []).Concat(home?.Layers ?? [])
+            .Where(layer => layer.Kind == "banner").DistinctBy(layer => layer.BannerSlotId).ToArray();
+    }
+
+    private ArtworkLayer? ActiveAdditionalBanner() => _additionalBannerSlotId is { } id
+        ? AdditionalBannerLayers().FirstOrDefault(layer => layer.BannerSlotId == id) : null;
+
+    private BannerSlotAppearance ActiveBannerAppearance() => _additionalBannerSlotId is { } id
+        ? BannerSlotState.Get(_session.ProfileWorking?.Overrides.BannerSlotsJson, id) : BannerSlotAppearance.Default;
+
+    private CustomizationBannerCandidate? ActiveBannerCandidate()
+    {
+        if (ActiveAdditionalBanner() is not { } layer || _subject is null) return null;
+        var state = ActiveBannerAppearance();
+        var members = _subject.BannerCandidates.Where(candidate => candidate.IsMember);
+        return state.MediaId is { } media ? members.FirstOrDefault(candidate => candidate.MediaId == media)
+            : members.Where(candidate => candidate.MediaId != _session.ProfileWorking?.Sources?.BannerMediaId)
+                .Skip(layer.BannerIndex - 1).FirstOrDefault();
+    }
+
+    private void EditAdditionalBanner(Func<BannerSlotAppearance, BannerSlotAppearance> edit)
+    {
+        if (_additionalBannerSlotId is not { } id) return;
+        _session.EditBanner(appearance => appearance with
+        {
+            BannerSlotsJson = BannerSlotState.Write(appearance.BannerSlotsJson, id,
+                edit(BannerSlotState.Get(appearance.BannerSlotsJson, id))),
+        });
+    }
 
     private sealed record CustomizationMediaChoice(
         Guid MediaId,
@@ -60,6 +96,44 @@ public sealed partial class CustomizationCenter
                 UI.F("Customize.Media.AdjustTitle", "Adjust {0}", role),
                 UI.T("Customize.Media.AdjustDescription", "Use the mouse wheel over the large preview to zoom. Drag the preview to reposition it. Changes remain a preview until you choose Save changes.")));
 
+        if (banner)
+        {
+            var layers = AdditionalBannerLayers();
+            if (_additionalBannerSlotId is not null && !layers.Any(layer => layer.BannerSlotId == _additionalBannerSlotId))
+                _additionalBannerSlotId = null;
+            if (layers.Count > 0)
+            {
+                var slots = UI.Wrap(6);
+                void Select(string? id)
+                {
+                    _additionalBannerSlotId = id;
+                    RenderPreview();
+                    RenderEditor();
+                }
+                slots.Children.Add(UI.Tab(UI.T("Customize.Role.Banner", "Banner") + " 1", _additionalBannerSlotId is null, () => Select(null)));
+                foreach (var layer in layers)
+                {
+                    var id = layer.BannerSlotId;
+                    slots.Children.Add(UI.Tab(id == $"banner-{layer.BannerIndex}"
+                        ? UI.T("Customize.Role.Banner", "Banner") + " " + (layer.BannerIndex + 1) : id,
+                        _additionalBannerSlotId == id, () => Select(id)));
+                }
+                editor.Children.Insert(0, slots);
+                if (_additionalBannerSlotId is not null)
+                {
+                    var rotation = new Slider { Minimum = -180, Maximum = 180, StepFrequency = 1, Value = ActiveBannerAppearance().Rotation };
+                    rotation.ValueChanged += (_, args) =>
+                    {
+                        _framingEdit = true;
+                        try { EditAdditionalBanner(value => value with { Rotation = args.NewValue }); }
+                        finally { _framingEdit = false; }
+                    };
+                    editor.Children.Add(UI.V(4, UI.Text(UI.T("Customize.Banner.Rotation", "Rotation"), "caption"), rotation));
+                    editor.Children.Add(UI.Button(UI.T("Customize.Banner.Automatic", "Automatic source"),
+                        () => EditAdditionalBanner(value => value with { MediaId = null }), ButtonKind.Secondary));
+                }
+            }
+        }
         if (IsCanonical(descriptor))
         {
             editor.Children.Add(_subject is null
@@ -74,6 +148,7 @@ public sealed partial class CustomizationCenter
     {
         var working = _session.ProfileWorking;
         var sources = working?.Sources;
+        var selectedBanner = banner && _additionalBannerSlotId is not null ? ActiveBannerCandidate()?.MediaId : sources?.BannerMediaId;
         var items = (banner
             ? _subject!.BannerCandidates.Where(candidate => candidate.IsMember).Select(c => new CustomizationMediaChoice(
                 c.MediaId,
@@ -82,7 +157,7 @@ public sealed partial class CustomizationCenter
                 c.IsRecommended,
                 false,
                 null,
-                c.MediaId == sources?.BannerMediaId,
+                c.MediaId == selectedBanner,
                 c.SuggestedFocusX,
                 c.SuggestedFocusY))
             : _subject!.CoverCandidates.Select(c => new CustomizationMediaChoice(
@@ -251,16 +326,26 @@ public sealed partial class CustomizationCenter
             browseHost));
         if (banner)
         {
-            root.Children.Add(BannerEffectsEditor());
+            root.Children.Add(BannerEffectsEditor(false));
+            if (_additionalBannerSlotId is null) root.Children.Add(BannerEffectsEditor(true));
             root.Children.Add(UI.Button(UI.T("Banner.Add", "Add as Banner"), ShowBannerPicker, ButtonKind.Primary));
         }
         return root;
     }
 
-    private FrameworkElement BannerEffectsEditor()
+    private FrameworkElement BannerEffectsEditor(bool scene)
     {
         var row = UI.Wrap(6);
-        var selectedEffect = _session.Resolve(PresentationSlots.BannerEffect).Definition;
+        var slotId = _additionalBannerSlotId ?? BannerSlotState.PrimarySlotId;
+        var slotState = BannerSlotState.Get(_session.ProfileWorking?.Overrides.BannerSlotsJson, slotId);
+        void EditSlot(Func<BannerSlotAppearance, BannerSlotAppearance> edit) =>
+            _session.EditBanner(appearance => appearance with
+            {
+                BannerSlotsJson = BannerSlotState.Write(appearance.BannerSlotsJson, slotId,
+                    edit(BannerSlotState.Get(appearance.BannerSlotsJson, slotId))),
+            });
+        var selectedEffect = scene ? _session.Resolve(PresentationSlots.BannerEffect).Definition
+            : slotState.Effect ?? DefinitionRef.BuiltIn("builtin.neuterradise.effect.none");
         var builtIns = new[] { "none", "film", "glitter", "shimmer" };
         var choices = builtIns.Select(id => (Reference: DefinitionRef.BuiltIn("builtin.neuterradise.effect." + id),
             Label: UI.T("Banner.Effect." + id, id)))
@@ -272,17 +357,25 @@ public sealed partial class CustomizationCenter
         {
             var selected = selectedEffect == reference;
             row.Children.Add(UI.Tab((selected ? "\u2713 " : string.Empty) + label, selected, () =>
-                _session.Select(PresentationSlots.BannerEffect, ScopeKind.Profile, reference)));
+            {
+                if (!scene)
+                    EditSlot(value => value with { EffectPackId = reference.PackId, EffectDefinitionId = reference.DefinitionId });
+                else _session.Select(PresentationSlots.BannerEffect, ScopeKind.Profile, reference);
+            }));
         }
         var intensity = new Slider { Minimum = 0, Maximum = 100, StepFrequency = 1,
-            Value = (_session.ProfileWorking?.Overrides.BannerEffectIntensity ?? .2) * 100 };
+            Value = (scene ? _session.ProfileWorking?.Overrides.BannerEffectIntensity ?? .2 : slotState.EffectIntensity) * 100 };
         intensity.ValueChanged += (_, args) =>
         {
             _framingEdit = true;
-            try { _session.EditBanner(appearance => appearance with { BannerEffectIntensity = args.NewValue / 100 }); }
+            try
+            {
+                if (!scene) EditSlot(value => value with { EffectIntensity = args.NewValue / 100 });
+                else _session.EditBanner(appearance => appearance with { BannerEffectIntensity = args.NewValue / 100 });
+            }
             finally { _framingEdit = false; }
         };
-        return UI.V(6, UI.Text(UI.T("Banner.Effects", "Banner Effects"), "caption"), row,
+        return UI.V(6, UI.Text(scene ? UI.T("Banner.SceneEffects", "Scene Effects") : UI.T("Banner.Effects", "Banner Effects"), "caption"), row,
             UI.Text(UI.T("Banner.Intensity", "Effect Intensity"), "caption"), intensity);
     }
 
@@ -393,6 +486,11 @@ public sealed partial class CustomizationCenter
     {
         if (banner)
         {
+            if (_additionalBannerSlotId is not null)
+            {
+                EditAdditionalBanner(value => value with { MediaId = assetId, FocusX = suggestedX, FocusY = suggestedY });
+                return;
+            }
             _bannerSource = ImageRef.FromPath(previewPath, 1600) ?? _bannerSource;
             _bannerVideoPath = _subject?.BannerCandidates
                 .FirstOrDefault(candidate => candidate.MediaId == assetId)
@@ -484,7 +582,8 @@ public sealed partial class CustomizationCenter
     {
         if (sender is not FrameworkElement surface) return;
         var banner = string.Equals(surface.Tag as string, "profile-banner-framing", StringComparison.Ordinal);
-        var zoom = banner ? _session.ProfileWorking?.Overrides.BannerZoom ?? 1 : _session.ProfileWorking?.Overrides.Zoom ?? 1;
+        var zoom = banner ? _additionalBannerSlotId is not null ? ActiveBannerAppearance().Zoom
+            : _session.ProfileWorking?.Overrides.BannerZoom ?? 1 : _session.ProfileWorking?.Overrides.Zoom ?? 1;
         EditFraming(banner, zoom + e.GetCurrentPoint(surface).Properties.MouseWheelDelta / 120.0 * 0.05, null, null);
         e.Handled = true;
     }
@@ -495,7 +594,14 @@ public sealed partial class CustomizationCenter
         _framingEdit = true;
         try
         {
-            if (banner)
+            if (banner && _additionalBannerSlotId is not null)
+                EditAdditionalBanner(value => value with
+                {
+                    Zoom = Math.Clamp(zoom ?? value.Zoom, 1, 2),
+                    FocusX = Math.Clamp(value.FocusX + (dx ?? 0), 0, 1),
+                    FocusY = Math.Clamp(value.FocusY + (dy ?? 0), 0, 1),
+                });
+            else if (banner)
                 _session.EditBanner(o => o with
                 {
                     BannerZoom = Math.Clamp(zoom ?? o.BannerZoom, 1, 2),
@@ -517,9 +623,10 @@ public sealed partial class CustomizationCenter
     private void UpdateFramingFeedback()
     {
         if (_framingFeedback is null || _session.ProfileWorking?.Overrides is not { } appearance) return;
-        var zoom = _framingFeedbackBanner ? appearance.BannerZoom : appearance.Zoom;
-        var x = _framingFeedbackBanner ? appearance.BannerFocusX : appearance.CropX;
-        var y = _framingFeedbackBanner ? appearance.BannerFocusY : appearance.CropY;
+        var secondary = _framingFeedbackBanner && _additionalBannerSlotId is not null ? ActiveBannerAppearance() : null;
+        var zoom = secondary?.Zoom ?? (_framingFeedbackBanner ? appearance.BannerZoom : appearance.Zoom);
+        var x = secondary?.FocusX ?? (_framingFeedbackBanner ? appearance.BannerFocusX : appearance.CropX);
+        var y = secondary?.FocusY ?? (_framingFeedbackBanner ? appearance.BannerFocusY : appearance.CropY);
         _framingFeedback.Text = $"{zoom:P0} · X {x:P0} · Y {y:P0}";
         if (_dragging) _framingFeedback.Text += " · " + UI.T("Customize.Media.Dragging", "Dragging");
     }

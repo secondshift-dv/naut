@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using Neuterradise.App.SystemServices.Resources;
+
 using Neuterradise.App.Localization;
 using Neuterradise.App.Import;
 using Neuterradise.App.Trash;
@@ -12,6 +14,7 @@ using Neuterradise.App.Profiles;
 using Neuterradise.App.SystemServices.Database;
 using Neuterradise.App.SystemServices.Database.Writes;
 using Neuterradise.App.SystemServices.Storage;
+
 
 namespace Neuterradise.App.Maintenance;
 
@@ -67,6 +70,9 @@ public sealed class LibraryHealthEvaluator
         CancellationToken cancellationToken = default)
     {
         var opts = options ?? new HealthScanOptions();
+        using var diskPermit = opts.Mode == HealthScanMode.Deep || (opts.Mode == HealthScanMode.Focused && opts.FocusedMediaId.HasValue)
+            ? await ResourceGovernor.Shared.AcquireAsync(ResourceClass.DiskHeavy, cancellationToken).ConfigureAwait(false)
+            : null;
         var startTime = _timeProvider.GetTimestamp();
         var findings = new List<HealthFinding>();
         var itemsScanned = 0;
@@ -91,6 +97,14 @@ public sealed class LibraryHealthEvaluator
                 _timeProvider.GetUtcNow());
         }
 
+        if (opts.Mode == HealthScanMode.Deep)
+        {
+            var sqlite = await _catalog.HealthReads.GetSqliteIntegrityFindingsAsync(cancellationToken).ConfigureAwait(false);
+            findings.AddRange(sqlite);
+            if (sqlite.Any(f => f.Code == HealthFindingCode.SqliteStructuralIntegrity))
+                return new HealthScanResult(findings, opts.Mode, itemsScanned,
+                    _timeProvider.GetElapsedTime(startTime), _timeProvider.GetUtcNow());
+        }
         progress?.Report(new HealthScanProgress("Evaluating database integrity invariants", itemsScanned, null, findings.Count));
         var rawDbFindings = await _catalog.HealthReads.GetDatabaseIntegrityFindingsAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -121,7 +135,13 @@ public sealed class LibraryHealthEvaluator
         findings.AddRange(await ScanImportLifecycleAsync(opts, cancellationToken).ConfigureAwait(false));
 
         progress?.Report(new HealthScanProgress("Scanning profiles and manifests", itemsScanned, null, findings.Count));
-        var profiles = await _catalog.HealthReads.GetHealthProfileItemsAsync(opts.FocusedProfileId, cancellationToken)
+        var focusedOwner = opts.FocusedMediaId is Guid focusedMedia
+            ? (await _catalog.HealthReads.GetHealthMediaItemsAsync(focusedMedia, cancellationToken: cancellationToken)
+                .ConfigureAwait(false)).FirstOrDefault()?.OwnerProfileId
+            : null;
+        var profiles = opts.FocusedMediaId.HasValue && focusedOwner is null
+            ? Array.Empty<HealthProfileItem>()
+            : await _catalog.HealthReads.GetHealthProfileItemsAsync(opts.FocusedProfileId ?? focusedOwner, cancellationToken)
             .ConfigureAwait(false);
 
         var knownProfileIds = new HashSet<Guid>();
@@ -133,6 +153,8 @@ public sealed class LibraryHealthEvaluator
         {
             cancellationToken.ThrowIfCancellationRequested();
             itemsScanned++;
+            if (itemsScanned % 64 == 0)
+                progress?.Report(new HealthScanProgress("Checking Vault items", itemsScanned, null, findings.Count));
 
             foreach (var text in await new ProfileTextFiles(_catalog).InspectAsync(profile.ProfileId,
                          cancellationToken, synchronize: false).ConfigureAwait(false))
@@ -364,7 +386,7 @@ public sealed class LibraryHealthEvaluator
             }
         }
 
-        AddDuplicateFolderTokenFindings(findings);
+        if (opts.Mode != HealthScanMode.Focused) AddDuplicateFolderTokenFindings(findings);
 
         progress?.Report(new HealthScanProgress("Scanning managed media and integrity", itemsScanned, null, findings.Count));
         var media = await _catalog.HealthReads.GetHealthMediaItemsAsync(opts.FocusedMediaId, opts.FocusedProfileId, cancellationToken)
@@ -379,6 +401,8 @@ public sealed class LibraryHealthEvaluator
         {
             cancellationToken.ThrowIfCancellationRequested();
             itemsScanned++;
+            if (itemsScanned % 64 == 0)
+                progress?.Report(new HealthScanProgress("Checking Vault items", itemsScanned, null, findings.Count));
 
             knownMediaIds.Add(asset.MediaId);
 
@@ -473,6 +497,47 @@ public sealed class LibraryHealthEvaluator
                 ? await _catalog.MediaWrites.GetMediaComponentsAsync(asset.MediaId, cancellationToken)
                     .ConfigureAwait(false)
                 : Array.Empty<MediaComponentRecord>();
+            if (asset.HasStablePublishedOwner && asset.Sha256 is not null)
+            {
+                var physical = await CanonicalOriginalInspection.InspectAsync(_catalog, asset, packageComponents,
+                    (opts.Mode == HealthScanMode.Deep || opts.Mode == HealthScanMode.Focused), cancellationToken).ConfigureAwait(false);
+                if (physical == OriginalInspectionStatus.Missing)
+                {
+                    try
+                    {
+                        var candidate = await new CanonicalOriginalRecovery(_catalog).FindPlacementAsync(
+                            asset, packageComponents, false, cancellationToken).ConfigureAwait(false);
+                        if (candidate is not null)
+                            findings.Add(new HealthFinding(HealthFindingCode.CanonicalPlacementStale, HealthSeverity.Warning,
+                                asset.OwnerProfileId, asset.MediaId, null, null,
+                                SurfaceText.Get("Health.PlacementStale", "A possible canonical placement exists. Verify it before adopting the catalog path."),
+                                true, ManagedRelativePath: candidate));
+                    }
+                    catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException or ManagedPathPlanningException)
+                    { /* No placement authority can be inferred from inaccessible or invalid paths. */ }
+                }
+                var code = physical switch
+                {
+                    OriginalInspectionStatus.Missing => HealthFindingCode.CanonicalOriginalMissing,
+                    OriginalInspectionStatus.Mismatch => HealthFindingCode.CanonicalOriginalMismatch,
+                    OriginalInspectionStatus.Unreadable => HealthFindingCode.CanonicalOriginalUnreadable,
+                    _ when asset.OriginalHealthStatus is not null => HealthFindingCode.CanonicalOriginalReverify,
+                    _ => null,
+                };
+                if (code is not null)
+                    findings.Add(new HealthFinding(code, physical == OriginalInspectionStatus.Mismatch
+                        ? HealthSeverity.Critical : HealthSeverity.Error, asset.OwnerProfileId, asset.MediaId,
+                        null, null, SurfaceText.Format("Health.Finding.Generic", "Vault health issue ({0}). Review it before applying a repair.", code),
+                        RepairAvailable: physical != OriginalInspectionStatus.Unreadable
+                            && (asset.OriginalHealthStatus is null || physical == OriginalInspectionStatus.Match
+                                || (physical == OriginalInspectionStatus.Missing && asset.OriginalHealthStatus != "MISSING")
+                                || (physical == OriginalInspectionStatus.Mismatch && asset.OriginalHealthStatus != "CONTENT_MISMATCH")),
+                        RecoveryAvailable: asset.OriginalHealthStatus is not null
+                            && physical != OriginalInspectionStatus.Unreadable
+                            && (physical != OriginalInspectionStatus.Match || opts.Mode != HealthScanMode.Deep),
+                        RecoveryRequiresFolder: packageComponents.Count > 1
+                            || packageComponents.Any(c => c.ComponentRole == ComponentRole.Dependency)));
+            }
             var isPackage = packageComponents.Count > 1
                 || packageComponents.Any(component => component.ComponentRole == ComponentRole.Dependency);
 
@@ -516,53 +581,21 @@ public sealed class LibraryHealthEvaluator
                     }
 
                     knownMediaFileNames.Add(Path.GetFileName(componentPath));
-                    if (!File.Exists(componentPath))
-                    {
+                    // Stable published originals were inspected by the canonical integrity authority.
+                    // Other records still receive diagnostics, but never gain repair/reuse authority.
+                    if (asset.HasStablePublishedOwner) continue;
+                    var status = await CanonicalOriginalInspection.InspectFileAsync(_catalog,
+                        $"{asset.CurrentManagedRelativePath}/{component.ComponentRelativePath}",
+                        component.ByteLength, component.Sha256,
+                        opts.Mode is HealthScanMode.Deep or HealthScanMode.Focused, cancellationToken).ConfigureAwait(false);
+                    if (status != OriginalInspectionStatus.Match)
                         findings.Add(new HealthFinding(
-                            HealthFindingCode.ManagedPathMismatch,
-                            HealthSeverity.Error,
-                            asset.OwnerProfileId,
-                            asset.MediaId,
-                            null,
-                            null,
-                            $"Required package component '{component.ComponentRelativePath}' is missing.",
-                            RepairAvailable: true));
-                        continue;
-                    }
-
-                    var info = new FileInfo(componentPath);
-                    if (info.Length != component.ByteLength)
-                    {
-                        findings.Add(new HealthFinding(
-                            HealthFindingCode.ContentMismatch,
-                            HealthSeverity.Critical,
-                            asset.OwnerProfileId,
-                            asset.MediaId,
-                            null,
-                            null,
-                            $"Package component '{component.ComponentRelativePath}' length does not match durable component authority.",
+                            status == OriginalInspectionStatus.Missing ? HealthFindingCode.ManagedPathMismatch
+                                : HealthFindingCode.ContentMismatch,
+                            status == OriginalInspectionStatus.Mismatch ? HealthSeverity.Critical : HealthSeverity.Error,
+                            asset.OwnerProfileId, asset.MediaId, null, null,
+                            $"Package component '{component.ComponentRelativePath}' could not be verified ({status}).",
                             RepairAvailable: false));
-                        continue;
-                    }
-
-                    if (opts.Mode == HealthScanMode.Deep)
-                    {
-                        await using var componentStream = File.OpenRead(componentPath);
-                        var componentHash = Convert.ToHexStringLower(
-                            await SHA256.HashDataAsync(componentStream, cancellationToken).ConfigureAwait(false));
-                        if (!string.Equals(componentHash, component.Sha256, StringComparison.Ordinal))
-                        {
-                            findings.Add(new HealthFinding(
-                                HealthFindingCode.ContentMismatch,
-                                HealthSeverity.Critical,
-                                asset.OwnerProfileId,
-                                asset.MediaId,
-                                null,
-                                null,
-                                $"Package component '{component.ComponentRelativePath}' SHA-256 does not match durable component authority.",
-                                RepairAvailable: false));
-                        }
-                    }
                 }
 
                 continue;
@@ -630,78 +663,31 @@ public sealed class LibraryHealthEvaluator
                 continue;
             }
 
-            string actualFilePath;
+            // Do not infer original identity from a substring of an unrelated filename.
+            // A placement discrepancy is separate from content health of the recorded original.
+            var recorded = $"{asset.CurrentManagedRelativePath}/{asset.CurrentManagedFileName}";
+            var isRecordedPlacement = string.Equals(recorded, expectedRelative, StringComparison.OrdinalIgnoreCase);
+            if (asset.HasStablePublishedOwner && asset.Sha256 is not null && isRecordedPlacement)
+                continue;
+
             if (!File.Exists(expectedFullPath))
             {
-
-                var profileFolder = Path.Combine(_paths.ProfilesPath, Path.GetFileName(assetPlan.ProfileFolderRelativePath));
-                var expectedDirectory = Path.GetDirectoryName(expectedFullPath) ?? profileFolder;
-                if (TryFindMediaFileByToken(profileFolder, expectedDirectory, asset.StorageToken, out var foundPath))
-                {
-                    actualFilePath = foundPath;
-                    knownMediaFileNames.Add(Path.GetFileName(foundPath));
-                    findings.Add(new HealthFinding(
-                        HealthFindingCode.ManagedFileNameMismatch,
-                        HealthSeverity.Warning,
-                        asset.OwnerProfileId,
-                        asset.MediaId,
-                        null,
-                        null,
-                        $"Managed file name '{Path.GetFileName(foundPath)}' does not match canonical name '{expectedFileName}'.",
-                        RepairAvailable: true));
-                }
-                else
-                {
-                    findings.Add(new HealthFinding(
-                        HealthFindingCode.ManagedPathMismatch,
-                        HealthSeverity.Error,
-                        asset.OwnerProfileId,
-                        asset.MediaId,
-                        null,
-                        null,
-                        $"Managed file is missing at expected path '{expectedRelative}'.",
-                        RepairAvailable: true));
-                    continue;
-                }
-            }
-            else
-            {
-                actualFilePath = expectedFullPath;
+                findings.Add(new HealthFinding(HealthFindingCode.ManagedPathMismatch, HealthSeverity.Error,
+                    asset.OwnerProfileId, asset.MediaId, null, null,
+                    $"Managed file is missing at expected path '{expectedRelative}'.", RepairAvailable: false));
+                continue;
             }
 
-            var actualName = Path.GetFileName(actualFilePath);
-            var extractedToken = ExtractMediaStorageTokenFromFileName(actualName);
-            if (extractedToken is not null && !string.Equals(extractedToken, asset.StorageToken, StringComparison.OrdinalIgnoreCase))
+            if (!asset.HasStablePublishedOwner && !string.IsNullOrWhiteSpace(asset.Sha256))
             {
-                findings.Add(new HealthFinding(
-                    HealthFindingCode.StorageTokenPathMismatch,
-                    HealthSeverity.Error,
-                    asset.OwnerProfileId,
-                    asset.MediaId,
-                    null,
-                    null,
-                    $"Managed file '{actualName}' carries storage token '{extractedToken}' which does not match assigned token '{asset.StorageToken}'.",
-                    RepairAvailable: true));
-            }
-
-            if (opts.Mode == HealthScanMode.Deep && !string.IsNullOrWhiteSpace(asset.Sha256))
-            {
-                await using var stream = File.OpenRead(actualFilePath);
-                var hashBytes = await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
-                var actualSha256 = Convert.ToHexStringLower(hashBytes);
-
-                if (!string.Equals(actualSha256, asset.Sha256, StringComparison.OrdinalIgnoreCase))
-                {
-                    findings.Add(new HealthFinding(
-                        HealthFindingCode.ContentMismatch,
-                        HealthSeverity.Critical,
-                        asset.OwnerProfileId,
-                        asset.MediaId,
-                        null,
-                        null,
-                        $"Content fingerprint mismatch for asset {asset.MediaId}. Catalog SHA-256: {asset.Sha256}, actual file SHA-256: {actualSha256}.",
-                        RepairAvailable: false));
-                }
+                var status = await CanonicalOriginalInspection.InspectFileAsync(_catalog, expectedRelative,
+                    asset.ByteLength, asset.Sha256, opts.Mode is HealthScanMode.Deep or HealthScanMode.Focused,
+                    cancellationToken).ConfigureAwait(false);
+                if (status != OriginalInspectionStatus.Match)
+                    findings.Add(new HealthFinding(HealthFindingCode.ContentMismatch,
+                        status == OriginalInspectionStatus.Mismatch ? HealthSeverity.Critical : HealthSeverity.Error,
+                        asset.OwnerProfileId, asset.MediaId, null, null,
+                        $"Managed original could not be verified ({status}).", RepairAvailable: false));
             }
         }
 
@@ -886,6 +872,14 @@ public sealed class LibraryHealthEvaluator
                     SurfaceText.Get("Health.Trash.RetentionPending", "Expired Trash awaits automatic purge at startup or when Trash opens. Protected items remain until safe."), false));
         }
 
+        var pendingOriginals = await _catalog.MaintenanceWrites.ReadPendingOriginalRepairsAsync(
+            opts.FocusedMediaId, cancellationToken).ConfigureAwait(false);
+        var scopeMedia = media.Select(m => m.MediaId).ToHashSet();
+        foreach (var pending in pendingOriginals.Where(p => p.MediaId.HasValue && scopeMedia.Contains(p.MediaId.Value)))
+            findings.Add(new HealthFinding(HealthFindingCode.CanonicalOriginalRepairPending, HealthSeverity.Warning,
+                null, pending.MediaId, null, pending.OperationId.ToString("D"),
+                "A journaled original repair remains pending. Review it before retrying.", true));
+
         for (var index = 0; index < findings.Count; index++)
         {
             if (findings[index].RepairAvailable && !RepairPlanner.SupportsFinding(findings[index].Code))
@@ -989,7 +983,7 @@ public sealed class LibraryHealthEvaluator
                         if (File.Exists(physical))
                         {
                             var valid = await new ModelRenderValidationReceipts(_catalog).ValidateAsync(physical,
-                                reader.GetString(9), cancellationToken, deep: options.Mode == HealthScanMode.Deep).ConfigureAwait(false);
+                                reader.GetString(9), cancellationToken, deep: options.Mode == HealthScanMode.Deep, persistReceipt: false).ConfigureAwait(false);
                             if (valid.ByteLength != reader.GetInt64(2) || valid.Sha256 != reader.GetString(3))
                                 throw new InvalidDataException("ModelRender catalog fingerprint differs from validated bytes.");
                             if (ModelRenderContainer.NeedsAlphaMipRefresh(valid.Header))
@@ -1196,46 +1190,6 @@ public sealed class LibraryHealthEvaluator
                 || dir.Contains(marker, StringComparison.OrdinalIgnoreCase))
             {
                 foundPath = dir;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool TryFindMediaFileByToken(
-        string profileFolder,
-        string expectedDirectory,
-        string token,
-        out string foundPath)
-    {
-        foundPath = string.Empty;
-
-        if (TryMatchTokenInDirectory(expectedDirectory, token, SearchOption.TopDirectoryOnly, out foundPath))
-        {
-            return true;
-        }
-
-        return TryMatchTokenInDirectory(profileFolder, token, SearchOption.AllDirectories, out foundPath);
-    }
-
-    private static bool TryMatchTokenInDirectory(
-        string directory,
-        string token,
-        SearchOption searchOption,
-        out string foundPath)
-    {
-        foundPath = string.Empty;
-        if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory))
-        {
-            return false;
-        }
-
-        foreach (var file in Directory.EnumerateFiles(directory, "*", searchOption))
-        {
-            if (Path.GetFileName(file).Contains(token, StringComparison.OrdinalIgnoreCase))
-            {
-                foundPath = file;
                 return true;
             }
         }

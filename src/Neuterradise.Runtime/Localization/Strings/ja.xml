@@ -79,6 +79,11 @@
     <sys:String x:Key="Import.Normalize">通常</sys:String>
     <sys:String x:Key="Import.Problems">要レビュー</sys:String>
     <sys:String x:Key="Import.Problems.Description">問題を解決して続行してください。</sys:String>
+    <sys:String x:Key="Import.Review.RetryAll">すべて再試行 ({0})</sys:String>
+    <sys:String x:Key="Import.Review.ReuseAll">重複メディアをすべて再利用 ({0})</sys:String>
+    <sys:String x:Key="Import.Review.KeepAll">すべて選択先に保持 ({0})</sys:String>
+    <sys:String x:Key="Import.Review.MoveAll">認識されたプロフィールへすべて移動 ({0})</sys:String>
+    <sys:String x:Key="Import.Review.RemoveAll">確認対象をすべて除外 ({0})</sys:String>
     <sys:String x:Key="Import.ProfileCollision">別の Profile として認識されます</sys:String>
     <sys:String x:Key="Import.ProfilePicker.CurrentSelection">メディアはこのProfileに追加されます。</sys:String>
     <sys:String x:Key="Import.ProfilePicker.ExistingResult">既存のProfile</sys:String>
@@ -887,6 +892,14 @@
     <sys:String x:Key="Customize.FromPack">パック</sys:String>
     <sys:String x:Key="Customize.InstallFailed">このパックはインストールできません</sys:String>
     <sys:String x:Key="Customize.InstallFile">ファイルからインストール…</sys:String>
+    <sys:String x:Key="Customize.Banner.Rotation">回転</sys:String>
+    <sys:String x:Key="Customize.Banner.Automatic">自動ソース</sys:String>
+    <sys:String x:Key="Customize.Packs.CheckUpdates">公式パックの更新を確認</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateAll">すべて更新</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateVersion">{0} に更新</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateFailed">公式パックの更新に失敗しました</sys:String>
+    <sys:String x:Key="Customize.Packs.NoUpdates">互換性のある公式パックの更新はありません。</sys:String>
+    <sys:String x:Key="Customize.Packs.Updated">{0} を {1} に更新しました</sys:String>
     <sys:String x:Key="Customize.InstallFolder">フォルダーからインストール…</sys:String>
     <sys:String x:Key="Customize.Installed">インストール済み</sys:String>
     <sys:String x:Key="Customize.NoChanges">変更はありません。</sys:String>
@@ -1041,6 +1054,12 @@
     <sys:String x:Key="Nav.Home">ホーム</sys:String>
     <sys:String x:Key="Nav.Import">インポート</sys:String>
     <sys:String x:Key="Nav.Settings">設定</sys:String>
+    <sys:String x:Key="Nav.Recovery">標準ナビゲーション</sys:String>
+    <sys:String x:Key="Nav.CustomNavigation">カスタムナビゲーション</sys:String>
+    <sys:String x:Key="Banner.SceneEffects">シーンエフェクト</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset">グローバルプリセット</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset.Desc">各プロフィールの設定とメディアを保持したまま全体の外観の既定値を適用します。</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset.Confirm">{0} を全体の外観、ホーム、ギャラリー、プロフィールの既定値に適用しますか？</sys:String>
     <sys:String x:Key="Breadcrumb.System">システム</sys:String>
     <sys:String x:Key="Breadcrumb.LibraryHealth">Vault 健康</sys:String>
     <sys:String x:Key="Breadcrumb.People">人々</sys:String>
@@ -1202,6 +1221,7 @@
     <sys:String x:Key="Import.Intake.NoneSupported">{0} 個のファイルはいずれも対応している写真、動画、3D モデルではありません。そのまま残されました。</sys:String>
     <sys:String x:Key="Import.Intake.PrepareFailed">このインポートを準備できませんでした。元のファイルは変更されていません。リストからもう一度お試しください。</sys:String>
     <sys:String x:Key="Import.Intake.Starting">ファイルを確認しています…</sys:String>
+    <sys:String x:Key="Import.Intake.WithFailures">{0} 件準備完了、{1} 件未対応、{2} 件欠落、{3} 件ロック中、{4} 件アクセス拒否、{5} 件読み取り不可、{6} フォルダーにアクセス不可。元のファイルは変更していません。</sys:String>
     <sys:String x:Key="Import.Intake.WithUnsupported">{0} 件のメディアを準備完了 · 未対応の {1} ファイルはそのままです</sys:String>
     <sys:String x:Key="Import.Progress.Percent">{0}%</sys:String>
     <sys:String x:Key="Import.Stage.Checking">メディアの準備</sys:String>
@@ -2213,4 +2233,9 @@
     <sys:String x:Key="Inspector.MoveToTrashFailed">メディアをゴミ箱に移動できませんでした。</sys:String>
     <sys:String x:Key="Inspector.MoveToTrashTitle">メディアをゴミ箱に移動しますか？</sys:String>
     <sys:String x:Key="Inspector.MoveToTrashBody">{0} をゴミ箱に移動しますか？プロフィールとの関連付けとカバー、バナー、Figure の選択が解除されます。顔データは復元可能なメディア記録に保持されます。30 日以内に設定 → ゴミ箱から復元できます。</sys:String>
+    <sys:String x:Key="Health.RestoreOriginal">オリジナルを復元</sys:String>
+    <sys:String x:Key="Health.BulkIntegrity">オリジナルの整合性を調整</sys:String>
+    <sys:String x:Key="Health.BulkConfirm">{0} 件の整合性記録を確定します。各オリジナルを再確認し、ファイルは変更しません。</sys:String>
+    <sys:String x:Key="Health.BulkOutcome">整合性の調整：完了 {0} 件、未解決 {1} 件、未処理 {2} 件。</sys:String>
+    <sys:String x:Key="Health.PlacementStale">正規の配置先の候補があります。カタログのパスを採用する前に検証してください。</sys:String>
 </ResourceDictionary>

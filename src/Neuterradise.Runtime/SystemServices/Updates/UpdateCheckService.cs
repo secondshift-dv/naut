@@ -36,7 +36,7 @@ public sealed class UpdateCheckService
         try
         {
             var metadataRead = await ReadTrustedAsync(
-                feed,
+                _http, feed,
                 MaxMetadataBytes,
                 "Update metadata",
                 cancellationToken).ConfigureAwait(false);
@@ -45,7 +45,7 @@ public sealed class UpdateCheckService
 
             var signatureUri = ResolvePublisherSignatureUri(feed);
             var signatureRead = await ReadTrustedAsync(
-                signatureUri,
+                _http, signatureUri,
                 MaxSignatureBytes,
                 "Update publisher signature",
                 cancellationToken).ConfigureAwait(false);
@@ -109,13 +109,13 @@ public sealed class UpdateCheckService
         }
     }
 
-    private async Task<TrustedReadResult> ReadTrustedAsync(
-        Uri requestedUri,
+    internal static async Task<TrustedReadResult> ReadTrustedAsync(
+        HttpClient http, Uri requestedUri,
         int maximumBytes,
         string label,
         CancellationToken cancellationToken)
     {
-        using var response = await _http
+        using var response = await http
             .GetAsync(requestedUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
 
@@ -194,7 +194,7 @@ public sealed class UpdateCheckService
         return output.ToArray();
     }
 
-    private sealed record TrustedReadResult(
+    internal sealed record TrustedReadResult(
         bool Success,
         byte[]? Bytes,
         string? Error)

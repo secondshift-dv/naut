@@ -102,6 +102,7 @@ public sealed class TrashCoordinator
     {
         EnsureNonEmpty(assetId, nameof(assetId));
 
+        await using var writerLease = await _catalog.WriteCoordinator.EnterAsync(cancellationToken).ConfigureAwait(false);
         MediaTrashPlan plan;
 
         await using (var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken).ConfigureAwait(false))
@@ -138,6 +139,10 @@ public sealed class TrashCoordinator
                         "An earlier Trash record for this media item cannot be read and needs attention.")
                     : OperationResult<MediaTrashPlan>.Success(existingPlan);
             }
+
+            if (await HasUnhealthyOriginalAsync(connection, assetId, profile: false, cancellationToken).ConfigureAwait(false))
+                return OperationResult<MediaTrashPlan>.NeedsAttention(OperationErrorCode.TrashPlanStale,
+                    "The canonical original has unresolved integrity findings. Restore or reverify it in Vault Health before Trash.");
 
             var appearanceReferences = await ReadAffectedAppearanceReferencesAsync(
                     connection, transaction: null, assetId, cancellationToken).ConfigureAwait(false);
@@ -195,7 +200,7 @@ public sealed class TrashCoordinator
             };
         }
 
-        await _catalog.TrashWrites.PersistEntryAsync(
+        await _catalog.TrashWrites.PersistEntryUnderLeaseAsync(
                 new TrashEntryPersistence(
                     plan.TrashEntryId,
                     TrashEntityType.Media,
@@ -205,7 +210,7 @@ public sealed class TrashCoordinator
                     plan.ToJson(),
                     plan.PreparedAtUtc,
                     plan.PreparedAtUtc),
-                cancellationToken)
+                writerLease, cancellationToken)
             .ConfigureAwait(false);
 
         return OperationResult<MediaTrashPlan>.Success(plan, plan.OperationId);
@@ -494,6 +499,10 @@ public sealed class TrashCoordinator
                         "An earlier Trash record for this Profile cannot be read and needs attention.")
                     : OperationResult<ProfileTrashPlan>.Success(existingPlan);
             }
+
+            if (await HasUnhealthyOriginalAsync(connection, profileId, profile: true, cancellationToken).ConfigureAwait(false))
+                return OperationResult<ProfileTrashPlan>.NeedsAttention(OperationErrorCode.TrashPlanStale,
+                    "An owned canonical original has unresolved integrity findings. Restore or reverify it in Vault Health before Trash.");
 
             var owned = await ReadOwnedActiveMediasAsync(connection, transaction: null, profileId, cancellationToken)
                 .ConfigureAwait(false);
@@ -1405,6 +1414,21 @@ public sealed class TrashCoordinator
                 OperationErrorCode.TrashPhysicalMoveFailed,
                 "The Profile manifest could not be moved into recovery. The operation can be retried."),
         };
+
+    private static async Task<bool> HasUnhealthyOriginalAsync(Microsoft.Data.Sqlite.SqliteConnection connection,
+        Guid id, bool profile, CancellationToken ct)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = profile
+            ? """
+              SELECT EXISTS(SELECT 1 FROM profile_media own
+                  JOIN canonical_original_health health ON health.media_id=own.media_id
+                  WHERE own.profile_id=$id AND own.relation_type='OWNER');
+              """
+            : "SELECT EXISTS(SELECT 1 FROM canonical_original_health WHERE media_id=$id);";
+        command.Parameters.AddWithValue("$id", DbGuid.Format(id));
+        return Convert.ToInt64(await command.ExecuteScalarAsync(ct).ConfigureAwait(false)) != 0;
+    }
 
     private static OperationResult<MediaTrashPlan>? ValidateMediaIsTrashable(MediaTrashState asset)
     {

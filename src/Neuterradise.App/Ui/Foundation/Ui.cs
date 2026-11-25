@@ -837,7 +837,7 @@ public static class UI
                 var skin = ThemeRuntime.Current.ControlFamily("chip");
                 value.CornerRadius = new CornerRadius(skin.Radius);
                 value.Padding = new Thickness(skin.HorizontalPadding, skin.VerticalPadding, skin.HorizontalPadding, skin.VerticalPadding);
-                value.MinHeight = ThemeRuntime.Current.Tokens.Number("chipHeight", 20);
+                value.MinHeight = skin.PassiveChipHeight ?? ThemeRuntime.Current.Tokens.Number("chipHeight", 20);
                 value.BorderThickness = ThemeRuntime.ControlEdge(skin);
                 if (!selected)
                 {

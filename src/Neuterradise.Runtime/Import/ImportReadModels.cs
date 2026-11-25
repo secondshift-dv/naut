@@ -195,7 +195,7 @@ public sealed record ImportItemSummary(
     MediaType? MediaType,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc,
-    ImportCleanupPolicy CleanupPolicy = ImportCleanupPolicy.Copy);
+    ImportCleanupPolicy CleanupPolicy = ImportCleanupPolicy.Copy, string? SourceIdentityJson = null);
 
 public sealed record ImportHistoryEntry(
     Guid SessionId,

@@ -225,7 +225,7 @@ public sealed class VerificationValidator
                            FROM media c
                            JOIN media a INDEXED BY ix_media_active_byte_length ON {ImportReads.ExactMediaIdentitySql}
                                         AND a.media_id <> c.media_id
-                                        AND a.state = 'ACTIVE'
+                                        AND a.state = 'ACTIVE' AND ({ImportReads.PublishedReuseAuthoritySql})
                            WHERE c.media_id = i.candidate_media_id
                        ) ELSE 0 END AS has_active_duplicate,
                        c.dependency_status

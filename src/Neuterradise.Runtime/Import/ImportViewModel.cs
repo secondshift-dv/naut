@@ -663,11 +663,7 @@ public sealed class ImportViewModel : ScreenStateViewModel, IDisposable
             return;
         }
 
-        // Existence probes can block on removable, redirected, or temporarily unavailable
-        // storage. Keep them off the UI thread just like the subsequent enumeration/intake work.
-        var sourceList = await Task.Run(
-            () => paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList(),
-            cancellationToken).ConfigureAwait(true);
+        var sourceList = paths.Where(p => !string.IsNullOrWhiteSpace(p)).ToList();
         if (sourceList.Count == 0)
         {
             IntakeStatusMessage = SurfaceText.Get(
@@ -687,24 +683,37 @@ public sealed class ImportViewModel : ScreenStateViewModel, IDisposable
             var intakeResult = await Task.Run(() => _intake.IntakeAsync(request, cancellationToken: cancellationToken), cancellationToken);
             _activity?.RequestRefresh();
 
-            var unsupported = intakeResult.TotalDiscoveredItemCount - intakeResult.TotalAllocatedCandidateCount;
             var usableUnits = intakeResult.Units.Where(unit => unit.AllocatedCandidateCount > 0).ToList();
-            if (usableUnits.Count == 0)
+            var issues = intakeResult.Issues.ToLookup(issue => issue.Kind);
+            var unsupported = issues[SourceIntakeIssueKind.Unsupported].Count();
+            if (intakeResult.Issues.Count > unsupported)
             {
-                IntakeStatusMessage = SurfaceText.Format(
-                    "Import.Intake.NoneSupported",
-                    "None of the {0} files are supported photos, videos, or 3D models. They were left untouched.",
-                    intakeResult.TotalDiscoveredItemCount);
-                return;
+                IntakeStatusMessage = SurfaceText.Format("Import.Intake.WithFailures",
+                    "{0} ready; {1} unsupported; {2} missing; {3} locked; {4} access denied; {5} unreadable; {6} inaccessible folders. Originals untouched.",
+                    intakeResult.TotalAllocatedCandidateCount, unsupported,
+                    issues[SourceIntakeIssueKind.Missing].Count(),
+                    issues[SourceIntakeIssueKind.Locked].Count(),
+                    issues[SourceIntakeIssueKind.AccessDenied].Count(),
+                    issues[SourceIntakeIssueKind.Unreadable].Count(),
+                    issues[SourceIntakeIssueKind.DirectoryUnavailable].Count());
             }
-
-            IntakeStatusMessage = unsupported > 0
-                ? SurfaceText.Format(
-                    "Import.Intake.WithUnsupported",
-                    "{0} media ready · {1} unsupported file(s) left untouched",
-                    intakeResult.TotalAllocatedCandidateCount,
-                    unsupported)
-                : null;
+            else if (usableUnits.Count == 0)
+            {
+                IntakeStatusMessage = unsupported > 0
+                    ? SurfaceText.Format("Import.Intake.NoneSupported",
+                        "None of the {0} files are supported photos, videos, or 3D models. They were left untouched.", unsupported)
+                    : SurfaceText.Get("Import.Intake.NothingUsable",
+                        "Nothing there could be imported. Try photos, videos or a folder containing them.");
+            }
+            else
+            {
+                IntakeStatusMessage = unsupported > 0
+                    ? SurfaceText.Format("Import.Intake.WithUnsupported",
+                        "{0} media ready; {1} unsupported file(s) left untouched",
+                        intakeResult.TotalAllocatedCandidateCount, unsupported)
+                    : null;
+            }
+            if (usableUnits.Count == 0) return;
 
             // Admission and background preparation share the existing pipeline for every intake origin.
             if (_preparationCoordinator is not null)

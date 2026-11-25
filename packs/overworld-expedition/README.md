@@ -1,6 +1,6 @@
-# Voxel Playground 3.0.0
+# Voxel Playground 4.0.0
 
-Requires Naut v0.0.29 or later (Presentation Contract 3).
+Source requires Presentation Contract 4. Published 3.0.0 downloads require Naut v0.0.29 or later (Contract 3).
 
 Creative Hub puts the projects you can resume first. Below, World Portal sits beside the activity and statistics panels, with a stacked arrangement in a narrow window.
 

@@ -529,10 +529,10 @@ END;
 
 CREATE TABLE catalog_contract (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-    schema_version INTEGER NOT NULL CHECK (schema_version = 3)
+    schema_version INTEGER NOT NULL CHECK (schema_version = 4)
 );
-INSERT INTO catalog_contract(singleton, schema_version) VALUES(1, 3);
-PRAGMA user_version = 3;
+INSERT INTO catalog_contract(singleton, schema_version) VALUES(1, 4);
+PRAGMA user_version = 4;
 
 CREATE TRIGGER trg_media_storage_token_immutable
 BEFORE UPDATE OF media_storage_token ON media
@@ -1411,4 +1411,11 @@ CREATE TABLE profile_banner_requests (
     origin TEXT NOT NULL CHECK (origin IN ('INITIAL','ADDED')),
     sort_order INTEGER NOT NULL CHECK (sort_order >= 0),
     PRIMARY KEY (profile_id, media_id)
+);
+
+CREATE TABLE canonical_original_health (
+    media_id TEXT PRIMARY KEY REFERENCES media(media_id) ON DELETE CASCADE,
+    status TEXT NOT NULL CHECK (status IN ('MISSING','CONTENT_MISMATCH')),
+    operation_id TEXT NOT NULL REFERENCES storage_operations(operation_id),
+    checked_at_ms INTEGER NOT NULL
 );

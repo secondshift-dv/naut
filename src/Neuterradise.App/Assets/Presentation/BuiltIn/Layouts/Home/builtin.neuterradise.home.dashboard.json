@@ -31,7 +31,7 @@
         "maxItems": 5
       }
     ],
-    "surface": {
+    "scene": {
       "type": "columns",
       "columns": [
         "2.1*",

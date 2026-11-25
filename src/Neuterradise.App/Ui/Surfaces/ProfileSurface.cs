@@ -166,6 +166,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
     private ImageRef? _previewBannerImage;
     private string? _previewBannerVideo;
     private bool _hasPreviewMedia;
+    private bool _customizeEditorOccluded;
 
     public Task RefreshCommittedAppearanceAsync() => _vm.RefreshAppearanceAsync();
 
@@ -263,6 +264,13 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
 
     public void SetFigureOccluded(bool occluded) => _figureView.SetOccluded(occluded);
 
+    public void SetCustomizeEditorOccluded(bool occluded)
+    {
+        if (_customizeEditorOccluded == occluded) return;
+        _customizeEditorOccluded = occluded;
+        SetHeaderActive(IsActive);
+    }
+
     protected override void OnSuspended()
     {
         _vm.ClearFolderStatus();
@@ -319,7 +327,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
 
     private void SetHeaderActive(bool active)
     {
-        _profileHeader.SetActive(active);
+        _profileHeader.SetActive(active && !_customizeEditorOccluded);
         if (_surface?.Modular == true) _figureView.SetActive(active);
     }
 
@@ -358,7 +366,9 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             FigureView: figureSource is null || _surface?.Modular == true ? null : _figureView, Tags: _vm.AssignedTags,
             DetailsFactory: _layout.Id == "chronicle" && _surface?.Modular != true ? ChronicleDetails : null,
             BannerPoster: Preview is not null && _hasPreviewMedia ? _previewBannerImage : ImageRef.FromPath(_vm.BannerPosterPath, 1600),
-             IndependentModules: _surface?.Modular == true, BannerArtwork: plan.BannerArtwork),
+             IndependentModules: _surface?.Modular == true, BannerArtwork: plan.BannerArtwork,
+            BannerAuthority: Services.Runtime.MediaResources,
+            BannerPrimaryMediaId: Preview is not null && _hasPreviewMedia ? Context.Profile?.Sources?.BannerMediaId : _vm.BannerMediaId),
             rebuildIdentity: forceIdentity || previousLayout != _layout);
         SetHeaderActive(IsActive);
     }

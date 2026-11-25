@@ -1,4 +1,6 @@
 using System.IO;
+using System.Net.Http;
+using Neuterradise.App.SystemServices.Storage;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Neuterradise.App.Design.Themes;
@@ -24,6 +26,8 @@ public sealed class PresentationManagementView
     private readonly StackPanel _editor = UI.V(10);
     private readonly Action<string>? _tabChanged;
     private string _tab;
+    private readonly Dictionary<string, OfficialPackOffer> _officialOffers = new(StringComparer.Ordinal);
+    private bool _officialBusy;
 
     public PresentationManagementView(AppServices services, string? selectedTab = null, Action<string>? tabChanged = null)
     {
@@ -391,6 +395,19 @@ public sealed class PresentationManagementView
                     UI.T("Customize.InstallFailed", "This pack can't be installed")),
                 ButtonKind.Secondary));
 
+        var check = UI.Button(UI.T("Customize.Packs.CheckUpdates", "Check official pack updates"),
+            () => Run(CheckOfficialUpdatesAsync(), "PresentationManagementView.CheckOfficialUpdates", UI.T("Customize.Packs.UpdateFailed", "Official pack update failed")),
+            ButtonKind.Secondary);
+        check.IsEnabled = !_officialBusy;
+        actions.Children.Add(check);
+        if (_officialOffers.Count > 0)
+        {
+            var updateAll = UI.Button(UI.T("Customize.Packs.UpdateAll", "Update all"),
+                () => Run(UpdateOfficialAsync(_officialOffers.Values.ToArray()), "PresentationManagementView.UpdateAll", UI.T("Customize.Packs.UpdateFailed", "Official pack update failed")),
+                ButtonKind.Primary);
+            updateAll.IsEnabled = !_officialBusy;
+            actions.Children.Add(updateAll);
+        }
         var list = UI.V(10);
         foreach (var pack in _services.Presentation.Packs.Where(pack => !pack.IsStandaloneAsset).OrderBy(pack => pack.Origin))
         {
@@ -460,6 +477,14 @@ public sealed class PresentationManagementView
                         UI.T("Customize.RemoveFailed", "The presentation pack could not be removed.")),
                     ButtonKind.Destructive));
 
+            if (_officialOffers.TryGetValue(packId, out var offer))
+            {
+                var update = UI.Button(UI.F("Customize.Packs.UpdateVersion", "Update to {0}", offer.AvailableVersion),
+                    () => Run(UpdateOfficialAsync([offer]), "PresentationManagementView.UpdateOfficial", UI.T("Customize.Packs.UpdateFailed", "Official pack update failed")),
+                    ButtonKind.Primary);
+                update.IsEnabled = !_officialBusy;
+                packActions.Children.Insert(0, update);
+            }
             var problems = UI.V(2);
             foreach (var diagnostic in pack.Diagnostics.Take(6))
             {
@@ -486,6 +511,59 @@ public sealed class PresentationManagementView
                 "Install .ntpack, .zip, or a folder with pack.json. Include schemaVersion 1, packId, version, a supported definition and relative asset paths. Scripts and executables are not allowed."),
             actions,
             list));
+    }
+
+    private static HttpClient CreateOfficialPackHttp() =>
+        new(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromMinutes(5) };
+
+    private async Task CheckOfficialUpdatesAsync()
+    {
+        if (_officialBusy) return;
+        _officialBusy = true;
+        _officialOffers.Clear();
+        Render();
+        try
+        {
+            using var http = CreateOfficialPackHttp();
+            var result = await new OfficialPackUpdater(http, AppStatePaths.CreateProduction())
+                .CheckAsync(_services.Presentation).ConfigureAwait(true);
+            if (result.Error is not null)
+                await _services.ConfirmAsync(UI.T("Customize.Packs.UpdateFailed", "Official pack update failed"),
+                    result.Error, UI.T("Common.Ok", "OK")).ConfigureAwait(true);
+            else
+            {
+                foreach (var offer in result.Offers) _officialOffers[offer.PackId] = offer;
+                if (_officialOffers.Count == 0)
+                    _services.Toast(UI.T("Customize.Packs.NoUpdates", "No compatible official pack updates found."), "success");
+            }
+        }
+        finally { _officialBusy = false; Render(); }
+    }
+
+    private async Task UpdateOfficialAsync(IReadOnlyList<OfficialPackOffer> offers)
+    {
+        if (_officialBusy || offers.Count == 0) return;
+        _officialBusy = true;
+        Render();
+        try
+        {
+            using var http = CreateOfficialPackHttp();
+            var updater = new OfficialPackUpdater(http, AppStatePaths.CreateProduction());
+            foreach (var offer in offers)
+            {
+                var result = await updater.ApplyAsync(_services.Presentation, offer).ConfigureAwait(true);
+                if (!result.Succeeded)
+                {
+                    await _services.ConfirmAsync(UI.T("Customize.Packs.UpdateFailed", "Official pack update failed"),
+                        result.Message ?? string.Join(Environment.NewLine, result.Diagnostics.Take(4).Select(d => d.Detail)),
+                        UI.T("Common.Ok", "OK")).ConfigureAwait(true);
+                    break;
+                }
+                _officialOffers.Remove(offer.PackId);
+                _services.Toast(UI.F("Customize.Packs.Updated", "{0} updated to {1}", offer.Name, offer.AvailableVersion), "success");
+            }
+        }
+        finally { _officialBusy = false; Render(); }
     }
 
     private async Task InstallAsync(bool folder)

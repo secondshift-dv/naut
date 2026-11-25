@@ -14,6 +14,8 @@ using Neuterradise.App.SystemServices.Storage;
 
 namespace Neuterradise.App.Import.Preparation;
 
+internal sealed class ImportSourceChangedException() : InvalidOperationException("The source file no longer matches the intake identity.") { }
+
 public sealed record CandidatePreparationResult(
     Guid ImportItemId,
     Guid CandidateMediaId,
@@ -104,10 +106,10 @@ public sealed class ImportPreparationCoordinator
                 bufferSize: 1,
                 FileOptions.Asynchronous | FileOptions.SequentialScan))
             {
-                var identity = SourceIdentityHelper.CaptureIdentity(item.SourcePath);
+                var identity = item.SourceIdentityJson;
                 if (identity is null || !SourceIdentityHelper.VerifyIdentity(
                         identity, stream.SafeFileHandle, item.SourcePath))
-                    throw new InvalidOperationException("Source identity could not be established for duplicate investigation.");
+                    throw new ImportSourceChangedException();
                 var priority = disk.BulkPriority;
                 if (priority != DiskIoPriority.Normal) WindowsDiskTelemetry.SetPriority(stream.SafeFileHandle, priority);
                 using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -143,7 +145,7 @@ public sealed class ImportPreparationCoordinator
                 }
                 if (stream.Length != byteLength || !SourceIdentityHelper.VerifyIdentity(
                         identity, stream.SafeFileHandle, item.SourcePath))
-                    throw new InvalidOperationException("Source changed during duplicate investigation.");
+                    throw new ImportSourceChangedException();
                 sha256 = Convert.ToHexStringLower(hash.GetHashAndReset());
             }
 
@@ -229,7 +231,7 @@ public sealed class ImportPreparationCoordinator
         using var disk = await ResourceGovernor.Shared
             .AcquireImportDiskAsync(item.SourcePath, null, cancellationToken).ConfigureAwait(false);
         var discovery = await Task.Run(
-            () => ModelPackageDiscovery.Discover(item.SourcePath, sha256, byteLength), cancellationToken)
+            () => ModelPackageDiscovery.Discover(item.SourcePath, sha256, byteLength, cancellationToken), cancellationToken)
             .ConfigureAwait(false);
         await _catalog.MediaWrites.UpdateMediaPackageIdentityAsync(candidateMediaId,
             discovery.DependencyStatus, discovery.DiscoveryState, discovery.BundleSha256, cancellationToken)
@@ -425,41 +427,6 @@ public sealed class ImportPreparationCoordinator
             unitId,
             verifySourceFilesOnDisk: false,
             cancellationToken);
-
-    /// <summary>
-    /// Compatibility duplicate-decision entry. Persisting the decision is allowed; deciding
-    /// ReadyForVerification is not. Finalizer/MediaPreparation remain the lifecycle authorities.
-    /// </summary>
-    public async Task<PreparationReadiness> ApplyDuplicateDecisionAsync(
-        Guid importItemId,
-        DuplicateDecision decision,
-        Guid? reusedMediaId = null,
-        CancellationToken cancellationToken = default)
-    {
-        var item = await _reads.GetItemSummaryAsync(importItemId, cancellationToken)
-            .ConfigureAwait(false);
-        if (item is null)
-        {
-            throw new InvalidOperationException($"ImportItem {importItemId:D} was not found.");
-        }
-
-        await _importWrites.ApplyDuplicateDecisionAsync(
-                importItemId,
-                DbEnum.DispositionFor(decision),
-                decision,
-                reusedMediaId,
-                cancellationToken)
-            .ConfigureAwait(false);
-
-        if (decision == DuplicateDecision.Include)
-        {
-            await ScheduleIncludedTransferAsync(importItemId, cancellationToken).ConfigureAwait(false);
-        }
-
-        return await _readinessEvaluator
-            .EvaluateUnitReadinessAsync(item.UnitId, verifySourceFilesOnDisk: false, cancellationToken)
-            .ConfigureAwait(false);
-    }
 
     private async Task<AdmissionCounts> ReadAdmissionCountsAsync(
         Guid unitId,

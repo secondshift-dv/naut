@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Windows.Foundation;
 using Neuterradise.App.Presentation;
+using Neuterradise.App.Profiles;
 
 namespace Neuterradise.App.Ui;
 
@@ -96,6 +97,7 @@ public static class PresentationEffects
     {
         if (element is EffectView effect && (slot is null || effect.Slot == slot)) effect.Refresh();
         if (element is BackdropView backdrop && slot is null) backdrop.RefreshActivity();
+        if (element is SceneMotionView motion && slot is null) motion.RefreshActivity();
         for (var i = 0; i < VisualTreeHelper.GetChildrenCount(element); i++)
             RefreshTree(VisualTreeHelper.GetChild(element, i), slot);
     }
@@ -264,4 +266,34 @@ public sealed class EffectView : Grid
         Opacity = _interactionOnly && !active ? 0 : 1;
     }
     private void Release() => _view.IsSurfaceActive = false;
+}
+
+internal sealed class PrimaryBannerEffect(Grid host)
+{
+    private string? _json;
+    private BannerSlotAppearance _state = BannerSlotAppearance.Default;
+    private EffectView? _view;
+
+    public void Update(ProfileAppearanceOverrides? appearance)
+    {
+        if (_json == appearance?.BannerSlotsJson) return;
+        _json = appearance?.BannerSlotsJson;
+        var state = BannerSlotState.Get(_json, BannerSlotState.PrimarySlotId);
+        if (_state == state) return;
+        _state = state;
+        if (state.Effect is null || state.EffectIntensity <= 0)
+        {
+            if (_view is not null) host.Children.Remove(_view);
+            _view = null;
+            return;
+        }
+        if (_view is null)
+        {
+            _view = PresentationEffects.View(PresentationSlots.BannerEffect, () => PresentationContext.Global,
+                preview: () => PresentationEffects.Runtime?.ResolveBannerSlotEffect(_state));
+            _view.VisualPriority = PresentationVisualPriority.Surface;
+            host.Children.Add(_view);
+        }
+        else _view.Refresh();
+    }
 }

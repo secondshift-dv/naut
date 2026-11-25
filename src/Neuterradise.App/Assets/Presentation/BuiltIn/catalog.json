@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "packId": "builtin.neuterradise",
-  "version": "2.0.0",
+  "version": "4.0.0",
   "name": "naut",
   "author": "naut",
   "description": "The application's own presentation. It uses exactly the same contract, validator and compiler as user packs.",
   "license": "Proprietary (application payload)",
-  "minContractVersion": 1,
+  "minContractVersion": 4,
   "assets": [
     {
       "id": "frame-sakura",

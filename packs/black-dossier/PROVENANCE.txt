@@ -1,12 +1,11 @@
-Black Dossier 3.0.0
+Black Dossier 4.0.0
 Pack ID: naut.black-dossier.
 Credit: secondshift-dv.
 
 Backdrops and Cover Frame artwork: original AI-assisted illustrations
 prepared for this collection. Pack artwork has no third-party assets,
 characters or logos. Openings and exterior alpha were extracted and aligned
-to the renderer’s square or circular Cover aperture. Theme artwork and the
-source preview are compositions or derivatives of the included illustrations.
+to the renderer’s square or circular Cover aperture. Theme artwork is derived from the included illustrations.
 Spotlight and Banner masks and decorative overlays are original artwork.
 
 Original artwork and definitions are CC BY 4.0; see LICENSE.txt.
@@ -16,3 +15,7 @@ Inter: assets/inter.ttf; licenses/inter-OFL.txt.
 Naut Instrument Condensed: renamed modified IBM Plex Sans Condensed;
   assets/instrument-condensed.ttf; licenses/ibmplexsanscondensed-OFL.txt.
 Noto Sans Mono: assets/notosansmono.ttf; licenses/notosansmono-OFL.txt.
+
+assets/gallery-architecture.png: original locally generated geometric ornament (768 x 576 transparent PNG); no external source material.
+
+Collection previews show native Naut captures with disposable sample profiles and original repository artwork, not private Vault media.

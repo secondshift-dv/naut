@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "packId": "naut.overworld-expedition",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "name": "Voxel Playground",
   "author": "secondshift-dv",
   "description": "Explore, return to the workshop, and keep building.",
   "license": "CC-BY-4.0 (original definitions/artwork); SIL-OFL-1.1 (fonts)",
-  "minContractVersion": 3,
+  "minContractVersion": 4,
   "assets": [
     {
       "kind": "Image",
@@ -79,6 +79,12 @@
       "kind": "Image",
       "path": "assets/banner-edge.png",
       "bytes": 3782
+    },
+    {
+      "kind": "Image",
+      "bytes": 9596,
+      "path": "assets/gallery-architecture.png",
+      "id": "gallery-architecture"
     }
   ],
   "definitions": [
@@ -273,6 +279,65 @@
             "relief": 0.2,
             "scrollbarWidth": 10
           }
+        },
+        "navigation": {
+          "dock": "bottom",
+          "extent": 84,
+          "immersive": false,
+          "scene": {
+            "type": "grid",
+            "rows": [
+              "*"
+            ],
+            "columns": [
+              "1.5*",
+              "*",
+              "*",
+              "*",
+              "*",
+              "1.4*",
+              "*"
+            ],
+            "spacing": 5,
+            "padding": 6,
+            "children": [
+              {
+                "type": "semantic",
+                "id": "vault",
+                "column": 0
+              },
+              {
+                "type": "semantic",
+                "id": "home",
+                "column": 1
+              },
+              {
+                "type": "semantic",
+                "id": "gallery",
+                "column": 2
+              },
+              {
+                "type": "semantic",
+                "id": "import",
+                "column": 3
+              },
+              {
+                "type": "semantic",
+                "id": "settings",
+                "column": 4
+              },
+              {
+                "type": "semantic",
+                "id": "activity",
+                "column": 5
+              },
+              {
+                "type": "semantic",
+                "id": "customize",
+                "column": 6
+              }
+            ]
+          }
         }
       }
     },
@@ -306,7 +371,7 @@
             "maxItems": 4
           }
         ],
-        "surface": {
+        "scene": {
           "type": "stack",
           "spacing": 20,
           "children": [
@@ -384,12 +449,12 @@
       "spec": {
         "showCover": true,
         "showOverview": false,
-        "scrimStrength": 0.30,
+        "scrimStrength": 0.3,
         "motion": "ken-burns",
         "pagination": "counter",
         "rotationSeconds": 24,
         "composition": "split-glass",
-        "surface": {
+        "scene": {
           "type": "grid",
           "columns": [
             "3*",
@@ -555,7 +620,7 @@
       "description": "The Figure is the main work surface on wide layouts, with the project identity and a compact Banner alongside it. Media follows as a shelf of builds.",
       "previewAccent": "#FF476338",
       "spec": {
-        "surface": {
+        "scene": {
           "type": "grid",
           "columns": [
             "5*",
@@ -991,6 +1056,73 @@
         "scale": 1,
         "tint": false,
         "animated": false
+      }
+    },
+    {
+      "id": "naut.overworld-expedition.gallery",
+      "kind": "gallery-layout",
+      "name": "Builder's Inventory",
+      "description": "Virtualized collection with a world-specific static architectural frame.",
+      "spec": {
+        "primitive": "VirtualizedGrid",
+        "itemMinWidth": 230,
+        "itemMaxWidth": 360,
+        "spacing": 14,
+        "maxColumns": 6,
+        "scene": {
+          "background": {
+            "variants": {
+              "full": {
+                "layers": [
+                  {
+                    "kind": "image",
+                    "asset": "backdrop-workshop",
+                    "opacity": 1
+                  },
+                  {
+                    "kind": "scrim",
+                    "color": "#FF121A10",
+                    "opacity": 0.62
+                  }
+                ]
+              },
+              "reduced": {
+                "layers": [
+                  {
+                    "kind": "image",
+                    "asset": "backdrop-workshop",
+                    "opacity": 1
+                  },
+                  {
+                    "kind": "scrim",
+                    "color": "#FF121A10",
+                    "opacity": 0.62
+                  }
+                ]
+              },
+              "fallback": {
+                "layers": [
+                  {
+                    "kind": "image",
+                    "asset": "backdrop-workshop",
+                    "opacity": 1
+                  },
+                  {
+                    "kind": "scrim",
+                    "color": "#FF121A10",
+                    "opacity": 0.62
+                  }
+                ]
+              }
+            }
+          },
+          "itemOverlay": "gallery-architecture",
+          "itemInset": 0.06,
+          "cardSizing": "intrinsic",
+          "cardRotation": 0,
+          "cardSkew": 0,
+          "overlayPlacement": "behind"
+        }
       }
     }
   ]

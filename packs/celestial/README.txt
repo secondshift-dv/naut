@@ -1,6 +1,6 @@
-# Nightfall Murim 3.0.0
+# Nightfall Murim 4.0.0
 
-Requires Naut v0.0.29 or later (Presentation Contract 3).
+Source requires Presentation Contract 4. Published 3.0.0 downloads require Naut v0.0.29 or later (Contract 3).
 
 Sect Hall reads top to bottom as an opening scene, a row of disciple portraits, and the record of recent activity.
 

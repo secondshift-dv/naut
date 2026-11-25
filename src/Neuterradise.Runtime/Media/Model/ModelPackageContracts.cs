@@ -7,7 +7,7 @@ using Neuterradise.App.SystemServices.Storage;
 
 namespace Neuterradise.App.Media.Model;
 
-public enum ModelPackageFormat { Gltf, Glb, Obj, Dae, Fbx, Blend, Stl, ThreeMf }
+public enum ModelPackageFormat { Gltf, Glb, Obj, Dae, Fbx, Blend, Stl, ThreeMf, Ply }
 
 public enum ComponentRole { Primary, Dependency }
 
@@ -174,9 +174,11 @@ public static class ModelPackageDiscovery
     public static ModelPackageDiscoveryResult Discover(
         string primaryFilePath,
         string? knownPrimarySha256 = null,
-        long? knownPrimaryByteLength = null)
+        long? knownPrimaryByteLength = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(primaryFilePath);
+        cancellationToken.ThrowIfCancellationRequested();
         var fullPath = Path.GetFullPath(primaryFilePath);
         var packageDir = Path.GetDirectoryName(fullPath) ?? string.Empty;
         var primaryFileName = Path.GetFileName(fullPath);
@@ -192,7 +194,8 @@ public static class ModelPackageDiscovery
             ".blend" => ModelPackageFormat.Blend,
             ".stl" => ModelPackageFormat.Stl,
             ".3mf" => ModelPackageFormat.ThreeMf,
-            _ => ModelPackageFormat.Obj,
+            ".ply" => ModelPackageFormat.Ply,
+            _ => throw new NotSupportedException("Unrecognized model package format."),
         };
 
         if (!File.Exists(fullPath))
@@ -205,9 +208,10 @@ public static class ModelPackageDiscovery
                 Array.Empty<DiscoveredComponent>());
         }
 
+        RootPathRules.RejectExistingReparsePoints(Path.GetPathRoot(fullPath)!, fullPath);
         var primaryInfo = new FileInfo(fullPath);
         var primaryLength = knownPrimaryByteLength ?? primaryInfo.Length;
-        var primarySha = knownPrimarySha256 ?? ModelPackagePlan.Hash(fullPath);
+        var primarySha = knownPrimarySha256 ?? HashComponent(fullPath, cancellationToken);
         var primaryComp = new DiscoveredComponent(
             primaryFileName,
             ModelPackagePlan.NormalizeComponentPath(primaryFileName),
@@ -217,7 +221,7 @@ public static class ModelPackageDiscovery
             fullPath,
             true);
 
-        if (format is ModelPackageFormat.Glb or ModelPackageFormat.Stl or ModelPackageFormat.ThreeMf)
+        if (format is ModelPackageFormat.Glb or ModelPackageFormat.Stl or ModelPackageFormat.ThreeMf or ModelPackageFormat.Ply)
         {
             return new ModelPackageDiscoveryResult(
                 format,
@@ -242,15 +246,15 @@ public static class ModelPackageDiscovery
         {
             if (format == ModelPackageFormat.Gltf)
             {
-                DiscoverGltfDependencies(fullPath, discoveredDeps);
+                DiscoverGltfDependencies(fullPath, discoveredDeps, cancellationToken);
             }
             else if (format == ModelPackageFormat.Obj)
             {
-                DiscoverObjDependencies(fullPath, packageDir, discoveredDeps);
+                DiscoverObjDependencies(fullPath, packageDir, discoveredDeps, cancellationToken);
             }
             else if (format == ModelPackageFormat.Dae)
             {
-                DiscoverDaeDependencies(fullPath, discoveredDeps);
+                DiscoverDaeDependencies(fullPath, discoveredDeps, cancellationToken);
             }
         }
         catch (UnauthorizedAccessException)
@@ -273,13 +277,21 @@ public static class ModelPackageDiscovery
         {
             return Failure(format, primaryComp, DependencyDiscoveryState.FailedTerminal);
         }
+        catch (RegexMatchTimeoutException)
+        {
+            return Failure(format, primaryComp, DependencyDiscoveryState.Unsupported);
+        }
 
         var components = new List<DiscoveredComponent> { primaryComp };
         var hasMissing = false;
 
         foreach (var (relPath, normPath) in discoveredDeps)
         {
-            var depFullPath = Path.Combine(packageDir, relPath.Replace('/', Path.DirectorySeparatorChar));
+            cancellationToken.ThrowIfCancellationRequested();
+            string depFullPath;
+            try { depFullPath = RootPathRules.ResolveContainedPath(packageDir, packageDir, relPath, nameof(relPath)); }
+            catch (IOException) { return Failure(format, primaryComp, DependencyDiscoveryState.Unsupported); }
+            catch (ArgumentException) { return Failure(format, primaryComp, DependencyDiscoveryState.Unsupported); }
             if (File.Exists(depFullPath))
             {
                 var depInfo = new FileInfo(depFullPath);
@@ -288,7 +300,7 @@ public static class ModelPackageDiscovery
                     normPath,
                     ComponentRole.Dependency,
                     depInfo.Length,
-                    ModelPackagePlan.Hash(depFullPath),
+                    HashComponent(depFullPath, cancellationToken),
                     depFullPath,
                     true));
             }
@@ -327,16 +339,51 @@ public static class ModelPackageDiscovery
         DependencyDiscoveryState state) =>
         new(format, MediaDependencyStatus.DependenciesUnknown, state, null, [primary]);
 
-    private static void DiscoverGltfDependencies(string gltfPath, Dictionary<string, string> deps)
+    private const long MaxDiscoveryDocumentBytes = 32L * 1024 * 1024;
+    private const int MaxDependencies = 4096;
+
+    private static FileStream OpenPackageFile(string path)
     {
-        using var stream = File.OpenRead(gltfPath);
-        using var doc = JsonDocument.Parse(stream);
+        RootPathRules.RejectExistingReparsePoints(Path.GetPathRoot(path)!, path);
+        var stream = File.OpenRead(path);
+        if (SourceIdentityHelper.MatchesOpenedPath(stream.SafeFileHandle, path)) return stream;
+        stream.Dispose();
+        throw new IOException("The opened model package file resolves outside its declared path.");
+    }
+
+    private static IEnumerable<string> ReadPackageLines(string path)
+    {
+        using var stream = OpenPackageFile(path);
+        using var reader = new StreamReader(stream);
+        while (reader.ReadLine() is { } line) yield return line;
+    }
+
+    private static string HashComponent(string path, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        using var stream = OpenPackageFile(path);
+        return Convert.ToHexStringLower(SHA256.HashDataAsync(stream, token).GetAwaiter().GetResult());
+    }
+
+    private static void CheckDocumentSize(string path)
+    {
+        if (new FileInfo(path).Length > MaxDiscoveryDocumentBytes)
+            throw new UnsupportedDependencyReferenceException("Model dependency document exceeds the discovery limit.");
+    }
+
+    private static void DiscoverGltfDependencies(string gltfPath, Dictionary<string, string> deps, CancellationToken token)
+    {
+        CheckDocumentSize(gltfPath);
+        token.ThrowIfCancellationRequested();
+        using var stream = OpenPackageFile(gltfPath);
+        using var doc = JsonDocument.ParseAsync(stream, cancellationToken: token).GetAwaiter().GetResult();
         var root = doc.RootElement;
 
         if (root.TryGetProperty("buffers", out var buffers) && buffers.ValueKind == JsonValueKind.Array)
         {
             foreach (var buffer in buffers.EnumerateArray())
             {
+                token.ThrowIfCancellationRequested();
                 if (buffer.TryGetProperty("uri", out var uri) && uri.ValueKind == JsonValueKind.String)
                 {
                     AddSafeUri(uri.GetString(), true, deps);
@@ -348,6 +395,7 @@ public static class ModelPackageDiscovery
         {
             foreach (var image in images.EnumerateArray())
             {
+                token.ThrowIfCancellationRequested();
                 if (image.TryGetProperty("uri", out var uri) && uri.ValueKind == JsonValueKind.String)
                 {
                     AddSafeUri(uri.GetString(), true, deps);
@@ -356,11 +404,14 @@ public static class ModelPackageDiscovery
         }
     }
 
-    private static void DiscoverObjDependencies(string objPath, string packageDir, Dictionary<string, string> deps)
+    private static void DiscoverObjDependencies(string objPath, string packageDir, Dictionary<string, string> deps, CancellationToken token)
     {
-        var mtlFiles = new List<string>();
-        foreach (var line in File.ReadLines(objPath))
+        if (new FileInfo(objPath).Length > 256L * 1024 * 1024)
+            throw new UnsupportedDependencyReferenceException("OBJ document exceeds the discovery limit.");
+        var mtlFiles = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var line in ReadPackageLines(objPath))
         {
+            token.ThrowIfCancellationRequested();
             var trimmed = line.Trim();
             if (trimmed.Length == 0 || trimmed.StartsWith("#")) continue;
             var tokens = trimmed.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
@@ -378,11 +429,15 @@ public static class ModelPackageDiscovery
 
         foreach (var mtlName in mtlFiles)
         {
-            var mtlPath = Path.Combine(packageDir, mtlName.Replace('/', Path.DirectorySeparatorChar));
+            token.ThrowIfCancellationRequested();
+            var mtlPath = RootPathRules.ResolveContainedPath(packageDir, packageDir, mtlName, nameof(mtlName));
             if (!File.Exists(mtlPath)) continue;
+            CheckDocumentSize(mtlPath);
+            var mtlDirectory = Path.GetDirectoryName(mtlName.Replace('\\', '/'))?.Replace('\\', '/');
 
-            foreach (var line in File.ReadLines(mtlPath))
+            foreach (var line in ReadPackageLines(mtlPath))
             {
+                token.ThrowIfCancellationRequested();
                 var trimmed = line.Trim();
                 if (trimmed.Length == 0 || trimmed.StartsWith("#")) continue;
                 var tokens = trimmed.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
@@ -390,18 +445,22 @@ public static class ModelPackageDiscovery
                 var directive = tokens[0].ToLowerInvariant();
                 if (directive is "map_kd" or "map_bump" or "bump" or "map_d" or "map_ks" or "map_ka" or "map_ns" or "disp" or "decal")
                 {
-                    AddSafeUri(tokens[^1], false, deps);
+                    AddSafeUri(tokens[^1], false, deps, mtlDirectory);
                 }
             }
         }
     }
 
-    private static void DiscoverDaeDependencies(string daePath, Dictionary<string, string> deps)
+    private static void DiscoverDaeDependencies(string daePath, Dictionary<string, string> deps, CancellationToken token)
     {
-        var text = File.ReadAllText(daePath);
-        var regex = new Regex(@"<init_from>\s*(.*?)\s*</init_from>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        CheckDocumentSize(daePath);
+        using var stream = OpenPackageFile(daePath);
+        using var reader = new StreamReader(stream);
+        var text = reader.ReadToEndAsync(token).GetAwaiter().GetResult();
+        var regex = new Regex(@"<init_from>\s*(.*?)\s*</init_from>", RegexOptions.IgnoreCase | RegexOptions.Singleline, TimeSpan.FromSeconds(2));
         foreach (Match match in regex.Matches(text))
         {
+            token.ThrowIfCancellationRequested();
             var value = match.Groups[1].Value.Trim();
             if (!string.IsNullOrEmpty(value))
             {
@@ -410,7 +469,7 @@ public static class ModelPackageDiscovery
         }
     }
 
-    private static bool AddSafeUri(string? uri, bool unescape, Dictionary<string, string> deps)
+    private static bool AddSafeUri(string? uri, bool unescape, Dictionary<string, string> deps, string? declaringDirectory = null)
     {
         if (string.IsNullOrWhiteSpace(uri))
         {
@@ -438,12 +497,15 @@ public static class ModelPackageDiscovery
             throw new FormatException("Model dependency reference is outside the package boundary.");
         }
 
+        if (!string.IsNullOrEmpty(declaringDirectory)) candidate = declaringDirectory + "/" + candidate;
         var normalized = ModelPackagePlan.NormalizeComponentPath(candidate);
         if (string.IsNullOrEmpty(normalized))
         {
             throw new FormatException("Model dependency reference is empty after normalization.");
         }
 
+        if (deps.Count >= MaxDependencies && !deps.ContainsKey(candidate))
+            throw new UnsupportedDependencyReferenceException("Model dependency count exceeds the discovery limit.");
         deps[candidate] = normalized;
         return true;
     }

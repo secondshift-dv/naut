@@ -7,6 +7,13 @@ namespace Neuterradise.App.Media;
 public enum MediaAssetResourceState { Ready, Missing, NeedsRepair }
 
 public sealed record MediaAssetResource(Guid MediaAssetId, MediaAssetResourceState State, string? PhysicalPath);
+public sealed record SceneBannerResource(Guid MediaId, string VideoPath, string? PosterPath);
+public enum SceneBannerResolutionStatus { Resolved, Incomplete, TemporarilyUnavailable }
+public sealed record SceneBannerResolution(IReadOnlyDictionary<int, SceneBannerResource> Resources, SceneBannerResolutionStatus Status)
+{
+    public bool RetryRequired => Status != SceneBannerResolutionStatus.Resolved;
+    public bool HasSnapshot => Status != SceneBannerResolutionStatus.TemporarilyUnavailable;
+}
 
 /// <summary>Resolves catalog-owned MediaAsset identity without generating media or exposing Candidate output.</summary>
 public sealed class MediaAssetResourceAuthority
@@ -65,6 +72,62 @@ public sealed class MediaAssetResourceAuthority
         var rendition = await new Neuterradise.App.Profiles.ProfileBannerOperations(_catalog)
             .ResolveRenditionAsync(profileId, hover.MediaId, ct: ct).ConfigureAwait(false);
         return await ResolveMediaAssetAsync(rendition, ct).ConfigureAwait(false);
+    }
+
+    // Resolve only on demand for a visible authored multi-banner scene. Use existing ordered, prepared
+    // collection entries and the same rendition readiness/containment authority as the primary Banner.
+    public async Task<SceneBannerResolution> ResolveSceneBannersAsync(
+        Guid profileId, string? primaryPath, Guid? primaryMediaId, IReadOnlyDictionary<int, Guid?> choices,
+        CancellationToken ct = default)
+    {
+        var results = new Dictionary<int, SceneBannerResource>();
+        if (choices.Count == 0 || choices.Keys.Any(index => index <= 0 || index >= Presentation.PresentationCompiler.MaxBackdropLayers))
+            return new(results, SceneBannerResolutionStatus.Resolved);
+        var selection = await _reads.GetPublicSelectionAsync(profileId, ct).ConfigureAwait(false);
+        if (selection is null) return new(results, SceneBannerResolutionStatus.Resolved);
+        if (primaryMediaId is null && selection.BannerMediaAssetId is { } selected)
+            primaryMediaId = (await _reads.GetPublicSelectedMediaAsync(profileId, selected, ct).ConfigureAwait(false))?.MediaId;
+        var operations = new Neuterradise.App.Profiles.ProfileBannerOperations(_catalog);
+        var entries = await operations.ReadEntriesAsync(profileId, ct).ConfigureAwait(false);
+        var cache = new Dictionary<Guid, SceneBannerResource?>();
+        var retryRequired = false;
+        async Task<SceneBannerResource?> ResolveAsync(Guid id)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (cache.TryGetValue(id, out var cached)) return cached;
+            if (!entries.Any(entry => entry.MediaId == id)) return cache[id] = null;
+            var asset = await operations.ResolveRenditionAsync(profileId, id, ct: ct).ConfigureAwait(false);
+            var resource = await ResolveMediaAssetAsync(asset, ct).ConfigureAwait(false);
+            if (resource.State != MediaAssetResourceState.Ready || resource.PhysicalPath is not { } path)
+            {
+                // Membership exists, but readiness or the physical file may be temporarily unavailable.
+                retryRequired = true;
+                return cache[id] = null;
+            }
+            var poster = await ResolveMediaThumbnailAsync(id, ct).ConfigureAwait(false);
+            retryRequired |= poster.State == MediaAssetResourceState.NeedsRepair;
+            return cache[id] = new(id, path, poster.PhysicalPath);
+        }
+
+        var fallbackCount = choices.Where(pair => pair.Value is null).Select(pair => pair.Key).DefaultIfEmpty(0).Max();
+        var ordered = new List<SceneBannerResource>(fallbackCount);
+        if (fallbackCount > 0)
+            foreach (var entry in entries)
+            {
+                if (entry.MediaId == primaryMediaId) continue;
+                if (await ResolveAsync(entry.MediaId).ConfigureAwait(false) is not { } resource
+                    || string.Equals(resource.VideoPath, primaryPath, StringComparison.OrdinalIgnoreCase)
+                    || ordered.Any(previous => string.Equals(previous.VideoPath, resource.VideoPath, StringComparison.OrdinalIgnoreCase))) continue;
+                ordered.Add(resource);
+                if (ordered.Count == fallbackCount) break;
+            }
+        foreach (var (index, id) in choices)
+        {
+            var resource = id is { } mediaId ? await ResolveAsync(mediaId).ConfigureAwait(false)
+                : index <= ordered.Count ? ordered[index - 1] : null;
+            if (resource is not null) results[index] = resource;
+        }
+        return new(results, retryRequired ? SceneBannerResolutionStatus.Incomplete : SceneBannerResolutionStatus.Resolved);
     }
 
     private Task<MediaAssetResource> ResolveMediaAssetAsync(MediaAssetRecord? mediaAsset, CancellationToken ct)

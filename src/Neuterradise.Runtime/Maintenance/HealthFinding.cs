@@ -21,4 +21,4 @@ public sealed record HealthFinding(
     bool RepairAvailable,
     string? ManagedRelativePath = null,
     Guid? ImportUnitId = null,
-    IReadOnlyList<HealthImportAction>? ImportActions = null);
+    IReadOnlyList<HealthImportAction>? ImportActions = null, bool RecoveryAvailable = false, bool RecoveryRequiresFolder = false);

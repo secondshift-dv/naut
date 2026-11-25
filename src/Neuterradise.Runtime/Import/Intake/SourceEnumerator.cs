@@ -1,4 +1,5 @@
 using System.IO;
+using Neuterradise.App.SystemServices.Storage;
 
 namespace Neuterradise.App.Import.Intake;
 
@@ -8,66 +9,41 @@ public static class SourceEnumerator
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fullPath);
 
-        FileInfo fileInfo;
+        var classification = SupportedMediaClassifier.Classify(fullPath);
         try
         {
-            fileInfo = new FileInfo(fullPath);
-            if (!fileInfo.Exists)
-            {
-                return new SourceItemDescriptor(
-                    fullPath,
-                    Exists: false,
-                    IsReadable: false,
-                    ByteLength: 0,
-                    LastWriteUtc: null,
-                    Classification: null);
-            }
+            var attributes = File.GetAttributes(fullPath);
+            if ((attributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0)
+                return Failed(fullPath, SourceIntakeIssueKind.Unreadable, classification);
+            if (classification is null)
+                return Failed(fullPath, SourceIntakeIssueKind.Unsupported, null, exists: true);
+
+            using var stream = File.Open(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var identity = SourceIdentityHelper.ReadIdentity(stream.SafeFileHandle, fullPath);
+            if (identity is null)
+                return Failed(fullPath, SourceIntakeIssueKind.Unreadable, classification, exists: true);
+            return new SourceItemDescriptor(fullPath, true, true, identity.ByteLength,
+                new DateTimeOffset(DateTime.FromFileTimeUtc(identity.LastWriteTimeUtcTicks)), classification,
+                SourceIdentityJson: SourceIdentityHelper.SerializeIdentity(identity));
         }
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or System.Security.SecurityException)
         {
-            return new SourceItemDescriptor(
-                fullPath,
-                Exists: false,
-                IsReadable: false,
-                ByteLength: 0,
-                LastWriteUtc: null,
-                Classification: null);
+            return Failed(fullPath, ClassifyFailure(exception), classification);
         }
-
-        var classification = SupportedMediaClassifier.Classify(fileInfo.Name);
-        var isReadable = false;
-        long length = 0;
-        DateTimeOffset? lastWriteUtc = null;
-
-        try
-        {
-            length = fileInfo.Length;
-            lastWriteUtc = new DateTimeOffset(fileInfo.LastWriteTimeUtc, TimeSpan.Zero);
-
-            if (classification.HasValue)
-            {
-                using var stream = fileInfo.Open(FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                isReadable = stream.CanRead;
-            }
-        }
-        catch (Exception exception) when (
-            exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or System.Security.SecurityException)
-        {
-            // The file is present but locked, denied or otherwise unreadable. Report that truthfully
-            // rather than inventing a byte length or a write timestamp.
-            isReadable = false;
-            lastWriteUtc = null;
-        }
-
-        return new SourceItemDescriptor(
-            fullPath,
-            Exists: true,
-            IsReadable: isReadable,
-            ByteLength: length,
-            LastWriteUtc: lastWriteUtc,
-            Classification: classification);
     }
+
+    private static SourceIntakeIssueKind ClassifyFailure(Exception exception) => exception switch
+    {
+        FileNotFoundException or DirectoryNotFoundException => SourceIntakeIssueKind.Missing,
+        UnauthorizedAccessException or System.Security.SecurityException => SourceIntakeIssueKind.AccessDenied,
+        IOException io when (io.HResult & 0xffff) is 32 or 33 => SourceIntakeIssueKind.Locked,
+        _ => SourceIntakeIssueKind.Unreadable,
+    };
+
+    private static SourceItemDescriptor Failed(string path, SourceIntakeIssueKind issue,
+        Neuterradise.App.Media.MediaType? classification = null, bool exists = false) =>
+        new(path, exists, false, 0, null, classification, issue);
 
     public static IReadOnlyList<SourceItemDescriptor> EnumerateDirectory(
         string directoryPath,
@@ -82,13 +58,13 @@ public static class SourceEnumerator
             fullDir = Path.GetFullPath(directoryPath);
             if (!Directory.Exists(fullDir))
             {
-                return Array.Empty<SourceItemDescriptor>();
+                return [Failed(directoryPath, SourceIntakeIssueKind.DirectoryUnavailable)];
             }
 
             var dirInfo = new DirectoryInfo(fullDir);
-            if (dirInfo.Attributes.HasFlag(FileAttributes.ReparsePoint))
+            if (dirInfo.Attributes.HasFlag(FileAttributes.ReparsePoint) || IsWithinPresentationPackDirectory(dirInfo))
             {
-                // Unsafe reparse point / symlink / junction at directory root is not followed
+                // Unsafe reparse point / symlink / junction or pack root is not followed
                 return Array.Empty<SourceItemDescriptor>();
             }
         }
@@ -192,7 +168,7 @@ public static class SourceEnumerator
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException or System.Security.SecurityException or DirectoryNotFoundException)
         {
-            // Directory unreadable or denied; proceed safely
+            results.Add(Failed(directoryPath, SourceIntakeIssueKind.DirectoryUnavailable));
         }
 
         try
@@ -220,30 +196,28 @@ public static class SourceEnumerator
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException or System.Security.SecurityException or DirectoryNotFoundException)
         {
-            // Subdirectories inaccessible; return safely
+            if (!results.Any(item => item.FullSourcePath == directoryPath && item.Issue == SourceIntakeIssueKind.DirectoryUnavailable))
+                results.Add(Failed(directoryPath, SourceIntakeIssueKind.DirectoryUnavailable));
         }
     }
 
     /// <summary>
-    /// True for a Presentation Pack root (a <c>pack.json</c> manifest declaring a <c>packId</c>) and for
-    /// anything inside a Vault <c>_system/presentation-packs</c> tree.
+    /// True for a Presentation Pack root, including the Vault presentation-pack collection.
     /// </summary>
-    internal static bool IsPresentationPackDirectory(DirectoryInfo directory)
+    internal static bool IsWithinPresentationPackDirectory(DirectoryInfo? directory)
+    {
+        for (var current = directory; current is not null; current = current.Parent)
+            if (IsPresentationPackDirectory(current)) return true;
+        return false;
+    }
+
+    private static bool IsPresentationPackDirectory(DirectoryInfo directory)
     {
         var parent = directory.Parent;
         if (string.Equals(directory.Name, "presentation-packs", StringComparison.OrdinalIgnoreCase)
             && string.Equals(parent?.Name, "_system", StringComparison.OrdinalIgnoreCase))
         {
             return true;
-        }
-
-        for (var current = directory; current is not null; current = current.Parent)
-        {
-            if (string.Equals(current.Name, "presentation-packs", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(current.Parent?.Name, "_system", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
         }
 
         var manifest = Path.Combine(directory.FullName, "pack.json");

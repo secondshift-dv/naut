@@ -35,6 +35,9 @@ public sealed class ManagedFileVerifier
                 FileShare.Read,
                 _bufferSize,
                 FileOptions.Asynchronous | FileOptions.SequentialScan);
+            if (!SourceIdentityHelper.MatchesOpenedPath(stream.SafeFileHandle, path))
+                return new ManagedFileVerificationResult(ManagedFileVerificationStatus.ReadFailed,
+                    SafeErrorDetail: "The opened file did not match the requested managed path.");
             var actualByteLength = stream.Length;
             if (actualByteLength != expectedByteLength)
             {

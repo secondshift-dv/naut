@@ -53,6 +53,7 @@ public sealed class HomeProfileTile : Button
         _name.Text = name;
         _name.Tip(name);
         _count.Text = count;
+        _favorite.Selected = favorite;
         _favorite.Visibility = favorite ? Visibility.Visible : Visibility.Collapsed;
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(this, name);
         _cover.Plan = null;

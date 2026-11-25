@@ -23,6 +23,7 @@ public sealed class MediaGridPanel : IDisposable
     private readonly HashSet<MediaCardView> _views = [];
     private MediaLayoutDefinition _layout;
     private string _browse = "wall";
+    private MediaCollectionPlan? _collection;
     private int _observedPage;
 
     public MediaGridPanel(AppServices services, MediaGridViewModel vm, Func<PresentationContext> context, Func<string, PresentationContext, CompiledDefinition>? resolve = null, Action? bringMediaIntoView = null)
@@ -91,8 +92,9 @@ public sealed class MediaGridPanel : IDisposable
     public void RefreshLayout()
     {
         var previousBrowse = _browse;
+        var previousCollection = _collection;
         var next = ResolveLayout();
-        if (next == _layout && previousBrowse == _browse)
+        if (next == _layout && previousBrowse == _browse && previousCollection == _collection)
         {
             return;
         }
@@ -110,8 +112,11 @@ public sealed class MediaGridPanel : IDisposable
     {
         var plan = _resolve(PresentationSlots.ProfileMediaLayout, _context() with { Surface = "media" }).PlanAs<ProfileMediaLayoutPlan>();
         _browse = plan.Browse;
+        _collection = plan.Collection;
         var width = _repeater is { ActualWidth: > 0 } ? _repeater.ActualWidth
             : _root.ActualWidth > 0 ? _root.ActualWidth : plan.Layout.CardWidth;
+        if (_collection is not null)
+            return plan.Layout with { CardWidth = Math.Min(Math.Max(1, width), plan.Layout.CardWidth) };
         var maxWidth = _browse == "workbench" ? 320 : _browse == "editorial" ? 260 : 220;
         var target = _browse == "workbench" && width >= 620
             ? Math.Min(maxWidth, (width - 44) / 3)
@@ -121,6 +126,19 @@ public sealed class MediaGridPanel : IDisposable
 
     private void ApplyBrowse()
     {
+        if (_collection is { } authored)
+        {
+            _repeater.Layout = authored.Layout == "editorial"
+                ? new EditorialGridLayout(_layout.CardWidth, _layout.CardHeight, authored.ColumnSpacing,
+                    authored.MaxColumns, authored.RowSpacing, authoredSizing: true)
+                : new UniformGridLayout
+                {
+                    MinItemWidth = _layout.CardWidth, MinItemHeight = _layout.CardHeight,
+                    MinColumnSpacing = authored.ColumnSpacing, MinRowSpacing = authored.RowSpacing,
+                    ItemsStretch = UniformGridLayoutItemsStretch.None, MaximumRowsOrColumns = authored.MaxColumns,
+                };
+            return;
+        }
         _repeater.Layout = _browse switch
         {
             "editorial" => new EditorialGridLayout(_layout.CardWidth, _layout.CardHeight, 14),

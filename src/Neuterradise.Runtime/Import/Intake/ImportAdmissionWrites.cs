@@ -1,5 +1,7 @@
+using Neuterradise.App.Import.Verification;
 using Neuterradise.App.SystemServices.Database;
 using Neuterradise.App.SystemServices.Database.Writes;
+using Neuterradise.App.SystemServices.Storage;
 
 namespace Neuterradise.App.Import.Intake;
 
@@ -24,6 +26,7 @@ internal sealed class ImportAdmissionWrites
     public async Task<IReadOnlyList<Guid>> AdmitUnitAsync(
         ImportUnitRegistration registration,
         IReadOnlyList<CandidateAllocationRequest> candidates,
+        VerificationDraftV1? initialDraft,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(registration);
@@ -49,7 +52,7 @@ internal sealed class ImportAdmissionWrites
 
         var now = DbTime.Format(_timeProvider.GetUtcNow());
         await EnsureSessionAsync(transaction, registration, now, cancellationToken).ConfigureAwait(false);
-        await EnsureUnitAsync(transaction, registration, now, cancellationToken).ConfigureAwait(false);
+        await EnsureUnitAsync(transaction, registration, initialDraft, now, cancellationToken).ConfigureAwait(false);
 
         var allocated = new List<Guid>(candidates.Count);
         foreach (var candidate in candidates)
@@ -92,19 +95,33 @@ internal sealed class ImportAdmissionWrites
     private static async Task EnsureUnitAsync(
         CatalogTransaction transaction,
         ImportUnitRegistration registration,
+        VerificationDraftV1? initialDraft,
         long now,
         CancellationToken cancellationToken)
     {
+        if (initialDraft is not null)
+        {
+            if (initialDraft.ValidateDestination().Count != 0 || initialDraft.Destination.Kind != DestinationKind.ExistingNormal)
+                throw new CatalogInvariantException("Initial import destination is invalid.");
+            await using var destination = transaction.CreateCommand("""
+                SELECT 1 FROM profiles WHERE profile_id=$profile AND kind='NORMAL'
+                    AND visibility='PUBLISHED' AND trashed_at_ms IS NULL;
+                """);
+            destination.Parameters.AddWithValue("$profile", DbGuid.Format(initialDraft.Destination.ProfileId!.Value));
+            if (await destination.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is null)
+                throw new CatalogInvariantException("The selected import destination is no longer available.");
+        }
         await using (var command = transaction.CreateCommand(
             """
             INSERT OR IGNORE INTO import_units(
                 import_unit_id, import_session_id, parent_import_unit_id,
                 source_kind, source_display_name, source_path_or_reference,
-                state, created_at_ms, updated_at_ms)
+                state, created_at_ms, updated_at_ms,
+                destination_kind, destination_profile_id, verification_step, verification_draft_json, verification_version)
             VALUES (
                 $unitId, $sessionId, $parentUnitId,
                 $sourceKind, $sourceDisplayName, $sourceReference,
-                $state, $now, $now);
+                $state, $now, $now, $destinationKind, $destinationProfile, $step, $draft, $version);
             """))
         {
             command.Parameters.AddWithValue("$unitId", DbGuid.Format(registration.ImportUnitId));
@@ -120,6 +137,11 @@ internal sealed class ImportAdmissionWrites
                     ? DBNull.Value
                     : registration.SourcePathOrReference);
             command.Parameters.AddWithValue("$state", DbEnum.Format(registration.UnitState));
+            command.Parameters.AddWithValue("$destinationKind", initialDraft is null ? DBNull.Value : DbEnum.Format(initialDraft.Destination.Kind!.Value));
+            command.Parameters.AddWithValue("$destinationProfile", initialDraft is null ? DBNull.Value : DbGuid.Format(initialDraft.Destination.ProfileId!.Value));
+            command.Parameters.AddWithValue("$step", initialDraft?.CurrentStep ?? 1);
+            command.Parameters.AddWithValue("$draft", initialDraft?.ToJson() ?? "{}");
+            command.Parameters.AddWithValue("$version", initialDraft?.SchemaVersion ?? 0);
             command.Parameters.AddWithValue("$now", now);
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -128,7 +150,7 @@ internal sealed class ImportAdmissionWrites
             """
             SELECT u.import_session_id, u.parent_import_unit_id,
                    u.source_kind, u.source_display_name, u.source_path_or_reference,
-                   s.state, u.state
+                   s.state, u.state, u.destination_kind, u.destination_profile_id, u.verification_draft_json
             FROM import_units u
             JOIN import_sessions s ON s.import_session_id = u.import_session_id
             WHERE u.import_unit_id = $unitId;
@@ -139,6 +161,17 @@ internal sealed class ImportAdmissionWrites
         {
             throw new CatalogInvariantException(
                 $"ImportUnit {registration.ImportUnitId:D} was not durable inside intake admission.");
+        }
+
+        if (initialDraft is not null)
+        {
+            var persisted = VerificationDraftV1.FromJson(reader.GetString(9), now);
+            if (reader.IsDBNull(7) || reader.GetString(7) != DbEnum.Format(initialDraft.Destination.Kind!.Value)
+                || reader.IsDBNull(8) || DbGuid.Parse(reader.GetString(8)) != initialDraft.Destination.ProfileId
+                || persisted.Destination != initialDraft.Destination
+                || persisted.ImportRequested != initialDraft.ImportRequested
+                || persisted.PublishWhenReady != initialDraft.PublishWhenReady)
+                throw new CatalogInvariantException("Repeated admission has different destination authority.");
         }
 
         var parentId = reader.IsDBNull(1) ? (Guid?)null : DbGuid.Parse(reader.GetString(1));
@@ -168,7 +201,7 @@ internal sealed class ImportAdmissionWrites
             SELECT i.import_unit_id, i.candidate_media_id,
                    i.source_path, i.source_file_name,
                    i.source_byte_length, i.source_last_write_ms,
-                   a.media_type, a.media_storage_token
+                   a.media_type, a.media_storage_token, i.source_identity_json
             FROM import_items i
             LEFT JOIN media a ON a.media_id = i.candidate_media_id
             WHERE i.import_item_id = $itemId;
@@ -187,7 +220,8 @@ internal sealed class ImportAdmissionWrites
                     || (existing.IsDBNull(5) ? (long?)null : existing.GetInt64(5)) != request.SourceLastWriteMilliseconds
                     || existing.IsDBNull(6)
                     || DbEnum.ParseMediaType(existing.GetString(6)) != request.MediaType
-                    || existing.IsDBNull(7))
+                    || existing.IsDBNull(7)
+                    || !SourceIdentityHelper.SameIdentity(existing.IsDBNull(8) ? null : existing.GetString(8), request.SourceIdentityJson))
                 {
                     throw new CatalogInvariantException(
                         $"ImportItem {request.ImportItemId:D} already exists with different discovery authority.");

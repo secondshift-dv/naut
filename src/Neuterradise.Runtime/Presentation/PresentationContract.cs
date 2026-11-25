@@ -9,7 +9,7 @@ namespace Neuterradise.App.Presentation;
 public static class PresentationContract
 {
     /// <summary>The contract version this renderer implements.</summary>
-    public const int Version = 3;
+    public const int Version = 4;
 
     /// <summary>The Presentation Pack manifest schema this build reads.</summary>
     public const int PackSchemaVersion = 1;
@@ -185,6 +185,7 @@ public static class PresentationSlots
     private static readonly ScopeKind[] GlobalOnly = [ScopeKind.Global];
     private static readonly ScopeKind[] SurfaceOnly = [ScopeKind.Surface];
     private static readonly ScopeKind[] ProfileOnly = [ScopeKind.Profile];
+    private static readonly ScopeKind[] ProfileVisual = [ScopeKind.Profile, ScopeKind.Global];
 
     public static IReadOnlyList<SlotDescriptor> All { get; } =
     [
@@ -212,17 +213,17 @@ public static class PresentationSlots
             "Search, filters, collection layout and virtualized browsing. Each Profile owns its Card composition.", SurfaceOnly, "gallery",
             BuiltInPresentationCatalog.DefaultFor(GalleryLayout), EditorKind.DefinitionChooser),
         new(ProfileCard, DefinitionKinds.ProfileCard, CustomizationCategories.Profile, "Customize.Profile.Card", "Card",
-            "How this Profile is represented in Gallery and other card collections.", ProfileOnly, "profile",
+            "How this Profile is represented in Gallery and other card collections.", ProfileVisual, "profile",
             BuiltInPresentationCatalog.DefaultFor(ProfileCard), EditorKind.DefinitionChooser),
         new(ProfileBackdrop, DefinitionKinds.Backdrop, CustomizationCategories.Profile, "Customize.Profile.Backdrop", "Backdrop",
-            "The background behind this Profile.", ProfileOnly, "profile",
+            "The background behind this Profile.", ProfileVisual, "profile",
             BuiltInPresentationCatalog.DefaultFor(ProfileBackdrop), EditorKind.DefinitionChooser),
 
         new(ProfileLayout, DefinitionKinds.ProfileLayout, CustomizationCategories.Profile, "Customize.Profile.Layout", "Layout",
-            "Arrangement of the Banner, Cover, identity and sections.", ProfileOnly, "profile",
+            "Arrangement of the Banner, Cover, identity and sections.", ProfileVisual, "profile",
             BuiltInPresentationCatalog.DefaultFor(ProfileLayout), EditorKind.DefinitionChooser),
         new(ProfileMediaLayout, DefinitionKinds.ProfileMediaLayout, CustomizationCategories.Profile, "Customize.Profile.MediaLayout", "Media Layout",
-            "How this Profile's media cards are composed. Media data and hover assets remain unchanged.", ProfileOnly, "profile",
+            "How this Profile's media cards are composed. Media data and hover assets remain unchanged.", ProfileVisual, "profile",
             BuiltInPresentationCatalog.DefaultFor(ProfileMediaLayout), EditorKind.DefinitionChooser),
         new(ProfileCover, null, CustomizationCategories.Profile, "Customize.Profile.Cover", "Cover",
             "Prepared Cover media selection for this Profile.", ProfileOnly, "profile",
@@ -231,7 +232,7 @@ public static class PresentationSlots
             "Prepared Banner media selection for this Profile.", ProfileOnly, "profile",
             null, EditorKind.BannerEditor),
         new(ProfileFrame, DefinitionKinds.CoverFrame, CustomizationCategories.Profile, "Customize.Profile.Frame", "Frame",
-            "The collectible frame around the Cover.", ProfileOnly, "profile",
+            "The collectible frame around the Cover.", ProfileVisual, "profile",
             BuiltInPresentationCatalog.DefaultFor(ProfileFrame), EditorKind.DefinitionChooser),
         EffectSlot(AppEffect, "App", CustomizationCategories.Appearance, GlobalOnly, null),
         EffectSlot(ControlsEffect, "Controls", CustomizationCategories.Appearance, GlobalOnly, null),
@@ -239,13 +240,13 @@ public static class PresentationSlots
         EffectSlot(GalleryEffect, "Effects", CustomizationCategories.Gallery, SurfaceOnly, "gallery"),
         EffectSlot(SettingsEffect, "Settings Effects", CustomizationCategories.Appearance, SurfaceOnly, "settings"),
         EffectSlot(ImportEffect, "Import Effects", CustomizationCategories.Appearance, SurfaceOnly, "import"),
-        EffectSlot(ProfileEffect, "Profile Effects", CustomizationCategories.Profile, ProfileOnly, "profile"),
-        EffectSlot(BackdropEffect, "Backdrop Effects", CustomizationCategories.Profile, ProfileOnly, "profile"),
-        EffectSlot(BannerEffect, "Banner Effects", CustomizationCategories.Profile, ProfileOnly, "profile"),
-        EffectSlot(CoverEffect, "Cover Effects", CustomizationCategories.Profile, ProfileOnly, "profile"),
-        EffectSlot(FrameEffect, "Frame Effects", CustomizationCategories.Profile, ProfileOnly, "profile"),
-        EffectSlot(CardEffect, "Card Effects", CustomizationCategories.Profile, ProfileOnly, "profile"),
-        EffectSlot(MediaEffect, "Media Effects", CustomizationCategories.Profile, ProfileOnly, "profile"),
+        EffectSlot(ProfileEffect, "Profile Effects", CustomizationCategories.Profile, ProfileVisual, "profile"),
+        EffectSlot(BackdropEffect, "Backdrop Effects", CustomizationCategories.Profile, ProfileVisual, "profile"),
+        EffectSlot(BannerEffect, "Banner Effects", CustomizationCategories.Profile, ProfileVisual, "profile"),
+        EffectSlot(CoverEffect, "Cover Effects", CustomizationCategories.Profile, ProfileVisual, "profile"),
+        EffectSlot(FrameEffect, "Frame Effects", CustomizationCategories.Profile, ProfileVisual, "profile"),
+        EffectSlot(CardEffect, "Card Effects", CustomizationCategories.Profile, ProfileVisual, "profile"),
+        EffectSlot(MediaEffect, "Media Effects", CustomizationCategories.Profile, ProfileVisual, "profile"),
 
     ];
 

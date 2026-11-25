@@ -54,6 +54,16 @@ public sealed class ProductRoot : Grid
     private LivingNavigationButton? _vaultButton;
     private LivingNavigationButton? _customizeButton;
     private FrameworkElement? _primaryNavigationHost;
+    private readonly Grid _shell = UI.Grid("auto,auto,*,auto", "auto,*,auto");
+    private readonly Grid _navigationContainer = new();
+    private Grid? _legacyNavigation;
+    private StackPanel? _legacyNavGroup;
+    private StackPanel? _legacyUtilities;
+    private FrameworkElement? _authoredNavigation;
+    private NavigationScenePlan? _activeNavigation;
+    private bool _nativeNavigation;
+    private bool _immersiveHidden;
+    private Button? _navigationRecovery;
     private readonly StackPanel _breadcrumb = UI.H(4);
     private readonly Border _breadcrumbHost = new();
     private Surface? _current;
@@ -108,16 +118,26 @@ public sealed class ProductRoot : Grid
         KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
         WindowChrome.UseNativeTitleBar(services.Window);
 
-        var shell = UI.Grid("auto,auto,*", "*");
         _primaryNavigationHost = BuildPrimaryNavigation();
-        shell.Children.Add(_primaryNavigationHost.At(0));
-        shell.Children.Add(BuildBreadcrumb().At(1));
+        _shell.Children.Add(_primaryNavigationHost.At(0, 1));
+        _shell.Children.Add(BuildBreadcrumb().At(1, 1));
         _presentationWorkspace.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         _presentationWorkspace.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0) });
         _presentationWorkspace.Children.Add(_content.At(0, 0));
         _presentationWorkspace.Children.Add(_customizationLayer.At(0, 1));
-        shell.Children.Add(_presentationWorkspace.At(2));
-        Children.Add(shell);
+        _shell.Children.Add(_presentationWorkspace.At(2, 1));
+        _navigationRecovery = new Button
+        {
+            Content = UI.T("Nav.Recovery", "Native navigation"),
+            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(0, 8, 8, 0), Visibility = Visibility.Collapsed,
+            MinHeight = 32,
+        };
+        _navigationRecovery.Click += (_, _) => ToggleNativeNavigation();
+        _navigationRecovery.Tip("F10");
+        _shell.Children.Add(_navigationRecovery.At(2, 1));
+        Children.Add(_shell);
+        ApplyNavigationScene();
 
         Children.Add(_overlayLayer);
         Children.Add(_toasts);
@@ -138,6 +158,7 @@ public sealed class ProductRoot : Grid
         {
             ResourceGovernor.Shared.NotifyInteraction(InteractionSignal.Resize);
             UpdateCustomizationLayout();
+            ApplyNavigationScene();
         };
 
         RegisterAccelerators();
@@ -156,6 +177,7 @@ public sealed class ProductRoot : Grid
     private void OnThemeChanged() => UiDispatch.Run(() =>
     {
         ApplyNativeTheme();
+        ApplyNavigationScene();
         UpdateNavSelection();
         UpdateContextualAction();
     });
@@ -167,12 +189,20 @@ public sealed class ProductRoot : Grid
         var theme = ThemeRuntime.Current;
         var height = theme.Tokens.Number("chromeHeight", 50);
         var navigation = UI.Grid("*", "auto,*,auto");
+        _legacyNavigation = navigation;
         theme.TrackThemeElement(navigation, nav =>
         {
-            nav.Height = ThemeRuntime.Current.Tokens.Number("chromeHeight", height);
-            nav.Background = ThemeRuntime.Current.Brush("chromeBackground");
-            nav.BorderBrush = ThemeRuntime.Current.Brush("chromeBorder");
-            nav.BorderThickness = new Thickness(0, 0, 0, ThemeRuntime.Current.Tokens.Number("chromeBorderThickness", 1));
+            var current = ThemeRuntime.Current;
+            var chrome = current.ControlSkin?.Families.GetValueOrDefault("chrome");
+            var buttons = current.ControlSkin?.Families.GetValueOrDefault("navigation");
+            nav.Height = Math.Max(chrome?.Height ?? current.Tokens.Number("chromeHeight", height),
+                buttons is null ? 0 : Math.Max(buttons.Height, 28 + 2 * buttons.VerticalPadding) + 8);
+            nav.Background = chrome is null ? current.Brush("chromeBackground") : current.ControlFill(chrome, chrome.Fill);
+            nav.BorderBrush = current.Brush(chrome?.Border ?? "chromeBorder");
+            nav.BorderThickness = chrome is null
+                ? new Thickness(0, 0, 0, current.Tokens.Number("chromeBorderThickness", 1))
+                : ThemeRuntime.ControlEdge(chrome);
+            _navigationContainer.Background = nav.Background;
         });
 
         var vaultName = Path.GetFileName(_services.Paths.Root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
@@ -193,6 +223,7 @@ public sealed class ProductRoot : Grid
         navigation.Children.Add(_vaultButton.At(0, 0));
 
         var nav = UI.H(4);
+        _legacyNavGroup = nav;
         nav.VerticalAlignment = VerticalAlignment.Center;
         foreach (var (route, key, fallback, role) in new (AppRoute, string, string, LivingNavigationRole)[]
         {
@@ -233,25 +264,128 @@ public sealed class ProductRoot : Grid
         };
 
         var utilities = UI.H(6, _activityPill, _customizeButton);
+        _legacyUtilities = utilities;
         utilities.VerticalAlignment = VerticalAlignment.Center;
         utilities.Margin = new Thickness(0, 0, 8, 0);
         navigation.Children.Add(utilities.At(0, 2));
 
         navigation.SizeChanged += (_, _) => UpdateResponsiveTopBar(navigation.ActualWidth);
-        return navigation;
+        _navigationContainer.Children.Add(navigation);
+        return _navigationContainer;
+    }
+
+    private void ToggleNativeNavigation()
+    {
+        _nativeNavigation = !_nativeNavigation;
+        _immersiveHidden = false;
+        ApplyNavigationScene();
+    }
+
+    private void RestoreLegacyNavigation()
+    {
+        if (_authoredNavigation is not null)
+        {
+            _navigationContainer.Children.Remove(_authoredNavigation);
+            _authoredNavigation = null;
+        }
+        if (_legacyNavigation is null || _legacyNavGroup is null || _legacyUtilities is null) return;
+        foreach (var item in _navButtons)
+        {
+            if (_legacyNavGroup.Children.Contains(item.Button)) continue;
+            SurfaceComposer.Detach(item.Button);
+            _legacyNavGroup.Children.Add(item.Button);
+        }
+        if (_vaultButton is not null && !_legacyNavigation.Children.Contains(_vaultButton))
+        {
+            SurfaceComposer.Detach(_vaultButton);
+            _legacyNavigation.Children.Insert(0, _vaultButton.At(0, 0));
+        }
+        foreach (var item in new FrameworkElement?[] { _activityPill, _customizeButton })
+            if (item is not null && !_legacyUtilities.Children.Contains(item))
+            {
+                SurfaceComposer.Detach(item);
+                _legacyUtilities.Children.Add(item);
+            }
+        _legacyNavigation.Visibility = Visibility.Visible;
+    }
+
+    private void ApplyNavigationScene()
+    {
+        if (_legacyNavigation is null || _navigationRecovery is null) return;
+        var authored = ThemeRuntime.Current.ControlSkin?.Navigation;
+        if (!ReferenceEquals(_activeNavigation, authored))
+        {
+            _activeNavigation = authored;
+            _nativeNavigation = false;
+            _immersiveHidden = authored?.Immersive == true;
+            RestoreLegacyNavigation();
+        }
+        var route = _services.Navigation.CurrentRoute;
+        var safeRoute = route is HomeRoute or GalleryRoute or ProfileRoute;
+        var plan = !_nativeNavigation && safeRoute && ActualWidth >= 640 ? authored : null;
+        if (plan is null)
+        {
+            RestoreLegacyNavigation();
+        }
+        else if (_authoredNavigation is null)
+        {
+            FrameworkElement? Region(string id) => id switch
+            {
+                "vault" => _vaultButton,
+                "home" => _navButtons.First(item => item.Route is HomeRoute).Button,
+                "gallery" => _navButtons.First(item => item.Route is GalleryRoute).Button,
+                "import" => _navButtons.First(item => item.Route is ImportRoute).Button,
+                "settings" => _navButtons.First(item => item.Route is SettingsRoute).Button,
+                "activity" => _activityPill,
+                "customize" => _customizeButton,
+                _ => null,
+            };
+            _legacyNavigation.Visibility = Visibility.Collapsed;
+            _authoredNavigation = SurfaceComposer.Build(plan.Scene, Region, plan.Dock is "left" or "right" ? plan.Extent : ActualWidth);
+            _navigationContainer.Children.Add(_authoredNavigation);
+        }
+
+        var side = plan?.Dock is "left" or "right";
+        var hidden = plan?.Immersive == true && _immersiveHidden && _customization is null;
+        _navigationContainer.Visibility = hidden ? Visibility.Collapsed : Visibility.Visible;
+        _navigationContainer.Height = plan is not null && !side ? plan.Extent : double.NaN;
+        _navigationContainer.Width = side ? plan!.Extent : double.NaN;
+        Grid.SetRow(_navigationContainer, plan?.Dock == "bottom" ? 3 : 0);
+        Grid.SetColumn(_navigationContainer, plan?.Dock == "left" ? 0 : plan?.Dock == "right" ? 2 : 1);
+        Grid.SetRowSpan(_navigationContainer, side ? 4 : 1);
+        if (plan is not null)
+        {
+            foreach (var item in _navButtons) item.Button.SetCompact(side || ActualWidth < 900);
+            _vaultButton?.SetCompact(side || ActualWidth < 900);
+            _customizeButton?.SetCompact(side || ActualWidth < 900);
+        }
+        else UpdateResponsiveTopBar(ActualWidth);
+        _navigationRecovery.Visibility = authored is not null && safeRoute && _customization is null
+            ? Visibility.Visible : Visibility.Collapsed;
+        _navigationRecovery.Content = _nativeNavigation
+            ? UI.T("Nav.CustomNavigation", "Custom navigation") : UI.T("Nav.Recovery", "Native navigation");
     }
 
     private FrameworkElement BuildBreadcrumb()
     {
         var theme = ThemeRuntime.Current;
         _breadcrumbHost.Child = _breadcrumb;
-        _breadcrumbHost.Padding = new Thickness(10, 0, 10, 0);
-        _breadcrumbHost.Height = theme.Tokens.Number("breadcrumbHeight", 36);
         _breadcrumb.Visibility = Visibility.Collapsed;
         _breadcrumbHost.Visibility = Visibility.Collapsed;
-        _breadcrumbHost.Background = theme.Brush("surface2");
-        _breadcrumbHost.BorderBrush = theme.Brush("borderSubtle");
-        _breadcrumbHost.BorderThickness = new Thickness(0, 0, 0, 1);
+        theme.TrackControlBorder(_breadcrumbHost, host =>
+        {
+            var current = ThemeRuntime.Current;
+            var skin = current.ControlSkin?.Families.GetValueOrDefault("breadcrumb");
+            host.Padding = skin is null ? new Thickness(10, 0, 10, 0)
+                : new Thickness(skin.HorizontalPadding, skin.VerticalPadding, skin.HorizontalPadding, skin.VerticalPadding);
+            host.Height = skin is null ? current.Tokens.Number("breadcrumbHeight", 36)
+                : Math.Max(skin.Height, current.ControlFamily("button").Height + 2 * skin.VerticalPadding);
+            host.CornerRadius = new CornerRadius(skin?.Radius ?? 0);
+            host.Background = skin is null ? current.Brush("surface2") : current.ControlFill(skin, skin.Fill);
+            host.BorderBrush = current.Brush(skin?.Border ?? "borderSubtle");
+            host.BorderThickness = skin is null ? new Thickness(0, 0, 0, 1) : ThemeRuntime.ControlEdge(skin);
+            _breadcrumb.Spacing = skin?.HorizontalPadding ?? 4;
+        });
         _breadcrumbHost.SizeChanged += (_, _) => FitBreadcrumb();
         return _breadcrumbHost;
     }
@@ -298,8 +432,8 @@ public sealed class ProductRoot : Grid
     {
         if (_breadcrumbHost.ActualWidth <= 0 || _breadcrumb.Children.LastOrDefault() is not TextBlock current) return;
         var used = _breadcrumb.Children.OfType<FrameworkElement>().Where(child => !ReferenceEquals(child, current))
-            .Sum(child => child.ActualWidth + 4);
-        current.MaxWidth = Math.Max(40, _breadcrumbHost.ActualWidth - used - 24);
+            .Sum(child => child.ActualWidth + _breadcrumb.Spacing);
+        current.MaxWidth = Math.Max(40, _breadcrumbHost.ActualWidth - used - _breadcrumbHost.Padding.Left - _breadcrumbHost.Padding.Right - 4);
     }
 
     private void ObserveBreadcrumbProfile()
@@ -411,6 +545,7 @@ public sealed class ProductRoot : Grid
 
     private void UpdateContextualAction()
     {
+        ApplyNavigationScene();
         if (_customizeButton is null)
         {
             return;
@@ -746,7 +881,10 @@ public sealed class ProductRoot : Grid
     {
         // Native children occupy HWND airspace; XAML modal scrims cannot cover them.
         if (_current is ProfileSurface profile)
+        {
             profile.SetFigureOccluded(Dialogs.HasOpenDialog || _customization is not null && (_customization.IsEditor || ActualWidth < 900));
+            profile.SetCustomizeEditorOccluded(_customization?.IsEditor == true);
+        }
         _customization?.SetFigureOccluded(Dialogs.HasOpenDialog);
     }
 
@@ -780,9 +918,6 @@ public sealed class ProductRoot : Grid
 
     public CardData? SampleHomeCard() =>
         _topLevel.Values.OfType<HomeSurface>().FirstOrDefault()?.SampleCard();
-
-    public string? SampleHomeVideo() =>
-        _topLevel.Values.OfType<HomeSurface>().FirstOrDefault()?.SampleSpotlightVideo;
 
     public Task ImportAsync(
         IEnumerable<string> paths,
@@ -907,10 +1042,14 @@ public sealed class ProductRoot : Grid
     private void OnKeyDown(object sender, KeyRoutedEventArgs e)
     {
         ResourceGovernor.Shared.NotifyInteraction(InteractionSignal.Keyboard);
-        if (e.Key != VirtualKey.Escape)
+        if (e.Key == VirtualKey.F10 && _activeNavigation is not null && _customization is null
+            && !Dialogs.HasOpenDialog && !_services.Overlay.HasOverlay)
         {
+            ToggleNativeNavigation();
+            e.Handled = true;
             return;
         }
+        if (e.Key != VirtualKey.Escape) return;
 
         if (Dialogs.TryDismissTop())
         {
@@ -924,6 +1063,12 @@ public sealed class ProductRoot : Grid
         else if (_customization is not null)
         {
             _customization.RequestClose();
+            e.Handled = true;
+        }
+        else if (_activeNavigation?.Immersive == true && !_nativeNavigation)
+        {
+            _immersiveHidden = !_immersiveHidden;
+            ApplyNavigationScene();
             e.Handled = true;
         }
     }

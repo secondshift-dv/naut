@@ -21,13 +21,13 @@ public sealed record ImportIntakeResult(
     Guid SessionId,
     int TotalDiscoveredItemCount,
     int TotalAllocatedCandidateCount,
-    IReadOnlyList<ImportIntakeUnitResult> Units);
+    IReadOnlyList<ImportIntakeUnitResult> Units,
+    IReadOnlyList<SourceIntakeIssue> Issues);
 
 public sealed class ImportIntakeCoordinator
 {
     private readonly CatalogDb _catalog;
     private readonly ImportAdmissionWrites _admissionWrites;
-    private readonly VerificationOperations _verification;
     private readonly VaultPaths _paths;
     private readonly TimeProvider _timeProvider;
 
@@ -38,7 +38,6 @@ public sealed class ImportIntakeCoordinator
         _timeProvider = timeProvider ?? TimeProvider.System;
         _paths = catalog.Paths;
         _admissionWrites = new ImportAdmissionWrites(catalog, _timeProvider);
-        _verification = new VerificationOperations(catalog, _timeProvider);
     }
 
     public async Task<ImportIntakeResult> IntakeAsync(
@@ -70,6 +69,7 @@ public sealed class ImportIntakeCoordinator
         var unitResults = new List<ImportIntakeUnitResult>();
         var totalDiscovered = 0;
         var totalAllocated = 0;
+        var issues = new List<SourceIntakeIssue>();
 
         foreach (var unitPlan in plan.Units)
         {
@@ -82,9 +82,16 @@ public sealed class ImportIntakeCoordinator
                 // stay outside durable import work instead of becoming a Candidate that later stalls.
                 if (!item.Exists || !item.IsReadable || !item.Classification.HasValue)
                 {
+                    issues.Add(new(item.FullSourcePath, item.Issue ?? SourceIntakeIssueKind.Unreadable));
                     continue;
                 }
 
+                var identity = item.SourceIdentityJson;
+                if (identity is null)
+                {
+                    issues.Add(new(item.FullSourcePath, SourceIntakeIssueKind.Unreadable));
+                    continue;
+                }
                 allocations.Add(new CandidateAllocationRequest(
                     DeriveDeterministicId(unitPlan.ImportUnitId, "item:" + item.FullSourcePath),
                     unitPlan.ImportUnitId,
@@ -94,7 +101,7 @@ public sealed class ImportIntakeCoordinator
                     item.Classification.Value,
                     item.ByteLength,
                     DbTime.FormatOrNull(item.LastWriteUtc),
-                    SourceIdentityJson: SourceIdentityHelper.CaptureIdentity(item.FullSourcePath)));
+                    SourceIdentityJson: identity));
             }
 
             // Zero-valid intake has no durable Import Unit. Unit registration and every initial
@@ -114,39 +121,19 @@ public sealed class ImportIntakeCoordinator
                 UnitState: ImportUnitState.Intake,
                 SourcePathOrReference: unitPlan.SourcePathOrReference);
 
-            var candidateMediaIds = (await _admissionWrites
-                .AdmitUnitAsync(registration, allocations, cancellationToken)
-                .ConfigureAwait(false)).ToList();
-            totalAllocated += candidateMediaIds.Count;
-
-            // "Add media" from a Profile is explicit human intent. Persist it after atomic admission;
-            // normal picker/drop imports intentionally remain unresolved.
-            if (plan.SuggestedDestinationProfileId is { } explicitProfileId
-                && explicitProfileId != Guid.Empty)
-            {
-                var model = await _verification
-                    .LoadVerificationReadModelAsync(unitPlan.ImportUnitId, cancellationToken)
-                    .ConfigureAwait(false)
-                    ?? throw new CatalogInvariantException(
-                        $"ImportUnit {unitPlan.ImportUnitId:D} vanished during intake.");
-                var draft = VerificationDraftV1.FromJson(
-                    model.VerificationDraftJson,
-                    _timeProvider.GetUtcNow().ToUnixTimeMilliseconds()) with
+            var initialDraft = plan.SuggestedDestinationProfileId is { } explicitProfileId && explicitProfileId != Guid.Empty
+                ? VerificationDraftV1.CreateDefault(_timeProvider.GetUtcNow().ToUnixTimeMilliseconds()) with
                 {
                     CurrentStep = (int)ImportWizardStep.Details,
                     ImportRequested = plan.Origin == IntakeOrigin.ProfileAddMedia ? true : null,
                     PublishWhenReady = plan.Origin == IntakeOrigin.ProfileAddMedia,
-                    Destination = new VerificationDestinationDraft(
-                        DestinationKind.ExistingNormal,
-                        explicitProfileId,
-                        NewProfile: null),
-                };
-                await _verification.UpdateDraftAsync(
-                    unitPlan.ImportUnitId,
-                    draft,
-                    model.RowVersion,
-                    cancellationToken).ConfigureAwait(false);
-            }
+                    Destination = new VerificationDestinationDraft(DestinationKind.ExistingNormal, explicitProfileId, null),
+                }
+                : null;
+            var candidateMediaIds = (await _admissionWrites
+                .AdmitUnitAsync(registration, allocations, initialDraft, cancellationToken)
+                .ConfigureAwait(false)).ToList();
+            totalAllocated += candidateMediaIds.Count;
 
             unitResults.Add(new ImportIntakeUnitResult(
                 unitPlan.ImportUnitId,
@@ -162,7 +149,7 @@ public sealed class ImportIntakeCoordinator
             plan.ImportSessionId,
             totalDiscovered,
             totalAllocated,
-            unitResults);
+            unitResults, issues);
     }
 
     private void EnsureVaultIsReadyForImport()

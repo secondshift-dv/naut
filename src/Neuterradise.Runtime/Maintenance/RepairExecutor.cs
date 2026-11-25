@@ -61,6 +61,7 @@ public sealed class RepairExecutor
 
         async Task<OperationResult<RepairPlan>> ExecuteGatedAsync(OperationContext operation)
         {
+            using var admission = _catalog.MutationAdmission.Enter(ExecuteRepairKind);
             var vaultKey = Path.GetFullPath(_catalog.Paths.Root);
             var executionGate = _vaultExecutionGates.GetOrAdd(vaultKey, static _ => new SemaphoreSlim(1, 1));
             await executionGate.WaitAsync(operation.CancellationToken).ConfigureAwait(false);
@@ -107,6 +108,9 @@ public sealed class RepairExecutor
                 OperationErrorCode.RepairPlanStale,
                 "The repair plan was already invalidated by newer authority or physical facts.");
         }
+
+        if (plan.Kind is RepairKind.ReconcileOriginalIntegrity or RepairKind.RestoreCanonicalOriginal or RepairKind.ReconcileOriginalPlacement)
+            return await ExecuteOriginalIntegrityAsync(plan, cancellationToken).ConfigureAwait(false);
 
         var checkpointStarted = persisted.State is "EXECUTING" or "FAILED_RETRYABLE";
         var readiness = await RevalidateAsync(plan, checkpointStarted, cancellationToken).ConfigureAwait(false);
@@ -176,6 +180,98 @@ public sealed class RepairExecutor
             "COMPLETED",
             cancellationToken: CancellationToken.None).ConfigureAwait(false);
         return OperationResult<RepairPlan>.Success(plan, plan.OperationId);
+    }
+
+    private async Task<OperationResult<RepairPlan>> ExecuteOriginalIntegrityAsync(RepairPlan plan, CancellationToken ct)
+    {
+        if (plan.MediaId is not Guid mediaId)
+            return OperationResult<RepairPlan>.Conflict(OperationErrorCode.RepairPlanStale, "Repair has no Media identity.");
+        var media = (await _catalog.HealthReads.GetHealthMediaItemsAsync(mediaId, cancellationToken: ct)
+            .ConfigureAwait(false)).SingleOrDefault();
+        if (media is not { HasStablePublishedOwner: true, OwnerProfileId: Guid owner }
+            || media.RowVersion != plan.ExpectedRowVersion
+            || plan.ExpectedAuthorityState != $"{owner:D}|{media.OriginalHealthStatus ?? "UNRECORDED"}"
+            || (plan.Kind == RepairKind.ReconcileOriginalPlacement ? plan.SourcePathOrRelative : plan.TargetPathOrRelative) != $"{media.CurrentManagedRelativePath}/{media.CurrentManagedFileName}"
+            || (plan.Kind == RepairKind.ReconcileOriginalIntegrity && plan.SourcePathOrRelative != plan.TargetPathOrRelative)
+            || media.Sha256 != plan.ExpectedPhysicalSha256 || media.ByteLength != plan.ExpectedPhysicalByteLength)
+            return await StaleAsync().ConfigureAwait(false);
+        var components = media.MediaType == MediaType.Model
+            ? await _catalog.MediaWrites.GetMediaComponentsAsync(mediaId, ct).ConfigureAwait(false) : [];
+        using var disk = await Neuterradise.App.SystemServices.Resources.ResourceGovernor.Shared.AcquireAsync(
+            Neuterradise.App.SystemServices.Resources.ResourceClass.DiskHeavy, ct).ConfigureAwait(false);
+        if (plan.Kind == RepairKind.ReconcileOriginalPlacement)
+        {
+            var recovery = new CanonicalOriginalRecovery(_catalog);
+            if (await recovery.FindPlacementAsync(media, components, true, ct).ConfigureAwait(false) != plan.TargetPathOrRelative)
+                return await StaleAsync().ConfigureAwait(false);
+            if (!await _catalog.MaintenanceWrites.CompleteOriginalIntegrityAsync(plan, media, components, null, ct,
+                async (transaction, token) =>
+                {
+                    if (await recovery.FindPlacementAsync(media, components, true, token, transaction).ConfigureAwait(false)
+                        != plan.TargetPathOrRelative)
+                        throw new CatalogConcurrencyConflictException("Verified placement changed.");
+                }).ConfigureAwait(false))
+                return await StaleAsync().ConfigureAwait(false);
+            await AppendCompletionActivityAsync(plan).ConfigureAwait(false);
+            return OperationResult<RepairPlan>.Success(plan, plan.OperationId);
+        }
+        if (plan.Kind == RepairKind.RestoreCanonicalOriginal)
+        {
+            var files = CanonicalOriginalInspection.Files(media, components);
+            if (files is null || media.OriginalHealthStatus is null) return await StaleAsync().ConfigureAwait(false);
+            var recovery = new CanonicalOriginalRecovery(_catalog);
+            await _catalog.MaintenanceWrites.SetRepairOperationStateAsync(plan.OperationId, "EXECUTING",
+                cancellationToken: ct).ConfigureAwait(false);
+            try
+            {
+                await recovery.StageAsync(plan, media, files, ct).ConfigureAwait(false);
+                if (!await _catalog.MaintenanceWrites.CompleteOriginalIntegrityAsync(plan, media, components, null, ct,
+                        (transaction, token) => recovery.PublishAsync(transaction, plan, media, files, token)).ConfigureAwait(false))
+                    return await StaleAsync().ConfigureAwait(false);
+                try { recovery.CleanupStaging(plan, files.Count); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+                { System.Diagnostics.Trace.TraceWarning("Completed original repair staging could not be removed."); }
+                await AppendCompletionActivityAsync(plan).ConfigureAwait(false);
+                return OperationResult<RepairPlan>.Success(plan, plan.OperationId);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or OperationCanceledException)
+            {
+                await _catalog.MaintenanceWrites.SetRepairOperationStateAsync(plan.OperationId, "FAILED_RETRYABLE",
+                    OperationErrorCode.RepairExecutionFailed, "Verified original recovery requires retry.",
+                    CancellationToken.None).ConfigureAwait(false);
+                if (ex is OperationCanceledException) throw;
+                return OperationResult<RepairPlan>.NeedsAttention(OperationErrorCode.RepairExecutionFailed,
+                    "Recovery remains pending. Original identity and preserved evidence were retained.", plan.OperationId);
+            }
+        }
+        var observed = await CanonicalOriginalInspection.InspectAsync(_catalog, media, components, true, ct).ConfigureAwait(false);
+        var expected = plan.CurrentPhysicalFact switch
+        {
+            RepairPhysicalFact.OriginalMissing => OriginalInspectionStatus.Missing,
+            RepairPhysicalFact.OriginalMismatch => OriginalInspectionStatus.Mismatch,
+            RepairPhysicalFact.SourcePresent => OriginalInspectionStatus.Match,
+            _ => OriginalInspectionStatus.Unreadable,
+        };
+        if (observed == OriginalInspectionStatus.Unreadable || observed != expected)
+            return await StaleAsync().ConfigureAwait(false);
+        var status = observed switch
+        {
+            OriginalInspectionStatus.Missing => "MISSING",
+            OriginalInspectionStatus.Mismatch => "CONTENT_MISMATCH",
+            _ => null,
+        };
+        if (!await _catalog.MaintenanceWrites.CompleteOriginalIntegrityAsync(plan, media, components, status, ct).ConfigureAwait(false))
+            return await StaleAsync().ConfigureAwait(false);
+        await AppendCompletionActivityAsync(plan).ConfigureAwait(false);
+        return OperationResult<RepairPlan>.Success(plan, plan.OperationId);
+
+        async Task<OperationResult<RepairPlan>> StaleAsync()
+        {
+            await _catalog.MaintenanceWrites.SetRepairOperationStateAsync(plan.OperationId, "STALE",
+                OperationErrorCode.RepairPlanStale, "Original integrity or ownership changed.", ct).ConfigureAwait(false);
+            return OperationResult<RepairPlan>.Conflict(OperationErrorCode.RepairPlanStale,
+                "Original integrity or ownership changed. Run Health again.");
+        }
     }
 
     private async Task<RepairReadiness> RevalidateAsync(

@@ -10,7 +10,10 @@ public enum RepairKind
 {
     RegenerateProfileManifest,
     RegenerateMediaAsset,
-    RemoveRetiredProfileDirectory
+    RemoveRetiredProfileDirectory,
+    ReconcileOriginalIntegrity,
+    RestoreCanonicalOriginal,
+    ReconcileOriginalPlacement
 }
 
 public enum RepairPhysicalFact
@@ -20,7 +23,9 @@ public enum RepairPhysicalFact
     ManifestStale,
     SourcePresent,
     ArtifactInvalid,
-    EmptyDirectory
+    EmptyDirectory,
+    OriginalMissing,
+    OriginalMismatch
 }
 
 public sealed record RepairPlan(

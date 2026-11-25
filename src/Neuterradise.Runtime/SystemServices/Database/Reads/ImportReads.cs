@@ -123,7 +123,7 @@ public sealed class ImportReads
                    (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id) AS total_items,
                    (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id AND disposition = 'INCLUDED') AS included_count,
                    (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id AND disposition = 'SKIPPED') AS skipped_count,
-                   (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id AND duplicate_decision IS NULL AND EXISTS (SELECT 1 FROM media ca JOIN media aa INDEXED BY ix_media_active_byte_length ON aa.sha256 = ca.sha256 AND aa.byte_length = ca.byte_length AND aa.state = 'ACTIVE' AND aa.media_id <> ca.media_id WHERE ca.media_id = import_items.candidate_media_id)) AS dup_count,
+                   (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id AND duplicate_decision IS NULL AND EXISTS (SELECT 1 FROM media ca JOIN media aa INDEXED BY ix_media_active_byte_length ON aa.sha256 = ca.sha256 AND aa.byte_length = ca.byte_length AND aa.state = 'ACTIVE' AND aa.media_id <> ca.media_id AND NOT EXISTS (SELECT 1 FROM canonical_original_health health WHERE health.media_id = aa.media_id) WHERE ca.media_id = import_items.candidate_media_id)) AS dup_count,
                    (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id AND disposition = 'INVALID') AS needs_attn_count,
                    u.created_at_ms, u.updated_at_ms,
                    u.destination_profile_id, u.library_commit_state, u.verification_step,
@@ -211,7 +211,7 @@ public sealed class ImportReads
                    (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id) AS total_items,
                    (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id AND disposition = 'INCLUDED') AS included_count,
                    (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id AND disposition = 'SKIPPED') AS skipped_count,
-                   (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id AND duplicate_decision IS NULL AND EXISTS (SELECT 1 FROM media ca JOIN media aa INDEXED BY ix_media_active_byte_length ON aa.sha256 = ca.sha256 AND aa.byte_length = ca.byte_length AND aa.state = 'ACTIVE' AND aa.media_id <> ca.media_id WHERE ca.media_id = import_items.candidate_media_id)) AS dup_count,
+                   (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id AND duplicate_decision IS NULL AND EXISTS (SELECT 1 FROM media ca JOIN media aa INDEXED BY ix_media_active_byte_length ON aa.sha256 = ca.sha256 AND aa.byte_length = ca.byte_length AND aa.state = 'ACTIVE' AND aa.media_id <> ca.media_id AND NOT EXISTS (SELECT 1 FROM canonical_original_health health WHERE health.media_id = aa.media_id) WHERE ca.media_id = import_items.candidate_media_id)) AS dup_count,
                    (SELECT COUNT(*) FROM import_items WHERE import_unit_id = u.import_unit_id AND disposition = 'INVALID') AS needs_attn_count,
                    u.created_at_ms, u.updated_at_ms, u.completed_at_ms, u.row_version
             FROM import_units u
@@ -301,7 +301,7 @@ public sealed class ImportReads
                    ii.disposition, ii.duplicate_decision,
                    ii.source_cleanup_state, ii.source_cleanup_error,
                    a.media_type, ii.created_at_ms, ii.updated_at_ms,
-                   ii.cleanup_policy
+                   ii.cleanup_policy, ii.source_identity_json
             FROM import_items ii
             LEFT JOIN media a ON ii.candidate_media_id = a.media_id
             WHERE ii.import_unit_id = $unitId
@@ -347,7 +347,7 @@ public sealed class ImportReads
                 mediaType,
                 createdAt,
                 updatedAt,
-                cleanupPolicy));
+                cleanupPolicy, reader.IsDBNull(16) ? null : reader.GetString(16)));
         }
 
         return items;
@@ -378,7 +378,7 @@ public sealed class ImportReads
                    ii.disposition, ii.duplicate_decision,
                    ii.source_cleanup_state, ii.source_cleanup_error,
                    a.media_type, ii.created_at_ms, ii.updated_at_ms,
-                   ii.cleanup_policy
+                   ii.cleanup_policy, ii.source_identity_json
             FROM import_items ii
             LEFT JOIN media a ON ii.candidate_media_id = a.media_id
             WHERE ii.import_unit_id = $unitId
@@ -423,7 +423,7 @@ public sealed class ImportReads
                 mediaType,
                 createdAt,
                 updatedAt,
-                cleanupPolicy));
+                cleanupPolicy, reader.IsDBNull(16) ? null : reader.GetString(16)));
         }
 
         return items;
@@ -575,7 +575,7 @@ public sealed class ImportReads
                    COUNT(i.import_item_id) AS total_count,
                    SUM(CASE WHEN i.disposition = 'INCLUDED' THEN 1 ELSE 0 END) AS included_count,
                    SUM(CASE WHEN i.disposition = 'SKIPPED' THEN 1 ELSE 0 END) AS skipped_count,
-                   SUM(CASE WHEN i.duplicate_decision IS NULL AND EXISTS (SELECT 1 FROM media ca JOIN media aa INDEXED BY ix_media_active_byte_length ON aa.sha256 = ca.sha256 AND aa.byte_length = ca.byte_length AND aa.state = 'ACTIVE' AND aa.media_id <> ca.media_id WHERE ca.media_id = i.candidate_media_id) THEN 1 ELSE 0 END) AS exact_dup_count,
+                   SUM(CASE WHEN i.duplicate_decision IS NULL AND EXISTS (SELECT 1 FROM media ca JOIN media aa INDEXED BY ix_media_active_byte_length ON aa.sha256 = ca.sha256 AND aa.byte_length = ca.byte_length AND aa.state = 'ACTIVE' AND aa.media_id <> ca.media_id AND NOT EXISTS (SELECT 1 FROM canonical_original_health health WHERE health.media_id = aa.media_id) WHERE ca.media_id = i.candidate_media_id) THEN 1 ELSE 0 END) AS exact_dup_count,
                    SUM(CASE WHEN i.disposition = 'INVALID' THEN 1 ELSE 0 END) AS needs_attention_count,
                    u.destination_profile_id,
                    u.library_commit_state,
@@ -1019,7 +1019,7 @@ public sealed class ImportReads
                    COUNT(i.import_item_id) AS total_count,
                    SUM(CASE WHEN i.disposition = 'INCLUDED' THEN 1 ELSE 0 END) AS included_count,
                    SUM(CASE WHEN i.disposition = 'SKIPPED' THEN 1 ELSE 0 END) AS skipped_count,
-                   SUM(CASE WHEN i.duplicate_decision IS NULL AND EXISTS (SELECT 1 FROM media ca JOIN media aa INDEXED BY ix_media_active_byte_length ON aa.sha256 = ca.sha256 AND aa.byte_length = ca.byte_length AND aa.state = 'ACTIVE' AND aa.media_id <> ca.media_id WHERE ca.media_id = i.candidate_media_id) THEN 1 ELSE 0 END) AS exact_dup_count,
+                   SUM(CASE WHEN i.duplicate_decision IS NULL AND EXISTS (SELECT 1 FROM media ca JOIN media aa INDEXED BY ix_media_active_byte_length ON aa.sha256 = ca.sha256 AND aa.byte_length = ca.byte_length AND aa.state = 'ACTIVE' AND aa.media_id <> ca.media_id AND NOT EXISTS (SELECT 1 FROM canonical_original_health health WHERE health.media_id = aa.media_id) WHERE ca.media_id = i.candidate_media_id) THEN 1 ELSE 0 END) AS exact_dup_count,
                    SUM(CASE WHEN i.disposition = 'INVALID' THEN 1 ELSE 0 END) AS needs_attention_count,
                    u.destination_profile_id,
                    u.library_commit_state,
@@ -1100,6 +1100,7 @@ public sealed class ImportReads
     // All admission and commit paths use this predicate with the reusable media aliased as a.
     internal const string PublishedReuseAuthoritySql = """
         a.state = 'ACTIVE' AND a.trashed_at_ms IS NULL AND a.path_state = 'NONE'
+        AND NOT EXISTS (SELECT 1 FROM canonical_original_health health WHERE health.media_id = a.media_id)
         AND NULLIF(trim(a.current_managed_relative_path), '') IS NOT NULL
         AND NULLIF(trim(a.current_managed_file_name), '') IS NOT NULL
         AND EXISTS (
@@ -1128,9 +1129,9 @@ public sealed class ImportReads
         await using var command = connection.CreateCommand();
         command.CommandText =
             $"""
-            SELECT import_item_id, media_id, state, duplicate_decision, source_file_name
+            SELECT import_item_id, media_id, state, duplicate_decision, source_file_name, disposition
             FROM (
-                SELECT i.import_item_id, a.media_id, a.state, i.duplicate_decision, i.source_file_name, i.created_at_ms
+                SELECT i.import_item_id, a.media_id, a.state, i.duplicate_decision, i.source_file_name, i.created_at_ms, i.disposition
                 FROM import_items i
                 JOIN media c ON c.media_id = i.candidate_media_id
                 JOIN media a INDEXED BY ix_media_active_byte_length ON {ExactMediaIdentitySql}
@@ -1138,7 +1139,7 @@ public sealed class ImportReads
                              AND ({PublishedReuseAuthoritySql})
                 WHERE i.import_unit_id = $unitId AND c.sha256 IS NOT NULL AND c.byte_length IS NOT NULL
                 UNION ALL
-                SELECT i.import_item_id, a.media_id, a.state, i.duplicate_decision, i.source_file_name, i.created_at_ms
+                SELECT i.import_item_id, a.media_id, a.state, i.duplicate_decision, i.source_file_name, i.created_at_ms, i.disposition
                 FROM import_items i
                 JOIN media c ON c.media_id = i.candidate_media_id
                 JOIN media a ON {ExactMediaIdentitySql} AND a.media_id <> c.media_id AND a.state = 'TRASHED'
@@ -1158,7 +1159,7 @@ public sealed class ImportReads
                 DbGuid.Parse(reader.GetString(1), DomainIdKind.Media),
                 DbEnum.ParseMediaState(reader.GetString(2)),
                 DbEnum.ParseDuplicateDecisionOrNull(reader.IsDBNull(3) ? null : reader.GetString(3)),
-                reader.GetString(4)));
+                reader.GetString(4), DbEnum.ParseItemDisposition(reader.GetString(5))));
         }
 
         return matches;
@@ -1182,7 +1183,7 @@ public sealed class ImportReads
                    i.source_path, i.source_file_name, i.source_byte_length, i.source_last_write_ms,
                    i.disposition, i.duplicate_decision, i.source_cleanup_state, i.source_cleanup_error,
                    a.media_type, i.created_at_ms, i.updated_at_ms,
-                   i.cleanup_policy
+                   i.cleanup_policy, i.source_identity_json
             FROM import_items i
             LEFT JOIN media a ON a.media_id = i.candidate_media_id
             WHERE i.import_item_id = $itemId;
@@ -1211,7 +1212,7 @@ public sealed class ImportReads
             reader.IsDBNull(12) ? null : DbEnum.ParseMediaType(reader.GetString(12)),
             DbTime.Parse(reader.GetInt64(13)),
             DbTime.Parse(reader.GetInt64(14)),
-            reader.IsDBNull(15) ? ImportCleanupPolicy.Copy : DbEnum.ParseImportCleanupPolicy(reader.GetString(15)));
+            reader.IsDBNull(15) ? ImportCleanupPolicy.Copy : DbEnum.ParseImportCleanupPolicy(reader.GetString(15)), reader.IsDBNull(16) ? null : reader.GetString(16));
     }
 
     public async Task<ImportItemSummary?> GetItemByCandidateMediaIdAsync(
@@ -1232,7 +1233,7 @@ public sealed class ImportReads
                    i.source_path, i.source_file_name, i.source_byte_length, i.source_last_write_ms,
                    i.disposition, i.duplicate_decision, i.source_cleanup_state, i.source_cleanup_error,
                    a.media_type, i.created_at_ms, i.updated_at_ms,
-                   i.cleanup_policy
+                   i.cleanup_policy, i.source_identity_json
             FROM import_items i
             LEFT JOIN media a ON a.media_id = i.candidate_media_id
             WHERE i.candidate_media_id = $candidateMediaId;
@@ -1261,7 +1262,7 @@ public sealed class ImportReads
             reader.IsDBNull(12) ? null : DbEnum.ParseMediaType(reader.GetString(12)),
             DbTime.Parse(reader.GetInt64(13)),
             DbTime.Parse(reader.GetInt64(14)),
-            reader.IsDBNull(15) ? ImportCleanupPolicy.Copy : DbEnum.ParseImportCleanupPolicy(reader.GetString(15)));
+            reader.IsDBNull(15) ? ImportCleanupPolicy.Copy : DbEnum.ParseImportCleanupPolicy(reader.GetString(15)), reader.IsDBNull(16) ? null : reader.GetString(16));
     }
 
     public async Task<ImportItemSummary?> GetItemBySourcePathAsync(
@@ -1282,7 +1283,7 @@ public sealed class ImportReads
                    i.source_path, i.source_file_name, i.source_byte_length, i.source_last_write_ms,
                    i.disposition, i.duplicate_decision, i.source_cleanup_state, i.source_cleanup_error,
                    a.media_type, i.created_at_ms, i.updated_at_ms,
-                   i.cleanup_policy
+                   i.cleanup_policy, i.source_identity_json
             FROM import_items i
             LEFT JOIN media a ON a.media_id = i.candidate_media_id
             WHERE i.source_path = $sourcePath;
@@ -1311,7 +1312,7 @@ public sealed class ImportReads
             reader.IsDBNull(12) ? null : DbEnum.ParseMediaType(reader.GetString(12)),
             DbTime.Parse(reader.GetInt64(13)),
             DbTime.Parse(reader.GetInt64(14)),
-            reader.IsDBNull(15) ? ImportCleanupPolicy.Copy : DbEnum.ParseImportCleanupPolicy(reader.GetString(15)));
+            reader.IsDBNull(15) ? ImportCleanupPolicy.Copy : DbEnum.ParseImportCleanupPolicy(reader.GetString(15)), reader.IsDBNull(16) ? null : reader.GetString(16));
     }
 }
 
@@ -1324,9 +1325,9 @@ public sealed record ImportDuplicateMatch(
     Guid MatchedMediaId,
     MediaState MatchedMediaState,
     DuplicateDecision? Decision,
-    string SourceFileName = "")
+    string SourceFileName = "", ItemDisposition Disposition = ItemDisposition.Included)
 {
     /// <summary>True when the user still has to choose INCLUDE, REUSE or SKIP.</summary>
     public bool RequiresDecision =>
-        Decision is null && MatchedMediaState == MediaState.Active;
+        Decision is null && MatchedMediaState == MediaState.Active && Disposition == ItemDisposition.Included;
 }

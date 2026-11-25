@@ -2,13 +2,13 @@
   "id": "builtin.neuterradise.backdrop.night-chamber",
   "kind": "backdrop",
   "name": "Night Chamber",
-  "description": "Dark haze and soft light.",
+  "description": "Static layered atmospheric light.",
   "previewAccent": "#FF94A3B8",
   "performance": {
-    "tier": "cinematic",
-    "continuousAnimation": true,
+    "tier": "light",
+    "continuousAnimation": false,
     "offscreenPolicy": "suspend",
-    "maxAnimatedLayers": 4
+    "maxAnimatedLayers": 0
   },
   "spec": {
     "variants": {
@@ -29,36 +29,24 @@
             ]
           },
           {
-            "kind": "fog",
-            "color": "token:ambientPrimary",
-            "opacity": 0.1,
-            "scale": 1.6,
-            "speed": 0.35,
-            "period": 80
-          },
-          {
-            "kind": "fog",
+            "kind": "radial-glow",
             "color": "token:lightAmbient",
-            "opacity": 0.1,
-            "scale": 1,
-            "speed": 0.7,
-            "period": 50
+            "opacity": 0.22,
+            "centerX": 0.28,
+            "centerY": 0.18,
+            "radius": 0.9
           },
           {
-            "kind": "light-sweep",
+            "kind": "radial-glow",
             "color": "token:lightRim",
-            "opacity": 0.06,
-            "period": 22,
-            "width": 0.1,
-            "angle": 125
-          },
-          {
-            "kind": "noise",
-            "opacity": 0.012
+            "opacity": 0.055,
+            "centerX": 0.78,
+            "centerY": 0.18,
+            "radius": 0.55
           },
           {
             "kind": "vignette",
-            "opacity": 0.24
+            "opacity": 0.18
           }
         ]
       },
@@ -79,16 +67,24 @@
             ]
           },
           {
-            "kind": "fog",
+            "kind": "radial-glow",
             "color": "token:lightAmbient",
-            "opacity": 0.1,
-            "scale": 1.2,
-            "speed": 0.2,
-            "period": 90
+            "opacity": 0.22,
+            "centerX": 0.28,
+            "centerY": 0.18,
+            "radius": 0.9
+          },
+          {
+            "kind": "radial-glow",
+            "color": "token:lightRim",
+            "opacity": 0.055,
+            "centerX": 0.78,
+            "centerY": 0.18,
+            "radius": 0.55
           },
           {
             "kind": "vignette",
-            "opacity": 0.24
+            "opacity": 0.18
           }
         ]
       },
@@ -109,12 +105,24 @@
             ]
           },
           {
-            "kind": "noise",
-            "opacity": 0.012
+            "kind": "radial-glow",
+            "color": "token:lightAmbient",
+            "opacity": 0.22,
+            "centerX": 0.28,
+            "centerY": 0.18,
+            "radius": 0.9
+          },
+          {
+            "kind": "radial-glow",
+            "color": "token:lightRim",
+            "opacity": 0.055,
+            "centerX": 0.78,
+            "centerY": 0.18,
+            "radius": 0.55
           },
           {
             "kind": "vignette",
-            "opacity": 0.24
+            "opacity": 0.18
           }
         ]
       }

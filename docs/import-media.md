@@ -52,3 +52,7 @@ Open the Import surface and check **Needs attention**. Failed required preparati
 Naut guards against video thumbnail timestamps beyond the last decodable frame and retries from the beginning when needed. A valid Hover or Banner rendition from the first attempt is retained. Damaged or unsupported video streams can still require your attention.
 
 Windows icons (.ico) can be imported as images. If the face-analysis decoder cannot read a file, the import can continue once the required checks pass. To resume a batch already held at Stage 1 by an icon in an older Naut version, update Naut and select **Retry** in Import Activity. Figure eligibility is likewise separate from normal Profile use.
+
+## Original integrity and duplicates
+
+Exact duplicate detection uses catalog byte length and SHA-256, including complete model-package identity. Confirmed Vault Health exclusions prevent reuse of missing or mismatched originals. Restore or reverify the original through Vault Health to restore eligibility. Import does not rehash every existing original during duplicate lookup.

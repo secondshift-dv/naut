@@ -21,6 +21,10 @@ public sealed class UpdatePublisherSignatureVerifier
     public const string SignatureFileName = "update-signature.json";
     private const int CurrentSchemaVersion = 1;
     private const int MaximumSignatureDocumentBytes = 64 * 1024;
+    private readonly ReleaseContractDocument? _authority;
+
+    public UpdatePublisherSignatureVerifier() { }
+    internal UpdatePublisherSignatureVerifier(ReleaseContractDocument authority) => _authority = authority;
 
     public UpdatePublisherVerification Verify(
         ReadOnlySpan<byte> manifestBytes,
@@ -71,7 +75,7 @@ public sealed class UpdatePublisherSignatureVerifier
         ReleaseContractDocument contract;
         try
         {
-            contract = ReleaseContract.Current;
+            contract = _authority ?? ReleaseContract.Current;
         }
         catch (Exception exception) when (
             exception is FormatException

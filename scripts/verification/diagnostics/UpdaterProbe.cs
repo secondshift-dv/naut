@@ -218,7 +218,9 @@ using (var badSignatureHttp = new HttpClient(new FixtureHandler(_ => Encoding.UT
 foreach (var bad in new[] { manifest with { ProductId="wrong" }, manifest with { RuntimeIdentifier="linux-x64" } })
     Require(!new UpdateTrustPolicy().Evaluate(bad, new(feed.AbsoluteUri,false),false,false,true).Accepted, "Product/runtime mismatch accepted");
 
-var bridge = manifest with { ProductVersion = "0.0.40", MinimumCompatibleVersion = "0.0.39" };
+var installed = Version.Parse(Neuterradise.App.SystemServices.ProductIdentity.Version);
+var nextVersion = new Version(installed.Major, installed.Minor, checked(installed.Build + 1)).ToString(3);
+var bridge = manifest with { ProductVersion = nextVersion, MinimumCompatibleVersion = nextVersion };
 var localZip = Path.Combine(root, "bridge.zip");
 using (var archive = ZipFile.Open(localZip, ZipArchiveMode.Create))
 {
@@ -231,6 +233,10 @@ Require(localBridge.IsSuccess && localBridge.Manifest?.MinimumCompatibleVersion 
     "Local inspection lost compatibility floor");
 Require(!new UpdateTrustPolicy().Evaluate(localBridge.Manifest!, new(null, true), true, true).Accepted,
     "Local ZIP bypassed compatibility floor");
+Require(new UpdateTrustPolicy().Evaluate(localBridge.Manifest! with { MinimumCompatibleVersion = installed.ToString(3) },
+    new(null, true), true, true).Accepted, "Local ZIP rejected the exact compatibility floor");
+Require(!new UpdateTrustPolicy().Evaluate(localBridge.Manifest!, new(feed.AbsoluteUri, false), false, false, true).Accepted,
+    "Publisher-verified update bypassed compatibility floor");
 Require(!new UpdatePackageValidator(install).Validate(manifest with { MinimumCompatibleVersion = null }, payload).IsAccepted,
     "Staged payload compatibility mismatch accepted");
 using (var lease = await UpdateOperationLease.AcquireAsync(state.Root))

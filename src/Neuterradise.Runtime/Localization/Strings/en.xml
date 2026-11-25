@@ -79,6 +79,11 @@
     <sys:String x:Key="Import.Normalize">Normal</sys:String>
     <sys:String x:Key="Import.Problems">Review required</sys:String>
     <sys:String x:Key="Import.Problems.Description">Fix these issues to continue.</sys:String>
+    <sys:String x:Key="Import.Review.RetryAll">Retry all ({0})</sys:String>
+    <sys:String x:Key="Import.Review.ReuseAll">Reuse all duplicates ({0})</sys:String>
+    <sys:String x:Key="Import.Review.KeepAll">Keep all in destination ({0})</sys:String>
+    <sys:String x:Key="Import.Review.MoveAll">Move all to recognized Profiles ({0})</sys:String>
+    <sys:String x:Key="Import.Review.RemoveAll">Remove all review items ({0})</sys:String>
     <sys:String x:Key="Import.ProfileCollision">Recognized as another Profile</sys:String>
     <sys:String x:Key="Import.ProfilePicker.CurrentSelection">Media will be added to this Profile.</sys:String>
     <sys:String x:Key="Import.ProfilePicker.ExistingResult">Existing Profile</sys:String>
@@ -887,6 +892,14 @@
     <sys:String x:Key="Customize.FromPack">Pack</sys:String>
     <sys:String x:Key="Customize.InstallFailed">This pack can't be installed</sys:String>
     <sys:String x:Key="Customize.InstallFile">Install from file…</sys:String>
+    <sys:String x:Key="Customize.Banner.Rotation">Rotation</sys:String>
+    <sys:String x:Key="Customize.Banner.Automatic">Automatic source</sys:String>
+    <sys:String x:Key="Customize.Packs.CheckUpdates">Check official pack updates</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateAll">Update all</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateVersion">Update to {0}</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateFailed">Official pack update failed</sys:String>
+    <sys:String x:Key="Customize.Packs.NoUpdates">No compatible official pack updates found.</sys:String>
+    <sys:String x:Key="Customize.Packs.Updated">{0} updated to {1}</sys:String>
     <sys:String x:Key="Customize.InstallFolder">Install from folder…</sys:String>
     <sys:String x:Key="Customize.Installed">Installed</sys:String>
     <sys:String x:Key="Customize.NoChanges">No changes.</sys:String>
@@ -1041,6 +1054,12 @@
     <sys:String x:Key="Nav.Home">Home</sys:String>
     <sys:String x:Key="Nav.Import">Import</sys:String>
     <sys:String x:Key="Nav.Settings">Settings</sys:String>
+    <sys:String x:Key="Nav.Recovery">Native navigation</sys:String>
+    <sys:String x:Key="Nav.CustomNavigation">Custom navigation</sys:String>
+    <sys:String x:Key="Banner.SceneEffects">Scene Effects</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset">Global Presets</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset.Desc">Apply coordinated global appearance defaults while preserving individual Profile overrides and media.</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset.Confirm">Apply {0} to global appearance, Home, Gallery and Profile defaults?</sys:String>
     <sys:String x:Key="Breadcrumb.System">System</sys:String>
     <sys:String x:Key="Breadcrumb.LibraryHealth">Vault Health</sys:String>
     <sys:String x:Key="Breadcrumb.People">People</sys:String>
@@ -1202,6 +1221,7 @@
     <sys:String x:Key="Import.Intake.NoneSupported">None of the {0} files are supported photos, videos, or 3D models. They were left untouched.</sys:String>
     <sys:String x:Key="Import.Intake.PrepareFailed">naut could not prepare this import. Your original files were left untouched; try again from the list.</sys:String>
     <sys:String x:Key="Import.Intake.Starting">Looking through your files…</sys:String>
+    <sys:String x:Key="Import.Intake.WithFailures">{0} ready; {1} unsupported; {2} missing; {3} locked; {4} access denied; {5} unreadable; {6} inaccessible folders. Originals untouched.</sys:String>
     <sys:String x:Key="Import.Intake.WithUnsupported">{0} media ready · {1} unsupported file(s) left untouched</sys:String>
     <sys:String x:Key="Import.Progress.Percent">{0}%</sys:String>
     <sys:String x:Key="Import.Stage.Checking">Preparing media</sys:String>
@@ -2213,4 +2233,9 @@
     <sys:String x:Key="Inspector.MoveToTrashFailed">The media could not be moved to Trash.</sys:String>
     <sys:String x:Key="Inspector.MoveToTrashTitle">Move media to Trash?</sys:String>
     <sys:String x:Key="Inspector.MoveToTrashBody">Move {0} to Trash? It will be removed from Profile links and Cover, Banner and Figure selections. Its Face data stays with the recoverable media record. Restore it from Settings → Trash Bin within 30 days.</sys:String>
+    <sys:String x:Key="Health.RestoreOriginal">Restore original</sys:String>
+    <sys:String x:Key="Health.BulkIntegrity">Reconcile originals</sys:String>
+    <sys:String x:Key="Health.BulkConfirm">Confirm {0} original integrity records. Each original is rechecked; no files will be changed.</sys:String>
+    <sys:String x:Key="Health.BulkOutcome">Integrity reconciliation: {0} completed, {1} unresolved, {2} not processed.</sys:String>
+    <sys:String x:Key="Health.PlacementStale">A possible canonical placement exists. Verify it before adopting the catalog path.</sys:String>
 </ResourceDictionary>

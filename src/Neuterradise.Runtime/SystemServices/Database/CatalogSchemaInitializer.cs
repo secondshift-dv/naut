@@ -12,7 +12,7 @@ namespace Neuterradise.App.SystemServices.Database;
 /// </summary>
 public sealed class CatalogSchemaInitializer
 {
-    public const int SchemaVersion = 3;
+    public const int SchemaVersion = 4;
     private const string ContractTable = "catalog_contract";
     private static readonly string[] TransitionObjects = [ContractTable,
         "trg_group_trash_profile_metadata", "trg_group_trash_relation_insert", "trg_group_trash_relation_update",
@@ -75,14 +75,22 @@ public sealed class CatalogSchemaInitializer
             await using var versionRead = connection.CreateCommand();
             versionRead.CommandText = "PRAGMA user_version;";
             var version = Convert.ToInt32(await versionRead.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
-            if (legacy ? version is not (0 or 1) : version is not (2 or SchemaVersion))
+            if (legacy ? version is not (0 or 1) : version is not (2 or 3 or SchemaVersion))
                 throw new CatalogSchemaException("The catalog format is newer than or incompatible with this build.");
-            var recognizedSql = version == SchemaVersion ? schemaSql : PreviousSchema(schemaSql);
+            var v3Sql = BannerSchema(schemaSql);
+            var recognizedSql = version switch
+            {
+                SchemaVersion => schemaSql,
+                3 => v3Sql,
+                _ => PreviousSchema(v3Sql),
+            };
             await ValidateSchemaAsync(connection, recognizedSql, cancellationToken, legacy).ConfigureAwait(false);
             await ModelFigureSchemaAuthority.ReconcileAsync(connection, recognizedSql, cancellationToken).ConfigureAwait(false);
             await ReconcileContractAsync(connection, recognizedSql, legacy, cancellationToken).ConfigureAwait(false);
-            if (version != SchemaVersion)
-                await UpgradeBannerSchemaAsync(connection, schemaSql, cancellationToken).ConfigureAwait(false);
+            if (version < 3)
+                await UpgradeBannerSchemaAsync(connection, v3Sql, cancellationToken).ConfigureAwait(false);
+            if (version < SchemaVersion)
+                await UpgradeOriginalHealthSchemaAsync(connection, schemaSql, cancellationToken).ConfigureAwait(false);
         }
 
         await ValidateSchemaAsync(connection, schemaSql, cancellationToken).ConfigureAwait(false);
@@ -92,6 +100,37 @@ public sealed class CatalogSchemaInitializer
         if (Convert.ToInt32(await contractRead.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) != 1)
             throw new CatalogSchemaException("The catalog format contract is missing or invalid.");
         return new CatalogInitializationResult(created, SchemaVersion);
+    }
+
+    private static string BannerSchema(string schema) => schema[..schema.IndexOf("CREATE TABLE canonical_original_health", StringComparison.Ordinal)]
+        .Replace("schema_version = 4)", "schema_version = 3)", StringComparison.Ordinal)
+        .Replace("VALUES(1, 4)", "VALUES(1, 3)", StringComparison.Ordinal)
+        .Replace("user_version = 4", "user_version = 3", StringComparison.Ordinal);
+
+    private static async Task UpgradeOriginalHealthSchemaAsync(SqliteConnection connection, string schema, CancellationToken ct)
+    {
+        await using var expected = new SqliteConnection("Data Source=:memory:");
+        await expected.OpenAsync(ct).ConfigureAwait(false);
+        await using (var create = expected.CreateCommand())
+        {
+            create.CommandText = schema;
+            await create.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+        var definitions = await ReadDefinitionsAsync(expected, ct).ConfigureAwait(false);
+        await using var transaction = connection.BeginTransaction(deferred: false);
+        await using var upgrade = connection.CreateCommand();
+        upgrade.Transaction = transaction;
+        upgrade.CommandText = "DROP TABLE catalog_contract;" + definitions[ContractTable]
+            + ";INSERT INTO catalog_contract VALUES(1,4);" + definitions["canonical_original_health"]
+            + ";PRAGMA user_version=4;";
+        await upgrade.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        await using var check = connection.CreateCommand();
+        check.Transaction = transaction;
+        check.CommandText = "PRAGMA foreign_key_check;";
+        await using (var reader = await check.ExecuteReaderAsync(ct).ConfigureAwait(false))
+            if (await reader.ReadAsync(ct).ConfigureAwait(false))
+                throw new CatalogSchemaException("Original health migration failed referential integrity validation.");
+        await transaction.CommitAsync(ct).ConfigureAwait(false);
     }
 
     private static string PreviousSchema(string schema) => schema[..schema.IndexOf("CREATE TABLE profile_banner_entries", StringComparison.Ordinal)]

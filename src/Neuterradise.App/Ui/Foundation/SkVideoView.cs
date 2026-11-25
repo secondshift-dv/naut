@@ -7,11 +7,14 @@ using Microsoft.UI.Xaml;
 using Neuterradise.App.Presentation;
 using Neuterradise.App.Shell;
 using Neuterradise.App.SystemServices.MediaTools;
+using Neuterradise.App.SystemServices.Resources;
 using SkiaSharp;
 using Uno.WinUI.Graphics2DSK;
 using Windows.Foundation;
 
 namespace Neuterradise.App.Ui;
+
+public enum VideoPurpose { Primary, Secondary, Hover, Backdrop }
 
 /// <summary>
 /// Composited prepared-video surface for Uno Skia Desktop. Frames are decoded by Naut's approved
@@ -34,10 +37,15 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
     private static readonly ConcurrentDictionary<int, WeakReference<SkVideoView>> Instances = new();
 
     private readonly int _instanceId;
-    private readonly object _processLock = new();
-    private CancellationTokenSource? _decodeCancellation;
-    private Process? _process;
+    private static readonly Dictionary<PlaybackKey, SharedDecoder> Decoders = new(PlaybackKeyComparer.Instance);
+    private SharedDecoder? _decoder;
+    private static bool _reconciling;
+    private static bool _reconcilePending;
+    private static bool _stoppingAll;
+    internal static int ActiveDecoderCount => Decoders.Values.Count(decoder => decoder.Running);
+    public VideoPurpose Purpose { get; init; } = VideoPurpose.Primary;
     private SKBitmap? _frame;
+    private bool _notifyFirstFrame;
     private readonly SKPaint _renderPaint = new() { IsAntialias = true };
     private string? _sourcePath;
     private MediaTransformState _presentation = MediaTransformState.Default;
@@ -45,14 +53,17 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
     private bool _still;
     private bool _active = true;
     private bool _disposed;
-    private int _generation;
 
     public SkVideoView()
     {
         _instanceId = Interlocked.Increment(ref _instanceSeed);
         Instances[_instanceId] = new WeakReference<SkVideoView>(this);
         IsHitTestVisible = false;
-        Loaded += (_, _) => EnsurePlayback();
+        Loaded += (_, _) =>
+        {
+            EnsurePlayback();
+            NotifyFrame();
+        };
         Unloaded += (_, _) =>
         {
             // A shared hover surface can be re-parented in the same UI turn. Defer teardown so an
@@ -61,7 +72,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
             {
                 if (!_disposed && !IsLoaded)
                 {
-                    StopDecoder(clearFrame: true);
+                    StopDecoder();
                 }
             });
         };
@@ -77,6 +88,9 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
         var stopped = 0;
         void StopCore()
         {
+            _stoppingAll = true;
+            try
+            {
             foreach (var (id, weak) in Instances.ToArray())
             {
                 if (!weak.TryGetTarget(out var view) || view._disposed)
@@ -88,6 +102,8 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
                 view.Stop();
                 stopped++;
             }
+            }
+            finally { _stoppingAll = false; ReconcileDecoders(); }
         }
 
         if (UiDispatch.CheckAccess()) StopCore();
@@ -224,9 +240,9 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
         _active = true;
         if (changed)
         {
-            StopDecoder(clearFrame: true);
+            StopDecoder();
         }
-        else if (modeChanged) StopDecoder(clearFrame: false);
+        else if (modeChanged) StopDecoder();
 
         EnsurePlayback();
     }
@@ -245,7 +261,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
         }
         else
         {
-            StopDecoder(clearFrame: false);
+            StopDecoder();
         }
     }
 
@@ -258,24 +274,13 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
 
         _active = false;
         _sourcePath = null;
-        StopDecoder(clearFrame: true);
+        StopDecoder();
     }
 
     private void EnsurePlayback()
     {
-        if (_disposed || Volatile.Read(ref _shutdown) != 0 || !_active || !IsLoaded || string.IsNullOrWhiteSpace(_sourcePath) || (_still && _frame is not null))
-        {
-            return;
-        }
-
-        lock (_processLock)
-        {
-            if (_process is not null)
-            {
-                return;
-            }
-        }
-
+        if (_disposed || Volatile.Read(ref _shutdown) != 0 || !_active || !IsLoaded || string.IsNullOrWhiteSpace(_sourcePath)
+            || _decoder is not null) return;
         var ffmpeg = FfmpegExecutable.Value;
         if (string.IsNullOrWhiteSpace(ffmpeg))
         {
@@ -283,171 +288,285 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
             return;
         }
 
-        var generation = ++_generation;
-        var cancellation = new CancellationTokenSource();
-        if (_still) cancellation.CancelAfter(TimeSpan.FromSeconds(15));
-        _decodeCancellation?.Dispose();
-        _decodeCancellation = cancellation;
-        TaskObserver.Observe(
-            DecodeAsync(ffmpeg, _sourcePath, _loop, _still, generation, cancellation.Token),
-            "SkVideoView.DecodeAsync",
-            _ => UiDispatch.Run(() =>
-            {
-                if (!_disposed && generation == _generation)
-                {
-                    Failed?.Invoke();
-                }
-            }));
+        var key = new PlaybackKey(_sourcePath, _loop, _still);
+        if (!Decoders.TryGetValue(key, out var decoder))
+        {
+            decoder = new SharedDecoder(key, ffmpeg);
+            if (Decoders.Count == 0) ResourceGovernor.Shared.Changed += OnDecoderPolicyChanged;
+            Decoders.Add(key, decoder);
+        }
+        _decoder = decoder;
+        decoder.Attach(this);
+        ReconcileDecoders();
     }
 
-    private async Task DecodeAsync(
-        string ffmpegPath,
-        string sourcePath,
-        bool loop,
-        bool still,
-        int generation,
-        CancellationToken cancellationToken)
+    private static void OnDecoderPolicyChanged(object? sender, EventArgs args) => UiDispatch.Run(ReconcileDecoders);
+
+    private static void ReconcileDecoders()
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (Volatile.Read(ref _shutdown) != 0) return;
-        using var process = new Process
-        {
-            StartInfo = CreateStartInfo(ffmpegPath, sourcePath, loop, still),
-            EnableRaisingEvents = false,
-        };
-
-        if (!process.Start())
-        {
-            throw new InvalidOperationException("FFmpeg video decoder did not start.");
-        }
-
-        lock (_processLock)
-        {
-            if (generation != _generation || cancellationToken.IsCancellationRequested)
-            {
-                TryKill(process);
-                return;
-            }
-
-            _process = process;
-        }
-
-        var errorDrain = process.StandardError.BaseStream.CopyToAsync(Stream.Null);
-        var playbackClock = new Stopwatch();
-        long frameIndex = 0;
-        SKBitmap? spare = null;
+        _reconcilePending = true;
+        if (_reconciling || _stoppingAll) return;
+        _reconciling = true;
         try
         {
-            var header = new byte[BmpHeaderBytes];
-            var rowBuffer = new byte[BmpRowBufferBytes];
-            while (!cancellationToken.IsCancellationRequested)
+            while (_reconcilePending)
             {
-                var bitmap = await ReadBmpFrameAsync(process.StandardOutput.BaseStream, header, rowBuffer, cancellationToken, spare)
-                    .ConfigureAwait(false);
-                spare = null;
-                if (bitmap is null)
-                {
-                    break;
-                }
-
-                var accepted = false;
-                try
-                {
-                    if (frameIndex == 0) playbackClock.Start();
-                    if (frameIndex > 0)
-                    {
-                        var due = TimeSpan.FromSeconds(frameIndex / (double)FramesPerSecond);
-                        var delay = due - playbackClock.Elapsed;
-                        if (delay > TimeSpan.Zero)
-                        {
-                            await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-                        }
-                        else if (delay < TimeSpan.FromMilliseconds(-250))
-                        {
-                            // Do not flood the dispatcher to catch up after a blocked UI turn.
-                            playbackClock.Restart();
-                            frameIndex = 0;
-                        }
-                    }
-                    frameIndex++;
-
-                    await UiDispatch.InvokeAsync(() =>
-                    {
-                        if (!_disposed
-                            && generation == _generation
-                            && _active
-                            && IsLoaded
-                            && string.Equals(_sourcePath, sourcePath, StringComparison.OrdinalIgnoreCase))
-                        {
-                            var previous = _frame;
-                            _frame = bitmap;
-                            accepted = true;
-                            Invalidate();
-                            // The previous frame is no longer render-owned; recycle its native
-                            // pixel allocation in the next decode instead of allocating each frame.
-                            spare = previous;
-                            if (previous is null)
-                            {
-                                FrameReady?.Invoke();
-                            }
-                        }
-                    }).ConfigureAwait(false);
-                }
-                finally
-                {
-                    if (!accepted)
-                    {
-                        bitmap.Dispose();
-                    }
-                }
-            }
-
-            if (!cancellationToken.IsCancellationRequested)
-            {
-                await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-                if (process.ExitCode != 0)
-                {
-                    throw new InvalidOperationException($"FFmpeg video decoder exited with code {process.ExitCode}.");
-                }
-
-                if (loop && !still)
-                {
-                    throw new InvalidOperationException("Looping FFmpeg video decoder ended unexpectedly.");
-                }
-
-                UiDispatch.Run(() =>
-                {
-                    if (!_disposed && generation == _generation)
-                    {
-                        Ended?.Invoke();
-                    }
-                });
+                _reconcilePending = false;
+                var governor = ResourceGovernor.Shared;
+                var capacity = Volatile.Read(ref _shutdown) != 0 || governor.IsMemoryPressure ? 0
+                    : governor.Tier == PresentationTier.Full ? 2 : governor.Tier == PresentationTier.Reduced ? 1 : 0;
+                var ordered = Decoders.Values.Where(decoder => !decoder.Completed && !decoder.Retired
+                    && (decoder.Priority != VideoPurpose.Hover || governor.IsHoverVideoAllowed)
+                    && (decoder.Priority is VideoPurpose.Primary or VideoPurpose.Hover || decoder.Still || governor.Tier == PresentationTier.Full))
+                    .OrderBy(decoder => decoder.Priority).ThenByDescending(decoder => decoder.Running).Take(capacity).ToArray();
+                foreach (var decoder in Decoders.Values.ToArray())
+                    if (decoder.Running && !ordered.Contains(decoder)) decoder.Suspend();
+                foreach (var decoder in ordered) decoder.Start();
             }
         }
-        finally
+        finally { _reconciling = false; }
+    }
+
+    private readonly record struct PlaybackKey(string Path, bool Loop, bool Still);
+    private sealed class PlaybackKeyComparer : IEqualityComparer<PlaybackKey>
+    {
+        public static PlaybackKeyComparer Instance { get; } = new();
+        public bool Equals(PlaybackKey a, PlaybackKey b) =>
+            a.Loop == b.Loop && a.Still == b.Still && StringComparer.OrdinalIgnoreCase.Equals(a.Path, b.Path);
+        public int GetHashCode(PlaybackKey key) => HashCode.Combine(StringComparer.OrdinalIgnoreCase.GetHashCode(key.Path), key.Loop, key.Still);
+    }
+
+    // The UI thread owns the decoder registry, membership and published frame. Decode workers
+    // exclusively own the next frame and recycle the previous frame only after every view is updated.
+    private sealed class SharedDecoder(PlaybackKey key, string ffmpeg)
+    {
+        private readonly object _processLock = new();
+        private SkVideoView[] _views = [];
+        private CancellationTokenSource? _cancellation;
+        private Process? _process;
+        private SKBitmap? _current;
+        private bool _retired;
+        private bool _running;
+        private bool _completed;
+        private int _epoch;
+        public bool Running => _running;
+        public bool Still => key.Still;
+        public bool Completed => _completed;
+        public bool Retired => _retired;
+        public VideoPurpose Priority => _views.Length == 0 ? VideoPurpose.Backdrop : _views.Min(view => view.Purpose);
+
+        public void Attach(SkVideoView view)
         {
-            spare?.Dispose();
+            _views = [.. _views, view];
+            if (_current is not null)
+            {
+                view.AcceptFrame(this, _current);
+                view.NotifyFrame();
+            }
+        }
+
+        public void Start()
+        {
+            if (_running || _retired || _completed) return;
+            _running = true;
+            var epoch = ++_epoch;
+            var cancellation = new CancellationTokenSource();
+            if (key.Still) cancellation.CancelAfter(TimeSpan.FromSeconds(15));
+            _cancellation = cancellation;
+            TaskObserver.Observe(RunAsync(epoch, cancellation.Token), "SkVideoView.SharedDecoder");
+        }
+
+        public void Detach(SkVideoView view)
+        {
+            _views = _views.Where(candidate => !ReferenceEquals(candidate, view)).ToArray();
+            if (_views.Length != 0)
+            {
+                ReconcileDecoders();
+                return;
+            }
+            Decoders.Remove(key);
+            if (Decoders.Count == 0) ResourceGovernor.Shared.Changed -= OnDecoderPolicyChanged;
+            _retired = true;
+            Suspend();
+            ReconcileDecoders();
+        }
+
+        public void Suspend()
+        {
+            ++_epoch;
+            _running = false;
+            var cancellation = _cancellation;
+            _cancellation = null;
+            cancellation?.Cancel();
+            cancellation?.Dispose();
+            Process? process;
             lock (_processLock)
             {
-                if (ReferenceEquals(_process, process))
-                {
-                    _process = null;
-                }
+                process = _process;
+                _process = null;
             }
+            if (process is not null) TryKill(process);
+            foreach (var view in _views)
+            {
+                if (!ReferenceEquals(view._decoder, this)) continue;
+                view._frame = null;
+                view._notifyFirstFrame = false;
+                view.Invalidate();
+            }
+            _current?.Dispose();
+            _current = null;
+        }
 
-            // StopDecoder may have killed/disposed the process concurrently with async teardown.
-            // Probe and terminate through the same guarded path as foreground shutdown.
-            TryKill(process);
-
+        private async Task RunAsync(int epoch, CancellationToken cancellationToken)
+        {
+            var failed = false;
             try
             {
-                await errorDrain.ConfigureAwait(false);
+                await DecodeAsync(ffmpeg, epoch, cancellationToken).ConfigureAwait(false);
+                failed = cancellationToken.IsCancellationRequested;
             }
-            catch
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                // Process teardown can close stderr while the drain is pending.
+                failed = true;
+            }
+            catch (Exception exception)
+            {
+                failed = true;
+                Trace.TraceError("Shared video decoder failed: {0}", exception);
+            }
+            finally
+            {
+                // A deadline cancels the current epoch; suspension/detachment first retires it.
+                // Reconcile only after the worker has released its process and spare frame.
+                await UiDispatch.InvokeAsync(() => Complete(epoch, failed)).ConfigureAwait(false);
             }
         }
+
+        private void Complete(int epoch, bool failed)
+        {
+            if (_retired || epoch != _epoch) return;
+            _running = false;
+            _completed = true;
+            _cancellation?.Dispose();
+            _cancellation = null;
+            try
+            {
+                foreach (var view in _views)
+                    if (ReferenceEquals(view._decoder, this))
+                    {
+                        if (failed) view.Failed?.Invoke();
+                        else view.Ended?.Invoke();
+                    }
+            }
+            finally { ReconcileDecoders(); }
+        }
+
+        private async Task DecodeAsync(string ffmpegPath, int epoch, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Volatile.Read(ref _shutdown) != 0) return;
+            using var process = new Process
+            {
+                StartInfo = CreateStartInfo(ffmpegPath, key.Path, key.Loop, key.Still),
+                EnableRaisingEvents = false,
+            };
+            if (!process.Start()) throw new InvalidOperationException("FFmpeg video decoder did not start.");
+            lock (_processLock)
+            {
+                if (cancellationToken.IsCancellationRequested || epoch != Volatile.Read(ref _epoch))
+                {
+                    TryKill(process);
+                    return;
+                }
+                _process = process;
+            }
+            Task? errorDrain = null;
+            var playbackClock = new Stopwatch();
+            long frameIndex = 0;
+            SKBitmap? spare = null;
+            try
+            {
+                // Closing the owned process also unblocks a redirected pipe read that
+                // does not promptly honor cancellation. The worker owns the bounded join.
+                using var cancellationRegistration = cancellationToken.Register(() => TryKill(process, waitForExit: false));
+                errorDrain = process.StandardError.BaseStream.CopyToAsync(Stream.Null);
+                var header = new byte[BmpHeaderBytes];
+                var rowBuffer = new byte[BmpRowBufferBytes];
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    var bitmap = await ReadBmpFrameAsync(process.StandardOutput.BaseStream, header, rowBuffer, cancellationToken, spare)
+                        .ConfigureAwait(false);
+                    spare = null;
+                    if (bitmap is null) break;
+                    var accepted = false;
+                    try
+                    {
+                        if (frameIndex == 0) playbackClock.Start();
+                        else
+                        {
+                            var delay = TimeSpan.FromSeconds(frameIndex / (double)FramesPerSecond) - playbackClock.Elapsed;
+                            if (delay > TimeSpan.Zero) await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+                            else if (delay < TimeSpan.FromMilliseconds(-250))
+                            {
+                                playbackClock.Restart();
+                                frameIndex = 0;
+                            }
+                        }
+                        frameIndex++;
+                        await UiDispatch.InvokeAsync(() =>
+                        {
+                            if (_retired || epoch != _epoch || cancellationToken.IsCancellationRequested) return;
+                            spare = _current;
+                            _current = bitmap;
+                            accepted = true;
+                            var views = _views;
+                            foreach (var view in views) view.AcceptFrame(this, bitmap);
+                            foreach (var view in views)
+                                if (ReferenceEquals(view._decoder, this)) view.NotifyFrame();
+                        }).ConfigureAwait(false);
+                    }
+                    finally { if (!accepted) bitmap.Dispose(); }
+                }
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+                    if (process.ExitCode != 0)
+                        throw new InvalidOperationException($"FFmpeg video decoder exited with code {process.ExitCode}.");
+                    if (key.Loop && !key.Still)
+                        throw new InvalidOperationException("Looping FFmpeg video decoder ended unexpectedly.");
+                }
+            }
+            finally
+            {
+                spare?.Dispose();
+                lock (_processLock)
+                {
+                    if (ReferenceEquals(_process, process)) _process = null;
+                }
+                TryKill(process);
+                if (errorDrain is not null)
+                {
+                    try { await errorDrain.ConfigureAwait(false); }
+                    catch { /* Process teardown can close stderr during the drain. */ }
+                }
+            }
+        }
+    }
+
+    private void AcceptFrame(SharedDecoder decoder, SKBitmap bitmap)
+    {
+        if (_disposed || !ReferenceEquals(_decoder, decoder)) return;
+        _notifyFirstFrame |= _frame is null;
+        _frame = bitmap;
+    }
+
+    private void NotifyFrame()
+    {
+        if (_disposed || !_active || !IsLoaded || _frame is null) return;
+        Invalidate();
+        if (!_notifyFirstFrame) return;
+        _notifyFirstFrame = false;
+        FrameReady?.Invoke();
     }
 
     private static ProcessStartInfo CreateStartInfo(string ffmpegPath, string sourcePath, bool loop, bool still)
@@ -632,36 +751,19 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
         }
     }
 
-    private void StopDecoder(bool clearFrame)
+    private void StopDecoder()
     {
-        ++_generation;
-        var cancellation = _decodeCancellation;
-        _decodeCancellation = null;
-        cancellation?.Cancel();
-        cancellation?.Dispose();
-
-        Process? process;
-        lock (_processLock)
-        {
-            process = _process;
-            _process = null;
-        }
-
-        if (process is not null)
-        {
-            TryKill(process);
-        }
-
-        if (clearFrame)
-        {
-            var previous = _frame;
-            _frame = null;
-            previous?.Dispose();
-            Invalidate();
-        }
+        var decoder = _decoder;
+        _decoder = null;
+        // A borrowed frame must never outlive its decoder lease.
+        var hadFrame = _frame is not null;
+        _frame = null;
+        _notifyFirstFrame = false;
+        decoder?.Detach(this);
+        if (hadFrame) Invalidate();
     }
 
-    private static void TryKill(Process process)
+    private static void TryKill(Process process, bool waitForExit = true)
     {
         try
         {
@@ -670,7 +772,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
                 process.Kill(entireProcessTree: true);
                 // Kill is asynchronous on Windows. Briefly join here so shutdown/packaging does
                 // not race an FFmpeg executable that still owns its image or source handles.
-                process.WaitForExit(750);
+                if (waitForExit) process.WaitForExit(750);
             }
         }
         catch (InvalidOperationException)
@@ -705,6 +807,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
 
         canvas.Save();
         canvas.ClipRect(new SKRect(0, 0, (float)area.Width, (float)area.Height));
+        if (placement.Rotation != 0) canvas.RotateDegrees((float)placement.Rotation, (float)area.Width / 2, (float)area.Height / 2);
         canvas.DrawBitmap(_frame, destination, _renderPaint);
         canvas.Restore();
     }
@@ -720,7 +823,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
         Instances.TryRemove(_instanceId, out _);
         _active = false;
         _sourcePath = null;
-        StopDecoder(clearFrame: true);
+        StopDecoder();
         _renderPaint.Dispose();
     }
 }

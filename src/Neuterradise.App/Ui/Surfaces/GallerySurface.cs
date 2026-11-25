@@ -32,6 +32,8 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
     private readonly Dictionary<Guid, CompiledDefinition> _cardByProfile = [];
     private readonly Dictionary<FrameworkElement, IDisposable> _cardObservers = [];
     private GalleryLayoutPlan _layout = null!;
+    private BackdropView? _sceneBackground;
+    private BackdropView? _sceneForeground;
     private bool _measurePinboardByCardAspect;
     private int _presentationGeneration;
     private CompiledDefinition _defaultCard = null!;
@@ -110,6 +112,7 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
     {
         var layoutDefinition = ResolvePresentation(PresentationSlots.GalleryLayout, Context);
         _layout = layoutDefinition.PlanAs<GalleryLayoutPlan>();
+        UpdateScene();
         _measurePinboardByCardAspect = layoutDefinition.Origin == PackOrigin.BuiltIn
             && layoutDefinition.Ref.DefinitionId == "builtin.neuterradise.gallery.pinboard";
         _defaultCard = ResolvePresentation(PresentationSlots.ProfileCard, Context);
@@ -123,6 +126,33 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         _presentationGeneration = unchecked(_presentationGeneration + 1);
         _factory.Clear();
         ApplyLayout();
+    }
+
+    private void UpdateScene()
+    {
+        void Update(ref BackdropView? view, BackdropPlan? plan, bool foreground)
+        {
+            if (plan is null)
+            {
+                if (view is not null)
+                {
+                    view.IsSurfaceActive = false;
+                    _field.Children.Remove(view);
+                    view = null;
+                }
+                return;
+            }
+            if (view is null)
+            {
+                view = new BackdropView { IsHitTestVisible = false };
+                if (foreground) _field.Children.Insert(_field.Children.IndexOf(_empty), view);
+                else _field.Children.Insert(0, view);
+            }
+            view.Plan = plan;
+            view.IsSurfaceActive = IsActive;
+        }
+        Update(ref _sceneBackground, _layout.Scene?.Background, false);
+        Update(ref _sceneForeground, _layout.Scene?.Foreground, true);
     }
 
     private void ApplyLayout(bool refreshItems = true)
@@ -169,11 +199,11 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         _repeater.Layout = layout;
         _repeater.Width = double.NaN;
         _repeater.HorizontalAlignment = HorizontalAlignment.Stretch;
-        if (_layout.HeightPattern is { } pattern)
+        if (_layout.Scene?.CardSizing == "intrinsic" || _layout.HeightPattern is not null)
             _repeater.Layout = new MasonryLayout(_layout.ItemMinWidth, _layout.ItemMaxWidth, _layout.MaxColumns, _layout.Spacing,
-                index => _measurePinboardByCardAspect && index < _vm.Cards.Count
+                index => (_layout.Scene?.CardSizing == "intrinsic" || _measurePinboardByCardAspect) && index < _vm.Cards.Count
                     ? CardFor(_vm.Cards[index]).PlanAs<CardPlan>().Aspect
-                    : pattern[index % pattern.Count], CardActionHeight);
+                    : _layout.HeightPattern is { } pattern ? pattern[index % pattern.Count] : 1, CardActionHeight);
         else if (_layout.Primitive is not (CollectionPrimitives.SingleColumn or CollectionPrimitives.List or CollectionPrimitives.Carousel))
         {
             _repeater.Width = Math.Min(availableWidth, columns * width + (columns - 1) * _layout.Spacing);
@@ -181,7 +211,7 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         }
         foreach (var host in _cardObservers.Keys.OfType<Grid>().ToArray())
         {
-            if (host.Children.FirstOrDefault() is CardVisual visual)
+            if (CardIn(host) is { } visual)
             {
                 UpdateHostGeometry(host, visual);
             }
@@ -203,6 +233,8 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
 
     protected override void OnActivated(AppRoute route)
     {
+        if (_sceneBackground is not null) _sceneBackground.IsSurfaceActive = true;
+        if (_sceneForeground is not null) _sceneForeground.IsSurfaceActive = true;
         var origin = (route as GalleryRoute)?.Origin;
         if (origin is not null)
         {
@@ -231,7 +263,12 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         }
     }
 
-    protected override void OnSuspended() => HoverVideoCoordinator.Shared.StopAll();
+    protected override void OnSuspended()
+    {
+        if (_sceneBackground is not null) _sceneBackground.IsSurfaceActive = false;
+        if (_sceneForeground is not null) _sceneForeground.IsSurfaceActive = false;
+        HoverVideoCoordinator.Shared.StopAll();
+    }
 
     public override void OnPresentationChanged(PresentationChangedEventArgs args)
     {
@@ -644,6 +681,13 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
 
     private bool IsCatalogue => _layout.Toolbar == "feed" && _layout.Primitive == CollectionPrimitives.AdaptiveWall;
 
+    private static CardVisual? CardIn(Grid host) => host.Children.FirstOrDefault() switch
+    {
+        CardVisual card => card,
+        Grid slot => slot.Children.OfType<CardVisual>().FirstOrDefault(),
+        _ => null,
+    };
+
     private FrameworkElement Create(string kind, object? data)
     {
         var definition = data is GalleryCardViewModel card ? CardFor(card) : _defaultCard;
@@ -668,7 +712,25 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         customize.MinHeight = 0;
         customize.HorizontalAlignment = HorizontalAlignment.Center;
         customize.Tapped += (_, args) => args.Handled = true;
-        host.Children.Add(visual);
+        if (_layout.Scene is { } scene)
+        {
+            var slot = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch };
+            if (scene.ItemOverlay is { } overlay && scene.OverlayPlacement == "behind")
+                slot.Children.Add(new SkImageView { Source = ImageRef.FromPath(overlay, 960), PlaceholderToken = "transparent", IsHitTestVisible = false });
+            visual.VerticalAlignment = VerticalAlignment.Center;
+            if (scene.CardRotation != 0 || scene.CardSkew != 0)
+            {
+                visual.RenderTransformOrigin = new Windows.Foundation.Point(.5, .5);
+                var geometry = new Microsoft.UI.Xaml.Media.CompositeTransform { Rotation = scene.CardRotation, SkewX = scene.CardSkew };
+                visual.RenderTransform = new Microsoft.UI.Xaml.Media.TransformGroup { Children = { visual.RenderTransform, geometry } };
+            }
+            slot.Children.Add(visual);
+            if (scene.ItemOverlay is { } front && scene.OverlayPlacement == "front")
+                slot.Children.Add(new SkImageView { Source = ImageRef.FromPath(front, 960), PlaceholderToken = "transparent", IsHitTestVisible = false });
+            host.Children.Add(slot);
+            slot.SizeChanged += (_, _) => FitCardVisual(host, visual);
+        }
+        else host.Children.Add(visual);
         if (catalogue)
         {
             var details = UI.Grid("*,*,*,*", "*");
@@ -732,7 +794,7 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
 
     private void Bind(FrameworkElement element, object? data)
     {
-        if (data is not GalleryCardViewModel card || element is not Grid host || host.Children[0] is not CardVisual visual)
+        if (data is not GalleryCardViewModel card || element is not Grid host || CardIn(host) is not { } visual)
         {
             return;
         }
@@ -834,6 +896,8 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
 
     private void FitCardVisual(Grid host, CardVisual visual)
     {
+        // Recycled ItemsRepeater hosts may receive a final tiny arrange while unbound.
+        if (host.DataContext is not GalleryCardViewModel) return;
         var width = host.ActualWidth;
         var height = Math.Max(0, host.ActualHeight - CardActionHeight);
         if (width <= 0 || height <= 0)
@@ -843,6 +907,31 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
 
         if (host.Children.OfType<Button>().FirstOrDefault() is { } action) action.MaxWidth = width;
         var aspect = Math.Max(0.3, visual.Plan.Aspect);
+        if (_layout.Scene is { } scene && host.Children[0] is Grid slot)
+        {
+            var slotWidth = IsCatalogue || _layout.Primitive == CollectionPrimitives.SingleColumn
+                ? width * .38 : width;
+            var slotHeight = height;
+            // Keep native details/actions outside the clipped artwork slot.
+            if (IsCatalogue || _layout.Primitive == CollectionPrimitives.SingleColumn)
+            {
+                slot.Width = slotWidth;
+                slot.HorizontalAlignment = HorizontalAlignment.Left;
+            }
+            var (cardWidth, cardHeight) = scene.FitCard(slotWidth * (1 - 2 * scene.ItemInset),
+                slotHeight * (1 - 2 * scene.ItemInset), aspect);
+            visual.Width = cardWidth;
+            visual.Height = cardHeight;
+            if (scene.CardSizing == "crop")
+            {
+                if (slot.Clip is not Microsoft.UI.Xaml.Media.RectangleGeometry clip)
+                    slot.Clip = clip = new Microsoft.UI.Xaml.Media.RectangleGeometry();
+                clip.Rect = new Windows.Foundation.Rect(slotWidth * scene.ItemInset, slotHeight * scene.ItemInset,
+                    slotWidth * (1 - 2 * scene.ItemInset), slotHeight * (1 - 2 * scene.ItemInset));
+            }
+            else slot.Clip = null;
+            return;
+        }
         if (IsCatalogue || _layout.Primitive == CollectionPrimitives.SingleColumn)
         {
             visual.Width = Math.Min(width * 0.38, height * aspect);
@@ -863,15 +952,17 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
 
         if (host.Children.OfType<Button>().FirstOrDefault() is { } customize)
         {
-            customize.RenderTransform = new Microsoft.UI.Xaml.Media.TranslateTransform
-            {
-                Y = Math.Min(0, visual.Height - height),
-            };
+            var y = _layout.Scene is null ? Math.Min(0, visual.Height - height) : 0;
+            if (customize.RenderTransform is not Microsoft.UI.Xaml.Media.TranslateTransform translate)
+                customize.RenderTransform = translate = new Microsoft.UI.Xaml.Media.TranslateTransform();
+            if (translate.Y != y) translate.Y = y;
         }
     }
 
     public override void Dispose()
     {
+        if (_sceneBackground is not null) _sceneBackground.IsSurfaceActive = false;
+        if (_sceneForeground is not null) _sceneForeground.IsSurfaceActive = false;
         foreach (var observer in _cardObservers.Values.ToList())
         {
             observer.Dispose();
@@ -888,7 +979,7 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
             return;
         }
 
-        if (host.Children.FirstOrDefault() is CardVisual { BannerMediaHost: { } mediaHost })
+        if (CardIn(host) is { BannerMediaHost: { } mediaHost })
         {
             HoverVideoCoordinator.Shared.Release(mediaHost);
         }

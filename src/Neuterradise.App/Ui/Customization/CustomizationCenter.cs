@@ -228,7 +228,7 @@ public sealed partial class CustomizationCenter : IDisposable
         _ => UI.T(descriptor.LabelKey, descriptor.LabelFallback),
     };
 
-    private ScopeKind DefaultScope(SlotDescriptor slot) => slot.Scopes.Single();
+    private ScopeKind DefaultScope(SlotDescriptor slot) => slot.Scopes.Contains(ScopeKind.Profile) ? ScopeKind.Profile : slot.Scopes.Single();
 
     private void ShowCategory(string category, string? slot)
     {
@@ -320,7 +320,14 @@ public sealed partial class CustomizationCenter : IDisposable
     {
         if (_framingEdit && _session.ProfileWorking is { } framing)
         {
-            _profilePreviewHeader.UpdateFraming(framing.Overrides);
+            if (_slot == PresentationSlots.ProfileCover && _focusedCover is not null)
+                _focusedCover.Transform = MediaTransformState.FromCover(framing.Overrides);
+            else if (_slot == PresentationSlots.ProfileBanner && _additionalBannerSlotId is not null)
+            {
+                var state = ActiveBannerAppearance();
+                _profilePreviewHeader.UpdateFocusedBanner(state.Transform, _services.Presentation.ResolveBannerSlotEffect(state));
+            }
+            else _profilePreviewHeader.UpdateFraming(framing.Overrides);
             UpdateFramingFeedback();
             UpdateStatus();
             return;

@@ -79,6 +79,11 @@
     <sys:String x:Key="Import.Normalize">일반</sys:String>
     <sys:String x:Key="Import.Problems">검토 필요</sys:String>
     <sys:String x:Key="Import.Problems.Description">계속하려면 문제를 해결하세요.</sys:String>
+    <sys:String x:Key="Import.Review.RetryAll">모두 다시 시도 ({0})</sys:String>
+    <sys:String x:Key="Import.Review.ReuseAll">모든 중복 미디어 재사용 ({0})</sys:String>
+    <sys:String x:Key="Import.Review.KeepAll">모두 대상 프로필에 유지 ({0})</sys:String>
+    <sys:String x:Key="Import.Review.MoveAll">모두 인식된 프로필로 이동 ({0})</sys:String>
+    <sys:String x:Key="Import.Review.RemoveAll">검토 대상 모두 제외 ({0})</sys:String>
     <sys:String x:Key="Import.ProfileCollision">다른 Profile로 인식됨</sys:String>
     <sys:String x:Key="Import.ProfilePicker.CurrentSelection">이 Profile에 미디어가 추가됩니다.</sys:String>
     <sys:String x:Key="Import.ProfilePicker.ExistingResult">기존 Profile</sys:String>
@@ -887,6 +892,14 @@
     <sys:String x:Key="Customize.FromPack">팩</sys:String>
     <sys:String x:Key="Customize.InstallFailed">이 팩을 설치할 수 없습니다.</sys:String>
     <sys:String x:Key="Customize.InstallFile">파일에서 설치…</sys:String>
+    <sys:String x:Key="Customize.Banner.Rotation">회전</sys:String>
+    <sys:String x:Key="Customize.Banner.Automatic">자동 소스</sys:String>
+    <sys:String x:Key="Customize.Packs.CheckUpdates">공식 팩 업데이트 확인</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateAll">모두 업데이트</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateVersion">{0}(으)로 업데이트</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateFailed">공식 팩 업데이트 실패</sys:String>
+    <sys:String x:Key="Customize.Packs.NoUpdates">호환되는 공식 팩 업데이트가 없습니다.</sys:String>
+    <sys:String x:Key="Customize.Packs.Updated">{0}을(를) {1}(으)로 업데이트했습니다</sys:String>
     <sys:String x:Key="Customize.InstallFolder">폴더에서 설치…</sys:String>
     <sys:String x:Key="Customize.Installed">설치됨</sys:String>
     <sys:String x:Key="Customize.NoChanges">변경사항이 없습니다.</sys:String>
@@ -1041,6 +1054,12 @@
     <sys:String x:Key="Nav.Home">홈</sys:String>
     <sys:String x:Key="Nav.Import">가져오기</sys:String>
     <sys:String x:Key="Nav.Settings">설정</sys:String>
+    <sys:String x:Key="Nav.Recovery">기본 탐색</sys:String>
+    <sys:String x:Key="Nav.CustomNavigation">사용자 지정 탐색</sys:String>
+    <sys:String x:Key="Banner.SceneEffects">장면 효과</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset">전역 프리셋</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset.Desc">개별 프로필 설정과 미디어를 유지하며 전역 모양 기본값을 적용합니다.</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset.Confirm">{0}을(를) 전체 모양, 홈, 갤러리 및 프로필 기본값에 적용하시겠습니까?</sys:String>
     <sys:String x:Key="Breadcrumb.System">시스템</sys:String>
     <sys:String x:Key="Breadcrumb.LibraryHealth">Vault 건강</sys:String>
     <sys:String x:Key="Breadcrumb.People">사람들</sys:String>
@@ -1202,6 +1221,7 @@
     <sys:String x:Key="Import.Intake.NoneSupported">{0} 파일은 지원되는 사진, 비디오 또는 3D 모델이 없습니다. 그들은 손대지 않은 채로 남겨졌습니다.</sys:String>
     <sys:String x:Key="Import.Intake.PrepareFailed">naut가 이 가져오기를 준비할 수 없습니다. 원본 파일은 그대로 유지되었습니다. 목록에서 다시 시도하세요.</sys:String>
     <sys:String x:Key="Import.Intake.Starting">파일을 살펴보는 중…</sys:String>
+    <sys:String x:Key="Import.Intake.WithFailures">{0}개 준비 완료, {1}개 미지원, {2}개 없음, {3}개 잠김, {4}개 접근 거부, {5}개 읽기 불가, {6}개 폴더 접근 불가. 원본은 변경되지 않았습니다.</sys:String>
     <sys:String x:Key="Import.Intake.WithUnsupported">{0} 미디어 준비 완료 · {1} 지원되지 않는 파일(들)이 그대로 남아 있습니다.</sys:String>
     <sys:String x:Key="Import.Progress.Percent">{0}%</sys:String>
     <sys:String x:Key="Import.Stage.Checking">미디어 준비</sys:String>
@@ -2213,4 +2233,9 @@
     <sys:String x:Key="Inspector.MoveToTrashFailed">미디어를 휴지통으로 이동할 수 없습니다.</sys:String>
     <sys:String x:Key="Inspector.MoveToTrashTitle">미디어를 휴지통으로 이동할까요?</sys:String>
     <sys:String x:Key="Inspector.MoveToTrashBody">{0}을(를) 휴지통으로 이동할까요? 프로필 연결과 커버, 배너, Figure 선택이 해제됩니다. 얼굴 데이터는 복원 가능한 미디어 기록에 남습니다. 30일 이내에 설정 → 휴지통에서 복원할 수 있습니다.</sys:String>
+    <sys:String x:Key="Health.RestoreOriginal">원본 복원</sys:String>
+    <sys:String x:Key="Health.BulkIntegrity">원본 무결성 조정</sys:String>
+    <sys:String x:Key="Health.BulkConfirm">원본 무결성 기록 {0}개를 확인합니다. 각 원본을 다시 검사하며 파일은 변경하지 않습니다.</sys:String>
+    <sys:String x:Key="Health.BulkOutcome">무결성 조정: 완료 {0}개, 미해결 {1}개, 미처리 {2}개.</sys:String>
+    <sys:String x:Key="Health.PlacementStale">가능한 정식 저장 위치가 있습니다. 카탈로그 경로를 채택하기 전에 검증하세요.</sys:String>
 </ResourceDictionary>

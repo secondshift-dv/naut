@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "packId": "naut.black-dossier",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "name": "Black Dossier",
   "author": "secondshift-dv",
   "description": "Briefing and evidence in a cold architectural setting.",
   "license": "CC-BY-4.0 (original definitions/artwork); SIL-OFL-1.1 (fonts)",
-  "minContractVersion": 3,
+  "minContractVersion": 4,
   "assets": [
     {
       "id": "backdrop-atrium",
@@ -79,6 +79,12 @@
       "kind": "Image",
       "path": "assets/banner-edge.png",
       "bytes": 8990
+    },
+    {
+      "kind": "Image",
+      "bytes": 7110,
+      "path": "assets/gallery-architecture.png",
+      "id": "gallery-architecture"
     }
   ],
   "definitions": [
@@ -237,7 +243,7 @@
             "maxItems": 4
           }
         ],
-        "surface": {
+        "scene": {
           "type": "grid",
           "columns": [
             "3*",
@@ -328,7 +334,7 @@
         "showOverview": true,
         "pagination": "counter-rail",
         "scrimStrength": 0.4,
-        "surface": {
+        "scene": {
           "type": "grid",
           "columns": [
             "5*",
@@ -415,7 +421,7 @@
       "description": "Separate Banner still from its selected video; hover plays that Banner. Cover stays framed in the identity panel.",
       "previewAccent": "#FFB72739",
       "spec": {
-        "aspect": 1.0,
+        "aspect": 1,
         "hover": "banner",
         "frame": "full",
         "composition": {
@@ -540,7 +546,7 @@
       "previewAccent": "#FFB72739",
       "spec": {
         "preset": "cinematic",
-        "surface": {
+        "scene": {
           "type": "grid",
           "columns": [
             "3*",
@@ -943,6 +949,179 @@
         "scale": 1,
         "tint": false,
         "animated": false
+      }
+    },
+    {
+      "id": "naut.black-dossier.gallery",
+      "kind": "gallery-layout",
+      "name": "Evidence Shelves",
+      "description": "Virtualized collection with a world-specific static architectural frame.",
+      "spec": {
+        "primitive": "VirtualizedGrid",
+        "itemMinWidth": 240,
+        "itemMaxWidth": 360,
+        "itemAspect": 1.25,
+        "spacing": 14,
+        "maxColumns": 8,
+        "scene": {
+          "background": {
+            "variants": {
+              "full": {
+                "layers": [
+                  {
+                    "kind": "image",
+                    "asset": "backdrop-archive",
+                    "opacity": 1
+                  },
+                  {
+                    "kind": "scrim",
+                    "color": "#FF08090B",
+                    "opacity": 0.62
+                  }
+                ]
+              },
+              "reduced": {
+                "layers": [
+                  {
+                    "kind": "image",
+                    "asset": "backdrop-archive",
+                    "opacity": 1
+                  },
+                  {
+                    "kind": "scrim",
+                    "color": "#FF08090B",
+                    "opacity": 0.62
+                  }
+                ]
+              },
+              "fallback": {
+                "layers": [
+                  {
+                    "kind": "image",
+                    "asset": "backdrop-archive",
+                    "opacity": 1
+                  },
+                  {
+                    "kind": "scrim",
+                    "color": "#FF08090B",
+                    "opacity": 0.62
+                  }
+                ]
+              }
+            }
+          },
+          "itemOverlay": "gallery-architecture",
+          "itemInset": 0.1,
+          "cardSizing": "intrinsic",
+          "cardRotation": 0,
+          "cardSkew": -2,
+          "overlayPlacement": "behind"
+        }
+      }
+    },
+    {
+      "id": "naut.black-dossier.controls",
+      "kind": "control-skin",
+      "name": "Dossier Console",
+      "description": "Coordinated native control skin.",
+      "spec": {
+        "radius": 2,
+        "borderWidth": 1.2,
+        "horizontalPadding": 10,
+        "verticalPadding": 4,
+        "height": 32,
+        "scrollbarWidth": 7,
+        "fill": "token:surface2",
+        "hoverFill": "token:surfaceHover",
+        "pressedFill": "token:surfacePressed",
+        "border": "token:borderDefault",
+        "focus": "token:focus",
+        "material": "bevel",
+        "relief": 0.16,
+        "families": {
+          "button": {
+            "radius": 3
+          },
+          "chip": {
+            "radius": 2
+          },
+          "input": {
+            "material": "inset"
+          },
+          "tab": {
+            "edge": "bottom"
+          }
+        },
+        "navigation": {
+          "dock": "left",
+          "extent": 150,
+          "immersive": false,
+          "scene": {
+            "type": "stack",
+            "spacing": 8,
+            "padding": 8,
+            "children": [
+              {
+                "type": "semantic",
+                "id": "vault"
+              },
+              {
+                "type": "semantic",
+                "id": "home"
+              },
+              {
+                "type": "semantic",
+                "id": "gallery"
+              },
+              {
+                "type": "semantic",
+                "id": "import"
+              },
+              {
+                "type": "semantic",
+                "id": "settings"
+              },
+              {
+                "type": "semantic",
+                "id": "activity"
+              },
+              {
+                "type": "semantic",
+                "id": "customize"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "naut.black-dossier.media",
+      "kind": "profile-media-layout",
+      "name": "Evidence Contact Sheets",
+      "description": "Readable native evidence tiles.",
+      "spec": {
+        "layoutId": "editorial",
+        "browse": "editorial",
+        "cardWidth": 250,
+        "aspect": 1.25,
+        "metadataPlacement": "below",
+        "metadataFields": [
+          "name",
+          "type",
+          "dimensions",
+          "duration"
+        ],
+        "metadataLines": 2,
+        "frameStyle": "hairline",
+        "frameRadius": 2,
+        "frameThickness": 1,
+        "fit": "fit",
+        "collection": {
+          "layout": "editorial",
+          "maxColumns": 6,
+          "rowSpacing": 8,
+          "columnSpacing": 8
+        }
       }
     }
   ]

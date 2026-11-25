@@ -79,6 +79,11 @@
     <sys:String x:Key="Import.Normalize">Normal</sys:String>
     <sys:String x:Key="Import.Problems">Überprüfung erforderlich</sys:String>
     <sys:String x:Key="Import.Problems.Description">Beheben Sie diese Probleme, um fortzufahren.</sys:String>
+    <sys:String x:Key="Import.Review.RetryAll">Alle erneut versuchen ({0})</sys:String>
+    <sys:String x:Key="Import.Review.ReuseAll">Alle Duplikate wiederverwenden ({0})</sys:String>
+    <sys:String x:Key="Import.Review.KeepAll">Alle im Ziel behalten ({0})</sys:String>
+    <sys:String x:Key="Import.Review.MoveAll">Alle zu erkannten Profilen verschieben ({0})</sys:String>
+    <sys:String x:Key="Import.Review.RemoveAll">Alle zu prüfenden Medien entfernen ({0})</sys:String>
     <sys:String x:Key="Import.ProfileCollision">Wird als weiterer Profile erkannt</sys:String>
     <sys:String x:Key="Import.ProfilePicker.CurrentSelection">Die Medien werden diesem Profile hinzugefügt.</sys:String>
     <sys:String x:Key="Import.ProfilePicker.ExistingResult">Vorhanden Profile</sys:String>
@@ -887,6 +892,14 @@
     <sys:String x:Key="Customize.FromPack">Packen</sys:String>
     <sys:String x:Key="Customize.InstallFailed">Dieses Paket kann nicht installiert werden</sys:String>
     <sys:String x:Key="Customize.InstallFile">Aus Datei installieren…</sys:String>
+    <sys:String x:Key="Customize.Banner.Rotation">Drehung</sys:String>
+    <sys:String x:Key="Customize.Banner.Automatic">Automatische Quelle</sys:String>
+    <sys:String x:Key="Customize.Packs.CheckUpdates">Offizielle Pack-Updates prüfen</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateAll">Alle aktualisieren</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateVersion">Auf {0} aktualisieren</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateFailed">Update des offiziellen Packs fehlgeschlagen</sys:String>
+    <sys:String x:Key="Customize.Packs.NoUpdates">Keine kompatiblen offiziellen Pack-Updates gefunden.</sys:String>
+    <sys:String x:Key="Customize.Packs.Updated">{0} auf {1} aktualisiert</sys:String>
     <sys:String x:Key="Customize.InstallFolder">Aus Ordner installieren…</sys:String>
     <sys:String x:Key="Customize.Installed">Installiert</sys:String>
     <sys:String x:Key="Customize.NoChanges">Keine Änderungen.</sys:String>
@@ -1041,6 +1054,12 @@
     <sys:String x:Key="Nav.Home">Startseite</sys:String>
     <sys:String x:Key="Nav.Import">Importieren</sys:String>
     <sys:String x:Key="Nav.Settings">Einstellungen</sys:String>
+    <sys:String x:Key="Nav.Recovery">Native Navigation</sys:String>
+    <sys:String x:Key="Nav.CustomNavigation">Benutzerdefinierte Navigation</sys:String>
+    <sys:String x:Key="Banner.SceneEffects">Szeneneffekte</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset">Globale Vorgaben</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset.Desc">Globale Darstellungsvorgaben anwenden und individuelle Profileinstellungen und Medien beibehalten.</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset.Confirm">{0} auf Darstellung, Startseite, Galerie und Profilvorgaben anwenden?</sys:String>
     <sys:String x:Key="Breadcrumb.System">System</sys:String>
     <sys:String x:Key="Breadcrumb.LibraryHealth">Vault Gesundheit</sys:String>
     <sys:String x:Key="Breadcrumb.People">Menschen</sys:String>
@@ -1202,6 +1221,7 @@
     <sys:String x:Key="Import.Intake.NoneSupported">Keine der {0}-Dateien unterstützt Fotos, Videos oder 3D-Modelle. Sie blieben unberührt.</sys:String>
     <sys:String x:Key="Import.Intake.PrepareFailed">naut konnte diesen Import nicht vorbereiten. Ihre Originaldateien blieben unberührt; Versuchen Sie es erneut aus der Liste.</sys:String>
     <sys:String x:Key="Import.Intake.Starting">Durchsuchen Sie Ihre Dateien…</sys:String>
+    <sys:String x:Key="Import.Intake.WithFailures">{0} bereit; {1} nicht unterstützt; {2} fehlen; {3} gesperrt; {4} Zugriff verweigert; {5} unlesbar; {6} unzugängliche Ordner. Originale unverändert.</sys:String>
     <sys:String x:Key="Import.Intake.WithUnsupported">{0}-Medien bereit · {1} nicht unterstützte Datei(en) bleiben unberührt</sys:String>
     <sys:String x:Key="Import.Progress.Percent">{0}%</sys:String>
     <sys:String x:Key="Import.Stage.Checking">Medien vorbereiten</sys:String>
@@ -2213,4 +2233,9 @@
     <sys:String x:Key="Inspector.MoveToTrashFailed">Das Medium konnte nicht in den Papierkorb verschoben werden.</sys:String>
     <sys:String x:Key="Inspector.MoveToTrashTitle">Medium in den Papierkorb verschieben?</sys:String>
     <sys:String x:Key="Inspector.MoveToTrashBody">{0} in den Papierkorb verschieben? Profilverknüpfungen und Cover-, Banner- sowie Figure-Auswahlen werden entfernt. Die Gesichtsdaten bleiben beim wiederherstellbaren Medieneintrag. Innerhalb von 30 Tagen unter Einstellungen → Papierkorb wiederherstellen.</sys:String>
+    <sys:String x:Key="Health.RestoreOriginal">Original wiederherstellen</sys:String>
+    <sys:String x:Key="Health.BulkIntegrity">Originale abgleichen</sys:String>
+    <sys:String x:Key="Health.BulkConfirm">{0} Integritätseinträge bestätigen. Jedes Original wird erneut geprüft; keine Dateien werden geändert.</sys:String>
+    <sys:String x:Key="Health.BulkOutcome">Integritätsabgleich: {0} abgeschlossen, {1} offen, {2} nicht verarbeitet.</sys:String>
+    <sys:String x:Key="Health.PlacementStale">Ein möglicher kanonischer Speicherort wurde gefunden. Vor Übernahme des Katalogpfads prüfen.</sys:String>
 </ResourceDictionary>

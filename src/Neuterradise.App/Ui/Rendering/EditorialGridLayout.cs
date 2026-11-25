@@ -6,7 +6,8 @@ using Windows.Foundation;
 namespace Neuterradise.App.Ui;
 
 /// <summary>Roomy caption-first media pages, distinct from the dense square Mosaic.</summary>
-public sealed class EditorialGridLayout(double minimumWidth, double cardHeight, double spacing) : VirtualizingLayout
+public sealed class EditorialGridLayout(double minimumWidth, double cardHeight, double spacing,
+    int maximumColumns = 3, double? rowSpacing = null, bool authoredSizing = false) : VirtualizingLayout
 {
     private sealed class State
     {
@@ -18,11 +19,12 @@ public sealed class EditorialGridLayout(double minimumWidth, double cardHeight, 
     protected override Size MeasureOverride(VirtualizingLayoutContext context, Size availableSize)
     {
         var width = double.IsFinite(availableSize.Width) ? Math.Max(1, availableSize.Width) : minimumWidth;
-        var ideal = Math.Clamp(minimumWidth, 180, 260);
-        var columns = Math.Clamp((int)Math.Floor((width + spacing) / (ideal + spacing)), 1, 3);
+        var ideal = authoredSizing ? minimumWidth : Math.Clamp(minimumWidth, 180, 260);
+        var columns = Math.Clamp((int)Math.Floor((width + spacing) / (ideal + spacing)), 1, maximumColumns);
         var unit = Math.Min(ideal, Math.Max(1, (width - spacing * (columns - 1)) / columns));
         var inset = Math.Max(0, (width - (columns * unit + spacing * (columns - 1))) / 2);
-        var stride = cardHeight + spacing;
+        var verticalSpacing = rowSpacing ?? spacing;
+        var stride = cardHeight + verticalSpacing;
         var state = context.LayoutState as State ?? new State();
         context.LayoutState = state;
         state.Realized.Clear();
@@ -38,7 +40,7 @@ public sealed class EditorialGridLayout(double minimumWidth, double cardHeight, 
             state.Realized.Add((element, bounds));
         }
         var rows = (int)Math.Ceiling(context.ItemCount / (double)columns);
-        return new Size(width, rows == 0 ? 0 : rows * stride - spacing);
+        return new Size(width, rows == 0 ? 0 : rows * stride - verticalSpacing);
     }
 
     protected override Size ArrangeOverride(VirtualizingLayoutContext context, Size finalSize)

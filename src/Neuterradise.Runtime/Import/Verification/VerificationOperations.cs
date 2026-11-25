@@ -39,11 +39,30 @@ public sealed class VerificationOperations
         return _importReads.GetVerificationReadModelAsync(unitId, cancellationToken);
     }
 
-    public async Task<long> UpdateDraftAsync(
+    public Task<long> UpdateDraftAsync(
         Guid unitId,
         VerificationDraftV1 draft,
         long expectedRowVersion,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        UpdateDraftCoreAsync(unitId, draft, expectedRowVersion, null, cancellationToken);
+
+    internal async Task<long> UpdateReviewDraftAsync(
+        Guid unitId,
+        VerificationDraftV1 draft,
+        long expectedRowVersion,
+        IReadOnlyList<ReviewItemMutation> changes,
+        CancellationToken cancellationToken)
+    {
+        await using var unitLease = await _catalog.ImportUnitMutations.EnterAsync(unitId, cancellationToken).ConfigureAwait(false);
+        return await UpdateDraftCoreAsync(unitId, draft, expectedRowVersion, changes, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<long> UpdateDraftCoreAsync(
+        Guid unitId,
+        VerificationDraftV1 draft,
+        long expectedRowVersion,
+        IReadOnlyList<ReviewItemMutation>? reviewChanges,
+        CancellationToken cancellationToken)
     {
         using var mutationAdmission = _catalog.MutationAdmission.Enter(nameof(UpdateDraftAsync));
         if (unitId == Guid.Empty)
@@ -79,7 +98,7 @@ public sealed class VerificationOperations
         Guid? currentDestinationProfileId = null;
         var destinationLocked = false;
         await using (var currentUnit = transaction.CreateCommand(
-            "SELECT destination_kind, destination_profile_id, commit_operation_id, library_commit_state FROM import_units WHERE import_unit_id = $unitId;"))
+            "SELECT destination_kind, destination_profile_id, commit_operation_id, library_commit_state, state FROM import_units WHERE import_unit_id = $unitId;"))
         {
             currentUnit.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
             await using var currentReader = await currentUnit.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -87,6 +106,10 @@ public sealed class VerificationOperations
             {
                 throw new CatalogInvariantException($"ImportUnit {unitId:D} does not exist.");
             }
+
+            if (reviewChanges is not null
+                && !DbEnum.ParseImportUnitState(currentReader.GetString(4)).CanCancelUnpublished())
+                throw new CatalogConcurrencyConflictException("The import is no longer available for Review.");
 
             currentDestinationKind = currentReader.IsDBNull(0) ? null : currentReader.GetString(0);
             currentDestinationProfileId = currentReader.IsDBNull(1) ? null : DbGuid.Parse(currentReader.GetString(1));
@@ -153,9 +176,51 @@ public sealed class VerificationOperations
                 $"ImportUnit {unitId:D} concurrency conflict: expected row_version {expectedRowVersion}, found {currentVer}.");
         }
 
+        if (reviewChanges is { Count: > 0 })
+        {
+            // The dispositions and the Review draft commit together; a crash cannot leave a
+            // newly skipped item with an obsolete appearance or ownership decision.
+            await using var review = transaction.CreateCommand(
+                $"""
+                WITH changes AS (
+                    SELECT json_extract(value, '$.id') AS id,
+                           json_extract(value, '$.decision') AS decision,
+                           json_extract(value, '$.reuse') AS reuse
+                    FROM json_each($changes)
+                )
+                UPDATE import_items AS item
+                SET disposition = CASE WHEN change.decision = 'REUSE' THEN 'REUSED' ELSE 'SKIPPED' END,
+                    duplicate_decision = CASE WHEN change.decision = 'REUSE' THEN 'REUSE'
+                        WHEN change.decision = 'SKIP' OR item.duplicate_decision IS NOT NULL THEN 'SKIP' ELSE NULL END,
+                    reused_media_id = change.reuse,
+                    updated_at_ms = $now
+                FROM changes AS change
+                WHERE item.import_item_id = change.id AND item.import_unit_id = $unitId
+                  AND item.disposition IN ('INCLUDED','REUSED')
+                  AND (change.decision IS NOT 'REUSE'
+                       OR (item.duplicate_decision IS NULL AND EXISTS (
+                           SELECT 1 FROM media c JOIN media a ON {ImportReads.ExactMediaIdentitySql}
+                               AND ({ImportReads.PublishedReuseAuthoritySql})
+                           WHERE c.media_id = item.candidate_media_id AND a.media_id = change.reuse AND a.media_id <> c.media_id
+                       )));
+                """);
+            review.Parameters.AddWithValue("$changes", JsonSerializer.Serialize(reviewChanges.Select(change => new
+            {
+                id = DbGuid.Format(change.ItemId),
+                decision = change.Decision is { } decision ? DbEnum.Format(decision) : null,
+                reuse = change.ReusedMediaId is { } mediaId ? DbGuid.Format(mediaId) : null,
+            })));
+            review.Parameters.AddWithValue("$unitId", DbGuid.Format(unitId));
+            review.Parameters.AddWithValue("$now", nowMs);
+            if (await review.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != reviewChanges.Count)
+                throw new CatalogConcurrencyConflictException("One or more Review items have changed. Refresh and try again.");
+        }
+
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         return expectedRowVersion + 1;
     }
+
+    internal sealed record ReviewItemMutation(Guid ItemId, DuplicateDecision? Decision, Guid? ReusedMediaId = null);
 
     public async Task<long> SetStepAsync(
         Guid unitId,

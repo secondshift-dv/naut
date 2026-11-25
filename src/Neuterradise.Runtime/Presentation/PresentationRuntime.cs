@@ -286,7 +286,12 @@ public sealed class PresentationRuntime
             }
             else if (BridgedProfileDefinition(slot, context.Profile) is { } bridged)
             {
-                chain.Add(new ResolutionStep(ResolutionSource.Profile, bridged, null));
+                // Non-default legacy values remain Profile overrides. A global preset supplies defaults,
+                // not a bulk rewrite of existing Profiles or their media sources.
+                var presetDefault = set.Get(ScopeKind.Global, ScopeIds.Global, slot)?.Definition;
+                if (presetDefault is null || !IsUsable(presetDefault.Value, descriptor.Kind, slot)
+                    || BuiltInPresentationCatalog.Normalize(bridged) != descriptor.Default)
+                    chain.Add(new ResolutionStep(ResolutionSource.Profile, bridged, null));
             }
         }
 
@@ -345,11 +350,26 @@ public sealed class PresentationRuntime
         if (slot == PresentationSlots.BannerEffect && typeof(T) == typeof(EffectPlan) && context.Profile is { } profile
             && ResolveCompiled(slot, context, bindings).Plan is EffectPlan banner)
         {
-            var intensity = Math.Sqrt(Math.Clamp(profile.Overrides.BannerEffectIntensity, 0, 1));
-            return (T)(object)(banner with { Environment = new BackdropPlan(banner.Environment.Variants.ToDictionary(
-                pair => pair.Key, pair => pair.Value with { Layers = intensity <= 0 ? [] : pair.Value.Layers.Select(layer => layer with { Opacity = layer.Opacity * intensity }).ToArray() })) });
+            return (T)(object)ScaleBannerEffect(banner, profile.Overrides.BannerEffectIntensity);
         }
         return ResolveCompiled(slot, context, bindings).PlanAs<T>();
+    }
+
+    public EffectPlan? ResolveBannerSlotEffect(BannerSlotAppearance appearance)
+    {
+        var reference = appearance.Effect ?? DefinitionRef.BuiltIn("builtin.neuterradise.effect.none");
+        var definition = Find(reference);
+        if (definition is null || !SupportsBannerEffect(definition))
+            definition = Find(DefinitionRef.BuiltIn("builtin.neuterradise.effect.none"));
+        return definition is not null && SupportsBannerEffect(definition)
+            ? ScaleBannerEffect(definition.PlanAs<EffectPlan>(), appearance.EffectIntensity) : null;
+    }
+
+    private static EffectPlan ScaleBannerEffect(EffectPlan banner, double value)
+    {
+        var intensity = Math.Sqrt(Math.Clamp(value, 0, 1));
+        return banner with { Environment = new BackdropPlan(banner.Environment.Variants.ToDictionary(
+            pair => pair.Key, pair => pair.Value with { Layers = intensity <= 0 ? [] : pair.Value.Layers.Select(layer => layer with { Opacity = layer.Opacity * intensity }).ToArray() })) };
     }
 
     public static bool SupportsBannerEffect(CompiledDefinition definition) =>
@@ -599,13 +619,18 @@ public sealed class PresentationRuntime
     public Task<PackInstallResult> InstallStandaloneAssetAsync(string sourcePath, CancellationToken cancellationToken = default) =>
         InstallPackCoreAsync(sourcePath, replaceExisting: false, standaloneAsset: true, cancellationToken: cancellationToken);
 
-    private async Task<PackInstallResult> InstallPackCoreAsync(string sourcePath, bool replaceExisting, bool standaloneAsset, CancellationToken cancellationToken)
+    internal Task<PackInstallResult> InstallOfficialPackAsync(string sourcePath, OfficialPackReplacement official,
+        CancellationToken cancellationToken) =>
+        InstallPackCoreAsync(sourcePath, true, false, cancellationToken, official);
+
+    private async Task<PackInstallResult> InstallPackCoreAsync(string sourcePath, bool replaceExisting, bool standaloneAsset,
+        CancellationToken cancellationToken, OfficialPackReplacement? official = null)
     {
         await _packMutations.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             var result = await _packs.InstallWithPublicationAsync(sourcePath, replaceExisting,
-                _store.RecordPackAsync, cancellationToken, standaloneAsset).ConfigureAwait(false);
+                _store.RecordPackAsync, cancellationToken, standaloneAsset, official).ConfigureAwait(false);
             if (result.Succeeded && result.Pack is { } pack)
             {
                 _compiler.Invalidate(pack.PackId);
@@ -801,6 +826,40 @@ public sealed class PreviewSession
         _ => [],
     };
 
+    public IReadOnlyList<InstalledPack> CompatibleGlobalPresets() => _runtime.Packs
+        .Where(pack => pack.IsUsable && !pack.IsStandaloneAsset
+            && (pack.Origin == PackOrigin.BuiltIn || pack.Manifest.MinContractVersion >= 4
+                && new[] { PresentationSlots.Theme, PresentationSlots.HomeLayout, PresentationSlots.GalleryLayout,
+                    PresentationSlots.ProfileLayout, PresentationSlots.ProfileCard }.All(slot => FirstPackDefinition(pack, slot) is not null)))
+        .ToArray();
+
+    public bool TrySelectGlobalPreset(string packId)
+    {
+        EnsureOpen();
+        if (!CompatibleGlobalPresets().Any(pack => pack.PackId == packId)
+            || !_runtime.PackStore.TryGetPack(packId, out var pack) || pack is null) return false;
+        foreach (var descriptor in PresentationSlots.All.Where(slot => slot.Kind is not null))
+        {
+            var scope = descriptor.AllowsScope(ScopeKind.Global) ? ScopeKind.Global
+                : descriptor.AllowsScope(ScopeKind.Surface) ? ScopeKind.Surface : (ScopeKind?)null;
+            if (scope is null) continue;
+            var definition = pack.Origin == PackOrigin.BuiltIn
+                ? _runtime.Find(descriptor.Default)
+                : FirstPackDefinition(pack, descriptor.Id) ?? _runtime.Find(descriptor.Default);
+            if (definition is null) continue;
+            var scopeId = ScopeIdFor(scope.Value, descriptor.Id);
+            // Preserve state-only preferences, such as Recently visibility, when applying a global preset.
+            var state = Working.Get(scope.Value, scopeId, descriptor.Id)?.StateJson;
+            if (pack.Origin == PackOrigin.BuiltIn && descriptor.Scopes.Contains(ScopeKind.Profile))
+                Working = Working.Apply(state is null
+                    ? BindingChange.Reset(scope.Value, scopeId, descriptor.Id)
+                    : new BindingChange(scope.Value, scopeId, descriptor.Id, null, state));
+            else SelectCore(descriptor.Id, scope.Value, definition.Ref, state, definition);
+        }
+        Changed?.Invoke(this, null);
+        return true;
+    }
+
     public IReadOnlyList<InstalledPack> CompatiblePacks()
     {
         var slots = PackSlots;
@@ -876,7 +935,11 @@ public sealed class PreviewSession
                 PresentationSlots.ProfileMediaLayout => profile with { Overrides = profile.Overrides with { MediaLayoutId = MediaLayoutCatalog.Normalize(legacy) } },
                 _ => profile with { Overrides = FrameAppearance(profile.Overrides, CoverFrameCatalog.TryGetFrame(legacy, out var legacyFrame) ? legacyFrame : CoverFrameCatalog.None) },
             };
-            Working = Working.Apply(BindingChange.Reset(scope, ScopeIdFor(scope, slot), slot));
+            var scopeId = ScopeIdFor(scope, slot);
+            // A specific built-in selection must still override an inherited global preset default.
+            Working = Working.Get(ScopeKind.Global, ScopeIds.Global, slot)?.Definition is not null
+                ? Working.Apply(new BindingChange(scope, scopeId, slot, reference, stateJson))
+                : Working.Apply(BindingChange.Reset(scope, scopeId, slot));
         }
         else
         {
@@ -1058,6 +1121,7 @@ public sealed class PreviewSession
                 BannerZoom = o.BannerZoom,
                 BannerEffect = o.BannerEffect,
                 BannerEffectIntensity = o.BannerEffectIntensity,
+                BannerSlotsJson = o.BannerSlotsJson,
             },
         };
     }

@@ -35,6 +35,7 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
     private HealthScanResult? _scanResult;
     private HealthFinding? _selectedFinding;
     private RepairPlan? _pendingRepair;
+    private IReadOnlyList<HealthFinding> _pendingBulk = [];
     private string? _scanProgressText;
 
     public LibraryHealthViewModel(
@@ -70,8 +71,9 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
 
         RefreshCommand = new AsyncRelayCommand(() => LoadMetricsAsync());
         ClearCacheCommand = new AsyncRelayCommand(() => ClearCacheAsync());
-        RunHealthCheckCommand = new AsyncRelayCommand(() => RunStandardScanAsync());
-        RunDeepHealthCheckCommand = new AsyncRelayCommand(() => RunDeepScanAsync());
+        RunHealthCheckCommand = new AsyncRelayCommand(() => RunStandardScanAsync(RouteCancellationToken));
+        RunDeepHealthCheckCommand = new AsyncRelayCommand(() => RunDeepScanAsync(RouteCancellationToken));
+        CancelScanCommand = new RelayCommand(_ => { _scanRequest.Begin(); ScanProgressText = "Health check cancelled."; ShowReady(); });
         ImportActionCommand = new AsyncRelayCommand(async parameter =>
         {
             if (_catalog is null || parameter is not ValueTuple<HealthFinding, HealthImportAction> request
@@ -92,8 +94,8 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
                 succeeded ? "Import action completed." : "Import action remains pending. Review Import Activity for details.");
             await RunStandardScanAsync(RouteCancellationToken).ConfigureAwait(true);
         });
-        PrepareRepairCommand = new AsyncRelayCommand(() => PrepareSelectedRepairAsync());
-        ConfirmRepairCommand = new AsyncRelayCommand(() => ConfirmPendingRepairAsync());
+        PrepareRepairCommand = new AsyncRelayCommand(() => PrepareSelectedRepairAsync(RouteCancellationToken));
+        ConfirmRepairCommand = new AsyncRelayCommand(() => ConfirmPendingRepairAsync(RouteCancellationToken));
         CancelRepairCommand = new RelayCommand(_ => CancelPendingRepair());
         ClearResultsCommand = new RelayCommand(_ => ClearResults());
         SelectFindingCommand = new RelayCommand(parameter =>
@@ -170,13 +172,15 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
         private set => SetProperty(ref _scanProgressText, value);
     }
 
-    public bool HasPendingRepair => PendingRepair is not null;
+    public bool HasPendingRepair => PendingRepair is not null || _pendingBulk.Count > 0;
 
     public bool HasScanResults => _scanResult is not null;
 
     public bool CanPrepareSelectedRepair => SelectedFinding?.RepairAvailable == true;
 
-    public string RepairConfirmationText => PendingRepair is null
+    public string RepairConfirmationText => _pendingBulk.Count > 0
+        ? SurfaceText.Format("Health.BulkConfirm", "Confirm {0} original integrity records. Each original is rechecked; no files will be changed.", _pendingBulk.Count)
+        : PendingRepair is null
         ? string.Empty
         : $"Review before repair: {PendingRepair.IntendedTargetAction} The plan will be revalidated before it changes anything.";
 
@@ -230,6 +234,7 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
     public ICommand RunHealthCheckCommand { get; }
 
     public ICommand RunDeepHealthCheckCommand { get; }
+    public ICommand CancelScanCommand { get; }
 
     public ICommand ImportActionCommand { get; }
 
@@ -282,7 +287,7 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
 
         if (_disposed) return;
         var request = _scanRequest.Begin();
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, request.CancellationToken);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, request.CancellationToken, RouteCancellationToken);
         ShowLoading();
         ScanProgressText = mode == HealthScanMode.Deep
             ? "Checking managed files and content integrity…"
@@ -290,9 +295,13 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
 
         try
         {
-            var result = await _healthEvaluator.RunScanAsync(
-                new HealthScanOptions(mode),
-                cancellationToken: linked.Token).ConfigureAwait(true);
+            var progress = new Progress<HealthScanProgress>(p =>
+            {
+                if (_scanRequest.IsCurrent(request) && !linked.IsCancellationRequested && IsLoading)
+                    ScanProgressText = $"{p.CurrentStage} — {p.ItemsScanned} checked, {p.FindingsCount} findings";
+            });
+            var result = await Task.Run(() => _healthEvaluator.RunScanAsync(
+                new HealthScanOptions(mode), progress, linked.Token), linked.Token).ConfigureAwait(true);
             if (!_scanRequest.IsCurrent(request) || linked.IsCancellationRequested) return;
 
             _scanResult = result;
@@ -351,8 +360,26 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
         }
     }
 
+    public async Task PrepareOriginalRecoveryAsync(HealthFinding finding, string sourcePath)
+    {
+        if (_repairPlanner is null || _disposed || !IsRouteActive) return;
+        SelectedFinding = finding;
+        var result = await _repairPlanner.PrepareOriginalRecoveryAsync(finding, sourcePath, RouteCancellationToken)
+            .ConfigureAwait(true);
+        if (_disposed || !IsRouteActive || SelectedFinding != finding) return;
+        PendingRepair = result.IsSuccess ? result.Value : null;
+        ActionFeedbackMessage = result.IsSuccess
+            ? "Recovery prepared. Review the exact action before confirming."
+            : result.UserMessage ?? "That source could not be verified.";
+    }
+
     public async Task ConfirmPendingRepairAsync(CancellationToken cancellationToken = default)
     {
+        if (_pendingBulk.Count > 0)
+        {
+            await ConfirmBulkIntegrityAsync(cancellationToken).ConfigureAwait(true);
+            return;
+        }
         if (_repairExecutor is null || PendingRepair is not { } plan)
         {
             return;
@@ -370,7 +397,12 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
 
             PendingRepair = null;
             ActionFeedbackMessage = "Repair completed and journaled. Vault Health is checking the result.";
-            await RunStandardScanAsync(cancellationToken).ConfigureAwait(true);
+            if (plan.MediaId is Guid mediaId && _healthEvaluator is not null)
+                await RefreshOriginalFindingsAsync(mediaId, cancellationToken).ConfigureAwait(true);
+            else if (plan.Kind == RepairKind.RegenerateProfileManifest && plan.ProfileId is Guid profileId && _healthEvaluator is not null)
+                await RefreshFocusedFindingsAsync(null, profileId, cancellationToken).ConfigureAwait(true);
+            else
+                await RunStandardScanAsync(cancellationToken).ConfigureAwait(true);
         }
         finally
         {
@@ -378,9 +410,95 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
         }
     }
 
+    private Task RefreshOriginalFindingsAsync(Guid mediaId, CancellationToken ct) =>
+        RefreshFocusedFindingsAsync(mediaId, null, ct);
+
+    private async Task RefreshFocusedFindingsAsync(Guid? mediaId, Guid? profileId, CancellationToken ct)
+    {
+        if (_healthEvaluator is null || _disposed) return;
+        var request = _scanRequest.Begin();
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, request.CancellationToken, RouteCancellationToken);
+        var focused = await Task.Run(() => _healthEvaluator.RunScanAsync(
+            new HealthScanOptions(HealthScanMode.Focused, FocusedProfileId: profileId, FocusedMediaId: mediaId), cancellationToken: linked.Token),
+            linked.Token).ConfigureAwait(true);
+        if (!_scanRequest.IsCurrent(request) || linked.IsCancellationRequested) return;
+        bool IsAffected(HealthFinding finding) => mediaId.HasValue
+            ? finding.MediaId == mediaId
+            : profileId.HasValue && finding.ProfileId == profileId && !finding.MediaId.HasValue;
+        var merged = Findings.Where(f => !IsAffected(f))
+            .Concat(focused.Findings.Where(IsAffected))
+            .Distinct().OrderByDescending(f => f.Severity).ThenBy(f => f.Code, StringComparer.Ordinal).ToArray();
+        Findings.Clear();
+        foreach (var finding in merged) Findings.Add(finding);
+        _scanResult = focused with { Findings = merged };
+        RebuildFindingGroups();
+        SelectedFinding = Findings.FirstOrDefault();
+        RaisePropertyChanged(nameof(HealthFindingCount));
+        RaisePropertyChanged(nameof(HealthStatusWord));
+        RaisePropertyChanged(nameof(HasScanResults));
+    }
+
+    public void PrepareBulkIntegrity()
+    {
+        if (_disposed || !IsRouteActive || IsLoading || IsBackgroundUpdating) return;
+        PendingRepair = null;
+        // Only independent catalog-only repairs can share one confirmation. Source selection,
+        // replacement, deletion and replay of material operations always require individual review.
+        _pendingBulk = Findings.Where(f => f.RepairAvailable
+                && f.MediaId.HasValue
+                && f.Code is HealthFindingCode.CanonicalOriginalMissing or HealthFindingCode.CanonicalOriginalMismatch
+                    or HealthFindingCode.CanonicalOriginalReverify)
+            .DistinctBy(f => f.MediaId).ToArray();
+        RaisePropertyChanged(nameof(HasPendingRepair));
+        RaisePropertyChanged(nameof(RepairConfirmationText));
+    }
+
+    private async Task ConfirmBulkIntegrityAsync(CancellationToken ct)
+    {
+        if (_repairPlanner is null || _repairExecutor is null || IsBackgroundUpdating) return;
+        var batch = _pendingBulk;
+        CancelPendingRepair();
+        BeginBackgroundUpdate();
+        var succeeded = 0;
+        var failed = 0;
+        var affected = new HashSet<Guid>();
+        try
+        {
+            foreach (var finding in batch)
+            {
+                ct.ThrowIfCancellationRequested();
+                var plan = await _repairPlanner.PrepareAsync(finding, ct).ConfigureAwait(true);
+                if (!plan.IsSuccess || plan.Value is null)
+                {
+                    failed++;
+                    continue;
+                }
+                var result = await _repairExecutor.ExecuteAsync(plan.Value, ct).ConfigureAwait(true);
+                if (result.IsSuccess)
+                {
+                    succeeded++;
+                    affected.Add(finding.MediaId!.Value);
+                }
+                else failed++;
+            }
+            foreach (var mediaId in affected)
+                await RefreshOriginalFindingsAsync(mediaId, ct).ConfigureAwait(true);
+        }
+        finally
+        {
+            ActionFeedbackMessage = SurfaceText.Format("Health.BulkOutcome",
+                "Integrity reconciliation: {0} completed, {1} unresolved, {2} not processed.",
+                succeeded, failed, batch.Count - succeeded - failed);
+            EndBackgroundUpdate();
+        }
+    }
+
     public void CancelPendingRepair()
     {
+        _pendingBulk = [];
         PendingRepair = null;
+        RaisePropertyChanged(nameof(HasPendingRepair));
+        RaisePropertyChanged(nameof(RepairConfirmationText));
     }
 
     public async Task LoadMetricsAsync(CancellationToken cancellationToken = default)
@@ -388,7 +506,7 @@ public sealed class LibraryHealthViewModel : ScreenStateViewModel, IDisposable
         if (_storageMetrics is null || _disposed) return;
 
         var request = _metricsRequest.Begin();
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, request.CancellationToken);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, request.CancellationToken, RouteCancellationToken);
         if (_storageMetrics.LastSnapshot is { } lastSnapshot) Metrics = lastSnapshot;
         MetricsStatus = SurfaceText.Get("Settings.Vault.MetricsLoading", "Calculating storage metrics…");
         try

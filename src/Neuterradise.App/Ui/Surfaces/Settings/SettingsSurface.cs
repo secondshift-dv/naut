@@ -21,7 +21,6 @@ namespace Neuterradise.App.Ui;
 public sealed class SettingsSurface : Surface
 {
     private readonly SettingsViewModel _vm;
-    private readonly ExplorerLocationProvider _explorer;
     private readonly Grid _root = UI.Grid("auto,*", "168,*");
     private readonly StackPanel _rail = UI.V(1);
     private readonly ScrollViewer _content;
@@ -36,7 +35,6 @@ public sealed class SettingsSurface : Surface
     public SettingsSurface(AppServices services, SettingsViewModel vm) : base(services)
     {
         _vm = vm;
-        _explorer = new ExplorerLocationProvider(services.Paths);
         _root.Background = ThemeRuntime.Current.Brush("canvas");
 
         var railScroll = UI.Scroll(_rail.Margin(6, 8, 6, 8));
@@ -244,6 +242,7 @@ public sealed class SettingsSurface : Surface
         var tabs = UI.Wrap(6);
         foreach (var (id, key, fallback) in new[]
         {
+            ("global-preset", "Settings.Appearance.GlobalPreset", "Global Presets"),
             ("theme", "Settings.Appearance.Theme", "Theme"),
             ("typography", "Settings.Presentation.Fonts", "Font"),
             ("control-style", "Settings.Presentation.ControlStyles", "Control Styles"),
@@ -264,12 +263,45 @@ public sealed class SettingsSurface : Surface
 
         UIElement section = _appearanceTab switch
         {
+            "global-preset" => GlobalPresets(),
             "typography" => AppearanceDefinitionSection(PresentationSlots.Typography),
             "control-style" => AppearanceDefinitionSection(PresentationSlots.ControlSkin),
             _ => AppearanceDefinitionSection(PresentationSlots.Theme),
         };
 
         return UI.V(12, tabs, section);
+    }
+
+    private FrameworkElement GlobalPresets()
+    {
+        var session = Services.Presentation.BeginPreview(PresentationContext.Global);
+        var choices = UI.Wrap(8);
+        foreach (var pack in session.CompatibleGlobalPresets())
+        {
+            var id = pack.PackId;
+            var name = pack.Origin == PackOrigin.BuiltIn ? "Naut" : pack.Manifest.Name;
+            choices.Children.Add(UI.Button(name, () => Services.RunUserAction(ApplyGlobalPresetAsync(id, name),
+                "SettingsSurface.ApplyGlobalPreset", UI.T("Customize.ApplyFailed", "Could not apply. Nothing was changed.")), ButtonKind.Secondary));
+        }
+        session.Cancel();
+        return UI.Section(UI.T("Settings.Appearance.GlobalPreset", "Global Presets"),
+            UI.T("Settings.Appearance.GlobalPreset.Desc", "Apply coordinated global appearance defaults while preserving individual Profile overrides and media."), choices);
+    }
+
+    private async Task ApplyGlobalPresetAsync(string packId, string name)
+    {
+        var session = Services.Presentation.BeginPreview(PresentationContext.Global);
+        if (!session.TrySelectGlobalPreset(packId)) { session.Cancel(); return; }
+        if (!await Services.ConfirmAsync(UI.T("Settings.Appearance.GlobalPreset", "Global Presets"),
+            UI.F("Settings.Appearance.GlobalPreset.Confirm", "Apply {0} to global appearance, Home, Gallery and Profile defaults?", name),
+            UI.T("Common.Save", "Save")).ConfigureAwait(true))
+        {
+            session.Cancel();
+            return;
+        }
+        var result = await session.ApplyAsync().ConfigureAwait(true);
+        if (!result.Succeeded) throw new InvalidOperationException(result.Message);
+        Services.Toast(UI.T("Customize.Applied", "Customization applied"), "success");
     }
 
     private FrameworkElement AppearanceDefinitionSection(string slot)
@@ -864,6 +896,7 @@ public sealed class SettingsSurface : Surface
         var metricsStatus = UI.WrappedText(string.Empty, "caption");
         var feedback = UI.WrappedText(string.Empty, "caption", "accent");
         var repair = UI.V(8);
+        var scanProgress = UI.WrappedText(string.Empty, "caption");
 
         void Fill()
         {
@@ -890,6 +923,8 @@ public sealed class SettingsSurface : Surface
             feedback.Foreground = ThemeRuntime.Current.Brush(health.HasError ? "textDanger" : "textAccent");
             feedback.Visibility = string.IsNullOrWhiteSpace(feedback.Text) ? Visibility.Collapsed : Visibility.Visible;
 
+
+
             findings.Children.Clear();
             foreach (var group in health.FindingGroups)
             {
@@ -902,6 +937,10 @@ public sealed class SettingsSurface : Surface
                         actions.Children.Add(UI.Button(UI.T("Home.OpenProfile", "Open Profile"),
                             () => Services.Navigation.Navigate(new ProfileRoute(profileId)), ButtonKind.Ghost));
                     }
+                    if (finding.RecoveryAvailable)
+                        actions.Children.Add(UI.Button(UI.T("Health.RestoreOriginal", "Restore original"), () =>
+                            Services.RunUserAction(PickOriginalAsync(finding), "Health.RestoreOriginal",
+                                "The recovery source could not be opened."), ButtonKind.Ghost));
                     foreach (var action in finding.ImportActions ?? [])
                     {
                         var label = action switch
@@ -944,7 +983,19 @@ public sealed class SettingsSurface : Surface
             }
         }
 
-        _sectionBag.Add(Observe.Props(health, Fill));
+        async Task PickOriginalAsync(HealthFinding finding)
+        {
+            var source = finding.RecoveryRequiresFolder
+                ? await Services.PickFolderAsync()
+                : (await Services.PickFilesAsync(false)).SingleOrDefault();
+            if (source is not null) await health.PrepareOriginalRecoveryAsync(finding, source);
+        }
+
+        _sectionBag.Add(Observe.Props(health, () => scanProgress.Text = health.ScanProgressText ?? string.Empty,
+            nameof(health.ScanProgressText)));
+        _sectionBag.Add(Observe.Props(health, Fill, nameof(health.HasScanResults), nameof(health.HealthFindingCount),
+            nameof(health.Metrics), nameof(health.MetricsStatus), nameof(health.ActionFeedbackMessage),
+            nameof(health.HasError), nameof(health.ErrorMessage), nameof(health.HasPendingRepair), nameof(health.RepairConfirmationText)));
         _sectionBag.Add(Observe.Collection(health.FindingGroups, Fill));
         Fill();
 
@@ -952,10 +1003,13 @@ public sealed class SettingsSurface : Surface
             status,
             metrics,
             metricsStatus,
+            scanProgress,
             feedback,
             UI.H(8,
                 UI.Button(UI.T("Health.Check", "Check Vault"), null, ButtonKind.Primary, command: health.RunHealthCheckCommand),
                 UI.Button(UI.T("Health.Deep", "Deep check"), null, command: health.RunDeepHealthCheckCommand),
+                UI.Button(UI.T("Health.BulkIntegrity", "Reconcile originals"), health.PrepareBulkIntegrity, ButtonKind.Ghost),
+                UI.Button(UI.T("Overlay.Cancel", "Cancel"), null, ButtonKind.Ghost, command: health.CancelScanCommand),
                 UI.Button(UI.T("Health.ClearCache", "Clear cache"), null, ButtonKind.Ghost, command: health.ClearCacheCommand),
                 UI.Button(UI.T("Settings.Health.ClearResults", "Clear results"), null, ButtonKind.Ghost, command: health.ClearResultsCommand)),
             UI.Text(UI.T("Health.CacheNote", "The cache only holds regenerable previews. Clearing it never touches your media."), "caption"),

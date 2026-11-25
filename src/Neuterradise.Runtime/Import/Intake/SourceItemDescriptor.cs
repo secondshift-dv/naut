@@ -14,4 +14,9 @@ public sealed record SourceItemDescriptor(
     bool IsReadable,
     long ByteLength,
     DateTimeOffset? LastWriteUtc,
-    MediaType? Classification);
+    MediaType? Classification,
+    SourceIntakeIssueKind? Issue = null,
+    string? SourceIdentityJson = null);
+
+public enum SourceIntakeIssueKind { Unsupported, Missing, Locked, AccessDenied, Unreadable, DirectoryUnavailable }
+public sealed record SourceIntakeIssue(string Path, SourceIntakeIssueKind Kind);

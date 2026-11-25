@@ -79,6 +79,11 @@
     <sys:String x:Key="Import.Normalize">普通</sys:String>
     <sys:String x:Key="Import.Problems">需要审核</sys:String>
     <sys:String x:Key="Import.Problems.Description">请解决这些问题后继续。</sys:String>
+    <sys:String x:Key="Import.Review.RetryAll">全部重试 ({0})</sys:String>
+    <sys:String x:Key="Import.Review.ReuseAll">复用所有重复媒体 ({0})</sys:String>
+    <sys:String x:Key="Import.Review.KeepAll">全部保留在目标中 ({0})</sys:String>
+    <sys:String x:Key="Import.Review.MoveAll">全部移至识别出的个人资料 ({0})</sys:String>
+    <sys:String x:Key="Import.Review.RemoveAll">移除所有待审核媒体 ({0})</sys:String>
     <sys:String x:Key="Import.ProfileCollision">被识别为另一个Profile</sys:String>
     <sys:String x:Key="Import.ProfilePicker.CurrentSelection">媒体将添加到此Profile。</sys:String>
     <sys:String x:Key="Import.ProfilePicker.ExistingResult">现有Profile</sys:String>
@@ -887,6 +892,14 @@
     <sys:String x:Key="Customize.FromPack">包</sys:String>
     <sys:String x:Key="Customize.InstallFailed">这个包无法安装</sys:String>
     <sys:String x:Key="Customize.InstallFile">从文件安装...</sys:String>
+    <sys:String x:Key="Customize.Banner.Rotation">旋转</sys:String>
+    <sys:String x:Key="Customize.Banner.Automatic">自动来源</sys:String>
+    <sys:String x:Key="Customize.Packs.CheckUpdates">检查官方包更新</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateAll">全部更新</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateVersion">更新至 {0}</sys:String>
+    <sys:String x:Key="Customize.Packs.UpdateFailed">官方包更新失败</sys:String>
+    <sys:String x:Key="Customize.Packs.NoUpdates">未找到兼容的官方包更新。</sys:String>
+    <sys:String x:Key="Customize.Packs.Updated">{0} 已更新至 {1}</sys:String>
     <sys:String x:Key="Customize.InstallFolder">从文件夹安装...</sys:String>
     <sys:String x:Key="Customize.Installed">已安装</sys:String>
     <sys:String x:Key="Customize.NoChanges">没有变化。</sys:String>
@@ -1041,6 +1054,12 @@
     <sys:String x:Key="Nav.Home">首页</sys:String>
     <sys:String x:Key="Nav.Import">导入</sys:String>
     <sys:String x:Key="Nav.Settings">设置</sys:String>
+    <sys:String x:Key="Nav.Recovery">原生导航</sys:String>
+    <sys:String x:Key="Nav.CustomNavigation">自定义导航</sys:String>
+    <sys:String x:Key="Banner.SceneEffects">场景效果</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset">全局预设</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset.Desc">应用统一的全局外观默认设置，同时保留各档案的独立设置和媒体。</sys:String>
+    <sys:String x:Key="Settings.Appearance.GlobalPreset.Confirm">将 {0} 应用到全局外观、主页、图库和档案默认设置吗？</sys:String>
     <sys:String x:Key="Breadcrumb.System">系统</sys:String>
     <sys:String x:Key="Breadcrumb.LibraryHealth">Vault 健康</sys:String>
     <sys:String x:Key="Breadcrumb.People">人</sys:String>
@@ -1202,6 +1221,7 @@
     <sys:String x:Key="Import.Intake.NoneSupported">{0} 文件均不受支持的照片、视频或 3D 模型。他们没有受到任何影响。</sys:String>
     <sys:String x:Key="Import.Intake.PrepareFailed">naut 无法准备此导入。您的原始文件保持不变；从列表中重试。</sys:String>
     <sys:String x:Key="Import.Intake.Starting">浏览你的文件...</sys:String>
+    <sys:String x:Key="Import.Intake.WithFailures">{0} 个已就绪；{1} 个不支持；{2} 个缺失；{3} 个被锁定；{4} 个拒绝访问；{5} 个无法读取；{6} 个文件夹无法访问。原始文件未修改。</sys:String>
     <sys:String x:Key="Import.Intake.WithUnsupported">{0} 媒体就绪 · {1} 不受支持的文件保持不变</sys:String>
     <sys:String x:Key="Import.Progress.Percent">{0}%</sys:String>
     <sys:String x:Key="Import.Stage.Checking">准备媒体</sys:String>
@@ -2213,4 +2233,9 @@
     <sys:String x:Key="Inspector.MoveToTrashFailed">无法将媒体移至回收站。</sys:String>
     <sys:String x:Key="Inspector.MoveToTrashTitle">将媒体移至回收站？</sys:String>
     <sys:String x:Key="Inspector.MoveToTrashBody">将 {0} 移至回收站？其资料关联以及封面、横幅和 Figure 选择将被移除。人脸数据仍保留在可恢复的媒体记录中。可在 30 天内通过设置 → 回收站恢复。</sys:String>
+    <sys:String x:Key="Health.RestoreOriginal">恢复原始文件</sys:String>
+    <sys:String x:Key="Health.BulkIntegrity">核对原始文件</sys:String>
+    <sys:String x:Key="Health.BulkConfirm">确认 {0} 条原始文件完整性记录。将重新检查每个原始文件，不会修改文件。</sys:String>
+    <sys:String x:Key="Health.BulkOutcome">完整性核对：已完成 {0} 项，未解决 {1} 项，未处理 {2} 项。</sys:String>
+    <sys:String x:Key="Health.PlacementStale">存在可能的规范存放位置。更新目录路径前请先验证。</sys:String>
 </ResourceDictionary>

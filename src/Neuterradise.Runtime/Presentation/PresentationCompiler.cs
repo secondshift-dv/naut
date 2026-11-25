@@ -374,6 +374,40 @@ public sealed partial class PresentationCompiler
                 if (pattern.Any(v => !double.IsFinite(v) || v < 0.5 || v > 2.5)) context.Error("heightPattern", "Item aspects must be between 0.5 and 2.5.");
             }
         }
+        GalleryScenePlan? scene = null;
+        if (spec.TryGetProperty("scene", out var authored))
+        {
+            if (context.ContractVersion < 4 || authored.ValueKind != JsonValueKind.Object)
+                context.Error("scene", "Gallery architecture requires Contract 4.");
+            else
+            {
+                BackdropPlan? ReadEnvironment(string name)
+                {
+                    if (!authored.TryGetProperty(name, out var environment)) return null;
+                    if (environment.ValueKind != JsonValueKind.Object)
+                    {
+                        context.Error("scene." + name, "Declare a backdrop variant object.");
+                        return null;
+                    }
+                    return CompileBackdrop(environment, context);
+                }
+                var background = ReadEnvironment("background");
+                var foreground = ReadEnvironment("foreground");
+                var overlay = context.OptionalString(authored, "itemOverlay");
+                var sizing = context.Enum(authored, "cardSizing", ["contain", "intrinsic", "crop"], "contain");
+                if (sizing == "crop" && primitive is (CollectionPrimitives.AdaptiveWall or CollectionPrimitives.SingleColumn)
+                    && context.String(spec, "toolbar", "standard") == "feed")
+                    context.Error("scene.cardSizing", "Catalogue detail rows require uncropped Cards.");
+                if (sizing == "intrinsic" && primitive is (CollectionPrimitives.Carousel or CollectionPrimitives.List or CollectionPrimitives.SingleColumn))
+                    context.Error("scene.cardSizing", "Intrinsic masonry requires a vertical grid or shelf collection.");
+                scene = new(background, foreground,
+                    overlay is null ? null : context.Asset(overlay, PackAssetKind.Image, "scene.itemOverlay"),
+                    context.Number(authored, "itemInset", 0, 0, 0.3), sizing,
+                    context.Number(authored, "cardRotation", 0, -20, 20),
+                    context.Number(authored, "cardSkew", 0, -20, 20),
+                    context.Enum(authored, "overlayPlacement", ["front", "behind"], "front"));
+            }
+        }
         return new GalleryLayoutPlan(
             primitive,
             context.Number(spec, "itemMinWidth", 220, 120, 640),
@@ -383,7 +417,7 @@ public sealed partial class PresentationCompiler
             context.Number(spec, "rowHeight", 72, 48, 320),
             (int)context.Number(spec, "maxColumns", 12, 1, 16),
             context.Enum(spec, "toolbar", ["standard", "feed", "catalog", "drawer"], "standard"),
-            pattern);
+            pattern, scene);
     }
 
     private static ProfileLayoutPlan? CompileProfileLayout(JsonElement spec, SpecContext context)
@@ -438,6 +472,16 @@ public sealed partial class PresentationCompiler
 
         var browse = context.Enum(spec, "browse", ["wall", "workbench", "editorial", "reel"], "wall");
         if (browse == "reel") browse = "wall";
+        MediaCollectionPlan? collection = null;
+        if (spec.TryGetProperty("collection", out var collectionSpec))
+        {
+            if (context.ContractVersion < 4 || collectionSpec.ValueKind != JsonValueKind.Object)
+                context.Error("collection", "Authored media collection geometry requires Contract 4.");
+            else collection = new(context.Enum(collectionSpec, "layout", ["grid", "editorial"], "grid"),
+                (int)context.Number(collectionSpec, "maxColumns", 12, 1, 12),
+                context.Number(collectionSpec, "rowSpacing", 10, 0, 48),
+                context.Number(collectionSpec, "columnSpacing", 10, 0, 48));
+        }
 
         return new ProfileMediaLayoutPlan(new MediaLayoutDefinition(
             layoutId,
@@ -472,7 +516,7 @@ public sealed partial class PresentationCompiler
             context.Number(spec, "frameGlow", 0, 0, 1),
             context.Enum(spec, "hoverStyle", ["lift", "spotlight", "none"], "lift"),
             context.Bool(spec, "showTypeBadge", true)),
-            browse);
+            browse, collection);
     }
 
     private static FramePlan? CompileFrame(JsonElement spec, SpecContext context)
