@@ -4,34 +4,82 @@
     {
       "slug": "celestial",
       "packId": "neuterradise.celestial",
-      "version": "3.0.0",
-      "file": "celestial-3.0.0.ntpack",
-      "sha256": "855fd9ba6635a23ae91b13303c2ab0bec25e50f8c8e05b6994b42564b441a06d",
-      "bytes": 329843
+      "version": "4.0.0",
+      "file": "celestial-4.0.0.ntpack",
+      "sha256": "30e129e5d3dd988fb64a127d09ee63d6f7bddc2f31e2b76bd5428a17a9fdcf75",
+      "bytes": 333022,
+      "contentHash": "5e70d03ed795de6371de6508b408ca65dcb6a96db51de478e5706ac8765a332f",
+      "minContractVersion": 4,
+      "predecessors": [
+        {
+          "version": "3.0.0",
+          "contentHash": "21c6c8beae0d803b41110e8cf4a5f2ce6c727a040cec4fe9f90d8cb894011c5d"
+        },
+        {
+          "version": "2.1.0",
+          "contentHash": "bb82a6845501e02a2d6042043491293a41150a32026d02297e3d3326a7a55dae"
+        }
+      ]
     },
     {
       "slug": "overworld-expedition",
       "packId": "naut.overworld-expedition",
-      "version": "3.0.0",
-      "file": "overworld-expedition-3.0.0.ntpack",
-      "sha256": "b085b150284820423d096da91c1c2d1ee68a8f71ec1914209ef65fa9f7bc9281",
-      "bytes": 692368
+      "version": "4.0.0",
+      "file": "overworld-expedition-4.0.0.ntpack",
+      "sha256": "ca4e056d912a96fdcdf2b3ef7bbc28dd292fdea2ba2c9c6df3bedf88abb8c50c",
+      "bytes": 694626,
+      "contentHash": "9ec292126fc4b4077d074c530a61b3f5b8691206468bc6f898fe3d29c1e202a5",
+      "minContractVersion": 4,
+      "predecessors": [
+        {
+          "version": "3.0.0",
+          "contentHash": "223807dafb1259e5266440e5e2e7403125d98795c357dbfc46f8df859f129f4d"
+        },
+        {
+          "version": "2.1.0",
+          "contentHash": "952cfaf0e301c84f0c1ad01bc7fe29aa384ef8b5d7ee980e4c85542b42f713c8"
+        }
+      ]
     },
     {
       "slug": "black-dossier",
       "packId": "naut.black-dossier",
-      "version": "3.0.0",
-      "file": "black-dossier-3.0.0.ntpack",
-      "sha256": "0bc0aef2688525141703d58b0da2b6d276c53abb7c15be74a606240bce049ddd",
-      "bytes": 636510
+      "version": "4.0.0",
+      "file": "black-dossier-4.0.0.ntpack",
+      "sha256": "d5a0426723b10b6d12f45e465780e3e7843c67a9ed28c7ca17011073ab7a3c9e",
+      "bytes": 639511,
+      "contentHash": "0b375f9c8f4da721f6df20a332d885386e870e7c25ab64b94c894f35ecfe33cc",
+      "minContractVersion": 4,
+      "predecessors": [
+        {
+          "version": "3.0.0",
+          "contentHash": "bb08503e78edc9604b315cad3aa25fa0dd4e2ac25a6c109c8375ed5712064313"
+        },
+        {
+          "version": "2.1.0",
+          "contentHash": "311543a947a676077710b441e3e934b6a55a5ff9c2a29b821e2a186e9fe4c749"
+        }
+      ]
     },
     {
       "slug": "conceal",
       "packId": "conceal",
-      "version": "3.0.0",
-      "file": "conceal-3.0.0.ntpack",
-      "sha256": "32e05c460c0822aa2d35e8fe250df8ed9009c1990316b28779a9d541ef395b39",
-      "bytes": 141653
+      "version": "4.0.0",
+      "file": "conceal-4.0.0.ntpack",
+      "sha256": "008941b0829587c74c218e7e5061db7718cf85d137ddc204832078c3cb463499",
+      "bytes": 146745,
+      "contentHash": "72a20458cbd888d4ea71056c0319892557da2ede007e4affbfc621825d14c438",
+      "minContractVersion": 4,
+      "predecessors": [
+        {
+          "version": "3.0.0",
+          "contentHash": "f353b1aba31fc3f19c9a347152061932a4c5b8d361503a92d80db12fba0de08f"
+        },
+        {
+          "version": "2.1.0",
+          "contentHash": "e85ed1aa3b1f8f167ba07e1cbad6d1006e266cd7ca3d4b3732fd3b85f0a20763"
+        }
+      ]
     }
   ]
 }
