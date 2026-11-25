@@ -23,6 +23,12 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     private readonly Grid _root = new();
     private readonly BackdropView _backdrop = new();
     private readonly Grid _hero = new();
+    private readonly Grid _stageHost = new() { Visibility = Visibility.Collapsed, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    private readonly Grid _stageContent = new();
+    private readonly Grid _stageFavorites = new();
+    private readonly Grid _stageStatistics = new();
+    private SurfaceNode? _stageScene;
+    internal double? StageAspect => _layout is { ViewportStage: true, Surface: { } scene } ? scene.CanvasAspect : null;
     private readonly StackPanel _rails = new() { Spacing = 0 };
     private readonly StackPanel _page = UI.V(0);
     private readonly ScrollViewer _scroll;
@@ -94,7 +100,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
             CardDataFactory.AppearanceFor(overrides, frame, ReducedMotionAuthority.IsReduced),
             media.Cover,
             media.Banner,
-            frame) { AssignedTags = spotlight.AssignedTags };
+            frame) { AssignedTags = spotlight.AssignedTags, PresentationAppearance = overrides, BannerHoverPath = spotlight.BannerVideoPath };
     }
 
     public HomeSurface(AppServices services, HomeViewModel vm) : base(services)
@@ -112,6 +118,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         _scroll = UI.Scroll(_page);
         _scroll.ViewChanged += (_, _) => HoverVideoCoordinator.Shared.NotifyScroll();
         _root.Children.Add(_scroll);
+        _root.Children.Add(_stageHost);
 
         _root.PointerMoved += (_, args) =>
         {
@@ -123,6 +130,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         };
         _root.SizeChanged += (_, _) =>
         {
+            SizeStage();
             LayoutHero();
             QueueRebuildRails();
         };
@@ -147,6 +155,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
             nameof(HomeViewModel.RefreshNotice)));
         Bag.Add(Observe.Collection(_vm.SpotlightCandidates, () => { OnSpotlightChanged(); QueueRebuildRails(); }));
         Bag.Add(Observe.Collection(_vm.RecentlyActive, QueueRebuildRails));
+        Bag.Add(Observe.Collection(_vm.FavoriteProfiles, QueueRebuildRails));
         Bag.Add(Observe.Collection(_vm.NeedsAttention, QueueRebuildRails));
         Bag.Add(Observe.Collection(_vm.RecentActivity, QueueRebuildRails));
         Bag.Add(Observe.Collection(_vm.Discovery, QueueRebuildRails));
@@ -213,6 +222,10 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     private void ResolvePlans()
     {
         _layout = ResolvePresentation(PresentationSlots.HomeLayout, Context).PlanAs<HomeLayoutPlan>();
+        var favoritesChanged = _vm.FavoriteRailEnabled != _layout.Rails.Any(r => r.Id == "favorites" && r.Visible && r.Style == "cover-only");
+        _vm.FavoriteRailEnabled = _layout.Rails.Any(r => r.Id == "favorites" && r.Visible && r.Style == "cover-only");
+        if (favoritesChanged && IsActive && _vm.FavoriteRailEnabled)
+            Services.RunUserAction(_vm.RefreshFavoriteRailAsync(), "HomeSurface.FavoriteRail", UI.T("Home.RefreshFailed", "Home could not be refreshed."));
         _spotlight = ResolvePresentation(PresentationSlots.HomeSpotlight, Context).PlanAs<SpotlightPlan>();
         _backdrop.Plan = ResolvePresentation(PresentationSlots.HomeBackdrop, Context).PlanAs<BackdropPlan>();
         _rotation.Interval = TimeSpan.FromSeconds(_spotlight.RotationSeconds);
@@ -481,6 +494,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         {
             _hero.Height = double.NaN;
             _heroArtworkHost.Visibility = _vm.CurrentSpotlight is null ? Visibility.Collapsed : Visibility.Visible;
+            if (_spotlight.Composition == "marquee") return;
             if (_heroName is not null) _heroName.Foreground = ThemeRuntime.Current.Brush("textPrimary");
             if (_heroMeta is not null) _heroMeta.Foreground = ThemeRuntime.Current.Brush("textSecondary");
             if (_heroOverview is not null) _heroOverview.Foreground = ThemeRuntime.Current.Brush("textSecondary");
@@ -695,7 +709,9 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         {
             _heroImage.Source = null;
             _backdrop.AmbientImagePath = null;
-            _identityHost.Children.Add(EmptyWelcome());
+            _identityHost.Children.Add(_spotlight.Composition == "marquee"
+                ? Marquee(null, null, () => Services.Navigation.Navigate(new ImportRoute()))
+                : EmptyWelcome());
             StopHeroVideo();
             LayoutHero();
             return;
@@ -826,6 +842,10 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     private FrameworkElement Identity(HomeSpotlightViewModel spotlight)
     {
         Services.ProfileSnapshots.Warm(spotlight.ProfileId);
+        if (_spotlight.Composition == "marquee")
+            return Marquee(spotlight.DisplayName, string.Join(" ? ", new[] { spotlight.CategoryName, spotlight.MediaCountText }
+                .Where(value => !string.IsNullOrWhiteSpace(value))),
+                () => Services.Navigation.Navigate(new ProfileRoute(spotlight.ProfileId)));
         var name = UI.Text(spotlight.DisplayName, "section-title", "textPrimary", 2);
         var meta = UI.Text(string.Join(" \u00b7 ",
             new[] { spotlight.CategoryName, spotlight.MediaCountText }
@@ -889,6 +909,47 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
             details.Align(vertical: VerticalAlignment.Center).At(0, 1));
         identity.ColumnSpacing = 16;
         return identity;
+    }
+
+    private FrameworkElement Marquee(string? name, string? info, Action open)
+    {
+        var theme = ThemeRuntime.Current;
+        Button Arrow(string label, bool next)
+        {
+            var icon = new IconView("icon.action.back", 14, "textInverse");
+            if (next) icon.RenderTransform = new ScaleTransform { ScaleX = -1, CenterX = 7 };
+            var button = new Button
+            {
+                Content = icon, Width = 24, Height = 24, MinHeight = 0, MinWidth = 0,
+                Padding = new Thickness(0), Background = theme.Brush("transparent"),
+                BorderThickness = new Thickness(0), VerticalAlignment = VerticalAlignment.Center,
+                IsEnabled = _vm.HasMultipleSpotlightCandidates,
+            };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, label);
+            button.Tip(label);
+            button.Click += (_, _) => { if (next) _vm.NextSpotlightCommand.Execute(null); else _vm.PreviousSpotlightCommand.Execute(null); };
+            return button;
+        }
+
+        var label = UI.Text(name ?? UI.T("Home.Empty.Title", "Your collection"), "control", "textInverse", 1);
+        label.FontWeight = new Windows.UI.Text.FontWeight(700);
+        var detail = UI.Text(info, "micro", "textInverse", 1);
+        var action = new Button
+        {
+            Content = name is null ? UI.T("Nav.Import", "Import") : UI.T("Home.OpenProfile", "Open Profile"),
+            FontSize = 10, MinHeight = 0, Height = 24, Padding = new Thickness(5, 0, 5, 0),
+            Background = theme.Brush("transparent"), Foreground = theme.Brush("textInverse"),
+            BorderThickness = new Thickness(0), VerticalAlignment = VerticalAlignment.Center,
+        };
+        action.Click += (_, _) => open();
+        var center = UI.Grid("*", "*,auto");
+        center.Children.Add(UI.V(0, label, detail).Align(HorizontalAlignment.Center, VerticalAlignment.Center).At(0, 0));
+        center.Children.Add(action.At(0, 1));
+        var panel = UI.Grid("*", "auto,*,auto");
+        panel.Children.Add(Arrow(UI.T("Home.Previous", "Previous"), false).At(0, 0));
+        panel.Children.Add(center.At(0, 1));
+        panel.Children.Add(Arrow(UI.T("Home.Next", "Next"), true).At(0, 2));
+        return panel;
     }
 
     private FrameworkElement EmptyWelcome()
@@ -1090,11 +1151,75 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         }
     }
 
+    private void SizeStage()
+    {
+        if (StageAspect is not { } aspect || _root.ActualWidth <= 0 || _root.ActualHeight <= 0) return;
+        var width = Math.Min(_root.ActualWidth, _root.ActualHeight * aspect);
+        _stageHost.Width = width;
+        _stageHost.Height = width / aspect;
+    }
+
+    private void RebuildStage(SurfaceNode scene)
+    {
+        if (_stageHost.Visibility != Visibility.Visible)
+        {
+            _page.Children.Clear();
+            _scroll.Visibility = Visibility.Collapsed;
+            SurfaceComposer.Detach(_backdrop);
+            _stageHost.Children.Add(_backdrop);
+            _stageHost.Children.Add(_stageContent);
+            _stageHost.Visibility = Visibility.Visible;
+        }
+        SizeStage();
+        var favorites = _layout.Rails.FirstOrDefault(r => r.Id == "favorites") ?? new HomeRailPlan("favorites", true, "cover-only", 24);
+        var stats = _layout.Rails.FirstOrDefault(r => r.Id == "statistics") ?? new HomeRailPlan("statistics", true, "hud", 4);
+        _stageFavorites.Children.Clear();
+        if (favorites.Visible && ProfileRail(0, favorites, true, UI.T("Gallery.Favorites", "Favorites")) is { } rail)
+            _stageFavorites.Children.Add(rail);
+        _stageStatistics.Children.Clear();
+        if (stats.Visible) _stageStatistics.Children.Add(PulseBar(0, stats));
+        if (!ReferenceEquals(_stageScene, scene))
+        {
+            _stageScene = scene;
+            _stageContent.Children.Clear();
+            FrameworkElement? Region(string id) => id switch
+            {
+                "featured" => _hero,
+                "favorites" => _stageFavorites,
+                "statistics" => _stageStatistics,
+                _ => null,
+            };
+            _stageContent.Children.Add(SurfaceComposer.Build(scene, Region, _stageHost.Width > 0 ? _stageHost.Width : 1280));
+            SurfaceComposer.Detach(_notice);
+            _stageContent.Children.Add(_notice.Align(HorizontalAlignment.Center, VerticalAlignment.Bottom));
+        }
+    }
+
     private void RebuildRails()
     {
         if (_layout is null || _retired)
         {
             return;
+        }
+
+        if (_layout is { ViewportStage: true, Surface: { } stage })
+        {
+            RebuildStage(stage);
+            return;
+        }
+        if (_stageHost.Visibility == Visibility.Visible)
+        {
+            _stageHost.Visibility = Visibility.Collapsed;
+            _stageContent.Children.Clear();
+            _stageFavorites.Children.Clear();
+            _stageStatistics.Children.Clear();
+            _stageScene = null;
+            _stageHost.Children.Clear();
+            _root.Children.Insert(0, _backdrop);
+            _scroll.Visibility = Visibility.Visible;
+            SurfaceComposer.Detach(_notice);
+            _notice.HorizontalAlignment = HorizontalAlignment.Stretch;
+            _notice.VerticalAlignment = VerticalAlignment.Stretch;
         }
 
         _rails.Children.Clear();
@@ -1164,6 +1289,9 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     private FrameworkElement PulseBar(double padding, HomeRailPlan rail)
     {
         var pulse = _vm.VaultPulse;
+        if (rail.Style == "hud")
+            return HomeReadability.Hud(pulse.StorageSummary, pulse.ActiveMediaCount.ToString("N0"),
+                pulse.ActiveProfileCount.ToString("N0"), pulse.HealthState);
         var stats = new (string Value, string Label)[]
         {
             (pulse.ActiveProfileCount.ToString("N0"), UI.T("Home.Stat.Profiles", "Profiles")),
@@ -1267,7 +1395,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         string titleText)
     {
         var candidates = favoritesOnly
-            ? _vm.RecentlyActive.Where(static item => item.IsFavorite)
+            ? rail.Style == "cover-only" ? _vm.FavoriteProfiles : _vm.RecentlyActive.Where(static item => item.IsFavorite)
             : _vm.RecentlyActive;
         var items = candidates
             .Take(Math.Max(1, rail.MaxItems))
@@ -1284,6 +1412,11 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
                 UI.F("Home.Rail.Recent.Count", "{0} Profiles", items.Count),
                 "micro", 6).Align(vertical: VerticalAlignment.Center));
         var (itemWidth, itemHeight) = ProfileRailGeometry(rail.Style);
+        if (rail.Style == "cover-only")
+        {
+            var size = Math.Clamp((_stageHost.Height > 0 ? _stageHost.Height : 720) * 0.19, 66, 142);
+            return ProfileCarousel(items, size, size, rail.Style);
+        }
         return UI.V(6, title, ProfileCarousel(items, itemWidth, itemHeight, rail.Style))
             .Margin(padding, 10, padding, 0);
     }
@@ -1327,7 +1460,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         const double gap = 10;
         var (scroll, repeater) = Repeaters.Virtualized(factory, Repeaters.Stack(true, gap), horizontal: true);
         repeater.ItemsSource = source;
-        var hoverInset = Math.Ceiling(height * 0.02);
+        var hoverInset = Math.Ceiling(height * (style == "cover-only" ? 0.10 : 0.02));
         repeater.Margin = new Thickness(0, hoverInset, 0, hoverInset);
         var gutter = theme.Tokens.Number("scrollbarContentGutter", 16);
         void UpdateEnvelope()

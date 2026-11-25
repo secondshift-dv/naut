@@ -32,7 +32,10 @@ public sealed record TypographyPlan(TypographyFace Display, TypographyFace Headi
 
 public sealed record SemanticIconSkin(string Path, string? SelectedPath, double StrokeWidth);
 
-public sealed record NavigationScenePlan(SurfaceNode Scene, string Dock, double Extent, bool Immersive);
+public sealed record NavigationScenePlan(SurfaceNode Scene, string Dock, double Extent, bool Immersive)
+{
+    public bool OverlayHome { get; init; }
+}
 
 public sealed record ControlSkinPlan(double Radius, double BorderWidth, double HorizontalPadding, double VerticalPadding,
     double Height, double ScrollbarWidth, string Fill, string HoverFill, string PressedFill, string Border, string Focus)
@@ -47,6 +50,8 @@ public sealed record ControlSkinPlan(double Radius, double BorderWidth, double H
     public double? PassiveChipHeight { get; init; }
     public double? IconButtonSize { get; init; }
     public string? SelectedFill { get; init; }
+    public bool SelectedUnderline { get; init; }
+    public double BreadcrumbStripeOpacity { get; init; }
     public NavigationScenePlan? Navigation { get; init; }
     public ControlSkinPlan For(string family) => Families.TryGetValue(family, out var plan) ? plan : this;
 }
@@ -88,7 +93,7 @@ public sealed partial class PresentationCompiler
         if (spotlight) semantics = ["artwork", "identity", "pagination"];
         if (navigation) semantics = ["vault", "home", "gallery", "import", "settings", "activity", "customize"];
         if (modular && kind == DefinitionKinds.ProfileLayout)
-            semantics = [.. semantics, "banner", "cover", "figure"];
+            semantics = [.. semantics, "banner", "cover", "figure", "tags", "profile-tools"];
 
         var used = new HashSet<string>(StringComparer.Ordinal);
         var count = 0;
@@ -158,6 +163,7 @@ public sealed partial class PresentationCompiler
                     Height: node.TryGetProperty("height", out _) ? context.Number(node, "height", 320, semantic == "figure" ? 240 : 24, 960) : null,
                     Row: (int)context.Number(node, "row", 0, 0, 7),
                     Column: (int)context.Number(node, "column", 0, 0, 7),
+                    StretchHeight: world && semantic == "figure" && context.Bool(node, "stretchHeight", false),
                     RowSpan: (int)context.Number(node, "rowSpan", 1, 1, 8),
                     ColumnSpan: (int)context.Number(node, "columnSpan", 1, 1, 8)) : new(),
             };
@@ -330,7 +336,7 @@ public sealed partial class PresentationCompiler
         if (animated > context.Definition.Performance.MaxAnimatedLayers)
             context.Error(name, "Artwork rotation exceeds its declared animation budget.");
         return new(maskPath, groupRotation, plans,
-            artwork.TryGetProperty("aspect", out _) ? context.Number(artwork, "aspect", 1, 0.5, 4) : null,
+            artwork.TryGetProperty("aspect", out _) ? context.Number(artwork, "aspect", 1, 0.5, context.ContractVersion >= 4 ? 6 : 4) : null,
             artwork.TryGetProperty("breakpoint", out _) && context.ContractVersion >= 3
                 ? context.Number(artwork, "breakpoint", 800, 320, 1920) : 800);
     }
@@ -427,10 +433,17 @@ public sealed partial class PresentationCompiler
                 context.Error("navigation", "Navigation scenes require Contract 4.");
             else if (CompileSurface(nav, context, DefinitionKinds.ControlSkin) is { } scene)
                 navigation = new(scene, context.Enum(nav, "dock", ["top", "bottom", "left", "right"], "top"),
-                    context.Number(nav, "extent", 120, 48, 240), context.Bool(nav, "immersive", false));
+                    context.Number(nav, "extent", 120, 48, 240), context.Bool(nav, "immersive", false))
+                { OverlayHome = context.Bool(nav, "overlayHome", false) };
             else context.Error("navigation", "Navigation requires a scene.");
         }
-        return fallback with { Families = families, Icons = icons, Navigation = navigation };
+        var stripeOpacity = 0.0;
+        if (spec.TryGetProperty("breadcrumbStripeOpacity", out _))
+        {
+            if (context.ContractVersion < 4) context.Error("breadcrumbStripeOpacity", "Breadcrumb stripes require Contract 4.");
+            else stripeOpacity = context.Number(spec, "breadcrumbStripeOpacity", 0, 0, 0.25);
+        }
+        return fallback with { Families = families, Icons = icons, Navigation = navigation, BreadcrumbStripeOpacity = stripeOpacity };
 
         static bool ValidIcon(string data)
         {
@@ -461,6 +474,7 @@ public sealed partial class PresentationCompiler
             ? context.Number(spec, "passiveHeight", 20, 12, 96) : fallback?.PassiveChipHeight,
         IconButtonSize = context.ContractVersion >= 4 && spec.TryGetProperty("iconButtonSize", out _)
             ? context.Number(spec, "iconButtonSize", 28, 24, 96) : fallback?.IconButtonSize,
+        SelectedUnderline = context.ContractVersion >= 4 && context.Bool(spec, "selectedUnderline", fallback?.SelectedUnderline ?? false),
         SelectedFill = context.ContractVersion >= 4 && spec.TryGetProperty("selectedFill", out _)
             ? context.Color(spec, "selectedFill", "token:surfaceSelected") : fallback?.SelectedFill,
     };

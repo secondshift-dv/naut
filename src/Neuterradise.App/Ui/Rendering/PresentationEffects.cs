@@ -268,7 +268,7 @@ public sealed class EffectView : Grid
     private void Release() => _view.IsSurfaceActive = false;
 }
 
-internal sealed class PrimaryBannerEffect(Grid host)
+internal sealed class PrimaryBannerEffect(Grid host, PresentationVisualPriority priority = PresentationVisualPriority.Surface)
 {
     private string? _json;
     private BannerSlotAppearance _state = BannerSlotAppearance.Default;
@@ -291,7 +291,7 @@ internal sealed class PrimaryBannerEffect(Grid host)
         {
             _view = PresentationEffects.View(PresentationSlots.BannerEffect, () => PresentationContext.Global,
                 preview: () => PresentationEffects.Runtime?.ResolveBannerSlotEffect(_state));
-            _view.VisualPriority = PresentationVisualPriority.Surface;
+            _view.VisualPriority = priority;
             host.Children.Add(_view);
         }
         else _view.Refresh();

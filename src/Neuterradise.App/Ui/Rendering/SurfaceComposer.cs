@@ -114,6 +114,8 @@ public static class SurfaceComposer
 
     private static FrameworkElement RegionHost(string id, FrameworkElement element, NodeLayout placement)
     {
+        if (id == "figure" && placement.StretchHeight)
+            return new Border { Child = element, MinHeight = 320 };
         var height = placement.Height ?? (id switch { "figure" => 320.0, "artwork" => 260.0, _ => double.NaN });
         if (placement.Width is null && double.IsNaN(height)) return element;
         return new Border
@@ -131,7 +133,7 @@ public static class SurfaceComposer
         return Enumerable.Range(0, count).Where(index => used[index]).ToArray();
     }
 
-    private sealed class AdaptiveCanvas(double aspect, double fallbackWidth) : Panel
+    internal sealed class AdaptiveCanvas(double aspect, double fallbackWidth) : Panel
     {
         private readonly Dictionary<UIElement, ArtworkPlacement> _placements = [];
 

@@ -34,6 +34,13 @@ public sealed class ImportSurface : Surface
     private Disposables? _wizardBag;
     private Disposables? _wizardRenderBag;
     private bool _isSurfaceActive;
+    private SkImageView? _dropzoneArtwork;
+    private Canvas? _dropzoneStripes;
+    private Border? _dropzoneScrim;
+    private TextBlock? _dropzoneLabel;
+    private Border? _dropzone;
+    private Grid? _dropzoneComposition;
+    private StackPanel? _dropzoneContent;
 
     public ImportSurface(AppServices services, ImportViewModel vm) : base(services)
     {
@@ -66,6 +73,7 @@ public sealed class ImportSurface : Surface
         // ImportActivityService owns the live polling loop. Entering the page only wakes that loop;
         // it must not turn a transient database read into a page-level "could not refresh" notice.
         _isSurfaceActive = true;
+        RefreshDropzoneArtwork();
         foreach (var row in _rows.Values) row.SetSurfaceActive(true);
         Services.ImportActivity.RequestRefresh();
     }
@@ -73,6 +81,7 @@ public sealed class ImportSurface : Surface
     protected override void OnSuspended()
     {
         _isSurfaceActive = false;
+        if (_dropzoneArtwork is not null) _dropzoneArtwork.Source = null;
         foreach (var row in _rows.Values) row.SetSurfaceActive(false);
         CloseVisualPicker();
         HoverVideoCoordinator.Shared.StopAll();
@@ -84,6 +93,34 @@ public sealed class ImportSurface : Surface
         Guid? destinationProfileId,
         IntakeOrigin origin = IntakeOrigin.Picker) =>
         _vm.IntakeSourcesAsync(paths, origin, destinationProfileId);
+
+    public override void OnPresentationChanged(PresentationChangedEventArgs args)
+    {
+        if (IsActive && (args.PacksChanged || args.Slots.Contains(PresentationSlots.Theme)))
+            RefreshDropzoneArtwork();
+    }
+
+    protected override void RefreshPreviewPresentation(string? slot = null)
+    {
+        if (IsActive && (slot is null || slot == PresentationSlots.Theme)) RefreshDropzoneArtwork();
+    }
+
+    private void RefreshDropzoneArtwork()
+    {
+        if (_dropzoneArtwork is null || _dropzoneScrim is null || _dropzoneStripes is null || _dropzoneLabel is null
+            || _dropzone is null || _dropzoneComposition is null || _dropzoneContent is null) return;
+        var plan = ResolvePresentation(PresentationSlots.Theme, PresentationContext.Global).PlanAs<ThemePlan>();
+        var hasArtwork = plan.ImportDropzoneArtwork is not null;
+        _dropzoneArtwork.Source = ImageRef.FromPath(plan.ImportDropzoneArtwork, 1600, plan.ArtworkIdentity + ":import");
+        _dropzoneArtwork.Visibility = _dropzoneScrim.Visibility = hasArtwork ? Visibility.Visible : Visibility.Collapsed;
+        _dropzoneStripes.Visibility = hasArtwork ? Visibility.Collapsed : Visibility.Visible;
+        _dropzone.Padding = new Thickness(hasArtwork ? 0 : 16);
+        _dropzoneComposition.MinHeight = hasArtwork ? 240 : 0;
+        _dropzoneContent.Margin = new Thickness(hasArtwork ? 16 : 0);
+        _dropzoneArtwork.CornerRadiusValue = ThemeRuntime.Current.Tokens.Number("radiusSurface", 16);
+        _dropzoneScrim.CornerRadius = new CornerRadius(_dropzoneArtwork.CornerRadiusValue);
+        ThemeRuntime.Current.ApplyType(_dropzoneLabel, "body-strong", hasArtwork ? "onMediaPrimary" : null);
+    }
 
     private FrameworkElement DropZone()
     {
@@ -142,19 +179,29 @@ public sealed class ImportSurface : Surface
         {
             HorizontalAlignment = HorizontalAlignment.Center,
         };
-        var content = UI.V(8,
-            emblem,
-            UI.Text(UI.T("Import.Drop", "Drop photos, videos, 3D models or folders here"),
-                    "body-strong", maxLines: 2)
-                .Align(HorizontalAlignment.Center),
-            actions);
+        _dropzoneLabel = UI.Text(UI.T("Import.Drop", "Drop photos, videos, 3D models or folders here"),
+            "body-strong", maxLines: 2);
+        _dropzoneLabel.HorizontalAlignment = HorizontalAlignment.Center;
+        var content = _dropzoneContent = UI.V(8, emblem, _dropzoneLabel, actions);
         content.HorizontalAlignment = HorizontalAlignment.Center;
         content.VerticalAlignment = VerticalAlignment.Center;
 
-        var composition = new Grid();
+        _dropzoneStripes = stripes;
+        _dropzoneArtwork = new SkImageView { PlaceholderToken = "transparent", IsHitTestVisible = false,
+            Visibility = Visibility.Collapsed };
+        _dropzoneScrim = new Border { Background = theme.Brush("#55000000"),
+            IsHitTestVisible = false, Visibility = Visibility.Collapsed };
+        var composition = _dropzoneComposition = new Grid();
+        composition.Children.Add(_dropzoneArtwork);
         composition.Children.Add(stripes);
+        composition.Children.Add(_dropzoneScrim);
         composition.Children.Add(content);
-        var zone = new Border
+        composition.SizeChanged += (_, _) =>
+        {
+            if (composition.Clip is not RectangleGeometry clip) composition.Clip = clip = new RectangleGeometry();
+            clip.Rect = new Windows.Foundation.Rect(0, 0, composition.ActualWidth, composition.ActualHeight);
+        };
+        var zone = _dropzone = new Border
         {
             AllowDrop = true,
             CornerRadius = new CornerRadius(theme.Tokens.Number("radiusSurface", 16)),

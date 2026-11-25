@@ -51,6 +51,23 @@ public static class HomeReadability
         return lettering;
     }
 
+    public static FrameworkElement Hud(string storage, string media, string profiles, string condition)
+    {
+        var rows = new StackPanel { Spacing = 1, HorizontalAlignment = HorizontalAlignment.Right };
+        foreach (var (icon, label, value) in new[]
+        {
+            ("icon.status.storage", UI.T("Home.Stat.Storage", "Space used"), storage),
+            ("icon.media.image", UI.T("Home.Stat.Media", "Media"), media),
+            ("icon.profile.person", UI.T("Home.Stat.Profiles", "Profiles"), profiles),
+            ("icon.status.health", UI.T("Home.Stat.Condition", "Condition"), condition),
+        })
+        {
+            var text = Text($"{label}: {value}", "micro", 1);
+            rows.Children.Add(UI.H(4, new IconView(icon, 12, "onHeroPrimary"), text));
+        }
+        return rows;
+    }
+
     public static Border Region(UIElement content, double padding = 10) => new()
     {
         Child = content,

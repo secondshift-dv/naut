@@ -166,7 +166,7 @@ public sealed partial class CustomizationCenter
         }
         if (descriptor.Id == PresentationSlots.ProfileLayout)
         {
-            return ProfileLayoutOptionPreview(definition.PlanAs<ProfileLayoutPlan>().Layout);
+            return ProfileLayoutOptionPreview(definition.PlanAs<ProfileLayoutPlan>());
         }
         if (descriptor.Id == PresentationSlots.ProfileMediaLayout
             && _subject?.PreviewMediaCard is { } mediaCard)
@@ -230,7 +230,10 @@ public sealed partial class CustomizationCenter
             Height = 132,
             Background = ThemeRuntime.Current.Brush("canvas"),
         };
-        if (layout.Scene?.Background is { } background)
+        if (layout.Scene?.ViewportArtwork is { } artwork)
+            stage.Children.Add(new SkImageView { Source = ImageRef.FromPath(artwork, 480), PlaceholderToken = "transparent",
+                Transform = MediaTransformState.Default with { Fit = "stretch" } });
+        else if (layout.Scene?.Background is { } background)
             stage.Children.Add(BackdropView.Preview(background, 132, PresentationVisualPriority.VisiblePreview));
         var sample = _services.Root?.SampleCard(null);
         if (sample is null)
@@ -264,7 +267,8 @@ public sealed partial class CustomizationCenter
                 IsFavorite = index == 0 ? data.IsFavorite : index % 2 == 0,
             });
 
-            var slotHeight = layout.HeightPattern is { } pattern && layout.Scene?.CardSizing != "intrinsic"
+            var slotHeight = layout.Scene?.FixedSlot == true && layout.ItemAspect is { } fixedAspect ? 280 / fixedAspect
+                : layout.HeightPattern is { } pattern && layout.Scene?.CardSizing != "intrinsic"
                 ? 280 / pattern[index % pattern.Count] : layout.Scene?.CardSizing == "intrinsic" ? 280 / aspect : isSingleColumn ? 180 : isShelf ? 220 : 260;
             var slot = new Grid { Width = 280, Height = slotHeight };
             var inset = layout.Scene?.ItemInset ?? 0;
@@ -293,7 +297,14 @@ public sealed partial class CustomizationCenter
             if (ornament is not null && scene?.OverlayPlacement == "behind") slot.Children.Add(ornament);
             slot.Children.Add(visual);
             if (ornament is not null && scene?.OverlayPlacement != "behind") slot.Children.Add(ornament);
-            collection.Children.Add(slot);
+            if (scene?.ActionArtwork is not null)
+            {
+                var previewAction = GallerySurface.CreateCardAction(scene, () => { });
+                previewAction.IsHitTestVisible = false;
+                previewAction.IsTabStop = false;
+                collection.Children.Add(UI.V(0, slot, previewAction));
+            }
+            else collection.Children.Add(slot);
         }
 
         stage.Children.Add(new Viewbox { Width = 198, Height = 120, Stretch = Stretch.Uniform, Child = collection });
@@ -368,9 +379,31 @@ public sealed partial class CustomizationCenter
         return stage;
     }
 
-    private FrameworkElement ProfileLayoutOptionPreview(ProfileLayoutDefinition layout)
+    private FrameworkElement ProfileLayoutOptionPreview(ProfileLayoutPlan plan)
     {
         var theme = ThemeRuntime.Current;
+        var layout = plan.Layout;
+        if (plan.Paper is { } paper && plan.Surface is { } scene)
+        {
+            var paperStage = new Grid { Width = 1000, Background = theme.Brush(paper.Background), IsHitTestVisible = false };
+            theme.SetPaperScope(paperStage, paper);
+            FrameworkElement? Region(string id) => id switch
+            {
+                "banner" when plan.BannerArtwork is { } artwork => new ArtworkCompositionView(artwork,
+                    role => role == "artwork" ? new SkImageView { Source = _bannerSource, PlaceholderToken = "surface1" } : null),
+                "identity" => UI.V(4, UI.Text(_subject?.Detail.DisplayName ?? _launchRequest?.ProfileDisplayName ?? "Profile", "hero", "accent", 2),
+                    UI.Text(_subject?.Detail.CategoryName ?? string.Empty, "body", "textSecondary", 1)).Align(vertical: VerticalAlignment.Center),
+                "cover" => new SkImageView { Source = _coverSource, Width = 176, Height = 176, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+                "tags" => UI.Text(UI.T("Profile.Tags", "Tags"), "section-title").Margin(12),
+                "overview" => UI.Text(UI.T("Profile.Overview", "Overview"), "section-title").Margin(12),
+                "related" => UI.Text(UI.T("Profile.Related", "Related"), "section-title").Margin(12),
+                "media" => UI.Text(UI.T("Profile.Media", "Media"), "section-title").Margin(12),
+                "figure" => new Border { Background = theme.Brush("#FFEDE4EA"), Child = new IconView("icon.media.model", 60).Align(HorizontalAlignment.Center, VerticalAlignment.Center) },
+                _ => null,
+            };
+            paperStage.Children.Add(SurfaceComposer.Build(scene, Region, 1000));
+            return new Viewbox { Width = 210, Height = 150, Stretch = Stretch.Uniform, Child = paperStage };
+        }
         if (layout.BannerMode == ProfileLayoutBannerMode.Split)
         {
             return SplitProfileLayoutOptionPreview(layout, theme);

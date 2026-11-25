@@ -7,6 +7,7 @@ public enum MediaMetadataPlacement
     Below,
     Side,
     Hidden,
+    LiveOverlay,
 }
 
 public enum MediaFrameStyle
@@ -48,6 +49,7 @@ public sealed record MediaLayoutDefinition(
     {
         MediaMetadataPlacement.Side => Math.Max(150, MediaWidth / Math.Max(0.5, Aspect)),
         MediaMetadataPlacement.Below => (CardWidth / Math.Max(0.5, Aspect)) + 48,
+        MediaMetadataPlacement.LiveOverlay => (CardWidth / Math.Max(0.5, Aspect)) + 26,
         _ => CardWidth / Math.Max(0.5, Aspect),
     };
 }

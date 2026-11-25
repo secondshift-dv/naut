@@ -44,28 +44,42 @@ public sealed class ThemeRuntime
         var originalHeight = control.Height;
         var originalIconSize = control is Button { Content: IconView initialIcon } ? initialIcon.Width : double.NaN;
         var originalWeight = control.FontWeight;
+        var inputPaper = false;
         TrackControl(control, value =>
         {
             var skin = preview?.For(family) ?? ControlFamily(family);
+            SolidColorBrush B(string reference) => ScopedBrush(value, reference);
+            Brush F(ControlSkinPlan plan, string reference, bool pressed = false) =>
+                PaperFor(value) is not null ? B(reference) : ControlFill(plan, reference, pressed);
+
             value.CornerRadius = new CornerRadius(skin.Radius);
             value.BorderThickness = ControlEdge(skin);
-            value.FocusVisualPrimaryBrush = Brush(skin.Focus);
+            value.FocusVisualPrimaryBrush = B(skin.Focus);
             value.FocusVisualPrimaryThickness = new Thickness(Math.Max(2, skin.BorderWidth));
             foreach (var prefix in new[] { "Button", "ToggleButton", "TextControl", "ComboBox" })
             {
-                value.Resources[prefix + "BackgroundDisabled"] = Brush("surface2");
-                value.Resources[prefix + "ForegroundDisabled"] = Brush("textDisabled");
-                value.Resources[prefix + "BorderBrushDisabled"] = Brush("borderSubtle");
+                value.Resources[prefix + "BackgroundDisabled"] = B("surface2");
+                value.Resources[prefix + "ForegroundDisabled"] = B("textDisabled");
+                value.Resources[prefix + "BorderBrushDisabled"] = B("borderSubtle");
             }
             if (family == "input")
             {
+                if (PaperFor(value) is not null || inputPaper)
+                {
+                    value.Foreground = B("textPrimary");
+                    value.Resources["TextControlForeground"] = B("textPrimary");
+                    value.Resources["TextControlForegroundPointerOver"] = B("textPrimary");
+                    value.Resources["TextControlForegroundFocused"] = B("textPrimary");
+                    value.Resources["ComboBoxForeground"] = B("textPrimary");
+                    inputPaper = PaperFor(value) is not null;
+                }
                 foreach (var prefix in new[] { "TextControl", "ComboBox" })
                 {
-                    value.Resources[prefix + "Background"] = ControlFill(skin, skin.Fill);
-                    value.Resources[prefix + "BackgroundPointerOver"] = ControlFill(skin, skin.HoverFill);
-                    value.Resources[prefix + "BackgroundFocused"] = ControlFill(skin, skin.Fill);
-                    value.Resources[prefix + "BorderBrushFocused"] = Brush(skin.Focus);
-                    value.Resources[prefix + "BorderBrushPointerOver"] = Brush(skin.Focus);
+                    value.Resources[prefix + "Background"] = F(skin, skin.Fill);
+                    value.Resources[prefix + "BackgroundPointerOver"] = F(skin, skin.HoverFill);
+                    value.Resources[prefix + "BackgroundFocused"] = F(skin, skin.Fill);
+                    value.Resources[prefix + "BorderBrushFocused"] = B(skin.Focus);
+                    value.Resources[prefix + "BorderBrushPointerOver"] = B(skin.Focus);
                 }
             }
             if (!compact)
@@ -87,11 +101,11 @@ public sealed class ThemeRuntime
             }
             if (family == "slider")
             {
-                value.Resources["SliderTrackFill"] = ControlFill(skin, skin.Fill);
-                value.Resources["SliderThumbBackground"] = ControlFill(skin, "accent");
-                value.Resources["SliderThumbBackgroundPointerOver"] = ControlFill(skin, "accentHover");
-                value.Resources["SliderThumbBackgroundPressed"] = ControlFill(skin, "accentPressed", pressed: true);
-                value.Resources["SliderThumbBorderBrush"] = Brush(skin.Border);
+                value.Resources["SliderTrackFill"] = F(skin, skin.Fill);
+                value.Resources["SliderThumbBackground"] = F(skin, "accent");
+                value.Resources["SliderThumbBackgroundPointerOver"] = F(skin, "accentHover");
+                value.Resources["SliderThumbBackgroundPressed"] = F(skin, "accentPressed", pressed: true);
+                value.Resources["SliderThumbBorderBrush"] = B(skin.Border);
                 value.Resources["SliderThumbCornerRadius"] = new CornerRadius(skin.Radius);
                 foreach (var orientation in new[] { "Horizontal", "Vertical" })
                 {
@@ -113,36 +127,36 @@ public sealed class ThemeRuntime
                     ("ToggleButtonForegroundCheckedPointerOver", "textOnAccent"), ("ToggleButtonForegroundCheckedPressed", "textOnAccent"),
                     ("ToggleSwitchFillOff", skin.Fill), ("ToggleSwitchFillOffPointerOver", skin.HoverFill),
                     ("ToggleSwitchFillOffPressed", skin.PressedFill), ("ToggleSwitchStrokeOff", skin.Border),
-                }) value.Resources[key] = Brush(reference);
+                }) value.Resources[key] = B(reference);
                 foreach (var prefix in new[] { "ToggleButtonBackground", "ToggleSwitchFillOff", "ToggleSwitchFillOn" })
                 {
                     var on = prefix == "ToggleSwitchFillOn";
-                    value.Resources[prefix] = ControlFill(skin, on ? "accent" : skin.Fill);
-                    value.Resources[prefix + "PointerOver"] = ControlFill(skin, on ? "accentHover" : skin.HoverFill);
-                    value.Resources[prefix + "Pressed"] = ControlFill(skin, on ? "accentPressed" : skin.PressedFill, pressed: true);
+                    value.Resources[prefix] = F(skin, on ? "accent" : skin.Fill);
+                    value.Resources[prefix + "PointerOver"] = F(skin, on ? "accentHover" : skin.HoverFill);
+                    value.Resources[prefix + "Pressed"] = F(skin, on ? "accentPressed" : skin.PressedFill, pressed: true);
                 }
             }
             if (neutral && family is not ("slider" or "toggle" or "scrollbar"))
             {
-                value.Background = ControlFill(skin, skin.Fill);
-                value.BorderBrush = Brush(skin.Border);
+                value.Background = F(skin, skin.Fill);
+                value.BorderBrush = B(skin.Border);
             }
             if (value is Microsoft.UI.Xaml.Controls.Primitives.ButtonBase)
             {
                 var primary = kind == ButtonKind.Primary;
                 var danger = kind == ButtonKind.Destructive;
                 var ghost = kind == ButtonKind.Ghost;
-                value.Background = ghost ? Brush("transparent") : ControlFill(skin, primary ? "accent" : skin.Fill);
-                value.BorderBrush = Brush(primary ? "accent" : danger ? "danger" : ghost ? "transparent" : skin.Border);
-                value.Resources["ButtonBackground"] = ghost ? Brush("transparent") : ControlFill(skin, primary ? "accent" : skin.Fill);
-                value.Resources["ButtonBackgroundPointerOver"] = ControlFill(skin, primary ? "accentHover" : skin.HoverFill);
-                value.Resources["ButtonBackgroundPressed"] = ControlFill(skin, primary ? "accentPressed" : skin.PressedFill, pressed: true);
-                value.Resources["ButtonBorderBrush"] = Brush(primary ? "accent" : danger ? "danger" : ghost ? "transparent" : skin.Border);
-                value.Resources["ButtonForeground"] = Brush(primary ? "textOnAccent" : danger ? "textDanger" : "textPrimary");
+                value.Background = ghost ? B("transparent") : F(skin, primary ? "accent" : skin.Fill);
+                value.BorderBrush = B(primary ? "accent" : danger ? "danger" : ghost ? "transparent" : skin.Border);
+                value.Resources["ButtonBackground"] = ghost ? B("transparent") : F(skin, primary ? "accent" : skin.Fill);
+                value.Resources["ButtonBackgroundPointerOver"] = F(skin, primary ? "accentHover" : skin.HoverFill);
+                value.Resources["ButtonBackgroundPressed"] = F(skin, primary ? "accentPressed" : skin.PressedFill, pressed: true);
+                value.Resources["ButtonBorderBrush"] = B(primary ? "accent" : danger ? "danger" : ghost ? "transparent" : skin.Border);
+                value.Resources["ButtonForeground"] = B(primary ? "textOnAccent" : danger ? "textDanger" : "textPrimary");
                 value.Resources["ButtonForegroundPointerOver"] = value.Resources["ButtonForeground"];
                 value.Resources["ButtonForegroundPressed"] = value.Resources["ButtonForeground"];
-                value.Resources["ButtonBorderBrushPointerOver"] = Brush(primary ? "accentHover" : danger ? "danger" : skin.Focus);
-                value.Resources["ButtonBorderBrushPressed"] = Brush(primary ? "accentPressed" : danger ? "danger" : skin.Focus);
+                value.Resources["ButtonBorderBrushPointerOver"] = B(primary ? "accentHover" : danger ? "danger" : skin.Focus);
+                value.Resources["ButtonBorderBrushPressed"] = B(primary ? "accentPressed" : danger ? "danger" : skin.Focus);
             }
         });
     }
@@ -299,6 +313,69 @@ public sealed class ThemeRuntime
 
     // ---------------------------------------------------------------- lookups
 
+    private readonly ConditionalWeakTable<FrameworkElement, ProfilePaperPlan> _paperScopes = new();
+
+    private ProfilePaperPlan? PaperFor(DependencyObject element)
+    {
+        for (DependencyObject? current = element; current is not null; current = VisualTreeHelper.GetParent(current))
+            if (current is FrameworkElement root && _paperScopes.TryGetValue(root, out var paper)) return paper;
+        return null;
+    }
+
+    public void SetPaperScope(FrameworkElement root, ProfilePaperPlan? paper)
+    {
+        _paperScopes.Remove(root);
+        if (paper is not null) _paperScopes.Add(root, paper);
+        Refresh(root);
+        void Refresh(DependencyObject element)
+        {
+            if (element is TextBlock text && _typed.TryGetValue(text, out var type)) ApplyRegisteredType(text, type);
+            if (element is Control control && _controls.TryGetValue(control, out var controlApply)) controlApply(control);
+            if (element is FrameworkElement visual && _themeElements.TryGetValue(visual, out var themeApply)) themeApply(visual);
+            if (element is IconView icon) icon.Invalidate();
+            for (var i = 0; i < VisualTreeHelper.GetChildrenCount(element); i++)
+                Refresh(VisualTreeHelper.GetChild(element, i));
+        }
+    }
+
+    private static string PaperReference(ProfilePaperPlan paper, string reference)
+    {
+        var token = reference.StartsWith("token:", StringComparison.Ordinal) ? reference[6..] : reference;
+        return token switch
+        {
+            "canvas" or "surface1" => paper.Background,
+            "surface2" or "surface3" or "surfaceElevated" => "#FFF2E8EE",
+            "surfaceOverlay" or "surfaceSelected" or "surfaceHover" or "surfacePressed" => "#FFF1D7E5",
+            "textPrimary" or "textInverse" => paper.Ink,
+            "textSecondary" or "textMuted" => "#FF604D65",
+            "textDisabled" => "#FF807484",
+            "textOnAccent" => "#FFFFFFFF",
+            "accent" or "accentHover" or "accentPressed" or "accentSecondary" or "textLink" or "focus" or "borderSelected" or "borderInteractive" => paper.Accent,
+            "accentSoft" or "selection" or "selectionHover" => "#FFF1D7E5",
+            "borderDefault" or "borderSubtle" or "borderStrong" => "#FFCCBCCB",
+            "danger" or "dangerHover" or "textDanger" => "#FFBB1957",
+            "warning" => "#FFB77900",
+            "success" => "#FF23794C",
+            "info" => "#FF256478",
+            _ => reference,
+        };
+    }
+
+    public SolidColorBrush ScopedBrush(DependencyObject element, string reference) =>
+        Brush(PaperFor(element) is { } paper ? PaperReference(paper, reference) : reference);
+
+    public ArgbColor ScopedArgb(DependencyObject element, string reference)
+    {
+        var mapped = PaperFor(element) is { } paper ? PaperReference(paper, reference) : reference;
+        return Tokens.Resolve(mapped.StartsWith('#') || mapped.StartsWith("token:", StringComparison.Ordinal) ? mapped : "token:" + mapped);
+    }
+
+    public Brush ScopedControlFill(DependencyObject element, ControlSkinPlan skin, string reference) =>
+        PaperFor(element) is not null ? ScopedBrush(element, reference) : ControlFill(skin, reference);
+
+    public Brush ScopedSurfaceBrush(DependencyObject element, bool raised) =>
+        PaperFor(element) is not null ? ScopedBrush(element, "canvas") : SurfaceBrush(raised);
+
     public SolidColorBrush Brush(string token)
     {
         if (!_brushes.TryGetValue(token, out var brush))
@@ -362,7 +439,7 @@ public sealed class ThemeRuntime
     private void OnTrackedTextLoaded(object sender, RoutedEventArgs args)
     {
         if (sender is TextBlock block && _typed.TryGetValue(block, out var registration)
-            && registration.AppliedRevision != _appearanceRevision)
+            && (registration.AppliedRevision != _appearanceRevision || registration.Paper != PaperFor(block)))
             ApplyRegisteredType(block, registration);
     }
 
@@ -374,7 +451,8 @@ public sealed class ThemeRuntime
         block.LineHeight = style.LineHeight;
         block.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
         block.FontWeight = new Windows.UI.Text.FontWeight((ushort)style.Weight);
-        block.Foreground = Brush(registration.Color ?? style.ColorRole);
+        block.Foreground = ScopedBrush(block, registration.Color ?? style.ColorRole);
+        registration.Paper = PaperFor(block);
         registration.AppliedRevision = _appearanceRevision;
         if (style.Trim)
         {
@@ -691,5 +769,6 @@ public sealed class ThemeRuntime
     private sealed record TypeRegistration(string Role, string? Color)
     {
         public int AppliedRevision { get; set; } = -1;
+        public ProfilePaperPlan? Paper { get; set; }
     }
 }

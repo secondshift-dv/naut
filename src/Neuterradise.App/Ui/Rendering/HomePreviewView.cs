@@ -39,6 +39,15 @@ public sealed class HomePreviewView : Grid
             IsSurfaceActive = !compact,
             AmbientImagePath = data?.Banner?.Path ?? data?.Cover?.Path,
         };
+        if (layout.ViewportStage && layout.Surface is { } stage)
+        {
+            var view = new Grid { Width = 1000, Height = 1000 / stage.CanvasAspect };
+            view.Children.Add(backdrop);
+            view.Children.Add(SurfaceComposer.Build(stage, id => id == "featured" ? BuildHero()
+                : BuildRail(layout.Rails.FirstOrDefault(r => r.Id == id) ?? new HomeRailPlan(id, true, "compact", 3)), 1000));
+            Children.Add(new Viewbox { Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform, Child = view });
+            return;
+        }
         Children.Add(backdrop);
 
         if (layout.Surface is { } surface)
@@ -227,6 +236,20 @@ public sealed class HomePreviewView : Grid
 
     private FrameworkElement BuildIdentity(CardData data, bool onArtwork)
     {
+        if (_spotlight.Composition == "marquee")
+        {
+            var content = UI.Grid("*", "auto,*,auto");
+            content.Children.Add(new IconView("icon.action.back", 14, "textInverse").At(0, 0));
+            content.Children.Add(UI.H(6, UI.Text(data.Name, "control", "textInverse", 1),
+                UI.Text(data.TextFor(SemanticSlots.ProfileMediaCount), "micro", "textInverse", 1),
+                UI.Text(UI.T("Home.OpenProfile", "Open Profile"), "micro", "textInverse", 1))
+                .Align(HorizontalAlignment.Center, VerticalAlignment.Center).At(0, 1));
+            content.Children.Add(new IconView("icon.action.back", 14, "textInverse")
+            {
+                RenderTransform = new Microsoft.UI.Xaml.Media.ScaleTransform { ScaleX = -1, CenterX = 7 },
+            }.At(0, 2));
+            return content;
+        }
         var name = UI.Text(data.Name, _compact ? "micro" : _spotlight.Composition == "editorial" ? "section-title" : "body-strong",
             onArtwork ? "onHeroPrimary" : "textPrimary", 2);
         var meta = UI.Text(
@@ -288,6 +311,7 @@ public sealed class HomePreviewView : Grid
 
     private FrameworkElement BuildRail(HomeRailPlan rail)
     {
+        if (rail.Style == "hud") return HomeReadability.Hud("?", "?", "?", "?");
         var title = rail.Id switch
         {
             "recent" => UI.T("Home.Rail.Recent", "Continue"),
@@ -312,6 +336,7 @@ public sealed class HomePreviewView : Grid
                     : BuildUtilityTile(rail, index));
         }
 
+        if (rail.Style == "cover-only") return row;
         return UI.V(
             _compact ? 1 : 3,
             HomeReadability.Heading(title, "micro", _compact ? 4 : 8),
@@ -320,7 +345,7 @@ public sealed class HomePreviewView : Grid
     private FrameworkElement BuildProfileTile(HomeRailPlan rail, CardData data)
     {
         var width = rail.Style is "strip" or "compact" ? 156d : 98d;
-        var height = rail.Style is "strip" or "compact" ? 72d : 138d;
+        var height = rail.Style == "cover-only" ? width : rail.Style is "strip" or "compact" ? 72d : 138d;
         var tile = new HomeProfileTile(rail.Style, width, height);
         tile.Bind(data.ProfileId, data.Name, data.Cover?.Path, data.TextFor(SemanticSlots.ProfileMediaCount), data.IsFavorite);
         if (data.Frame is { } frame) tile.Apply(frame, data.Appearance, data.CoverTransform);

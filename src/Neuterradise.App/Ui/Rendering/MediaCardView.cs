@@ -35,6 +35,16 @@ public sealed class MediaCardView : Grid, IDisposable
     private readonly TextBlock _typeText = UI.Text(string.Empty, "caption", "onMediaSecondary");
     private readonly Border _typeBadge;
     private readonly Button _favorite;
+    private readonly Button _inspect;
+    private readonly Button _open;
+    private readonly StackPanel _actions;
+    private readonly StackPanel _controlRail;
+    private readonly Grid _liveFooter = new();
+    private readonly TextBlock _liveTitle = UI.Text(null, "caption", "onMediaPrimary", 1);
+    private readonly StackPanel _liveFavoriteRail = UI.H(2);
+    private readonly IconView _liveHeart = new("icon.profile.favorite", 14, "onMediaPrimary");
+    private readonly LiveHeartOverlay _hearts = new() { IsHitTestVisible = false, Visibility = Visibility.Collapsed };
+    private bool _live;
     private readonly ScaleTransform _scale = new();
     private readonly Action<MediaGridCardViewModel>? _onFavorite;
     private readonly Action<MediaGridCardViewModel>? _onOpen;
@@ -84,6 +94,7 @@ public sealed class MediaCardView : Grid, IDisposable
             Visibility = Visibility.Collapsed,
         };
         _mediaHost.Children.Add(_innerFrame);
+        _mediaHost.Children.Add(_hearts);
 
         _metadataLines =
         [
@@ -111,7 +122,7 @@ public sealed class MediaCardView : Grid, IDisposable
         };
         _mediaHost.Children.Add(_favorite);
 
-        var inspect = UI.IconButton("icon.status.info", UI.T("Inspector.Title", "Media info"), null, 28);
+        var inspect = _inspect = UI.IconButton("icon.status.info", UI.T("Inspector.Title", "Media info"), null, 28);
         inspect.IsHitTestVisible = onInspect is not null;
         inspect.PointerPressed += (_, e) => e.Handled = true;
         inspect.Click += (_, _) =>
@@ -122,7 +133,7 @@ public sealed class MediaCardView : Grid, IDisposable
             }
         };
 
-        var open = UI.IconButton("icon.action.open", UI.T("Inspector.Open", "Open with default app"), null, 28);
+        var open = _open = UI.IconButton("icon.action.open", UI.T("Inspector.Open", "Open with default app"), null, 28);
         open.IsHitTestVisible = onOpen is not null;
         open.PointerPressed += (_, e) => e.Handled = true;
         open.Click += (_, _) =>
@@ -134,11 +145,11 @@ public sealed class MediaCardView : Grid, IDisposable
             }
         };
 
-        var actions = UI.H(4, inspect, open);
+        var actions = _actions = UI.H(4, inspect, open);
         actions.HorizontalAlignment = HorizontalAlignment.Right;
         actions.VerticalAlignment = VerticalAlignment.Top;
         actions.Visibility = onInspect is null && onOpen is null ? Visibility.Collapsed : Visibility.Visible;
-        var controlRail = UI.V(4, actions, _badges);
+        var controlRail = _controlRail = UI.V(4, actions, _badges);
         controlRail.HorizontalAlignment = HorizontalAlignment.Right;
         controlRail.VerticalAlignment = VerticalAlignment.Top;
         controlRail.Margin = new Thickness(6);
@@ -153,6 +164,24 @@ public sealed class MediaCardView : Grid, IDisposable
                 actionIcon.ColorToken = "onMediaPrimary";
             }
         }
+
+        _liveFavoriteRail.HorizontalAlignment = HorizontalAlignment.Right;
+        _liveFavoriteRail.VerticalAlignment = VerticalAlignment.Top;
+        _liveFavoriteRail.Margin = new Thickness(4);
+        _liveFavoriteRail.Visibility = Visibility.Collapsed;
+        _liveHeart.VerticalAlignment = VerticalAlignment.Center;
+        _liveFavoriteRail.Children.Add(_liveHeart);
+        _mediaHost.Children.Add(_liveFavoriteRail);
+        _liveFooter.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        _liveFooter.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _liveFooter.Height = 26;
+        _liveFooter.Background = ThemeRuntime.Current.Brush("#FF000000");
+        _liveFooter.Visibility = Visibility.Collapsed;
+        _liveTitle.Margin = new Thickness(6, 0, 0, 0);
+        _liveTitle.VerticalAlignment = VerticalAlignment.Center;
+        _liveFooter.Children.Add(_liveTitle);
+        Children.Add(_liveFooter.At(1, 0));
+        Grid.SetColumnSpan(_liveFooter, 2);
 
         _frame = new Border
         {
@@ -190,19 +219,20 @@ public sealed class MediaCardView : Grid, IDisposable
         Grid.SetColumn(_frame, 0);
         Grid.SetColumnSpan(_frame, side ? 1 : 2);
         ConfigureMetadata(layout.MetadataPlacement);
-        _selectionOutline.CornerRadius = new CornerRadius(Math.Max(0, layout.FrameRadius - layout.FrameThickness));
+        ConfigureLiveChrome(layout.MetadataPlacement == MediaMetadataPlacement.LiveOverlay);
+        _selectionOutline.CornerRadius = new CornerRadius(_live ? 0 : Math.Max(0, layout.FrameRadius - layout.FrameThickness));
 
         var below = layout.MetadataPlacement == MediaMetadataPlacement.Below;
-        _frame.CornerRadius = below
+        _frame.CornerRadius = _live ? new CornerRadius(0) : below
             ? new CornerRadius(layout.FrameRadius, layout.FrameRadius, 0, 0)
             : new CornerRadius(layout.FrameRadius);
         _metadata.CornerRadius = below
             ? new CornerRadius(0, 0, layout.FrameRadius, layout.FrameRadius)
             : new CornerRadius(0);
-        _image.CornerRadiusValue = Math.Max(0, layout.FrameRadius - layout.FrameThickness);
+        _image.CornerRadiusValue = _live ? 0 : Math.Max(0, layout.FrameRadius - layout.FrameThickness);
         _innerFrame.CornerRadius = new CornerRadius(Math.Max(0, layout.FrameRadius - 4));
 
-        var layered = layout.FrameStyle is MediaFrameStyle.Double or MediaFrameStyle.Gallery or MediaFrameStyle.Luminous or MediaFrameStyle.Neon;
+        var layered = !_live && layout.FrameStyle is (MediaFrameStyle.Double or MediaFrameStyle.Gallery or MediaFrameStyle.Luminous or MediaFrameStyle.Neon);
         _innerFrame.Visibility = layered ? Visibility.Visible : Visibility.Collapsed;
         if (layered)
         {
@@ -221,9 +251,49 @@ public sealed class MediaCardView : Grid, IDisposable
         UpdateVisual();
     }
 
+    private void ConfigureLiveChrome(bool live)
+    {
+        if (_live == live) return;
+        _live = live;
+        _hearts.Visibility = _liveFooter.Visibility = _liveFavoriteRail.Visibility = live ? Visibility.Visible : Visibility.Collapsed;
+        if (live)
+        {
+            _actions.Children.Remove(_inspect);
+            _actions.Children.Remove(_open);
+            _mediaHost.Children.Remove(_favorite);
+            _liveFavoriteRail.Children.Add(_favorite);
+            _liveFooter.Children.Add(_inspect.At(0, 1));
+            _mediaHost.Children.Add(_open);
+            _open.HorizontalAlignment = HorizontalAlignment.Left;
+            _open.VerticalAlignment = VerticalAlignment.Top;
+            _open.Margin = new Thickness(4);
+            _favorite.Margin = new Thickness(0);
+            _inspect.Width = _inspect.Height = 24;
+            _inspect.Margin = new Thickness(0);
+            _inspect.VerticalAlignment = VerticalAlignment.Center;
+            _actions.Visibility = Visibility.Collapsed;
+            _controlRail.Margin = new Thickness(4, 34, 4, 0);
+        }
+        else
+        {
+            _liveFavoriteRail.Children.Remove(_favorite);
+            _liveFooter.Children.Remove(_inspect);
+            _mediaHost.Children.Remove(_open);
+            _actions.Children.Add(_inspect);
+            _actions.Children.Add(_open);
+            _mediaHost.Children.Insert(_mediaHost.Children.IndexOf(_selectionOutline), _favorite);
+            _favorite.Margin = new Thickness(6);
+            _open.Margin = new Thickness(0);
+            _inspect.Width = _inspect.Height = 28;
+            _actions.Visibility = _onInspect is null && _onOpen is null ? Visibility.Collapsed : Visibility.Visible;
+            _controlRail.Margin = new Thickness(6);
+        }
+    }
+
     private void ConfigureMetadata(MediaMetadataPlacement placement)
     {
-        var overlay = placement is MediaMetadataPlacement.HoverOverlay or MediaMetadataPlacement.PersistentOverlay;
+        var live = placement == MediaMetadataPlacement.LiveOverlay;
+        var overlay = live || placement is MediaMetadataPlacement.HoverOverlay or MediaMetadataPlacement.PersistentOverlay;
         if (_metadataPlacement != placement)
         {
             // Reparent only the single metadata subtree when the presentation placement changes.
@@ -231,7 +301,7 @@ public sealed class MediaCardView : Grid, IDisposable
             Children.Remove(_metadata);
             _metadataPlacement = placement;
             if (overlay)
-                _mediaHost.Children.Insert(_mediaHost.Children.IndexOf(_innerFrame) + 1, _metadata);
+                _mediaHost.Children.Insert(_mediaHost.Children.IndexOf(_hearts) + 1, _metadata);
             else if (placement != MediaMetadataPlacement.Hidden)
                 Children.Add(_metadata);
             Grid.SetRow(_metadata, placement == MediaMetadataPlacement.Below ? 1 : 0);
@@ -241,15 +311,16 @@ public sealed class MediaCardView : Grid, IDisposable
             _metadata.VerticalAlignment = overlay ? VerticalAlignment.Bottom : VerticalAlignment.Stretch;
             _metadata.Padding = placement switch
             {
+                MediaMetadataPlacement.LiveOverlay => new Thickness(6, 0, 25, 6),
                 MediaMetadataPlacement.Side => new Thickness(10, 8, 8, 8),
                 MediaMetadataPlacement.Below => new Thickness(8, 5, 8, 6),
                 _ => new Thickness(8, 6, 8, 6),
             };
             for (var i = 0; i < _metadataLines.Length; i++)
                 ThemeRuntime.Current.ApplyType(_metadataLines[i], i == 0 ? "caption" : "micro",
-                    overlay ? i == 0 ? "onMediaPrimary" : "onMediaSecondary" : i == 0 ? "textSecondary" : "textMuted");
+                    live ? "onMediaPrimary" : overlay ? i == 0 ? "onMediaPrimary" : "onMediaSecondary" : i == 0 ? "textSecondary" : "textMuted");
         }
-        _metadata.Background = ThemeRuntime.Current.Brush(overlay ? "mediaOverlay" : "surface2");
+        _metadata.Background = ThemeRuntime.Current.Brush(live ? "transparent" : overlay ? "mediaOverlay" : "surface2");
         _metadata.Opacity = placement == MediaMetadataPlacement.HoverOverlay ? 0 : 1;
     }
 
@@ -298,7 +369,7 @@ public sealed class MediaCardView : Grid, IDisposable
             : MediaTransformState.Default;
         _image.Source = card.ThumbnailSource ?? ImageRef.FromPath(card.ThumbnailPath, 360);
 
-        var thickness = _layout.FrameStyle == MediaFrameStyle.None ? 0 : _layout.FrameThickness;
+        var thickness = _live || _layout.FrameStyle == MediaFrameStyle.None ? 0 : _layout.FrameThickness;
         _frame.BorderBrush = theme.Brush(_layout.FrameColor.Replace("token:", string.Empty, StringComparison.Ordinal));
         _frame.BorderThickness = new Thickness(thickness);
         _metadata.BorderBrush = _frame.BorderBrush;
@@ -318,7 +389,7 @@ public sealed class MediaCardView : Grid, IDisposable
         _placeholder.Visibility = card.IsModel && card.ThumbnailSource is null && string.IsNullOrWhiteSpace(card.ThumbnailPath)
             ? Visibility.Visible : Visibility.Collapsed;
         _typeText.Text = MediaSurfaceText.Type(card.MediaType);
-        _typeBadge.Visibility = _layout.ShowTypeBadge && !card.IsImage
+        _typeBadge.Visibility = !_live && _layout.ShowTypeBadge && !card.IsImage
             && _layout.MetadataPlacement is not (MediaMetadataPlacement.HoverOverlay or MediaMetadataPlacement.PersistentOverlay)
             ? Visibility.Visible : Visibility.Collapsed;
 
@@ -328,6 +399,11 @@ public sealed class MediaCardView : Grid, IDisposable
             icon.Selected = card.IsFavorite;
         }
         _favorite.Opacity = card.IsFavorite ? 1 : 0.72;
+        if (_live)
+        {
+            _liveHeart.Filled = card.IsFavorite;
+            _liveHeart.ColorToken = card.IsFavorite ? "#FFFF729B" : "onMediaSecondary";
+        }
         var favoriteLabel = card.IsFavorite
             ? UI.T("Media.Favorite.Remove", "Remove from favorites")
             : UI.T("Media.Favorite.Add", "Mark as favorite");
@@ -338,6 +414,23 @@ public sealed class MediaCardView : Grid, IDisposable
     private void UpdateMetadata(MediaGridCardViewModel card)
     {
         var lines = _metadataLines;
+        if (_live)
+        {
+            _liveTitle.Text = card.DisplayFileName ?? string.Empty;
+            _liveTitle.Tip(_liveTitle.Text);
+            var details = new List<string>(3);
+            if (_layout.MetadataFields.Contains("dimensions") && card.PixelWidth is > 0 && card.PixelHeight is > 0)
+                details.Add($"{card.PixelWidth} \u00D7 {card.PixelHeight}");
+            if (_layout.MetadataFields.Contains("duration") && card.IsVideo && !string.IsNullOrWhiteSpace(card.FormattedDuration))
+                details.Add(card.FormattedDuration);
+            if (_layout.MetadataFields.Contains("type")) details.Add(MediaSurfaceText.Type(card.MediaType));
+            for (var i = 0; i < lines.Length; i++)
+            {
+                lines[i].Text = i < details.Count ? details[i] : string.Empty;
+                lines[i].Visibility = i < details.Count ? Visibility.Visible : Visibility.Collapsed;
+            }
+            return;
+        }
 
         lines[0].Text = _layout.MetadataFields.Contains("name")
             ? card.DisplayFileName ?? string.Empty

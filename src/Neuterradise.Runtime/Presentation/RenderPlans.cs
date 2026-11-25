@@ -50,7 +50,10 @@ public sealed record MaterialSpec(
         "token:accent", "token:accentSecondary", []);
 }
 
-public sealed record ThemePlan(ThemeDefinition Theme, MaterialSpec Material, string? ArtworkPath = null, string? ArtworkIdentity = null);
+public sealed record InspectorPhonePlan(string? BrandArtwork, string Bezel, string Rim);
+
+public sealed record ThemePlan(ThemeDefinition Theme, MaterialSpec Material, string? ArtworkPath = null, string? ArtworkIdentity = null,
+    string? ImportDropzoneArtwork = null, InspectorPhonePlan? InspectorPhone = null);
 
 public sealed record TypeStyle(string FontRole, double Size, int Weight, double LineHeight, string ColorRole, bool Trim, bool Wrap);
 
@@ -128,7 +131,10 @@ public sealed record HomeLayoutPlan(
     double HeroMinHeight,
     double HeroMaxHeight,
     IReadOnlyList<HomeRailPlan> Rails,
-    SurfaceNode? Surface = null);
+    SurfaceNode? Surface = null)
+{
+    public bool ViewportStage { get; init; }
+}
 
 public sealed record ArtworkRotation(double Seconds, double PivotX, double PivotY, bool Clockwise);
 public sealed record ArtworkPlacement(double X, double Y, double Width, double Height,
@@ -206,7 +212,10 @@ public sealed record GalleryLayoutPlan(
 
 public sealed record GalleryScenePlan(BackdropPlan? Background, BackdropPlan? Foreground,
     string? ItemOverlay, double ItemInset, string CardSizing,
-    double CardRotation = 0, double CardSkew = 0, string OverlayPlacement = "front")
+    double CardRotation = 0, double CardSkew = 0, string OverlayPlacement = "front",
+    bool FixedSlot = false, int CompactColumns = 0, string? ViewportArtwork = null,
+    double HeaderSpace = 0, string? ActionArtwork = null, string ActionText = "#FFFF68C8",
+    string ActionHoverText = "#FFFFC5EA")
 {
     public (double Width, double Height) FitCard(double width, double height, double aspect)
     {
@@ -226,7 +235,9 @@ public sealed record GalleryScenePlan(BackdropPlan? Background, BackdropPlan? Fo
     }
 }
 
-public sealed record ProfileLayoutPlan(ProfileLayoutDefinition Layout, SurfaceNode? Surface = null, ArtworkPlan? BannerArtwork = null);
+public sealed record ProfilePaperPlan(string Background, string Ink, string Accent);
+public sealed record ProfileLayoutPlan(ProfileLayoutDefinition Layout, SurfaceNode? Surface = null, ArtworkPlan? BannerArtwork = null,
+    ProfilePaperPlan? Paper = null);
 
 public sealed record FramePlan(CoverFrameDefinition Frame, string? OverlayAssetPath, double? CoverInsetFraction = null, string? OverlayAssetIdentity = null);
 
@@ -252,13 +263,17 @@ public sealed record NodeLayout(
     int RowSpan = 1,
     int ColumnSpan = 1,
     double Opacity = 1,
-    string? VisibleWhen = null);
+    string? VisibleWhen = null, bool StretchHeight = false, ArtworkPlacement? CanvasPlacement = null);
 
 /// <summary>
 /// Approved declarative primitives (document 01 §14). Built-in cards are written in exactly this
 /// language, so a future layout designer can emit definitions the renderer already understands.
 /// </summary>
 public abstract record CompositionNode(NodeLayout Layout);
+
+public sealed record CardCanvasNode(NodeLayout Layout, IReadOnlyList<CompositionNode> Children) : CompositionNode(Layout);
+
+public sealed record CardAssetNode(NodeLayout Layout, string? AssetPath, bool Foreground) : CompositionNode(Layout);
 
 public sealed record StackNode(NodeLayout Layout, string Orientation, double Spacing, double Padding, string? Background, string? CornerRadius, IReadOnlyList<CompositionNode> Children) : CompositionNode(Layout);
 
@@ -287,14 +302,15 @@ public sealed record CardPlan(
     string Hover,
     string FrameMode,
     string? LegacyVariant,
-    CompositionNode Root)
+    CompositionNode Root, CompositionNode? HoverRoot = null)
 {
-    public bool UsesBanner => ArtSource is "banner" or "cover-over-banner";
+    public bool UsesBanner => HoverRoot is not null || ArtSource is "banner" or "cover-over-banner";
 
-    public int NodeCount => Count(Root);
+    public int NodeCount => Count(Root) + (HoverRoot is null ? 0 : Count(HoverRoot));
 
     private static int Count(CompositionNode node) => 1 + node switch
     {
+        CardCanvasNode canvas => canvas.Children.Sum(Count),
         StackNode stack => stack.Children.Sum(Count),
         GridNode grid => grid.Children.Sum(Count),
         OverlayNode overlay => overlay.Children.Sum(Count),

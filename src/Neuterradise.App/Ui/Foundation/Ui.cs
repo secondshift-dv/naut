@@ -414,6 +414,41 @@ public static class UI
         return button;
     }
 
+    public static void StyleOverlayControl(Control control)
+    {
+        ThemeRuntime.Current.TrackControl(control, value =>
+        {
+            var theme = ThemeRuntime.Current;
+            var fill = theme.Brush("#44110A22");
+            var hover = theme.Brush("#663C1539");
+            var ink = theme.Brush("#FFF8EFFB");
+            var edge = theme.Brush("#557C668B");
+            var accent = theme.Brush("#FFFF68C8");
+            value.Background = fill;
+            value.Foreground = ink;
+            value.BorderBrush = edge;
+            value.BorderThickness = new Thickness(1);
+            value.CornerRadius = new CornerRadius(8);
+            value.FocusVisualPrimaryBrush = accent;
+            foreach (var prefix in new[] { "Button", "ToggleButton", "TextControl", "ComboBox" })
+            {
+                value.Resources[prefix + "Background"] = fill;
+                value.Resources[prefix + "BackgroundPointerOver"] = hover;
+                value.Resources[prefix + "BackgroundPressed"] = hover;
+                value.Resources[prefix + "BackgroundFocused"] = fill;
+                value.Resources[prefix + "Foreground"] = ink;
+                value.Resources[prefix + "ForegroundPointerOver"] = ink;
+                value.Resources[prefix + "ForegroundPressed"] = ink;
+                value.Resources[prefix + "ForegroundFocused"] = ink;
+                value.Resources[prefix + "BorderBrush"] = edge;
+                value.Resources[prefix + "BorderBrushPointerOver"] = accent;
+                value.Resources[prefix + "BorderBrushFocused"] = accent;
+            }
+            value.Resources["ToggleButtonBackgroundChecked"] = theme.Brush("#993C1539");
+            value.Resources["ToggleButtonForegroundChecked"] = accent;
+        });
+    }
+
     public static FrameworkElement DecoratedControl(Control control)
     {
         ThemeRuntime.Current.TrackNativeControls(control);
@@ -724,8 +759,8 @@ public static class UI
             if (radius is null) surface.CornerRadius = new CornerRadius(ThemeRuntime.Current.Tokens.Number("radiusCard", 12));
             if (material is Material.Grounded or Material.Raised)
             {
-                surface.Background = ThemeRuntime.Current.SurfaceBrush(material == Material.Raised);
-                surface.BorderBrush = ThemeRuntime.Current.Brush("borderSubtle");
+                surface.Background = ThemeRuntime.Current.ScopedSurfaceBrush(surface, material == Material.Raised);
+                surface.BorderBrush = ThemeRuntime.Current.ScopedBrush(surface, "borderSubtle");
             }
         });
 
@@ -841,8 +876,8 @@ public static class UI
                 value.BorderThickness = ThemeRuntime.ControlEdge(skin);
                 if (!selected)
                 {
-                    value.Background = ThemeRuntime.Current.ControlFill(skin, skin.Fill);
-                    value.BorderBrush = ThemeRuntime.Current.Brush(skin.Border);
+                    value.Background = ThemeRuntime.Current.ScopedControlFill(value, skin, skin.Fill);
+                    value.BorderBrush = ThemeRuntime.Current.ScopedBrush(value, skin.Border);
                 }
             }
         }

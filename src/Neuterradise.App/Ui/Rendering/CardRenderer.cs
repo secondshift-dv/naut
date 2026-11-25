@@ -28,6 +28,8 @@ public sealed record CardData(
     FramePlan? Frame)
 {
     public IReadOnlyList<ProfileTagAssignment> AssignedTags { get; init; } = [];
+    public ProfileAppearanceOverrides? PresentationAppearance { get; init; }
+    public string? BannerHoverPath { get; init; }
     public bool Has(string slot) => slot switch
     {
         SemanticSlots.ProfileCategory => !string.IsNullOrWhiteSpace(Category),
@@ -70,6 +72,12 @@ public sealed class CardVisual : Grid
     private readonly ScaleTransform _scale = new() { ScaleX = 1, ScaleY = 1 };
     private readonly Grid _content = new();
     private bool _buildingArtBase;
+    private bool _buildingHover;
+    private Grid? _hoverContent;
+    private Grid? _restContent;
+    private SkImageView? _hoverPoster;
+    private PrimaryBannerEffect? _hoverPrimaryEffect;
+    private EffectView? _hoverSceneEffect;
     private Grid? _bannerMediaHost;
     private bool _selected;
     private bool _hovered;
@@ -89,6 +97,11 @@ public sealed class CardVisual : Grid
                 (byte)Math.Round(color.A * theme.Tokens.Number("cardSurfaceOpacity", 1)), color.R, color.G, color.B));
             card.BorderThickness = new Thickness(theme.Tokens.Number("cardBorderThickness", 1));
             card.CornerRadius = new CornerRadius(theme.Tokens.Number("radiusCard", 12));
+            if (Plan.HoverRoot is not null)
+            {
+                card.Background = theme.Brush("transparent");
+                card.BorderThickness = new Thickness(0);
+            }
             card.PaintOutline();
             if (card.Children.FirstOrDefault() is Border clip) clip.CornerRadius = card.CornerRadius;
         });
@@ -99,10 +112,21 @@ public sealed class CardVisual : Grid
         artBase.IsHitTestVisible = false;
         _buildingArtBase = false;
         _effect = PresentationEffects.View(PresentationSlots.CardEffect, () => new PresentationContext(ProfileId: Data?.ProfileId), this, previewEffect);
-        _content.Children.Add(artBase);
-        _content.Children.Add(_effect);
-        _content.Children.Add(Build(Plan.Root));
+        var rest = Plan.HoverRoot is null ? _content : (_restContent = new Grid());
+        rest.Children.Add(artBase);
+        rest.Children.Add(_effect);
+        rest.Children.Add(Build(Plan.Root));
+        if (_restContent is not null) _content.Children.Add(_restContent);
+        if (Plan.HoverRoot is { } hoverRoot)
+        {
+            _buildingHover = true;
+            _hoverContent = new Grid { Visibility = Visibility.Collapsed, IsHitTestVisible = false };
+            _hoverContent.Children.Add(Build(hoverRoot));
+            _buildingHover = false;
+            _content.Children.Add(_hoverContent);
+        }
         Children.Add(new Border { CornerRadius = CornerRadius, Child = _content });
+        Unloaded += (_, _) => ResetHover();
 
         PointerEntered += (_, _) => SetHover(true);
         PointerExited += (_, _) => SetHover(false);
@@ -131,6 +155,7 @@ public sealed class CardVisual : Grid
 
     public void Bind(CardData data)
     {
+        if (Data?.ProfileId != data.ProfileId) ResetHover();
         Data = data;
         _effect.Refresh();
         foreach (var binder in _binders)
@@ -142,15 +167,47 @@ public sealed class CardVisual : Grid
         {
             element.Visibility = data.Has(slot) ? Visibility.Visible : Visibility.Collapsed;
         }
+        if (_hovered && _hoverContent is not null) UpdateHoverMedia();
     }
 
     private void PaintOutline()
     {
-        BorderBrush = ThemeRuntime.Current.Brush(_selected ? "borderSelected" : _hovered ? "borderInteractive" : "borderSubtle");
+        BorderBrush = ThemeRuntime.Current.Brush(Plan.HoverRoot is not null ? "transparent" :
+            _selected ? "borderSelected" : _hovered ? "borderInteractive" : "borderSubtle");
+    }
+
+    public void ResetHover() => SetHover(false);
+
+    private void UpdateHoverMedia()
+    {
+        if (Data is not { } data || _hoverPoster is null || _bannerMediaHost is null) return;
+        _hoverPoster.Source = data.Banner;
+        _hoverPoster.Transform = data.BannerTransform;
+        _hoverPrimaryEffect?.Update(data.PresentationAppearance);
+        _hoverSceneEffect?.Refresh();
+        HoverVideoCoordinator.Shared.Play(_bannerMediaHost, data.BannerHoverPath, data.BannerTransform);
     }
 
     private void SetHover(bool hovered)
     {
+        if (_hoverContent is not null)
+        {
+            if (_hovered == hovered || hovered && (Data is null ||
+                Data.Banner is null && string.IsNullOrWhiteSpace(Data.BannerHoverPath))) return;
+            _hovered = hovered;
+            _hoverContent.Visibility = hovered ? Visibility.Visible : Visibility.Collapsed;
+            if (_restContent is not null) _restContent.Visibility = hovered ? Visibility.Collapsed : Visibility.Visible;
+            if (hovered) UpdateHoverMedia();
+            else
+            {
+                if (_bannerMediaHost is not null) HoverVideoCoordinator.Shared.Release(_bannerMediaHost);
+                if (_hoverPoster is not null) _hoverPoster.Source = null;
+            }
+            _effect.Refresh();
+            PresentationEffects.RefreshTree(_hoverContent);
+            PaintOutline();
+            return;
+        }
         _hovered = hovered;
         PaintOutline();
         foreach (var frame in _frames)
@@ -203,6 +260,22 @@ public sealed class CardVisual : Grid
         FrameworkElement element;
         switch (node)
         {
+            case CardCanvasNode canvas:
+            {
+                var panel = new SurfaceComposer.AdaptiveCanvas(Plan.Aspect, 280);
+                foreach (var child in canvas.Children.OrderBy(child => child.Layout.CanvasPlacement?.Order ?? 0))
+                    if (child.Layout.CanvasPlacement is { } position) panel.Add(Build(child), position);
+                element = panel;
+                break;
+            }
+            case CardAssetNode asset:
+            {
+                element = _buildingHover || asset.Foreground != _buildingArtBase
+                    ? new SkImageView { Source = ImageRef.FromPath(asset.AssetPath, 768), PlaceholderToken = "transparent",
+                        Transform = MediaTransformState.Default with { Fit = "stretch" } }
+                    : new Border();
+                break;
+            }
             case StackNode stack:
             {
                 var panel = new StackPanel
@@ -220,7 +293,7 @@ public sealed class CardVisual : Grid
                     {
                         Child = panel,
                         Padding = new Thickness(stack.Padding),
-                        Background = !_buildingArtBase || stack.Background is null ? null : theme.Brush(TokenName(stack.Background)),
+                        Background = (!_buildingArtBase && !_buildingHover) || stack.Background is null ? null : theme.Brush(TokenName(stack.Background)),
                         CornerRadius = new CornerRadius(theme.Tokens.ResolveRadius(stack.CornerRadius)),
                     }
                     : panel;
@@ -338,7 +411,7 @@ public sealed class CardVisual : Grid
             case ImageNode image:
             {
                 var baseArt = image.Ambient;
-                if (baseArt != _buildingArtBase)
+                if (!_buildingHover && baseArt != _buildingArtBase)
                 {
                     element = new Border();
                     break;
@@ -354,6 +427,31 @@ public sealed class CardVisual : Grid
                     view.Blur = 18;
                 }
 
+                if (_buildingHover && image.Slot == SemanticSlots.ProfileBanner)
+                {
+                    _hoverPoster = view;
+                    view.PlaceholderToken = "transparent";
+                    _bannerMediaHost = new Grid();
+                    _bannerMediaHost.Children.Add(view);
+                    var stage = new Grid();
+                    stage.Children.Add(_bannerMediaHost);
+                    var primary = new Grid { IsHitTestVisible = false };
+                    _hoverPrimaryEffect = new PrimaryBannerEffect(primary, PresentationVisualPriority.ActiveCard);
+                    stage.Children.Add(primary);
+                    _hoverSceneEffect = PresentationEffects.View(PresentationSlots.BannerEffect,
+                        () => Data is { } data ? new PresentationContext("gallery", data.ProfileId,
+                            Profile: new ProfilePresentationState(data.ProfileId, 0, null,
+                                data.PresentationAppearance ?? ProfileAppearanceOverrides.Default)) : PresentationContext.Global);
+                    _hoverSceneEffect.VisualPriority = PresentationVisualPriority.ActiveCard;
+                    stage.Children.Add(_hoverSceneEffect);
+                    stage.SizeChanged += (_, _) =>
+                    {
+                        if (stage.Clip is not RectangleGeometry clip) stage.Clip = clip = new RectangleGeometry();
+                        clip.Rect = new Windows.Foundation.Rect(0, 0, stage.ActualWidth, stage.ActualHeight);
+                    };
+                    element = stage;
+                    break;
+                }
                 _binders.Add(data =>
                 {
                     var isBanner = image.Slot == SemanticSlots.ProfileBanner;
@@ -376,8 +474,8 @@ public sealed class CardVisual : Grid
                         view.Circle = data.Appearance.Shape == CoverShape.Circle;
                     }
                 });
-                if (image.Slot == SemanticSlots.ProfileBanner
-                    || (!_buildingArtBase && image.Slot == SemanticSlots.ProfileCover && Plan.Hover is "spotlight" or "banner"))
+                if (Plan.HoverRoot is null && (image.Slot == SemanticSlots.ProfileBanner
+                    || (!_buildingArtBase && image.Slot == SemanticSlots.ProfileCover && Plan.Hover is "spotlight" or "banner")))
                 {
                     _bannerMediaHost = new Grid();
                     _bannerMediaHost.Children.Add(view);
@@ -396,10 +494,13 @@ public sealed class CardVisual : Grid
             {
                 if (_buildingArtBase)
                 {
-                    element = new Border { Width = frame.Size, Height = frame.Size };
+                    element = frame.Layout.CanvasPlacement is null
+                        ? new Border { Width = frame.Size, Height = frame.Size } : new Border();
                     break;
                 }
-                var view = new CoverFrameView { FrameMode = Plan.FrameMode, Width = frame.Size, Height = frame.Size };
+                var view = new CoverFrameView { FrameMode = Plan.FrameMode,
+                    Width = frame.Layout.CanvasPlacement is null ? frame.Size : double.NaN,
+                    Height = frame.Layout.CanvasPlacement is null ? frame.Size : double.NaN };
                 _frames.Add(view);
                 _binders.Add(data =>
                 {
@@ -493,8 +594,8 @@ public sealed class CardVisual : Grid
                 && node.Layout.VerticalAlignment == "bottom")
                 _hoverResting.Add(element);
         }
-        if (_buildingArtBase && node is TextNode or BadgeNode or IconNode
-            || !_buildingArtBase && node is ScrimNode or ShapeNode)
+        if (!_buildingHover && (_buildingArtBase && node is TextNode or BadgeNode or IconNode
+            || !_buildingArtBase && node is ScrimNode or ShapeNode))
             element.Opacity = 0;
         return element;
     }
@@ -502,6 +603,26 @@ public sealed class CardVisual : Grid
     private FrameworkElement BuildBadge(BadgeNode badge)
     {
         var theme = ThemeRuntime.Current;
+        if (badge.Style == "stars" && badge.Slot == SemanticSlots.ProfileRating)
+        {
+            if (_buildingArtBase) return new Border();
+            var stars = UI.H(2);
+            stars.VerticalAlignment = VerticalAlignment.Center;
+            var icons = Enumerable.Range(0, 5).Select(_ => new IconView("icon.profile.rating", 12, "#FF857B7B")).ToArray();
+            foreach (var star in icons) stars.Children.Add(star);
+            _binders.Add(data =>
+            {
+                for (var index = 0; index < icons.Length; index++)
+                {
+                    var active = index < (data.Rating ?? 0);
+                    icons[index].Selected = active;
+                    icons[index].Filled = active;
+                    icons[index].ColorToken = active ? "#FFE5A515" : "#FF857B7B";
+                }
+                stars.Tip(data.TextFor(SemanticSlots.ProfileRating));
+            });
+            return stars;
+        }
         var onMedia = badge.Style == "glass";
         var textColor = onMedia || Plan.Hover == "sheen" && badge.Style == "text"
             ? "onMediaPrimary" : badge.Style == "solid" ? "textOnAccent" : "textSecondary";
@@ -630,7 +751,7 @@ public static class CardDataFactory
             AppearanceFor(overrides, frame, ThemeRuntime.Current.ReducedMotion),
             media.Cover,
             media.Banner,
-            frame) { AssignedTags = card.AssignedTags };
+            frame) { AssignedTags = card.AssignedTags, PresentationAppearance = overrides, BannerHoverPath = card.BannerHoverPath };
     }
 
     /// <summary>Profile Cover appearance with the resolved frame definition (built-in or pack-defined).</summary>

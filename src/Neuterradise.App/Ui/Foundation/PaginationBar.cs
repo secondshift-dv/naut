@@ -19,6 +19,7 @@ public sealed class PaginationBar : IDisposable
     private readonly Border _balancer = new();
     private bool _syncing;
     private bool _compact;
+    private bool _overlayStyle;
 
     public PaginationBar(
         INotifyPropertyChanged source,
@@ -84,6 +85,15 @@ public sealed class PaginationBar : IDisposable
 
     public FrameworkElement View { get; }
 
+    public void SetOverlayStyle(bool overlay)
+    {
+        if (_overlayStyle == overlay) return;
+        _overlayStyle = overlay;
+        if (overlay) UI.StyleOverlayControl(_pageSize);
+        else ThemeRuntime.Current.TrackControlFamily(_pageSize, "input");
+        Refresh();
+    }
+
     private void OnChanged(object? sender, PropertyChangedEventArgs args) => UiDispatch.Run(Refresh);
 
     private void Refresh()
@@ -138,7 +148,7 @@ public sealed class PaginationBar : IDisposable
                     Width = 28,
                     Height = 28,
                     CornerRadius = new CornerRadius(8),
-                    Background = ThemeRuntime.Current.Brush("accent"),
+                    Background = ThemeRuntime.Current.Brush(_overlayStyle ? "#FFDB2B8D" : "accent"),
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center,
                 });
@@ -159,6 +169,7 @@ public sealed class PaginationBar : IDisposable
     private Button PageButton(string text, string tooltip, int page, bool enabled)
     {
         var button = UI.Button(text, () => _goToPage(page), ButtonKind.Ghost);
+        if (_overlayStyle) UI.StyleOverlayControl(button);
         button.IsEnabled = enabled;
         button.Width = 28;
         button.MinWidth = 28;

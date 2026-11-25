@@ -37,6 +37,21 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
     private readonly MediaGridPanel _media;
     private ProfileLayoutDefinition _layout;
     private SurfaceNode? _surface;
+    private ProfilePaperPlan? _paper;
+    private readonly VariableWrap _paperTags = new(6);
+    private readonly ContentControl _profileTools = new() { HorizontalContentAlignment = HorizontalAlignment.Stretch };
+    private bool IndependentTools => _surface?.HasRegion("profile-tools") == true;
+    private bool IndependentTags => _surface?.HasRegion("tags") == true;
+    private void ApplyPaper(ProfilePaperPlan? paper)
+    {
+        if (_paper == paper) return;
+        _paper = paper;
+        ThemeRuntime.Current.SetPaperScope(_page, paper);
+        _page.Background = paper is null ? null : ThemeRuntime.Current.Brush(paper.Background);
+        _pageScroll.Background = _page.Background;
+        _backdrop.Visibility = paper is null ? Visibility.Visible : Visibility.Collapsed;
+        _backdrop.IsSurfaceActive = paper is null && IsActive;
+    }
     private readonly BackdropView _backdrop = new() { ReadabilityGuard = true };
     private Disposables _inspectorBag = new();
     private bool _modulesRefreshQueued;
@@ -225,6 +240,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             }
         }
         var previousLayout = _layout;
+        var previousSurface = _surface;
         if (Preview is null) _hasPreviewMedia = false;
         if (Preview is not null) _inspectorHost.Visibility = Visibility.Collapsed;
         else UpdateInspector();
@@ -233,7 +249,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         // header. A real layout change still forces identity geometry through UpdateProfileHeader.
         UpdateProfileHeader(forceIdentity: Preview is null);
         _media.RefreshLayout();
-        if (Preview is null || previousLayout != _layout)
+        if (Preview is null || previousLayout != _layout || !ReferenceEquals(previousSurface, _surface))
         {
             QueueModulesRefresh();
         }
@@ -259,7 +275,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         }
 
         SetHeaderActive(true);
-        _backdrop.IsSurfaceActive = true;
+        _backdrop.IsSurfaceActive = _paper is null;
     }
 
     public void SetFigureOccluded(bool occluded) => _figureView.SetOccluded(occluded);
@@ -293,6 +309,8 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         // layout authority stays in the resolved ProfileLayoutDefinition owned by the Profile state.
         UpdateProfileHeader();
         QueueModulesRefresh();
+        if (_vm.IsInspectorOpen && (args.PacksChanged || args.Slots.Contains(PresentationSlots.Theme)))
+            UpdateInspector();
     }
 
     private void ApplyCoreState()
@@ -314,6 +332,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         var plan = ResolvePresentation(PresentationSlots.ProfileLayout, Context).PlanAs<ProfileLayoutPlan>();
         _layout = plan.Layout;
         _surface = plan.Surface;
+        ApplyPaper(plan.Paper);
         _backdrop.Plan = ResolvePresentation(PresentationSlots.ProfileBackdrop, Context).PlanAs<BackdropPlan>();
         _backdrop.AmbientImagePath = Preview is not null && _hasPreviewMedia ? _previewCover?.Path : _vm.CoverSource?.Path;
         _backdrop.AmbientVideoPath = Preview is not null && _hasPreviewMedia ? _previewBannerVideo : _vm.BannerVideoPath;
@@ -342,6 +361,8 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         var plan = ResolvePresentation(PresentationSlots.ProfileLayout, Context).PlanAs<ProfileLayoutPlan>();
         _layout = plan.Layout;
         _surface = plan.Surface;
+        ApplyPaper(plan.Paper);
+        if (IndependentTags) TagCapsules.Update(_paperTags, _vm.AssignedTags);
         if (Preview is null)
             _vm.SetRecentMediaModuleVisible(
                 _layout.Modules.Any(module => module.Id == ProfileLayoutModuleId.RecentMedia && module.Visible)
@@ -368,7 +389,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             BannerPoster: Preview is not null && _hasPreviewMedia ? _previewBannerImage : ImageRef.FromPath(_vm.BannerPosterPath, 1600),
              IndependentModules: _surface?.Modular == true, BannerArtwork: plan.BannerArtwork,
             BannerAuthority: Services.Runtime.MediaResources,
-            BannerPrimaryMediaId: Preview is not null && _hasPreviewMedia ? Context.Profile?.Sources?.BannerMediaId : _vm.BannerMediaId),
+            BannerPrimaryMediaId: Preview is not null && _hasPreviewMedia ? Context.Profile?.Sources?.BannerMediaId : _vm.BannerMediaId, Paper: _paper is not null),
             rebuildIdentity: forceIdentity || previousLayout != _layout);
         SetHeaderActive(IsActive);
     }
@@ -426,11 +447,14 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
                 UI.T("Profile.TextFiles.Review", "Review changed text files"),
                 () => Services.RunUserAction(ReviewTextFilesAsync(), "ProfileSurface.ReviewTextFilesAsync",
                     UI.T("Profile.TextFiles.Failed", "Text files could not be resolved.")), ButtonKind.Secondary));
+        if (IndependentTools)
+            _profileTools.Content = UI.V(4, actions, status).Margin(14, 2, 14, 2);
+        else _profileTools.Content = null;
         return ProfileIdentityView.Create(
             _vm.DisplayName, _vm.CategoryName, _vm.Tags, _vm.Rating, _vm.IsFavorite, alignment,
-            actions: actions,
-            status: status, assignedTags: _vm.AssignedTags,
-            showTags: _layout.Id != "portrait" || (string.IsNullOrWhiteSpace(_vm.BannerVideoPath) && string.IsNullOrWhiteSpace(_vm.BannerPosterPath)));
+            actions: IndependentTools ? null : actions,
+            status: IndependentTools ? null : status, assignedTags: _vm.AssignedTags,
+            showTags: !IndependentTags && (_layout.Id != "portrait" || (string.IsNullOrWhiteSpace(_vm.BannerVideoPath) && string.IsNullOrWhiteSpace(_vm.BannerPosterPath))), paper: _paper is not null);
     }
     private void QueueModulesRefresh() => QueueModulesRefresh(force: true);
 
@@ -593,7 +617,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         var contentViewportWidth = Math.Max(
             180,
             viewportWidth - _pageScroll.Padding.Left - _pageScroll.Padding.Right);
-        var padding = UI.PagePadding(contentViewportWidth);
+        var padding = _paper is null ? UI.PagePadding(contentViewportWidth) : 0;
         const double gap = 12;
         var wrap = new VariableWrap(gap)
         {
@@ -688,6 +712,11 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         }
         if (_surface is not null)
         {
+            if (IndependentTags)
+            {
+                SurfaceComposer.Detach(_paperTags);
+                regions["tags"] = UI.V(8, DetailLayout.Heading(UI.T("Profile.Tags", "Tags"), null, "icon.profile.tag"), _paperTags).Margin(14, 4, 14, 4);
+            }
             foreach (var region in regions.Values) region.Width = double.NaN;
             // The surface owns the inset content allocation. Descendant desired sizes (including
             // a native Figure and media columns) cannot enlarge the page and trigger another rebuild.
@@ -695,17 +724,28 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             // but cannot reposition the destructive Delete action above Profile modules.
             var body = SurfaceComposer.WithoutSemantic(_surface, "actions");
             if (body is null) return new Grid();
+            FrameworkElement? Cover()
+            {
+                var cover = _profileHeader.CoverModule;
+                if (_paper is not null && cover is not null)
+                {
+                    var size = available < _surface.Breakpoint ? Math.Min(160, available * 0.28) : Math.Min(240, available * 0.18);
+                    cover.Width = cover.Height = size;
+                }
+                return cover;
+            }
             FrameworkElement? Region(string id) => id switch
             {
                 "banner" => _profileHeader.BannerModule,
-                "cover" => _profileHeader.CoverModule,
+                "cover" => Cover(),
                 "figure" when _vm.FigureMediaId is not null => _figureView,
+                "profile-tools" when IndependentTools => _profileTools,
                 _ => regions.GetValueOrDefault(id),
             };
             var composition = SurfaceComposer.Build(body, Region, available, fallbackRegion: "figure");
             composition.Width = available;
             composition.HorizontalAlignment = HorizontalAlignment.Center;
-            return composition.Margin(padding, 12, padding, 18);
+            return composition.Margin(padding, _paper is null ? 12 : 0, padding, 18);
         }
         // Optional modules may leave a partial row; use its remaining width without reserving an absent column.
         var row = new List<FrameworkElement>();

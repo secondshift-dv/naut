@@ -8,7 +8,7 @@ Naut separates collection data from presentation choices. You can change how Hom
 
 Use the contextual **Customize** action on Home, Gallery, Cards or Profiles to apply layout, frame, backdrop and effect choices to the relevant surface. The built-in Home, Spotlight, Profile, Card, Media and Gallery categories each offer three curated alternatives. Saved legacy selections resolve through compatibility mappings; installed-pack selections remain independent when their definitions are available.
 
-Presentation Contract 4 adds layered Gallery scenes, responsive navigation and coordinated Global Presets in Appearance. Compatible installed collections can be applied as a single transaction; individual components remain separately selectable. Explicit Profile choices retain priority. Home and Profile support multiple Banner slots with bounded playback.
+Presentation Contract 4 adds layered Gallery scenes, responsive navigation and coordinated Global Presets in Appearance. Compatible installed collections can be applied as a single transaction; individual components remain separately selectable. Explicit Profile choices retain priority. Home and Profile support multiple Banner slots with bounded playback. Compatible packs using Naut v0.0.40 can also compose immersive Home stages, paper-style Profiles, fixed Gallery slots, independent Card hover canvases, live media overlays, and themed Import and Inspector surfaces. These options are pack-defined; existing components retain their appearance when the options are omitted.
 
 ## Select from pack
 

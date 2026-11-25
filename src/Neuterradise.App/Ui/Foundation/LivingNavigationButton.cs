@@ -296,7 +296,11 @@ internal sealed class LivingNavigationButton : Button
         {
             Background = theme.ControlFill(skin, selected ? skin.SelectedFill ?? "token:navSelectedBackground" : hover ? skin.HoverFill : skin.Fill);
             BorderBrush = theme.Brush(selected ? skin.Focus : skin.Border);
-            BorderThickness = ThemeRuntime.ControlEdge(skin);
+            BorderThickness = skin.SelectedUnderline
+                ? new Thickness(0, 0, 0, selected ? Math.Max(1, skin.BorderWidth) : 0)
+                : ThemeRuntime.ControlEdge(skin);
+            if (skin.SelectedUnderline && _vaultBadge is not null)
+                _vaultBadge.Background = theme.Brush("transparent");
         }
         _baseIcon.Selected = _detailIcon.Selected = selected;
         _baseIcon.ColorToken = selected ? "accent" : "textSecondary";

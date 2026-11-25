@@ -35,11 +35,14 @@ public sealed class InspectorPanel : IDisposable
     private readonly Button _favorite;
     private readonly Button _deleteMedia;
     private bool _deletingMedia;
+    private readonly InspectorPhonePlan? _phone;
 
     public InspectorPanel(AppServices services, MediaDetailViewModel vm, Action close, PresentationContext context)
     {
         _services = services;
         _vm = vm;
+        var theme = services.Presentation.ResolvePlan<ThemePlan>(PresentationSlots.Theme, PresentationContext.Global);
+        _phone = theme.InspectorPhone;
 
         _imageControls.Children.Add(UI.IconButton("icon.action.chevron", UI.T("Inspector.ZoomOut", "Zoom out"), null, 28, _vm.ZoomOutCommand));
         _imageControls.Children.Add(_zoomText.Align(vertical: VerticalAlignment.Center));
@@ -54,7 +57,7 @@ public sealed class InspectorPanel : IDisposable
         foreach (var name in new[] { "Info", "People" })
         {
             var tabName = name;
-            var button = UI.Button(UI.T("Inspector." + name, name), () => _vm.SelectTabCommand.Execute(tabName), ButtonKind.Ghost);
+            var button = UI.Button(TabLabel(name), () => _vm.SelectTabCommand.Execute(tabName), ButtonKind.Ghost);
             button.HorizontalAlignment = HorizontalAlignment.Stretch;
             _tabs.Add(name, button);
             tabs.Children.Add(button.At(0, tabs.Children.Count));
@@ -89,7 +92,9 @@ public sealed class InspectorPanel : IDisposable
         var previewFrame = UI.Surface(_preview, Material.Grounded, 10, 0);
         previewFrame.BorderBrush = ThemeRuntime.Current.Brush("borderSubtle");
         _imageControls.HorizontalAlignment = HorizontalAlignment.Center;
-        View = new Border
+        View = _phone is not null
+            ? BuildPhone(theme, header, previewFrame, navigation, tabs)
+            : new Border
         {
             Child = UI.Grid("auto,auto,auto,auto,auto,auto,*", "*",
                 header.Margin(12, 12, 12, 8).At(0),
@@ -103,7 +108,9 @@ public sealed class InspectorPanel : IDisposable
             BorderBrush = ThemeRuntime.Current.Brush("borderDefault"),
             BorderThickness = new Thickness(1, 0, 0, 0),
         };
-        View.SizeChanged += (_, args) => _preview.Height = Math.Clamp(args.NewSize.Height * 0.34, 100, 220);
+        View.SizeChanged += (_, args) => _preview.Height = _phone is null
+            ? Math.Clamp(args.NewSize.Height * 0.34, 100, 220)
+            : Math.Clamp(args.NewSize.Height * 0.30, 100, 210);
         _preview.SizeChanged += (_, _) => UpdateImagePreviewTransform();
         View.Unloaded += (_, _) => StopAnimation();
         ReducedMotionAuthority.Changed += OnReducedMotionChanged;
@@ -112,6 +119,114 @@ public sealed class InspectorPanel : IDisposable
     }
 
     public FrameworkElement View { get; }
+
+    private Border BuildPhone(ThemePlan themePlan, FrameworkElement header, Border previewFrame,
+        FrameworkElement navigation, Grid tabs)
+    {
+        var phone = themePlan.InspectorPhone!;
+        var theme = ThemeRuntime.Current;
+        var camera = new Border
+        {
+            Width = 10, Height = 10, CornerRadius = new CornerRadius(5),
+            BorderBrush = theme.Brush("#FF606172"), BorderThickness = new Thickness(1),
+            Background = theme.Brush("#FF222537"),
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = new Border
+            {
+                Width = 4, Height = 4, CornerRadius = new CornerRadius(2),
+                Background = theme.Brush("#FF566385"),
+                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+            },
+        };
+        var brand = new SkImageView
+        {
+            Source = ImageRef.FromPath(phone.BrandArtwork, 96, themePlan.ArtworkIdentity + ":inspector-brand"),
+            Width = 50, Height = 19, PlaceholderToken = "transparent", IsHitTestVisible = false,
+            Transform = MediaTransformState.Default with { Fit = "fit" },
+        };
+        var island = new Border
+        {
+            Width = 106, Height = 25, CornerRadius = new CornerRadius(13),
+            Background = theme.Brush("#FF09080D"),
+            Child = UI.H(12, camera, brand).Align(HorizontalAlignment.Center, VerticalAlignment.Center),
+            HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 5, 0, 8),
+            IsHitTestVisible = false,
+        };
+
+        // Reuse the real commands and tab selection. App icons are decoration, not a second action model.
+        tabs.Children.Clear();
+        var openLabel = UI.T("Inspector.Open", "Open with default app");
+        var viewer = UI.Button(openLabel, null, ButtonKind.Ghost, command: _vm.OpenInDefaultAppCommand);
+        var apps = UI.Grid("auto,auto", "*,*",
+            PhoneApp(viewer, openLabel, "icon.media.image", "#FF6944AD", "#FFFFFFFF").At(0, 0),
+            PhoneApp(_tabs["Info"], TabLabel("Info"), "icon.status.info", "#FF9855C5", "#FFFFFFFF").At(0, 1),
+            PhoneApp(_tabs["People"], TabLabel("People"), "icon.profile.related", "#FFFF9B50", "#FF21152E").At(1, 0),
+            PhoneApp(_deleteMedia, UI.T("Inspector.MoveToTrash", "Delete media"), "icon.action.delete", "#FFB83C62", "#FFFFFFFF").At(1, 1));
+        apps.RowSpacing = 4;
+        apps.ColumnSpacing = 6;
+
+        previewFrame.CornerRadius = new CornerRadius(16);
+        previewFrame.Background = theme.Brush("#FF110D1B");
+        var summary = new Border
+        {
+            CornerRadius = new CornerRadius(16),
+            Background = theme.Brush("surface2"),
+            BorderBrush = theme.Brush("borderSubtle"), BorderThickness = new Thickness(1),
+            Padding = new Thickness(10), Child = _tab,
+        };
+        var body = UI.V(8, previewFrame, _imageControls, navigation, apps, summary);
+        var gesture = new Border
+        {
+            Width = 86, Height = 4, CornerRadius = new CornerRadius(2),
+            Background = theme.Brush("textMuted"), Opacity = .75,
+            Margin = new Thickness(0, 8, 0, 6), HorizontalAlignment = HorizontalAlignment.Center,
+            IsHitTestVisible = false,
+        };
+        var screen = new Border
+        {
+            CornerRadius = new CornerRadius(25), Background = theme.Brush("canvas"),
+            Padding = new Thickness(10, 4, 10, 3),
+            Child = UI.Grid("auto,auto,*,auto", "*",
+                island.At(0), header.Margin(0, 0, 0, 8).At(1),
+                UI.Scroll(body).At(2), gesture.At(3)),
+        };
+        return new Border
+        {
+            Margin = new Thickness(8, 5, 8, 5),
+            CornerRadius = new CornerRadius(32), Padding = new Thickness(5),
+            BorderBrush = theme.Brush(phone.Rim), BorderThickness = new Thickness(2),
+            Background = theme.Brush(phone.Bezel),
+            Child = screen,
+        };
+    }
+
+    private static string TabLabel(string name) => name == "People"
+        ? UI.T("Breadcrumb.People", "People")
+        : UI.T("SurfaceText.Info.170322A3", "Info");
+
+    private static Button PhoneApp(Button button, string label, string icon, string fill, string ink)
+    {
+        var theme = ThemeRuntime.Current;
+        var glyph = new Border
+        {
+            Width = 38, Height = 38, CornerRadius = new CornerRadius(11),
+            Background = theme.Brush(fill),
+            Child = new IconView(icon, 22, ink).Align(HorizontalAlignment.Center, VerticalAlignment.Center),
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        var caption = UI.Text(label, "caption", "textPrimary", 2);
+        caption.TextAlignment = TextAlignment.Center;
+        var content = UI.V(3, glyph, caption);
+        content.HorizontalAlignment = HorizontalAlignment.Center;
+        content.IsHitTestVisible = false;
+        button.Content = content;
+        button.MinHeight = 74;
+        button.HorizontalAlignment = HorizontalAlignment.Stretch;
+        button.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, label);
+        button.Tip(label);
+        return button;
+    }
 
     private void Render()
     {

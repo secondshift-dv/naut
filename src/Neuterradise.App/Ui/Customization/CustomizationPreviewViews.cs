@@ -182,7 +182,7 @@ public sealed partial class CustomizationCenter
                 CardDataFactory.AppearanceFor(working.Overrides, frame, ReducedMotionAuthority.IsReduced),
                 subjectMedia.Cover,
                 subjectMedia.Banner,
-                frame) { AssignedTags = subject.Detail.AssignedTags };
+                frame) { AssignedTags = subject.Detail.AssignedTags, PresentationAppearance = working.Overrides, BannerHoverPath = _bannerVideoPath };
         }
 
         var card = _services.Root?.SampleCard(_session.Context.ProfileId);
@@ -206,6 +206,8 @@ public sealed partial class CustomizationCenter
                 CoverTransform = resolved.Cover,
                 BannerTransform = resolved.Banner,
                 Frame = frame,
+                PresentationAppearance = current.Overrides,
+                BannerHoverPath = _bannerVideoPath,
             }
             : data with { Frame = frame };
     }

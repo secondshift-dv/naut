@@ -30,7 +30,7 @@ Use **Settings → Vault** to rename the active Vault or choose a custom icon (P
 
 ## Catalog compatibility and upgrades
 
-Naut v0.0.39 uses Catalog Schema 4. Opening a recognized older Vault automatically applies the necessary migrations in order; each transition commits atomically and preserves existing collection identities, associations and presentation selections. Unknown or incompatible catalogs are rejected, not reset.
+Naut v0.0.39 and later use Catalog Schema 4. Opening a recognized older Vault automatically applies the necessary migrations in order; each transition commits atomically and preserves existing collection identities, associations and presentation selections. Unknown or incompatible catalogs are rejected, not reset.
 
 | Catalog transition | Introduced in |
 | --- | --- |

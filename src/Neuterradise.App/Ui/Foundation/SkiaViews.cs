@@ -19,6 +19,59 @@ internal static class SkiaColor
         From(ThemeRuntime.Current.Tokens.Resolve(reference.StartsWith('#') || reference.StartsWith("token:", StringComparison.Ordinal) ? reference : "token:" + reference), opacity);
 }
 
+internal sealed class LiveHeartOverlay : SKCanvasElement
+{
+    private static readonly (float X, float Y, float Size, byte Alpha)[] Hearts =
+        [(0.89f, 0.57f, 11, 105), (0.94f, 0.65f, 8, 68), (0.87f, 0.72f, 14, 115),
+         (0.94f, 0.80f, 9, 85), (0.88f, 0.88f, 12, 98)];
+
+    protected override void RenderOverride(SKCanvas canvas, Size area)
+    {
+        if (area.Width <= 0 || area.Height <= 0) return;
+        var w = (float)area.Width;
+        var h = (float)area.Height;
+        var bottom = Math.Min(88, h * .42f);
+        using var shader = SKShader.CreateLinearGradient(new SKPoint(0, h - bottom), new SKPoint(0, h),
+            [SKColors.Transparent, new SKColor(0, 0, 0, 164)], null, SKShaderTileMode.Clamp);
+        using var scrim = new SKPaint { Shader = shader };
+        canvas.DrawRect(SKRect.Create(0, h - bottom, w, bottom), scrim);
+        using var heart = SKPath.ParseSvgPathData("M12 21 C10 19 3 14 3 8 C3 2 10 1 12 6 C14 1 21 2 21 8 C21 14 14 19 12 21 Z");
+        using var paint = new SKPaint { IsAntialias = true };
+        foreach (var (x, y, size, alpha) in Hearts)
+        {
+            canvas.Save();
+            canvas.Translate(w * x - size / 2, h * y - size / 2);
+            canvas.Scale(size / 24);
+            paint.Color = new SKColor(255, 96, 141, alpha);
+            canvas.DrawPath(heart, paint);
+            canvas.Restore();
+        }
+    }
+}
+
+internal sealed class BreadcrumbStripeView : SKCanvasElement
+{
+    private SKColor _color;
+
+    public void SetPattern(double opacity)
+    {
+        _color = SkiaColor.Token("accent", opacity);
+        Visibility = opacity > 0 ? Visibility.Visible : Visibility.Collapsed;
+        Invalidate();
+    }
+
+    protected override void RenderOverride(SKCanvas canvas, Size area)
+    {
+        if (area.Width <= 0 || area.Height <= 0 || _color.Alpha == 0) return;
+        using var paint = new SKPaint { Color = _color, IsAntialias = true, StrokeWidth = 3 };
+        canvas.Save();
+        canvas.ClipRect(SKRect.Create(0, 0, (float)area.Width, (float)area.Height));
+        for (float x = -(float)area.Height; x < area.Width; x += 14)
+            canvas.DrawLine(x, 0, x + (float)area.Height, (float)area.Height, paint);
+        canvas.Restore();
+    }
+}
+
 /// <summary>A semantic icon using the active control skin or the built-in Neu Line fallback.</summary>
 public sealed class IconView : SKCanvasElement
 {
@@ -144,7 +197,7 @@ public sealed class IconView : SKCanvasElement
         using var paint = new SKPaint
         {
             IsAntialias = true,
-            Color = SkiaColor.Token(_color),
+            Color = SkiaColor.From(ThemeRuntime.Current.ScopedArgb(this, _color)),
             Style = SKPaintStyle.Stroke,
             StrokeWidth = (float)(skin?.StrokeWidth ?? IconCatalog.StrokeWidth),
             StrokeCap = SKStrokeCap.Round,
@@ -391,6 +444,11 @@ public sealed class SkImageView : SKCanvasElement
         var currentImage = _animationFrame ?? _image;
         if (currentImage is null)
         {
+            if (_placeholderToken == "transparent")
+            {
+                canvas.Restore();
+                return;
+            }
             using var shader = SKShader.CreateLinearGradient(
                 new SKPoint(0, 0), new SKPoint(rect.Width, rect.Height),
                 [SkiaColor.Token(_placeholderToken), SkiaColor.Token("surface1"), SkiaColor.Token("accentSecondary", 0.35)],

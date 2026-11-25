@@ -35,6 +35,10 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
     private readonly ObservableCollection<ImportActivityItem> _activeImports = [];
     private readonly ObservableCollection<HomeSpotlightViewModel> _spotlightCandidates = [];
     private readonly ObservableCollection<HomeProfileTileViewModel> _recentlyActive = [];
+    private readonly ObservableCollection<HomeProfileTileViewModel> _favoriteProfiles = [];
+    private int _favoriteGeneration;
+    public bool FavoriteRailEnabled { get; set; }
+    public ObservableCollection<HomeProfileTileViewModel> FavoriteProfiles => _favoriteProfiles;
     private readonly ObservableCollection<HomeAttentionItem> _needsAttention = [];
     private readonly ObservableCollection<HomeDiscoveryItem> _discovery = [];
     private readonly ObservableCollection<HomeActivityItem> _recentActivity = [];
@@ -185,7 +189,9 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
                     endOfMonthLocal.ToUniversalTime(),
                     cancellation));
 
+            var favoritesTask = RefreshFavoriteRailAsync(cancellation);
             await Task.WhenAll(
+                    favoritesTask,
                     spotlightTask,
                     recentTask,
                     healthTask,
@@ -721,7 +727,7 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
                     KindFilter: GalleryProfileKindFilter.NormalOnly),
                 cancellationToken));
 
-        await Task.WhenAll(spotlightTask, recentTask).ConfigureAwait(false);
+        await Task.WhenAll(spotlightTask, recentTask, RefreshFavoriteRailAsync(cancellationToken)).ConfigureAwait(false);
         if (_disposed) return;
 
         var spotlight = spotlightTask.Result;
@@ -751,6 +757,33 @@ public sealed class HomeViewModel : ScreenStateViewModel, IDisposable
             SetRefreshFailure(
                 "Recent media",
                 recent.IsSuccess && recentVisuals?.Degraded == true);
+        });
+    }
+
+    public async Task RefreshFavoriteRailAsync(CancellationToken cancellationToken = default)
+    {
+        if (_catalog is null || _disposed || !FavoriteRailEnabled) return;
+        var generation = Interlocked.Increment(ref _favoriteGeneration);
+        var result = await LoadHomeSectionAsync("Favorites", async () =>
+        {
+            var page = await _catalog.GalleryReads.GetGalleryPageAsync(new GalleryQuery(
+                IsFavorite: true, SortOrder: GallerySortOrder.UpdatedAtDesc, PageSize: 24,
+                KindFilter: GalleryProfileKindFilter.NormalOnly), cancellationToken).ConfigureAwait(false);
+            var artwork = await ResolveHomeArtworkAsync(page.Items.Select(item => item.ProfileId), cancellationToken).ConfigureAwait(false);
+            return page.Items.Select(item => new HomeProfileTileViewModel(item)
+            {
+                CoverImagePath = artwork.GetValueOrDefault(item.ProfileId)?.CoverPath,
+            }).ToArray();
+        }).ConfigureAwait(false);
+        UiDispatch.Run(() =>
+        {
+            if (_disposed || !FavoriteRailEnabled || cancellationToken.IsCancellationRequested || generation != _favoriteGeneration) return;
+            if (result.IsSuccess)
+            {
+                _favoriteProfiles.Clear();
+                foreach (var item in result.Value!) _favoriteProfiles.Add(item);
+            }
+            SetRefreshFailure("Favorites", !result.IsSuccess);
         });
     }
 

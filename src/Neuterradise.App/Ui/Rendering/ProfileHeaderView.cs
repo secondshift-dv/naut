@@ -29,7 +29,7 @@ public sealed record ProfileHeaderViewState(
     IReadOnlyList<ProfileTagAssignment>? Tags = null,
     Func<FrameworkElement>? DetailsFactory = null, ImageRef? BannerPoster = null,
     bool IndependentModules = false, ArtworkPlan? BannerArtwork = null,
-    MediaResourceAuthority? BannerAuthority = null, Guid? BannerPrimaryMediaId = null, bool FocusedBanner = false, MediaTransformState? FocusedTransform = null, EffectPlan? FocusedEffect = null);
+    MediaResourceAuthority? BannerAuthority = null, Guid? BannerPrimaryMediaId = null, bool FocusedBanner = false, MediaTransformState? FocusedTransform = null, EffectPlan? FocusedEffect = null, bool Paper = false);
 
 public static class ProfileIdentityView
 {
@@ -38,9 +38,9 @@ public static class ProfileIdentityView
         ProfileLayoutIdentityAlignment alignment, Action<int>? onRating = null, ICommand? favoriteCommand = null,
         string? favoriteTooltip = null,
         FrameworkElement? actions = null, FrameworkElement? status = null,
-        IReadOnlyList<ProfileTagAssignment>? assignedTags = null, bool showTags = true)
+        IReadOnlyList<ProfileTagAssignment>? assignedTags = null, bool showTags = true, bool paper = false)
     {
-        var nameView = UI.Text(name, "hero", maxLines: 2).Tip(name);
+        var nameView = UI.Text(name, "hero", paper ? "accent" : null, maxLines: 2).Tip(name);
         var taxonomy = new VariableWrap(6);
         if (!string.IsNullOrWhiteSpace(category))
         {
@@ -91,12 +91,12 @@ public static class ProfileIdentityView
         stars.VerticalAlignment = VerticalAlignment.Center;
         favorite.VerticalAlignment = VerticalAlignment.Center;
         var preferences = UI.H(10, stars, favorite);
-        stars.Visibility = onRating is null && rating is not > 0 ? Visibility.Collapsed : Visibility.Visible;
-        favorite.Visibility = favoriteCommand is null && !isFavorite ? Visibility.Collapsed : Visibility.Visible;
+        stars.Visibility = !paper && onRating is null && rating is not > 0 ? Visibility.Collapsed : Visibility.Visible;
+        favorite.Visibility = !paper && favoriteCommand is null && !isFavorite ? Visibility.Collapsed : Visibility.Visible;
         preferences.Visibility = stars.Visibility == Visibility.Collapsed && favorite.Visibility == Visibility.Collapsed
             ? Visibility.Collapsed : Visibility.Visible;
         taxonomy.Visibility = taxonomy.Children.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
-        var content = UI.V(8, taxonomy, nameView, preferences, actions, status);
+        var content = paper ? UI.V(6, nameView, taxonomy, preferences, actions, status) : UI.V(8, taxonomy, nameView, preferences, actions, status);
         content.SizeChanged += (_, args) =>
         {
             var size = ThemeRuntime.Current.TypeStyle("hero").Size;
@@ -122,9 +122,9 @@ public static class ProfileIdentityView
         {
             Child = content, Padding = new Thickness(12),
             VerticalAlignment = VerticalAlignment.Center,
-            Background = ThemeRuntime.Current.Brush("canvas"),
+            Background = ThemeRuntime.Current.Brush(paper ? "transparent" : "canvas"),
             BorderBrush = ThemeRuntime.Current.Brush("borderSubtle"),
-            BorderThickness = new Thickness(0, 0, 0, 1),
+            BorderThickness = paper ? new Thickness(0) : new Thickness(0, 0, 0, 1),
         };
     }
 }
@@ -297,7 +297,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         var figureChanged = !ReferenceEquals(previousState?.FigureView, state.FigureView);
         var layoutChanged = previousState is null || previousState.Layout != state.Layout
             || previousState.IndependentModules != state.IndependentModules
-            || previousState.FocusedBanner != state.FocusedBanner;
+            || previousState.FocusedBanner != state.FocusedBanner || previousState.Paper != state.Paper;
         if (layoutChanged)
         {
             SurfaceComposer.Detach(_bannerFrame);
@@ -389,7 +389,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         height = Math.Min(height, width < 960 ? 180.0 : width < 1200 ? 220.0 : 280.0);
 
         var showBanner = (state.IndependentModules || layout.BannerMode != ProfileLayoutBannerMode.None)
-            && (!string.IsNullOrWhiteSpace(state.BannerVideoPath) || state.BannerPoster is not null);
+            && (!string.IsNullOrWhiteSpace(state.BannerVideoPath) || state.BannerPoster is not null || (state.Paper && state.BannerArtwork is not null));
         _tagOverlay.Visibility = showBanner && !state.IndependentModules && layout.Id == "portrait" ? Visibility.Visible : Visibility.Collapsed;
         _tagOverlay.Margin = new Thickness(pagePadding, 16, pagePadding, 16);
         _tagOverlay.MaxWidth = CanOverlayFigure(layout, showBanner, state.FigureView is not null, width)
@@ -436,7 +436,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
 
             _bannerFrame.MinHeight = 0;
             _identityHost.MinHeight = 0;
-            _bannerFrame.Height = showBanner ? height : 0;
+            _bannerFrame.Height = showBanner ? (state.Paper && state.IndependentModules ? double.NaN : height) : 0;
             var contained = layout.BannerMode == ProfileLayoutBannerMode.Contained
                 || (layout.BannerMode == ProfileLayoutBannerMode.Split && width < 960);
             _bannerFrame.Margin = contained && !state.IndependentModules
@@ -547,7 +547,8 @@ public sealed class ProfileHeaderView : Grid, IDisposable
             coverVisual.FrameMode = layout.CoverDetailLevel == Design.CoverFrames.CoverFrameDetailLevel.Hidden
                 ? "none"
                 : layout.CoverDetailLevel == Design.CoverFrames.CoverFrameDetailLevel.Compact ? "lite" : "full";
-            coverVisual.Width = coverVisual.Height = coverSize;
+            if (!state.Paper || !ReferenceEquals(coverVisual, _coverView))
+                coverVisual.Width = coverVisual.Height = coverSize;
         }
         _coverView = coverVisual;
         CoverFramingSurfaceChanged?.Invoke(coverVisual);

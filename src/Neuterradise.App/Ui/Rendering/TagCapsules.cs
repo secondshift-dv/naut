@@ -31,8 +31,7 @@ public static class TagCapsules
             uint hash = 2166136261;
             foreach (var character in tag.TagId) hash = unchecked((hash ^ character) * 16777619);
             var color = Palette[hash % Palette.Length];
-            var label = UI.Text(tag.DisplayName, "caption", maxLines: 1);
-            label.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 17, 23, 33));
+            var label = UI.Text(tag.DisplayName, "caption", "#FF111721", maxLines: 1);
             label.TextTrimming = TextTrimming.CharacterEllipsis;
             var chip = new Border
             {

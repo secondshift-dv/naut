@@ -27,12 +27,14 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
     private readonly TextBlock _notice = UI.WrappedText(string.Empty, "caption", "danger");
     private readonly Grid _empty = new() { Visibility = Visibility.Collapsed };
     private readonly FrameworkElement _paginationHost;
+    private PaginationBar? _pager;
     private readonly ContentControl _header = new() { HorizontalContentAlignment = HorizontalAlignment.Stretch };
     private Disposables _headerBag = new();
     private readonly Dictionary<Guid, CompiledDefinition> _cardByProfile = [];
     private readonly Dictionary<FrameworkElement, IDisposable> _cardObservers = [];
     private GalleryLayoutPlan _layout = null!;
     private BackdropView? _sceneBackground;
+    private SkImageView? _viewportArtwork;
     private BackdropView? _sceneForeground;
     private bool _measurePinboardByCardAspect;
     private int _presentationGeneration;
@@ -113,6 +115,8 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         var layoutDefinition = ResolvePresentation(PresentationSlots.GalleryLayout, Context);
         _layout = layoutDefinition.PlanAs<GalleryLayoutPlan>();
         UpdateScene();
+        _pager?.SetOverlayStyle(_layout.Scene?.ViewportArtwork is not null);
+        ApplyPadding();
         _measurePinboardByCardAspect = layoutDefinition.Origin == PackOrigin.BuiltIn
             && layoutDefinition.Ref.DefinitionId == "builtin.neuterradise.gallery.pinboard";
         _defaultCard = ResolvePresentation(PresentationSlots.ProfileCard, Context);
@@ -151,6 +155,23 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
             view.Plan = plan;
             view.IsSurfaceActive = IsActive;
         }
+        if (_layout.Scene?.ViewportArtwork is { } path)
+        {
+            if (_viewportArtwork is null)
+            {
+                _viewportArtwork = new SkImageView { IsHitTestVisible = false, PlaceholderToken = "transparent",
+                    Transform = MediaTransformState.Default with { Fit = "stretch" } };
+                Grid.SetRowSpan(_viewportArtwork, 3);
+                _root.Children.Insert(0, _viewportArtwork);
+            }
+            _viewportArtwork.Source = ImageRef.FromPath(path, 1920);
+        }
+        else if (_viewportArtwork is not null)
+        {
+            _root.Children.Remove(_viewportArtwork);
+            _viewportArtwork.Source = null;
+            _viewportArtwork = null;
+        }
         Update(ref _sceneBackground, _layout.Scene?.Background, false);
         Update(ref _sceneForeground, _layout.Scene?.Foreground, true);
     }
@@ -163,8 +184,11 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         var availableWidth = Math.Max(120, viewportWidth - (2 * UI.PagePadding(viewportWidth)) - 12);
         var preferredWidth = Math.Min(availableWidth, Math.Clamp(_layout.ItemMinWidth, 120, _layout.ItemMaxWidth));
         var columns = Math.Max(1, (int)Math.Floor((availableWidth + _layout.Spacing) / (preferredWidth + _layout.Spacing)));
+        var fixedSlot = _layout.Scene?.FixedSlot == true;
+        if (fixedSlot && _layout.Scene is { CompactColumns: > 0 } fixedScene && columns < _layout.MaxColumns)
+            columns = Math.Min(columns, fixedScene.CompactColumns);
         columns = Math.Min(columns, Math.Max(1, _layout.MaxColumns));
-        if (_layout.HeightPattern is null && _layout.Primitive is not (CollectionPrimitives.SingleColumn or CollectionPrimitives.List or CollectionPrimitives.Carousel))
+        if (!fixedSlot && _layout.HeightPattern is null && _layout.Primitive is not (CollectionPrimitives.SingleColumn or CollectionPrimitives.List or CollectionPrimitives.Carousel))
             columns = Math.Min(columns, Math.Max(1, _vm.Cards.Count));
         var width = Math.Min(_layout.ItemMaxWidth, (availableWidth - ((columns - 1) * _layout.Spacing)) / columns);
         if (_layout.Primitive == CollectionPrimitives.Carousel)
@@ -174,9 +198,10 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         var requestedHeight = _layout.ItemAspect is { } containerAspect
             ? width / Math.Max(0.3, containerAspect)
             : _layout.RowHeight;
-        var rowHeight = Math.Min(Math.Max(120, requestedHeight), Math.Max(160, viewportHeight * 0.52)) + CardActionHeight;
+        var rowHeight = (fixedSlot ? requestedHeight :
+            Math.Min(Math.Max(120, requestedHeight), Math.Max(160, viewportHeight * 0.52))) + CardActionHeight;
 
-        Layout layout = _layout.Primitive switch
+        Layout layout = fixedSlot ? Repeaters.Grid(width, rowHeight, _layout.Spacing, columns) : _layout.Primitive switch
         {
             // Uno Skia's LinedFlowLayout does not reliably realize this Gallery yet.
             // Preserve the curated semantic choices on the proven virtualized hosts.
@@ -229,6 +254,7 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
     {
         var padding = UI.PagePadding(_root.ActualWidth);
         _scroll.Padding = new Thickness(padding, 6, padding, 16);
+        _header.Margin = new Thickness(0, _root.ActualHeight * (_layout?.Scene?.HeaderSpace ?? 0), 0, 0);
     }
 
     protected override void OnActivated(AppRoute route)
@@ -577,9 +603,10 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         }
         _headerBag.Add(Observe.Collection(_vm.ActiveFilters, UpdateActiveFilters));
         _headerBag.Add(Observe.Props(_vm, UpdateActiveFilters, nameof(GalleryViewModel.HasSearchText)));
-        var titleRow = UI.H(8,
-            UI.Text(UI.T("Nav.Gallery", "Gallery"), "page-title"),
-            _count.Align(vertical: VerticalAlignment.Center));
+        var titleRow = UI.H(8);
+        if (_layout.Scene?.ViewportArtwork is null)
+            titleRow.Children.Add(UI.Text(UI.T("Nav.Gallery", "Gallery"), "page-title"));
+        titleRow.Children.Add(_count.Align(vertical: VerticalAlignment.Center));
         var searchRow = UI.Grid("auto", "auto,*",
             new IconView("icon.action.search", 14, "textMuted").Align(vertical: VerticalAlignment.Center).Margin(0, 0, 6, 0).At(0, 0),
             UI.DecoratedControl(search).At(0, 1));
@@ -608,9 +635,19 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
             toolbar = UI.Wrap(8, titleRow, searchRow, sort, favorites, moreFilters, clear);
         }
         UpdateActiveFilters();
-        var header = UI.Surface(UI.V(6, toolbar, _notice), Material.Grounded, 0, 0);
-        header.BorderBrush = ThemeRuntime.Current.Brush("borderSubtle");
-        header.BorderThickness = new Thickness(0, 0, 0, 1);
+        var header = _layout.Scene?.ViewportArtwork is not null
+            ? new Border { Child = UI.V(6, toolbar, _notice), Background = ThemeRuntime.Current.Brush("transparent") }
+            : UI.Surface(UI.V(6, toolbar, _notice), Material.Grounded, 0, 0);
+        if (_layout.Scene?.ViewportArtwork is not null)
+        {
+            foreach (var control in new Control[] { search, sort, favorites, moreFilters, clear })
+                UI.StyleOverlayControl(control);
+        }
+        else
+        {
+            header.BorderBrush = ThemeRuntime.Current.Brush("borderSubtle");
+            header.BorderThickness = new Thickness(0, 0, 0, 1);
+        }
         header.Padding = new Thickness(14, 8, 14, 8);
         _notice.Visibility = string.IsNullOrWhiteSpace(_notice.Text) ? Visibility.Collapsed : Visibility.Visible;
         return header;
@@ -627,6 +664,7 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
             () => _vm.PageSize,
             size => _vm.SetPageSizeCommand.Execute(size),
             page => _ = _vm.GoToPageAsync(page));
+        _pager = pager;
         Bag.Add(pager);
         return pager.View.Margin(14, 4, 14, 6);
     }
@@ -688,6 +726,59 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         _ => null,
     };
 
+    internal static Button CreateCardAction(GalleryScenePlan? scene, Action action)
+    {
+        var label = UI.T("Card.Customize", "Customize Card");
+        if (scene?.ActionArtwork is not { } path)
+            return UI.Button(label, action, ButtonKind.Ghost, "icon.navigation.customize");
+
+        var machine = new SkImageView { Source = ImageRef.FromPath(path, 768), PlaceholderToken = "transparent",
+            Transform = MediaTransformState.Default with { Fit = "stretch" } };
+        var text = UI.Text(label, "control", scene.ActionText, 1);
+        text.HorizontalAlignment = HorizontalAlignment.Center;
+        text.VerticalAlignment = VerticalAlignment.Center;
+        var content = new Grid { IsHitTestVisible = false };
+        content.Children.Add(machine);
+        content.Children.Add(text);
+        var button = new Button
+        {
+            Content = content, Padding = new Thickness(0), BorderThickness = new Thickness(0),
+            Height = CardActionHeight, MinHeight = 0, MinWidth = 0,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, label);
+        button.Tip(label);
+        button.Click += (_, _) => action();
+        var hovered = false;
+        void Paint()
+        {
+            var theme = ThemeRuntime.Current;
+            text.Foreground = theme.Brush(hovered ? scene.ActionHoverText : scene.ActionText);
+            machine.Opacity = hovered ? 1 : .9;
+        }
+        ThemeRuntime.Current.TrackControl(button, value =>
+        {
+            var theme = ThemeRuntime.Current;
+            value.Padding = new Thickness(0);
+            value.BorderThickness = new Thickness(0);
+            value.Background = theme.Brush("transparent");
+            value.BorderBrush = theme.Brush("transparent");
+            value.FocusVisualPrimaryBrush = theme.Brush(scene.ActionHoverText);
+            foreach (var suffix in new[] { "", "PointerOver", "Pressed", "Disabled" })
+            {
+                value.Resources["ButtonBackground" + suffix] = theme.Brush("transparent");
+                value.Resources["ButtonBorderBrush" + suffix] = theme.Brush("transparent");
+            }
+            Paint();
+        });
+        button.PointerEntered += (_, _) => { hovered = true; Paint(); };
+        button.PointerExited += (_, _) => { hovered = false; Paint(); };
+        button.PointerCanceled += (_, _) => { hovered = false; Paint(); };
+        button.Unloaded += (_, _) => { hovered = false; Paint(); };
+        return button;
+    }
+
     private FrameworkElement Create(string kind, object? data)
     {
         var definition = data is GalleryCardViewModel card ? CardFor(card) : _defaultCard;
@@ -698,7 +789,7 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Top,
         };
-        var customize = UI.Button(UI.T("Card.Customize", "Customize Card"), () =>
+        var customize = CreateCardAction(_layout.Scene, () =>
         {
             if (host.DataContext is GalleryCardViewModel item)
             {
@@ -707,10 +798,10 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
                 Services.OpenCustomization(CustomizationCategories.Profile,
                     PresentationContext.ForProfile(state, "gallery"), PresentationSlots.ProfileCard);
             }
-        }, ButtonKind.Ghost, "icon.navigation.customize");
+        });
         customize.Height = CardActionHeight;
         customize.MinHeight = 0;
-        customize.HorizontalAlignment = HorizontalAlignment.Center;
+        customize.HorizontalAlignment = _layout.Scene?.ActionArtwork is not null ? HorizontalAlignment.Stretch : HorizontalAlignment.Center;
         customize.Tapped += (_, args) => args.Handled = true;
         if (_layout.Scene is { } scene)
         {
@@ -763,7 +854,7 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         };
         host.PointerEntered += (_, _) =>
         {
-            if (host.DataContext is GalleryCardViewModel { HasBannerHover: true } item
+            if (visual.Plan.HoverRoot is null && host.DataContext is GalleryCardViewModel { HasBannerHover: true } item
                 && (visual.Plan.UsesBanner || visual.Plan.Hover is "spotlight" or "banner")
                 && visual.BannerMediaHost is { } mediaHost)
             {
@@ -772,7 +863,7 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         };
         host.PointerExited += (_, _) =>
         {
-            if (visual.BannerMediaHost is { } mediaHost)
+            if (visual.Plan.HoverRoot is null && visual.BannerMediaHost is { } mediaHost)
             {
                 HoverVideoCoordinator.Shared.Release(mediaHost);
             }
@@ -979,9 +1070,10 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
             return;
         }
 
-        if (CardIn(host) is { BannerMediaHost: { } mediaHost })
+        if (CardIn(host) is { } visual)
         {
-            HoverVideoCoordinator.Shared.Release(mediaHost);
+            visual.ResetHover();
+            if (visual.BannerMediaHost is { } mediaHost) HoverVideoCoordinator.Shared.Release(mediaHost);
         }
         if (_cardObservers.Remove(host, out var observer))
         {

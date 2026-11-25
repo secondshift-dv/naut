@@ -194,7 +194,25 @@ public sealed partial class PresentationCompiler
         {
             artwork = context.Asset(art.GetString()!, PackAssetKind.Image, "artwork");
         }
-        return new ThemePlan(theme, material, artwork);
+        string? dropzone = null;
+        if (spec.TryGetProperty("importDropzoneArtwork", out _))
+        {
+            if (context.ContractVersion < 4)
+                context.Error("importDropzoneArtwork", "Import dropzone artwork requires Contract 4.");
+            else
+                dropzone = context.Asset(context.String(spec, "importDropzoneArtwork", ""), PackAssetKind.Image, "importDropzoneArtwork");
+        }
+        InspectorPhonePlan? phone = null;
+        if (spec.TryGetProperty("inspectorPhone", out var phoneSpec))
+        {
+            if (context.ContractVersion < 4 || phoneSpec.ValueKind != JsonValueKind.Object)
+                context.Error("inspectorPhone", "The Media Inspector phone shell requires Contract 4 and an object.");
+            else phone = new InspectorPhonePlan(
+                context.Asset(context.String(phoneSpec, "brandArtwork", ""), PackAssetKind.Image, "inspectorPhone.brandArtwork"),
+                context.Color(phoneSpec, "bezel", "#FF100D18"),
+                context.Color(phoneSpec, "rim", "token:borderStrong"));
+        }
+        return new ThemePlan(theme, material, artwork, ImportDropzoneArtwork: dropzone, InspectorPhone: phone);
     }
 
     // ---------------------------------------------------------------- backdrop / environment
@@ -326,21 +344,29 @@ public sealed partial class PresentationCompiler
                 rails.Add(new HomeRailPlan(
                     context.Enum(rail, "id", RailIds, "recent"),
                     context.Bool(rail, "visible", true),
-                    context.Enum(rail, "style", ["poster", "tile", "compact", "strip"], "tile"),
+                    context.Enum(rail, "style", context.ContractVersion >= 4
+                        ? ["poster", "tile", "compact", "strip", "cover-only", "hud"]
+                        : ["poster", "tile", "compact", "strip"], "tile"),
                     (int)context.Number(rail, "maxItems", 12, 3, 24)));
             }
         }
 
+        var surface = CompileSurface(spec, context, DefinitionKinds.HomeLayout);
+        var stage = context.ContractVersion >= 4 && context.Bool(spec, "viewportStage", false);
+        if (stage && (surface is not { Kind: "canvas", Modular: true, Narrow: null } || surface.Padding != 0))
+            context.Error("viewportStage", "A viewport stage requires a single unpadded modular canvas.");
         return new HomeLayoutPlan(
             hero.ValueKind == JsonValueKind.Object ? context.Enum(hero, "placement", ["full-bleed", "inset", "split"], "full-bleed") : "full-bleed",
             hero.ValueKind == JsonValueKind.Object ? context.Number(hero, "heightFraction", 0.38, 0.25, 0.7) : 0.38,
             hero.ValueKind == JsonValueKind.Object ? context.Number(hero, "minHeight", 240, 180, 520) : 240,
             hero.ValueKind == JsonValueKind.Object ? context.Number(hero, "maxHeight", 420, 280, 1000) : 420,
-            rails, CompileSurface(spec, context, DefinitionKinds.HomeLayout));
+            rails, surface) { ViewportStage = stage };
     }
 
     private static SpotlightPlan CompileSpotlight(JsonElement spec, SpecContext context) => new(
-        context.Enum(spec, "composition", ["cinematic-left", "centered-poster", "split-glass", "editorial", "storefront", "snapshot", "cinema"], "cinematic-left"),
+        context.Enum(spec, "composition", context.ContractVersion >= 4
+            ? ["cinematic-left", "centered-poster", "split-glass", "editorial", "storefront", "snapshot", "cinema", "marquee"]
+            : ["cinematic-left", "centered-poster", "split-glass", "editorial", "storefront", "snapshot", "cinema"], "cinematic-left"),
         context.Enum(spec, "motion", ["ken-burns", "parallax-drift", "still"], "ken-burns"),
         context.Enum(spec, "transition", ["crossfade-depth", "slide", "fade"], "crossfade-depth"),
         context.Number(spec, "rotationSeconds", 12, 10, 60),
@@ -400,12 +426,29 @@ public sealed partial class PresentationCompiler
                     context.Error("scene.cardSizing", "Catalogue detail rows require uncropped Cards.");
                 if (sizing == "intrinsic" && primitive is (CollectionPrimitives.Carousel or CollectionPrimitives.List or CollectionPrimitives.SingleColumn))
                     context.Error("scene.cardSizing", "Intrinsic masonry requires a vertical grid or shelf collection.");
+                var fixedSlot = context.Bool(authored, "fixedSlot", false);
+                var compactColumns = (int)context.Number(authored, "compactColumns", 0, 0, 16);
+                if (fixedSlot && (aspect is null || pattern is not null || sizing != "contain"
+                    || primitive is not (CollectionPrimitives.Grid or CollectionPrimitives.UniformGrid or CollectionPrimitives.AdaptiveWall)))
+                    context.Error("scene.fixedSlot", "A fixed slot requires itemAspect, contain sizing, and a uniform vertical grid without heightPattern.");
+                if (compactColumns > 0 && !fixedSlot)
+                    context.Error("scene.compactColumns", "Compact columns require a fixed slot.");
+                var viewportArtwork = context.OptionalString(authored, "viewportArtwork");
+                var actionArtwork = context.OptionalString(authored, "actionArtwork");
+                if (viewportArtwork is not null && background is not null)
+                    context.Error("scene.viewportArtwork", "Use either viewport artwork or a field background.");
                 scene = new(background, foreground,
                     overlay is null ? null : context.Asset(overlay, PackAssetKind.Image, "scene.itemOverlay"),
                     context.Number(authored, "itemInset", 0, 0, 0.3), sizing,
                     context.Number(authored, "cardRotation", 0, -20, 20),
                     context.Number(authored, "cardSkew", 0, -20, 20),
-                    context.Enum(authored, "overlayPlacement", ["front", "behind"], "front"));
+                    context.Enum(authored, "overlayPlacement", ["front", "behind"], "front"),
+                    fixedSlot, compactColumns,
+                    viewportArtwork is null ? null : context.Asset(viewportArtwork, PackAssetKind.Image, "scene.viewportArtwork"),
+                    context.Number(authored, "headerSpace", 0, 0, .35),
+                    actionArtwork is null ? null : context.Asset(actionArtwork, PackAssetKind.Image, "scene.actionArtwork"),
+                    context.Color(authored, "actionText", "#FFFF68C8"),
+                    context.Color(authored, "actionHoverText", "#FFFFC5EA"));
             }
         }
         return new GalleryLayoutPlan(
@@ -422,6 +465,30 @@ public sealed partial class PresentationCompiler
 
     private static ProfileLayoutPlan? CompileProfileLayout(JsonElement spec, SpecContext context)
     {
+        ProfilePaperPlan? paper = null;
+        if (spec.TryGetProperty("paper", out var paperSpec))
+        {
+            if (context.ContractVersion < 4 || paperSpec.ValueKind != JsonValueKind.Object)
+                context.Error("paper", "A paper surface requires a Contract 4 object.");
+            else
+            {
+                string Solid(string key, string fallback)
+                {
+                    var color = context.Color(paperSpec, key, fallback);
+                    if (!color.StartsWith("#FF", StringComparison.OrdinalIgnoreCase) || color.Length != 9)
+                        context.Error("paper." + key, "Paper colors must be opaque #AARRGGBB literals.");
+                    return color;
+                }
+                paper = new(Solid("background", "#FFF8F4F4"), Solid("ink", "#FF21182C"), Solid("accent", "#FFC51B68"));
+            }
+        }
+        ProfileLayoutPlan Compile(ProfileLayoutDefinition layout)
+        {
+            var scene = CompileSurface(spec, context, DefinitionKinds.ProfileLayout);
+            if (paper is not null && scene is not { Modular: true })
+                context.Error("paper", "Paper surfaces require a modular scene.");
+            return new(layout, scene, CompileArtwork(spec, context, "bannerArtwork"), paper);
+        }
         if (spec.TryGetProperty("preset", out var preset) && preset.ValueKind == JsonValueKind.String)
         {
             if (!ProfileLayoutResolver.TryGetBuiltInPreset(preset.GetString(), out var builtIn))
@@ -430,7 +497,7 @@ public sealed partial class PresentationCompiler
                 return null;
             }
 
-            return new ProfileLayoutPlan(builtIn, CompileSurface(spec, context, DefinitionKinds.ProfileLayout), CompileArtwork(spec, context, "bannerArtwork"));
+            return Compile(builtIn);
         }
 
         if (spec.TryGetProperty("layout", out var layout) && layout.ValueKind == JsonValueKind.Object)
@@ -441,7 +508,7 @@ public sealed partial class PresentationCompiler
                 context.Error("layout", $"{diagnostic.Code}: {diagnostic.Detail}");
             }
 
-            return parsed.Definition is null ? null : new ProfileLayoutPlan(parsed.Definition, CompileSurface(spec, context, DefinitionKinds.ProfileLayout), CompileArtwork(spec, context, "bannerArtwork"));
+            return parsed.Definition is null ? null : Compile(parsed.Definition);
         }
 
         context.Error("layout", "A Profile layout names a built-in 'preset' or embeds a 'layout' object.");
@@ -458,8 +525,10 @@ public sealed partial class PresentationCompiler
         var placement = context.Enum(
             spec,
             "metadataPlacement",
-            ["hover-overlay", "persistent-overlay", "below", "side", "hidden"],
+            ["hover-overlay", "persistent-overlay", "below", "side", "hidden", "live-overlay"],
             "hover-overlay");
+        if (placement == "live-overlay" && context.ContractVersion < 4)
+            context.Error("metadataPlacement", "Live media overlays require Contract 4.");
         var frameStyle = context.Enum(
             spec,
             "frameStyle",
@@ -493,6 +562,7 @@ public sealed partial class PresentationCompiler
             placement switch
             {
                 "persistent-overlay" => MediaMetadataPlacement.PersistentOverlay,
+                "live-overlay" => MediaMetadataPlacement.LiveOverlay,
                 "below" => MediaMetadataPlacement.Below,
                 "side" => MediaMetadataPlacement.Side,
                 "hidden" => MediaMetadataPlacement.Hidden,
@@ -585,6 +655,18 @@ public sealed partial class PresentationCompiler
             return null;
         }
 
+        CompositionNode? hoverRoot = null;
+        if (spec.TryGetProperty("hoverComposition", out var hoverComposition))
+        {
+            if (context.ContractVersion < 4 || hoverComposition.ValueKind != JsonValueKind.Object || hover != "banner")
+                context.Error("hoverComposition", "An independent Banner hover composition requires Contract 4 and hover: banner.");
+            else
+                hoverRoot = CompileNode(hoverComposition, context, "hoverComposition", 0);
+            if (hoverRoot is not CardCanvasNode || root is not CardCanvasNode
+                || CountBannerHosts(hoverRoot) != 1 || CountBannerHosts(hoverRoot, bannerOnly: true) != 1)
+                context.Error("hoverComposition", "Use independent canvas roots and exactly one Banner image in the hover canvas.");
+        }
+
         var plan = new CardPlan(
             context.Number(spec, "aspect", 1, 0.3, 5),
             context.Enum(spec, "art", ["cover", "banner", "cover-over-banner", "none"], "cover"),
@@ -592,7 +674,7 @@ public sealed partial class PresentationCompiler
             hover,
             frameMode,
             context.OptionalString(spec, "legacyVariant"),
-            root);
+            root, hoverRoot);
 
         if (plan.NodeCount > MaxCompositionNodes)
         {
@@ -600,7 +682,7 @@ public sealed partial class PresentationCompiler
             return null;
         }
 
-        if (hover == "banner" && CountBannerHosts(root) != 1)
+        if (hover == "banner" && hoverRoot is null && CountBannerHosts(root) != 1)
         {
             context.Error("composition", "Banner hover requires exactly one Banner image or non-ambient Cover image.");
             return null;
@@ -609,17 +691,18 @@ public sealed partial class PresentationCompiler
         return plan;
     }
 
-    private static int CountBannerHosts(CompositionNode node) => node switch
+    private static int CountBannerHosts(CompositionNode? node, bool bannerOnly = false) => node switch
     {
         ImageNode image when image.Slot == SemanticSlots.ProfileBanner
-            || (image.Slot == SemanticSlots.ProfileCover && !image.Ambient) => 1,
-        StackNode stack => stack.Children.Sum(CountBannerHosts),
-        GridNode grid => grid.Children.Sum(CountBannerHosts),
-        OverlayNode overlay => overlay.Children.Sum(CountBannerHosts),
+            || (!bannerOnly && image.Slot == SemanticSlots.ProfileCover && !image.Ambient) => 1,
+        CardCanvasNode canvas => canvas.Children.Sum(child => CountBannerHosts(child, bannerOnly)),
+        StackNode stack => stack.Children.Sum(child => CountBannerHosts(child, bannerOnly)),
+        GridNode grid => grid.Children.Sum(child => CountBannerHosts(child, bannerOnly)),
+        OverlayNode overlay => overlay.Children.Sum(child => CountBannerHosts(child, bannerOnly)),
         _ => 0,
     };
 
-    private static readonly string[] NodeTypes = ["stack", "grid", "overlay", "text", "image", "frame", "badge", "scrim", "shape", "icon"];
+    private static readonly string[] NodeTypes = ["stack", "grid", "overlay", "text", "image", "frame", "badge", "scrim", "shape", "icon", "canvas", "asset"];
 
     private static CompositionNode? CompileNode(JsonElement node, SpecContext context, string at, int depth)
     {
@@ -630,6 +713,8 @@ public sealed partial class PresentationCompiler
         }
 
         var type = context.Enum(node, "type", NodeTypes, "stack");
+        if (context.ContractVersion < 4 && (type is "canvas" or "asset" || node.TryGetProperty("position", out _)))
+            context.Error(at, "Card canvas artwork requires Contract 4.");
         var layout = new NodeLayout(
             MarginLeft: Margin(node, context, 0),
             MarginTop: Margin(node, context, 1),
@@ -644,7 +729,8 @@ public sealed partial class PresentationCompiler
             RowSpan: (int)context.Number(node, "rowSpan", 1, 1, 12),
             ColumnSpan: (int)context.Number(node, "columnSpan", 1, 1, 12),
             Opacity: context.Number(node, "opacity", 1, 0, 1),
-            VisibleWhen: node.TryGetProperty("visibleWhen", out _) ? context.Slot(node, "visibleWhen", at) : null);
+            VisibleWhen: node.TryGetProperty("visibleWhen", out _) ? context.Slot(node, "visibleWhen", at) : null,
+            CanvasPlacement: ReadArtworkPlacement(node, "position", context, 0, canvas: true));
 
         List<CompositionNode> Children()
         {
@@ -665,8 +751,26 @@ public sealed partial class PresentationCompiler
             return children;
         }
 
+        var ratingStyle = type == "badge" && context.OptionalString(node, "style") == "stars";
+        if (ratingStyle && (context.ContractVersion < 4 || context.OptionalString(node, "slot") != SemanticSlots.ProfileRating))
+            context.Error(at, "Stars are a Contract 4 Profile rating badge.");
+        CardCanvasNode Canvas()
+        {
+            var children = Children();
+            foreach (var child in children)
+                if (child.Layout.CanvasPlacement is not { } placement || placement.X < 0 || placement.Y < 0
+                    || placement.X + placement.Width > 1.000001 || placement.Y + placement.Height > 1.000001
+                    || placement.Horizontal != "left" || placement.Vertical != "top")
+                    context.Error(at, "Canvas children require bounded normalized top-left positions.");
+            return new CardCanvasNode(layout, children);
+        }
+
         return type switch
         {
+            "canvas" => Canvas(),
+            "asset" => new CardAssetNode(layout,
+                context.Asset(context.String(node, "asset", ""), PackAssetKind.Image, at + ".asset"),
+                context.Bool(node, "foreground", false)),
             "stack" => new StackNode(layout,
                 context.Enum(node, "orientation", ["vertical", "horizontal"], "vertical"),
                 context.Number(node, "spacing", 0, 0, 48),
@@ -698,7 +802,7 @@ public sealed partial class PresentationCompiler
             "frame" => new FrameNode(layout, context.Number(node, "size", 96, 32, 320)),
             "badge" => new BadgeNode(layout,
                 context.Slot(node, "slot", at),
-                context.Enum(node, "style", ["glass", "solid", "outline", "text"], "glass")),
+                context.Enum(node, "style", ["glass", "solid", "outline", "text", "stars"], "glass")),
             "scrim" => new ScrimNode(layout,
                 context.Enum(node, "direction", ["to-top", "to-bottom", "to-left", "to-right", "radial"], "to-top"),
                 context.Color(node, "from", "token:heroScrimStrong"),

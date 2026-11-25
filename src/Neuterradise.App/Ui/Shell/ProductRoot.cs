@@ -126,6 +126,9 @@ public sealed class ProductRoot : Grid
         _presentationWorkspace.Children.Add(_content.At(0, 0));
         _presentationWorkspace.Children.Add(_customizationLayer.At(0, 1));
         _shell.Children.Add(_presentationWorkspace.At(2, 1));
+        _shell.Children.Remove(_primaryNavigationHost);
+        _shell.Children.Add(_primaryNavigationHost);
+        _presentationWorkspace.SizeChanged += (_, _) => ApplyNavigationScene();
         _navigationRecovery = new Button
         {
             Content = UI.T("Nav.Recovery", "Native navigation"),
@@ -322,7 +325,8 @@ public sealed class ProductRoot : Grid
         }
         var route = _services.Navigation.CurrentRoute;
         var safeRoute = route is HomeRoute or GalleryRoute or ProfileRoute;
-        var plan = !_nativeNavigation && safeRoute && ActualWidth >= 640 ? authored : null;
+        var plan = !_nativeNavigation && safeRoute && ActualWidth >= 640
+            && (authored?.OverlayHome != true || route is HomeRoute) ? authored : null;
         if (plan is null)
         {
             RestoreLegacyNavigation();
@@ -346,6 +350,9 @@ public sealed class ProductRoot : Grid
         }
 
         var side = plan?.Dock is "left" or "right";
+        var stageAspect = (_current as HomeSurface)?.StageAspect;
+        var overlay = plan is { OverlayHome: true, Dock: "top" } && route is HomeRoute
+            && stageAspect is > 0 && _customization is null;
         var hidden = plan?.Immersive == true && _immersiveHidden && _customization is null;
         _navigationContainer.Visibility = hidden ? Visibility.Collapsed : Visibility.Visible;
         _navigationContainer.Height = plan is not null && !side ? plan.Extent : double.NaN;
@@ -353,11 +360,29 @@ public sealed class ProductRoot : Grid
         Grid.SetRow(_navigationContainer, plan?.Dock == "bottom" ? 3 : 0);
         Grid.SetColumn(_navigationContainer, plan?.Dock == "left" ? 0 : plan?.Dock == "right" ? 2 : 1);
         Grid.SetRowSpan(_navigationContainer, side ? 4 : 1);
+        _navigationContainer.Background = overlay ? ThemeRuntime.Current.Brush("transparent") : _legacyNavigation.Background;
+        _navigationContainer.HorizontalAlignment = overlay ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
+        _navigationContainer.VerticalAlignment = overlay ? VerticalAlignment.Top : VerticalAlignment.Stretch;
+        _navigationContainer.Margin = new Thickness(0);
+        if (overlay)
+        {
+            Grid.SetRow(_navigationContainer, 2);
+            var areaWidth = Math.Max(0, _presentationWorkspace.ActualWidth);
+            var areaHeight = Math.Max(0, _presentationWorkspace.ActualHeight);
+            var stageWidth = areaWidth > 0 && areaHeight > 0
+                ? Math.Min(areaWidth, areaHeight * stageAspect!.Value) : ActualWidth;
+            var stageHeight = stageWidth / stageAspect!.Value;
+            _navigationContainer.Width = Math.Max(0, stageWidth * 0.82);
+            _navigationContainer.Margin = new Thickness(Math.Max(0, (areaWidth - stageWidth) / 2 + stageWidth * 0.025),
+                Math.Max(0, (areaHeight - stageHeight) / 2), 0, 0);
+        }
+        _navigationRecovery.VerticalAlignment = overlay ? VerticalAlignment.Bottom : VerticalAlignment.Top;
         if (plan is not null)
         {
-            foreach (var item in _navButtons) item.Button.SetCompact(side || ActualWidth < 900);
-            _vaultButton?.SetCompact(side || ActualWidth < 900);
-            _customizeButton?.SetCompact(side || ActualWidth < 900);
+            var compact = side || (overlay ? _navigationContainer.Width < 900 : ActualWidth < 900);
+            foreach (var item in _navButtons) item.Button.SetCompact(compact);
+            _vaultButton?.SetCompact(compact);
+            _customizeButton?.SetCompact(compact);
         }
         else UpdateResponsiveTopBar(ActualWidth);
         _navigationRecovery.Visibility = authored is not null && safeRoute && _customization is null
@@ -369,7 +394,11 @@ public sealed class ProductRoot : Grid
     private FrameworkElement BuildBreadcrumb()
     {
         var theme = ThemeRuntime.Current;
-        _breadcrumbHost.Child = _breadcrumb;
+        var stripes = new BreadcrumbStripeView { IsHitTestVisible = false, Visibility = Visibility.Collapsed };
+        var stage = new Grid();
+        stage.Children.Add(stripes);
+        stage.Children.Add(_breadcrumb);
+        _breadcrumbHost.Child = stage;
         _breadcrumb.Visibility = Visibility.Collapsed;
         _breadcrumbHost.Visibility = Visibility.Collapsed;
         theme.TrackControlBorder(_breadcrumbHost, host =>
@@ -385,6 +414,7 @@ public sealed class ProductRoot : Grid
             host.BorderBrush = current.Brush(skin?.Border ?? "borderSubtle");
             host.BorderThickness = skin is null ? new Thickness(0, 0, 0, 1) : ThemeRuntime.ControlEdge(skin);
             _breadcrumb.Spacing = skin?.HorizontalPadding ?? 4;
+            stripes.SetPattern(current.ControlSkin?.BreadcrumbStripeOpacity ?? 0);
         });
         _breadcrumbHost.SizeChanged += (_, _) => FitBreadcrumb();
         return _breadcrumbHost;
@@ -1005,6 +1035,7 @@ public sealed class ProductRoot : Grid
         {
             surface.OnPresentationChanged(args);
         }
+        ApplyNavigationScene();
     }
 
     private void RegisterAccelerators()
