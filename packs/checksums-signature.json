@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "keyId": "nt-release-p256-2026-02",
+  "algorithm": "ECDSA_P256_SHA256",
+  "signedPayloadSha256": "2243b1301d84ccde6db1e031dbd140ed813ed2eb988babc2da43408926aeef44",
+  "signatureBase64": "rXxNzZwDHe9Ral/Z9vegKQ/UjVKJ30cRUf/6LSVI7eacgMy5dsNCmTB8YG7Zgc6g8jgYyedlg/YyqZ195dVQvw=="
+}
