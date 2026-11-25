@@ -74,6 +74,7 @@ function Verify-WorkflowPolicy {
         $lines = @(Get-Content -LiteralPath $workflow.FullName)
         $content = $lines -join "`n"
         $isRelease = $workflow.Name -ceq 'release.yml'
+        $isPackPublication = $workflow.Name -ceq 'packs.yml'
         if ($content -match '(?m)^  (?:pull_request_target|workflow_run):|(?im)^[ \t]*permissions:[ \t]*[^\s#]') {
             throw "Unexpected event or permissions syntax in $($workflow.Name)"
         }
@@ -89,12 +90,12 @@ function Verify-WorkflowPolicy {
                 throw "Unpinned action in $($workflow.Name)"
             }
             if ($line -match '^(\s+)([\w-]+):\s*["'']?write["'']?\s*(?:#.*)?$') {
-                if (-not ($isRelease -and $job -ceq 'publish' -and $Matches[1].Length -eq 6 -and $Matches[2] -in 'actions', 'contents')) {
+                if (-not (($isRelease -or $isPackPublication) -and $job -ceq 'publish' -and $Matches[1].Length -eq 6 -and $Matches[2] -in 'actions', 'contents')) {
                     throw "Unexpected write permission in $($workflow.Name) job '$job'"
                 }
             }
             if ($line -match '\bsecrets\.' -and
-                -not ($isRelease -and $job -ceq 'publish' -and
+                -not (($isRelease -or $isPackPublication) -and $job -ceq 'publish' -and
                     $line -match '^\s+(GH_TOKEN|NEUTERRADISE_UPDATE_SIGNING_KEY_PEM): \$\{\{ secrets\.\w+ \}\}\s*$' -and
                     ($line -match 'GH_TOKEN: \$\{\{ secrets\.GITHUB_TOKEN \}\}' -or
                      $line -match 'NEUTERRADISE_UPDATE_SIGNING_KEY_PEM: \$\{\{ secrets\.NEUTERRADISE_UPDATE_SIGNING_KEY_PEM \}\}'))) {
@@ -110,8 +111,17 @@ function Verify-WorkflowPolicy {
                 }
             }
             'packs.yml' {
-                if ($content -notmatch 'scripts/verify\.ps1 -Scope Packs' -or $content -match 'publish-packs|scripts/(?:build|release)\.ps1') {
-                    throw 'Optional Packs must validate packs without publishing.'
+                $packPublish = [regex]::Match($content, '(?ms)^  publish:\n(.*)\z').Value
+                $packValidation = $content.Substring(0, $content.Length - $packPublish.Length)
+                $guard = '    if: ${{ github.event_name == ''workflow_dispatch'' && inputs.publish == true && github.repository == ''secondshift-dv/naut'' && github.ref == ''refs/heads/main'' }}'
+                if ($packValidation -notmatch 'scripts/verify\.ps1 -Scope Packs' -or
+                    $packValidation -match 'publish-packs\.ps1 -Publish|secrets\.|scripts/(?:build|release)\.ps1' -or
+                    !$packPublish.Contains($guard) -or $packPublish -notmatch '(?m)^    needs: packs\s*$' -or
+                    $packPublish -notmatch '(?m)^        run: \./scripts/utilities/publish-packs\.ps1 -Publish -Prepared\s*$' -or
+                    $packPublish -notmatch 'scripts/verify\.ps1 -Scope WorkflowPolicy' -or
+                    $content -notmatch '(?ms)^  workflow_dispatch:\n    inputs:\n      publish:.*?default: false' -or
+                    $content -match 'scripts/(?:build|release)\.ps1') {
+                    throw 'Optional Packs must validate with read-only permissions and publish only after explicit trusted public-main dispatch.'
                 }
             }
             'release.yml' {

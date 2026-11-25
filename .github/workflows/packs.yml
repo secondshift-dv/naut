@@ -12,6 +12,7 @@ on:
       - 'scripts/verification/verify-privacy.ps1'
       - 'scripts/verification/diagnostics/CuratedPacksProbe.cs'
       - 'scripts/utilities/package-packs.ps1'
+      - 'scripts/utilities/publish-packs.ps1'
       - 'Directory.Build.props'
       - 'global.json'
       - '.github/workflows/packs.yml'
@@ -27,10 +28,17 @@ on:
       - 'scripts/verification/verify-privacy.ps1'
       - 'scripts/verification/diagnostics/CuratedPacksProbe.cs'
       - 'scripts/utilities/package-packs.ps1'
+      - 'scripts/utilities/publish-packs.ps1'
       - 'Directory.Build.props'
       - 'global.json'
       - '.github/workflows/packs.yml'
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the validated collection and signed registry to Pages
+        required: false
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -60,3 +68,43 @@ jobs:
             out/pack-downloads/checksums.json
           if-no-files-found: error
           retention-days: 1
+
+  publish:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true && github.repository == 'secondshift-dv/naut' && github.ref == 'refs/heads/main' }}
+    needs: packs
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      actions: write
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: optional-packs-${{ github.sha }}
+          path: out/pack-downloads
+      - name: Enforce workflow trust policy
+        shell: pwsh
+        run: ./scripts/verify.ps1 -Scope WorkflowPolicy
+      - name: Sign and publish validated pack collection
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEUTERRADISE_UPDATE_SIGNING_KEY_PEM: ${{ secrets.NEUTERRADISE_UPDATE_SIGNING_KEY_PEM }}
+        run: ./scripts/utilities/publish-packs.ps1 -Publish -Prepared
+      - name: Remove consumed pack handoff
+        if: ${{ success() }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $name = "optional-packs-$env:GITHUB_SHA"
+          $inventory = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID/artifacts" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot list pack handoff artifacts.' }
+          $matches = @($inventory.artifacts | Where-Object { $_.name -ceq $name })
+          if ($matches.Count -ne 1) { throw 'Expected exactly one pack handoff.' }
+          gh api -X DELETE "repos/$env:GITHUB_REPOSITORY/actions/artifacts/$($matches[0].id)"
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot delete consumed pack handoff.' }
