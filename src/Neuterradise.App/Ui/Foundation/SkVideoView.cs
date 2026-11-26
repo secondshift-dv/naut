@@ -48,6 +48,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
     private bool _notifyFirstFrame;
     private readonly SKPaint _renderPaint = new() { IsAntialias = true };
     private string? _sourcePath;
+    private string? _resourceIdentity;
     private MediaTransformState _presentation = MediaTransformState.Default;
     private bool _loop;
     private bool _still;
@@ -218,7 +219,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
             overflowY > 0.5 ? -deltaY / overflowY : 0);
     }
 
-    public void Play(string? path, bool loop, bool still = false)
+    public void Play(string? path, bool loop, bool still = false, string? resourceIdentity = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (Volatile.Read(ref _shutdown) != 0)
@@ -232,9 +233,11 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
             return;
         }
 
-        var changed = !string.Equals(_sourcePath, path, StringComparison.OrdinalIgnoreCase);
+        var changed = !string.Equals(_sourcePath, path, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(_resourceIdentity, resourceIdentity, StringComparison.Ordinal);
         var modeChanged = _loop != loop || _still != still;
         _sourcePath = path;
+        _resourceIdentity = resourceIdentity;
         _loop = loop;
         _still = still;
         _active = true;
@@ -274,6 +277,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
 
         _active = false;
         _sourcePath = null;
+        _resourceIdentity = null;
         StopDecoder();
     }
 
@@ -288,7 +292,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
             return;
         }
 
-        var key = new PlaybackKey(_sourcePath, _loop, _still);
+        var key = new PlaybackKey(_sourcePath, _loop, _still, _resourceIdentity);
         if (!Decoders.TryGetValue(key, out var decoder))
         {
             decoder = new SharedDecoder(key, ffmpeg);
@@ -327,13 +331,14 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
         finally { _reconciling = false; }
     }
 
-    private readonly record struct PlaybackKey(string Path, bool Loop, bool Still);
+    private readonly record struct PlaybackKey(string Path, bool Loop, bool Still, string? ResourceIdentity);
     private sealed class PlaybackKeyComparer : IEqualityComparer<PlaybackKey>
     {
         public static PlaybackKeyComparer Instance { get; } = new();
         public bool Equals(PlaybackKey a, PlaybackKey b) =>
-            a.Loop == b.Loop && a.Still == b.Still && StringComparer.OrdinalIgnoreCase.Equals(a.Path, b.Path);
-        public int GetHashCode(PlaybackKey key) => HashCode.Combine(StringComparer.OrdinalIgnoreCase.GetHashCode(key.Path), key.Loop, key.Still);
+            a.Loop == b.Loop && a.Still == b.Still && a.ResourceIdentity == b.ResourceIdentity
+            && StringComparer.OrdinalIgnoreCase.Equals(a.Path, b.Path);
+        public int GetHashCode(PlaybackKey key) => HashCode.Combine(StringComparer.OrdinalIgnoreCase.GetHashCode(key.Path), key.Loop, key.Still, key.ResourceIdentity);
     }
 
     // The UI thread owns the decoder registry, membership and published frame. Decode workers
@@ -823,6 +828,7 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
         Instances.TryRemove(_instanceId, out _);
         _active = false;
         _sourcePath = null;
+        _resourceIdentity = null;
         StopDecoder();
         _renderPaint.Dispose();
     }

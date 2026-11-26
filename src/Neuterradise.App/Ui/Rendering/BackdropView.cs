@@ -401,7 +401,7 @@ public sealed class BackdropView : Grid
                     if (video is null) video = new SkVideoView { Purpose = VideoPurpose.Backdrop };
                     else previousVideos.Remove(video);
                     video.Opacity = layer.Opacity;
-                    video.Play(videoPath, loop: true, still: _tier != VisualTier.Full || variant.Static);
+                    video.Play(videoPath, loop: true, still: _tier != VisualTier.Full || variant.Static, resourceIdentity: layer.AssetIdentity);
                     video.SetActive(_active && ResourceGovernor.Shared.Tier != PresentationTier.Suspended);
                     _videos.Add(video);
                     nextChildren.Add(video);
@@ -646,7 +646,9 @@ internal sealed class BackdropCanvas : SKCanvasElement
     private async Task LoadMediaAsync(BackdropLayer layer)
     {
         var generation = _generation;
-        var lease = await DerivedImageLoader.Shared.LoadAsync(layer.AssetPath, 1920).ConfigureAwait(false);
+        var lease = await (layer.AssetIdentity is { } identity
+            ? DerivedImageLoader.Shared.LoadAsync(identity, layer.AssetPath, 1920)
+            : DerivedImageLoader.Shared.LoadAsync(layer.AssetPath, 1920)).ConfigureAwait(false);
         if (lease is null) return;
         try
         {

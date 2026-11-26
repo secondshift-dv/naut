@@ -44,23 +44,30 @@ public sealed class ThemeRuntime
         var originalHeight = control.Height;
         var originalIconSize = control is Button { Content: IconView initialIcon } ? initialIcon.Width : double.NaN;
         var originalWeight = control.FontWeight;
+        var originalPadding = control.Padding;
+        var originalForeground = control.ReadLocalValue(Control.ForegroundProperty);
+        var hadScene = false;
         var inputPaper = false;
         TrackControl(control, value =>
         {
             var skin = preview?.For(family) ?? ControlFamily(family);
+            var scene = value is Microsoft.UI.Xaml.Controls.Primitives.ButtonBase ? SceneButtonFor(value) : null;
+            if (scene is not null)
+                skin = skin with { Radius = scene.Radius ?? skin.Radius, BorderWidth = scene.BorderWidth ?? skin.BorderWidth,
+                    HorizontalPadding = scene.HorizontalPadding ?? skin.HorizontalPadding, VerticalPadding = scene.VerticalPadding ?? skin.VerticalPadding };
             SolidColorBrush B(string reference) => ScopedBrush(value, reference);
             Brush F(ControlSkinPlan plan, string reference, bool pressed = false) =>
                 PaperFor(value) is not null ? B(reference) : ControlFill(plan, reference, pressed);
 
             value.CornerRadius = new CornerRadius(skin.Radius);
-            value.BorderThickness = ControlEdge(skin);
-            value.FocusVisualPrimaryBrush = B(skin.Focus);
+            value.BorderThickness = scene?.BorderWidth == 0 ? new Thickness(0) : ControlEdge(skin);
+            value.FocusVisualPrimaryBrush = B(scene?.Focus ?? skin.Focus);
             value.FocusVisualPrimaryThickness = new Thickness(Math.Max(2, skin.BorderWidth));
             foreach (var prefix in new[] { "Button", "ToggleButton", "TextControl", "ComboBox" })
             {
-                value.Resources[prefix + "BackgroundDisabled"] = B("surface2");
-                value.Resources[prefix + "ForegroundDisabled"] = B("textDisabled");
-                value.Resources[prefix + "BorderBrushDisabled"] = B("borderSubtle");
+                value.Resources[prefix + "BackgroundDisabled"] = B(scene?.DisabledFill ?? "surface2");
+                value.Resources[prefix + "ForegroundDisabled"] = B(scene?.DisabledForeground ?? "textDisabled");
+                value.Resources[prefix + "BorderBrushDisabled"] = B(scene?.Border ?? "borderSubtle");
             }
             if (family == "input")
             {
@@ -90,14 +97,17 @@ public sealed class ThemeRuntime
             }
             var type = TypeStyle("control");
             value.FontFamily = Font(type.FontRole);
-            value.FontSize = type.Size;
+            value.FontSize = scene?.FontSize ?? type.Size;
+            if (compact && value is Microsoft.UI.Xaml.Controls.Primitives.ButtonBase)
+                value.Padding = new Thickness(scene?.HorizontalPadding ?? originalPadding.Left, scene?.VerticalPadding ?? originalPadding.Top,
+                    scene?.HorizontalPadding ?? originalPadding.Right, scene?.VerticalPadding ?? originalPadding.Bottom);
             value.FontWeight = _typography?.Styles.ContainsKey("control") == true
                 ? new Windows.UI.Text.FontWeight((ushort)type.Weight) : originalWeight;
             if (compact && value is Button { Content: IconView icon } && double.IsFinite(originalIconSize))
             {
                 value.Width = skin.IconButtonSize ?? originalWidth;
                 value.Height = skin.IconButtonSize ?? originalHeight;
-                icon.Width = icon.Height = skin.IconButtonSize is { } iconSize ? Math.Round(iconSize * 0.5) : originalIconSize;
+                icon.Width = icon.Height = icon.ComponentSize ?? (skin.IconButtonSize is { } iconSize ? Math.Round(iconSize * 0.5) : originalIconSize);
             }
             if (family == "slider")
             {
@@ -146,18 +156,46 @@ public sealed class ThemeRuntime
                 var primary = kind == ButtonKind.Primary;
                 var danger = kind == ButtonKind.Destructive;
                 var ghost = kind == ButtonKind.Ghost;
-                value.Background = ghost ? B("transparent") : F(skin, primary ? "accent" : skin.Fill);
-                value.BorderBrush = B(primary ? "accent" : danger ? "danger" : ghost ? "transparent" : skin.Border);
-                value.Resources["ButtonBackground"] = ghost ? B("transparent") : F(skin, primary ? "accent" : skin.Fill);
-                value.Resources["ButtonBackgroundPointerOver"] = F(skin, primary ? "accentHover" : skin.HoverFill);
-                value.Resources["ButtonBackgroundPressed"] = F(skin, primary ? "accentPressed" : skin.PressedFill, pressed: true);
-                value.Resources["ButtonBorderBrush"] = B(primary ? "accent" : danger ? "danger" : ghost ? "transparent" : skin.Border);
-                value.Resources["ButtonForeground"] = B(primary ? "textOnAccent" : danger ? "textDanger" : "textPrimary");
-                value.Resources["ButtonForegroundPointerOver"] = value.Resources["ButtonForeground"];
-                value.Resources["ButtonForegroundPressed"] = value.Resources["ButtonForeground"];
-                value.Resources["ButtonBorderBrushPointerOver"] = B(primary ? "accentHover" : danger ? "danger" : skin.Focus);
-                value.Resources["ButtonBorderBrushPressed"] = B(primary ? "accentPressed" : danger ? "danger" : skin.Focus);
+                var fill = (primary && family is ("chip" or "tab") ? scene?.SelectedFill : null) ?? scene?.Fill;
+                value.Background = fill is not null ? B(fill) : ghost ? B("transparent") : F(skin, primary ? "accent" : skin.Fill);
+                value.BorderBrush = B(scene?.Border ?? (primary ? "accent" : danger ? "danger" : ghost ? "transparent" : skin.Border));
+                value.Resources["ButtonBackground"] = value.Background;
+                value.Resources["ButtonBackgroundPointerOver"] = scene?.HoverFill is { } hover ? B(hover) : F(skin, primary ? "accentHover" : skin.HoverFill);
+                value.Resources["ButtonBackgroundPressed"] = scene?.PressedFill is { } pressed ? B(pressed) : F(skin, primary ? "accentPressed" : skin.PressedFill, pressed: true);
+                value.Resources["ButtonBorderBrush"] = value.BorderBrush;
+                var foreground = scene?.Foreground is { } authored ? Brush(authored)
+                    : B(primary ? "textOnAccent" : danger ? "textDanger" : "textPrimary");
+                if (scene?.Foreground is not null) value.Foreground = foreground;
+                else if (hadScene)
+                {
+                    if (originalForeground == DependencyProperty.UnsetValue) value.ClearValue(Control.ForegroundProperty);
+                    else value.SetValue(Control.ForegroundProperty, originalForeground);
+                }
+                value.Resources["ButtonForeground"] = foreground;
+                value.Resources["ButtonForegroundPointerOver"] = foreground;
+                value.Resources["ButtonForegroundPressed"] = foreground;
+                value.Resources["ButtonBorderBrushPointerOver"] = B(scene?.Focus ?? (primary ? "accentHover" : danger ? "danger" : skin.Focus));
+                value.Resources["ButtonBorderBrushPressed"] = B(scene?.Focus ?? (primary ? "accentPressed" : danger ? "danger" : skin.Focus));
+                if (family == "toggle")
+                {
+                    value.Padding = scene is null ? originalPadding : new Thickness(skin.HorizontalPadding, skin.VerticalPadding, skin.HorizontalPadding, skin.VerticalPadding);
+                    value.Resources["ToggleButtonBackground"] = scene?.Fill is { } off ? B(off) : F(skin, skin.Fill);
+                    value.Resources["ToggleButtonBackgroundPointerOver"] = scene?.HoverFill is { } over ? B(over) : F(skin, skin.HoverFill);
+                    value.Resources["ToggleButtonBackgroundPressed"] = scene?.PressedFill is { } down ? B(down) : F(skin, skin.PressedFill, pressed: true);
+                    value.Resources["ToggleButtonBackgroundChecked"] = B(scene?.SelectedFill ?? "accent");
+                    value.Resources["ToggleButtonBackgroundCheckedPointerOver"] = B(scene?.HoverFill ?? scene?.SelectedFill ?? "accentHover");
+                    value.Resources["ToggleButtonBackgroundCheckedPressed"] = B(scene?.PressedFill ?? scene?.SelectedFill ?? "accentPressed");
+                    foreach (var key in new[] { "ToggleButtonForeground", "ToggleButtonForegroundPointerOver", "ToggleButtonForegroundPressed" })
+                    {
+                        if (scene?.Foreground is not null) value.Resources[key] = foreground;
+                        else if (hadScene) value.Resources.Remove(key);
+                    }
+                    foreach (var key in new[] { "ToggleButtonForegroundChecked", "ToggleButtonForegroundCheckedPointerOver", "ToggleButtonForegroundCheckedPressed" })
+                        value.Resources[key] = B(scene?.Foreground ?? "textOnAccent");
+                    value.Resources["ToggleButtonBorderBrush"] = B(scene?.Border ?? skin.Border);
+                }
             }
+            hadScene = scene is not null;
         });
     }
 
@@ -255,9 +293,57 @@ public sealed class ThemeRuntime
         if (!_controls.TryGetValue(control, out _))
         {
             control.Loaded += OnTrackedControlLoaded;
+            if (control is Microsoft.UI.Xaml.Controls.Primitives.ButtonBase) control.IsEnabledChanged += OnTrackedButtonEnabledChanged;
         }
         _controls.AddOrUpdate(control, apply);
         apply(control);
+    }
+
+    private void OnTrackedButtonEnabledChanged(object sender, DependencyPropertyChangedEventArgs args)
+    {
+        if (sender is Control control && SceneButtonFor(control) is not null)
+        {
+            if (_controls.TryGetValue(control, out var apply)) apply(control);
+            RefreshButtonContent(control);
+        }
+    }
+
+    internal void RefreshButtonContent(DependencyObject root)
+    {
+        if (root is TextBlock text && _typed.TryGetValue(text, out var registration)) ApplyRegisteredType(text, registration);
+        if (root is IconView icon) icon.Invalidate();
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+            RefreshButtonContent(VisualTreeHelper.GetChild(root, i));
+    }
+
+    // Compact authored controls keep their own allocation; only their native palette is projected.
+    internal void TrackArtworkButton(Button button, string foreground)
+    {
+        TrackControl(button, control =>
+        {
+            var scene = SceneButtonFor(control);
+            var color = scene?.Foreground ?? foreground;
+            control.Background = Brush(scene?.Fill ?? "transparent");
+            control.Foreground = Brush(color);
+            control.BorderBrush = Brush(scene?.Border ?? "transparent");
+            control.BorderThickness = new Thickness(scene?.BorderWidth ?? 0);
+            control.CornerRadius = new CornerRadius(scene?.Radius ?? 0);
+            control.FocusVisualPrimaryBrush = Brush(scene?.Focus ?? foreground);
+            control.Resources["ButtonBackground"] = control.Background;
+            control.Resources["ButtonBackgroundPointerOver"] = Brush(scene?.HoverFill ?? "transparent");
+            control.Resources["ButtonBackgroundPressed"] = Brush(scene?.PressedFill ?? "transparent");
+            control.Resources["ButtonBackgroundDisabled"] = Brush(scene?.DisabledFill ?? "transparent");
+            control.Resources["ButtonBorderBrush"] = control.BorderBrush;
+            control.Resources["ButtonBorderBrushPointerOver"] = control.BorderBrush;
+            control.Resources["ButtonBorderBrushPressed"] = control.BorderBrush;
+            control.Resources["ButtonBorderBrushDisabled"] = control.BorderBrush;
+            control.Resources["ButtonForeground"] = control.Foreground;
+            control.Resources["ButtonForegroundPointerOver"] = control.Foreground;
+            control.Resources["ButtonForegroundPressed"] = control.Foreground;
+            control.Resources["ButtonForegroundDisabled"] = Brush(scene?.DisabledForeground ?? foreground);
+            if (control is Button { Content: IconView icon })
+                icon.ColorToken = !control.IsEnabled ? scene?.DisabledForeground ?? color : color;
+        });
     }
 
     private void OnTrackedControlLoaded(object sender, RoutedEventArgs args)
@@ -314,6 +400,44 @@ public sealed class ThemeRuntime
     // ---------------------------------------------------------------- lookups
 
     private readonly ConditionalWeakTable<FrameworkElement, ProfilePaperPlan> _paperScopes = new();
+    private readonly ConditionalWeakTable<FrameworkElement, SceneButtonStyle> _buttonScopes = new();
+
+    private bool _hasButtonScopes;
+
+    internal void SetButtonScope(FrameworkElement root, SceneButtonStyle style)
+    {
+        _hasButtonScopes = true;
+        _buttonScopes.AddOrUpdate(root, style);
+    }
+
+    internal SceneButtonStyle? SceneButtonFor(DependencyObject button)
+    {
+        if (!_hasButtonScopes) return null;
+        for (DependencyObject? current = button; current is not null; current = VisualTreeHelper.GetParent(current) ?? (current as FrameworkElement)?.Parent)
+            if (current is FrameworkElement root && _buttonScopes.TryGetValue(root, out var style)) return style;
+        return null;
+    }
+
+    private (SceneButtonStyle? Style, bool Enabled) ButtonContentScope(DependencyObject element)
+    {
+        if (!_hasButtonScopes) return (null, true);
+        for (DependencyObject? current = element; current is not null; current = VisualTreeHelper.GetParent(current) ?? (current as FrameworkElement)?.Parent)
+            if (current is Microsoft.UI.Xaml.Controls.Primitives.ButtonBase button)
+                return (SceneButtonFor(button), button.IsEnabled);
+        return (null, true);
+    }
+
+    private string ScopedReference(DependencyObject element, string reference)
+    {
+        var token = reference.StartsWith("token:", StringComparison.Ordinal) ? reference[6..] : reference;
+        if (token is "textPrimary" or "textSecondary" or "textMuted" or "textOnAccent" or "textInverse" or "textDisabled")
+        {
+            var (style, enabled) = ButtonContentScope(element);
+            var foreground = enabled ? style?.Foreground : style?.DisabledForeground ?? style?.Foreground;
+            if (foreground is not null) return foreground;
+        }
+        return PaperFor(element) is { } paper ? PaperReference(paper, reference) : reference;
+    }
 
     private ProfilePaperPlan? PaperFor(DependencyObject element)
     {
@@ -362,19 +486,24 @@ public sealed class ThemeRuntime
     }
 
     public SolidColorBrush ScopedBrush(DependencyObject element, string reference) =>
-        Brush(PaperFor(element) is { } paper ? PaperReference(paper, reference) : reference);
+        Brush(ScopedReference(element, reference));
 
     public ArgbColor ScopedArgb(DependencyObject element, string reference)
     {
-        var mapped = PaperFor(element) is { } paper ? PaperReference(paper, reference) : reference;
+        var mapped = ScopedReference(element, reference);
         return Tokens.Resolve(mapped.StartsWith('#') || mapped.StartsWith("token:", StringComparison.Ordinal) ? mapped : "token:" + mapped);
     }
 
     public Brush ScopedControlFill(DependencyObject element, ControlSkinPlan skin, string reference) =>
         PaperFor(element) is not null ? ScopedBrush(element, reference) : ControlFill(skin, reference);
 
-    public Brush ScopedSurfaceBrush(DependencyObject element, bool raised) =>
-        PaperFor(element) is not null ? ScopedBrush(element, "canvas") : SurfaceBrush(raised);
+    public Brush ScopedSurfaceBrush(DependencyObject element, bool raised)
+    {
+        if (PaperFor(element) is not { } paper) return SurfaceBrush(raised);
+        if (paper.SurfaceOpacity >= 1) return ScopedBrush(element, "canvas");
+        var alpha = (int)Math.Round(paper.SurfaceOpacity * 255);
+        return Brush($"#{alpha:X2}{paper.Background[3..]}");
+    }
 
     public SolidColorBrush Brush(string token)
     {
@@ -427,19 +556,20 @@ public sealed class ThemeRuntime
         return _fonts[role] = new FontFamily(Tokens.Text(token));
     }
 
-    public void ApplyType(TextBlock block, string role, string? colorToken = null)
+    public void ApplyType(TextBlock block, string role, string? colorToken = null, double? fontSize = null)
     {
         if (!_typed.TryGetValue(block, out var registration))
             block.Loaded += OnTrackedTextLoaded;
-        if (registration is null || registration.Role != role || registration.Color != colorToken)
-            _typed.AddOrUpdate(block, registration = new TypeRegistration(role, colorToken));
+        if (registration is null || registration.Role != role || registration.Color != colorToken || registration.FontSize != fontSize)
+            _typed.AddOrUpdate(block, registration = new TypeRegistration(role, colorToken, fontSize));
         ApplyRegisteredType(block, registration);
     }
 
     private void OnTrackedTextLoaded(object sender, RoutedEventArgs args)
     {
         if (sender is TextBlock block && _typed.TryGetValue(block, out var registration)
-            && (registration.AppliedRevision != _appearanceRevision || registration.Paper != PaperFor(block)))
+            && (registration.AppliedRevision != _appearanceRevision || registration.Paper != PaperFor(block)
+                || registration.ButtonScope != ButtonContentScope(block)))
             ApplyRegisteredType(block, registration);
     }
 
@@ -447,12 +577,15 @@ public sealed class ThemeRuntime
     {
         var style = TypeStyle(registration.Role);
         block.FontFamily = Font(style.FontRole);
-        block.FontSize = style.Size;
-        block.LineHeight = style.LineHeight;
+        var buttonScope = ButtonContentScope(block);
+        var fontSize = registration.FontSize ?? buttonScope.Style?.FontSize;
+        block.FontSize = fontSize ?? style.Size;
+        block.LineHeight = fontSize is { } size ? Math.Max(size * 1.25, size + 2) : style.LineHeight;
         block.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
         block.FontWeight = new Windows.UI.Text.FontWeight((ushort)style.Weight);
         block.Foreground = ScopedBrush(block, registration.Color ?? style.ColorRole);
         registration.Paper = PaperFor(block);
+        registration.ButtonScope = buttonScope;
         registration.AppliedRevision = _appearanceRevision;
         if (style.Trim)
         {
@@ -766,9 +899,10 @@ public sealed class ThemeRuntime
             if (element.IsLoaded) apply(element);
     }
 
-    private sealed record TypeRegistration(string Role, string? Color)
+    private sealed record TypeRegistration(string Role, string? Color, double? FontSize)
     {
         public int AppliedRevision { get; set; } = -1;
         public ProfilePaperPlan? Paper { get; set; }
+        public (SceneButtonStyle? Style, bool Enabled) ButtonScope { get; set; }
     }
 }

@@ -83,7 +83,20 @@ public sealed class IconView : SKCanvasElement
     private string _color;
     private bool _filled;
     private bool _selected;
+    private ComponentVisualStyle? _componentStyle;
     private ThemeRuntime? _registeredTheme;
+
+    internal double? ComponentSize => _componentStyle?.IconSize;
+
+    internal void ApplyComponentStyle(ComponentVisualStyle? style, double fallbackSize)
+    {
+        var changed = _componentStyle != style;
+        _componentStyle = style;
+        var size = style?.IconSize ?? fallbackSize;
+        if (Width != size) Width = size;
+        if (Height != size) Height = size;
+        if (changed) Invalidate();
+    }
 
     private sealed record CachedPath(string Data, SKPath Path);
 
@@ -188,16 +201,18 @@ public sealed class IconView : SKCanvasElement
 
     protected override void RenderOverride(SKCanvas canvas, Size area)
     {
-        var skin = ThemeRuntime.Current.ControlSkin?.Icons.GetValueOrDefault(_key);
+        var skin = _componentStyle?.Icon ?? ThemeRuntime.Current.ControlSkin?.Icons.GetValueOrDefault(_key);
         var data = skin is null ? IconCatalog.PathFor(_key)
             : _selected && skin.SelectedPath is { } selected ? selected : skin.Path;
         var scale = (float)(Math.Min(area.Width, area.Height) / 24.0);
 
         using var path = AcquirePathCopy(data);
+        var color = _selected ? _componentStyle?.SelectedColor : _componentStyle?.IconColor;
         using var paint = new SKPaint
         {
             IsAntialias = true,
-            Color = SkiaColor.From(ThemeRuntime.Current.ScopedArgb(this, _color)),
+            Color = SkiaColor.From(color is null ? ThemeRuntime.Current.ScopedArgb(this, _color)
+                : ThemeRuntime.Current.Argb(color.Replace("token:", string.Empty, StringComparison.Ordinal))),
             Style = SKPaintStyle.Stroke,
             StrokeWidth = (float)(skin?.StrokeWidth ?? IconCatalog.StrokeWidth),
             StrokeCap = SKStrokeCap.Round,

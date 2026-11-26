@@ -391,13 +391,24 @@ public sealed partial class CustomizationCenter
             {
                 "banner" when plan.BannerArtwork is { } artwork => new ArtworkCompositionView(artwork,
                     role => role == "artwork" ? new SkImageView { Source = _bannerSource, PlaceholderToken = "surface1" } : null),
-                "identity" => UI.V(4, UI.Text(_subject?.Detail.DisplayName ?? _launchRequest?.ProfileDisplayName ?? "Profile", "hero", "accent", 2),
-                    UI.Text(_subject?.Detail.CategoryName ?? string.Empty, "body", "textSecondary", 1)).Align(vertical: VerticalAlignment.Center),
+                "identity" => plan.Visuals is null ? UI.V(4, UI.Text(_subject?.Detail.DisplayName ?? _launchRequest?.ProfileDisplayName ?? "Profile", "hero", "accent", 2),
+                    UI.Text(_subject?.Detail.CategoryName ?? string.Empty, "body", "textSecondary", 1)).Align(vertical: VerticalAlignment.Center)
+                    : ProfileIdentityView.Create(_subject?.Detail.DisplayName ?? _launchRequest?.ProfileDisplayName ?? "Profile",
+                    _subject?.Detail.CategoryName, [], _subject?.Detail.Rating, _subject?.Detail.IsFavorite ?? false,
+                    layout.IdentityAlignment, showTags: false, paper: true, visuals: plan.Visuals),
                 "cover" => new SkImageView { Source = _coverSource, Width = 176, Height = 176, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
-                "tags" => UI.Text(UI.T("Profile.Tags", "Tags"), "section-title").Margin(12),
-                "overview" => UI.Text(UI.T("Profile.Overview", "Overview"), "section-title").Margin(12),
-                "related" => UI.Text(UI.T("Profile.Related", "Related"), "section-title").Margin(12),
-                "media" => UI.Text(UI.T("Profile.Media", "Media"), "section-title").Margin(12),
+                "tags" => plan.Visuals?.GetValueOrDefault("tags") is { } tagsStyle
+                    ? DetailLayout.Heading(UI.T("Profile.Tags", "Tags"), null, "icon.profile.tag", tagsStyle).Margin(12)
+                    : UI.Text(UI.T("Profile.Tags", "Tags"), "section-title").Margin(12),
+                "overview" => plan.Visuals?.GetValueOrDefault("overview") is { } overviewStyle
+                    ? DetailLayout.Heading(UI.T("Profile.Overview", "Overview"), null, "icon.status.info", overviewStyle).Margin(12)
+                    : UI.Text(UI.T("Profile.Overview", "Overview"), "section-title").Margin(12),
+                "related" => plan.Visuals?.GetValueOrDefault("related") is { } relatedStyle
+                    ? DetailLayout.Heading(UI.T("Profile.Related", "Related"), null, "icon.profile.related", relatedStyle).Margin(12)
+                    : UI.Text(UI.T("Profile.Related", "Related"), "section-title").Margin(12),
+                "media" => plan.Visuals?.GetValueOrDefault("media") is { } mediaStyle
+                    ? DetailLayout.Heading(UI.T("Profile.Media", "Media"), null, "icon.media.image", mediaStyle).Margin(12)
+                    : UI.Text(UI.T("Profile.Media", "Media"), "section-title").Margin(12),
                 "figure" => new Border { Background = theme.Brush("#FFEDE4EA"), Child = new IconView("icon.media.model", 60).Align(HorizontalAlignment.Center, VerticalAlignment.Center) },
                 _ => null,
             };

@@ -9,6 +9,7 @@ using Neuterradise.App.Import;
 using Neuterradise.App.Localization;
 using Neuterradise.App.Maintenance;
 using Neuterradise.App.Media;
+using Neuterradise.App.Presentation;
 using Neuterradise.App.Profiles;
 using Neuterradise.App.Shell;
 using Neuterradise.App.SystemServices.Cache;
@@ -953,12 +954,14 @@ public sealed class HomeProfileTileViewModel
     {
         ArgumentNullException.ThrowIfNull(summary);
         ProfileId = summary.ProfileId; DisplayName = summary.DisplayName; MediaCount = summary.ActiveOwnedMediaCount; IsFavorite = summary.IsFavorite;
+        CoverTransform = MediaTransformState.FromCover(summary.EffectiveAppearance);
     }
     public Guid ProfileId { get; }
     public string DisplayName { get; }
     public string? CoverImagePath { get; init; }
     public long MediaCount { get; }
     public bool IsFavorite { get; }
+    public MediaTransformState CoverTransform { get; }
     public string MediaCountText => MediaCount == 1 ? SurfaceText.Get("Media.Count.One", "1 item") : SurfaceText.Format("Media.Count.Many", "{0} items", MediaCount);
 }
 

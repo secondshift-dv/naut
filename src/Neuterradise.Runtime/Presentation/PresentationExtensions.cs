@@ -17,9 +17,16 @@ public sealed record SurfaceNode(string Kind, string? Semantic, double Spacing, 
     public string? Fill { get; init; }
     public double Opacity { get; init; } = 1;
     public SceneMotionPlan? Motion { get; init; }
+    public SceneButtonStyle? ButtonStyle { get; init; }
+    public double? BannerAspect { get; init; }
 
     public bool HasRegion(string id) => Semantic == id || Children.Any(child => child.HasRegion(id));
 }
+
+public sealed record SceneButtonStyle(
+    string? Fill, string? HoverFill, string? PressedFill, string? SelectedFill, string? DisabledFill,
+    string? Foreground, string? DisabledForeground, string? Border, string? Focus,
+    double? Radius, double? BorderWidth, double? HorizontalPadding, double? VerticalPadding, double? FontSize);
 
 public sealed record SceneKeyframe(double Time, double X, double Y, double Scale, double Rotation, double Opacity);
 public sealed record SceneMotionPlan(double Seconds, bool Loop, IReadOnlyList<SceneKeyframe> Keyframes);
@@ -31,6 +38,9 @@ public sealed record TypographyPlan(TypographyFace Display, TypographyFace Headi
 }
 
 public sealed record SemanticIconSkin(string Path, string? SelectedPath, double StrokeWidth);
+
+public sealed record ComponentVisualStyle(SemanticIconSkin? Icon, double? IconSize, string? IconColor,
+    string? SelectedColor, double? TextSize, string? TextColor);
 
 public sealed record NavigationScenePlan(SurfaceNode Scene, string Dock, double Extent, bool Immersive)
 {
@@ -145,6 +155,16 @@ public sealed partial class PresentationCompiler
                 || child.HasRegion("recent-media")))
                 context.Error("surface.canvas", "Scrollable Profile collections belong outside finite canvas stages.");
             var hasSize = node.TryGetProperty("width", out _) || node.TryGetProperty("height", out _);
+            var bannerRegion = world && modular && kind == DefinitionKinds.ProfileLayout && semantic == "banner";
+            double? bannerAspect = null;
+            if (node.TryGetProperty("bannerAspect", out _))
+            {
+                if (!bannerRegion) context.Error("bannerAspect", "Banner aspect requires a Contract 4 independent Profile banner.");
+                else if (node.TryGetProperty("height", out _) || node.TryGetProperty("position", out _))
+                    context.Error("bannerAspect", "Use aspect or explicit height/canvas placement, not both.");
+                else bannerAspect = context.Number(node, "bannerAspect", 2, 0.25, 8);
+            }
+            var buttonStyle = ReadSceneButtonStyle(node, context, world && modular && type is not ("image" or "shape" or "spacer" or "divider"));
             if (hasSize && (context.ContractVersion < 3 || !modular))
                 context.Error("surface", "Region dimensions require a modular Presentation Contract 3 surface.");
             return new SurfaceNode(type, semantic, context.Number(node, "spacing", 12, 0, 64),
@@ -158,9 +178,11 @@ public sealed partial class PresentationCompiler
                 Fill = type == "shape" ? context.Color(node, "fill", "token:surface2") : null,
                 Opacity = type is "image" or "shape" ? context.Number(node, "opacity", 1, 0, 1) : 1,
                 Motion = motion,
+                ButtonStyle = buttonStyle,
+                BannerAspect = bannerAspect,
                 Placement = modular ? new NodeLayout(
-                    Width: node.TryGetProperty("width", out _) ? context.Number(node, "width", 320, semantic == "figure" ? 200 : 48, 1440) : null,
-                    Height: node.TryGetProperty("height", out _) ? context.Number(node, "height", 320, semantic == "figure" ? 240 : 24, 960) : null,
+                    Width: node.TryGetProperty("width", out _) ? context.Number(node, "width", 320, semantic == "figure" ? 200 : 48, bannerRegion ? 4096 : 1440) : null,
+                    Height: node.TryGetProperty("height", out _) ? context.Number(node, "height", 320, semantic == "figure" ? 240 : 24, bannerRegion ? 4096 : 960) : null,
                     Row: (int)context.Number(node, "row", 0, 0, 7),
                     Column: (int)context.Number(node, "column", 0, 0, 7),
                     StretchHeight: world && semantic == "figure" && context.Bool(node, "stretchHeight", false),
@@ -198,6 +220,26 @@ public sealed partial class PresentationCompiler
             Narrow = compact,
             Breakpoint = context.Number(root, "breakpoint", 800, 320, 1920),
         };
+    }
+
+    private static SceneButtonStyle? ReadSceneButtonStyle(JsonElement node, SpecContext context, bool allowed)
+    {
+        if (!node.TryGetProperty("buttonStyle", out var style)) return null;
+        if (!allowed || style.ValueKind != JsonValueKind.Object)
+        {
+            context.Error("buttonStyle", "Scoped button styling requires a modular Contract 4 semantic or container.");
+            return null;
+        }
+        foreach (var field in style.EnumerateObject())
+            if (field.Name is not ("fill" or "hoverFill" or "pressedFill" or "selectedFill" or "disabledFill" or "foreground" or "disabledForeground" or "border" or "focus" or "radius" or "borderWidth" or "horizontalPadding" or "verticalPadding" or "fontSize"))
+                context.Error("buttonStyle", $"Unsupported field '{field.Name}'.");
+        string? Color(string key) => style.TryGetProperty(key, out _) ? context.Color(style, key, "token:surface3") : null;
+        double? Number(string key, double minimum, double maximum) => style.TryGetProperty(key, out _)
+            ? context.Number(style, key, minimum, minimum, maximum) : null;
+        return new(Color("fill"), Color("hoverFill"), Color("pressedFill"), Color("selectedFill"), Color("disabledFill"),
+            Color("foreground"), Color("disabledForeground"), Color("border"), Color("focus"),
+            Number("radius", 0, 64), Number("borderWidth", 0, 3), Number("horizontalPadding", 0, 24),
+            Number("verticalPadding", 0, 12), Number("fontSize", 8, 32));
     }
 
     private static SceneMotionPlan? ReadSceneMotion(JsonElement node, SpecContext context, string type)
@@ -336,7 +378,9 @@ public sealed partial class PresentationCompiler
         if (animated > context.Definition.Performance.MaxAnimatedLayers)
             context.Error(name, "Artwork rotation exceeds its declared animation budget.");
         return new(maskPath, groupRotation, plans,
-            artwork.TryGetProperty("aspect", out _) ? context.Number(artwork, "aspect", 1, 0.5, context.ContractVersion >= 4 ? 6 : 4) : null,
+            artwork.TryGetProperty("aspect", out _) ? context.Number(artwork, "aspect", 1,
+                context.ContractVersion >= 4 && name == "bannerArtwork" ? 0.25 : 0.5,
+                context.ContractVersion >= 4 ? name == "bannerArtwork" ? 8 : 6 : 4) : null,
             artwork.TryGetProperty("breakpoint", out _) && context.ContractVersion >= 3
                 ? context.Number(artwork, "breakpoint", 800, 320, 1920) : 800);
     }
@@ -444,17 +488,61 @@ public sealed partial class PresentationCompiler
             else stripeOpacity = context.Number(spec, "breadcrumbStripeOpacity", 0, 0, 0.25);
         }
         return fallback with { Families = families, Icons = icons, Navigation = navigation, BreadcrumbStripeOpacity = stripeOpacity };
+    }
 
-        static bool ValidIcon(string data)
+    private static bool ValidIcon(string data)
+    {
+        if (data.Length is < 1 or > 4096 || !IconCatalog.IsSafePathData(data)) return false;
+        using var path = SKPath.ParseSvgPathData(data);
+        if (path is null || path.IsEmpty || path.PointCount > 256) return false;
+        var bounds = path.Bounds;
+        return float.IsFinite(bounds.Left) && float.IsFinite(bounds.Right)
+            && float.IsFinite(bounds.Top) && float.IsFinite(bounds.Bottom)
+            && bounds.Left >= 0 && bounds.Top >= 0 && bounds.Right <= 24 && bounds.Bottom <= 24;
+    }
+
+    private static IReadOnlyDictionary<string, ComponentVisualStyle>? ReadComponentVisuals(JsonElement spec, SpecContext context, bool media)
+    {
+        if (!spec.TryGetProperty("visuals", out var source)) return null;
+        if (context.ContractVersion < 4 || source.ValueKind != JsonValueKind.Object)
         {
-            if (data.Length is < 1 or > 4096 || !IconCatalog.IsSafePathData(data)) return false;
-            using var path = SKPath.ParseSvgPathData(data);
-            if (path is null || path.IsEmpty || path.PointCount > 256) return false;
-            var bounds = path.Bounds;
-            return float.IsFinite(bounds.Left) && float.IsFinite(bounds.Right)
-                && float.IsFinite(bounds.Top) && float.IsFinite(bounds.Bottom)
-                && bounds.Left >= 0 && bounds.Top >= 0 && bounds.Right <= 24 && bounds.Bottom <= 24;
+            context.Error("visuals", "Component visuals require a Contract 4 object.");
+            return null;
         }
+        var result = new Dictionary<string, ComponentVisualStyle>(StringComparer.Ordinal);
+        foreach (var property in source.EnumerateObject())
+        {
+            var header = !media && property.Name is ("tags" or "media" or "overview" or "related");
+            var selectable = property.Name == "favorite" || (!media && property.Name == "rating");
+            if (!(header || selectable || (media && property.Name is ("open" or "info"))) || property.Value.ValueKind != JsonValueKind.Object)
+            {
+                context.Error("visuals", $"Unknown or invalid component '{property.Name}'.");
+                continue;
+            }
+            var value = property.Value;
+            foreach (var field in value.EnumerateObject())
+                if (!(field.Name is ("path" or "strokeWidth" or "iconSize" or "iconColor")
+                    || (selectable && field.Name is ("selectedPath" or "selectedColor"))
+                    || (header && field.Name is ("textSize" or "textColor"))))
+                    context.Error("visuals", $"Unsupported field '{field.Name}' for '{property.Name}'.");
+            SemanticIconSkin? icon = null;
+            if (value.TryGetProperty("path", out _))
+            {
+                var path = context.String(value, "path", "");
+                var selected = context.OptionalString(value, "selectedPath");
+                if (!ValidIcon(path) || (selected is not null && !ValidIcon(selected)))
+                    context.Error("visuals", $"Invalid vector path for '{property.Name}'.");
+                else icon = new(path, selected, context.Number(value, "strokeWidth", IconCatalog.StrokeWidth, 0.25, 6));
+            }
+            else if (value.TryGetProperty("selectedPath", out _) || value.TryGetProperty("strokeWidth", out _))
+                context.Error("visuals", "A vector path is required with selectedPath or strokeWidth.");
+            string? Color(string key) => value.TryGetProperty(key, out _) ? context.Color(value, key, "token:textPrimary") : null;
+            double? Number(string key, double min, double max) => value.TryGetProperty(key, out _)
+                ? context.Number(value, key, min, min, max) : null;
+            result[property.Name] = new(icon, Number("iconSize", 8, 24), Color("iconColor"), Color("selectedColor"),
+                Number("textSize", 8, 24), Color("textColor"));
+        }
+        return result;
     }
 
     private static ControlSkinPlan ReadControlSkin(JsonElement spec, SpecContext context, ControlSkinPlan? fallback = null) => new ControlSkinPlan(

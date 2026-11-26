@@ -129,16 +129,6 @@ public sealed class ProductRoot : Grid
         _shell.Children.Remove(_primaryNavigationHost);
         _shell.Children.Add(_primaryNavigationHost);
         _presentationWorkspace.SizeChanged += (_, _) => ApplyNavigationScene();
-        _navigationRecovery = new Button
-        {
-            Content = UI.T("Nav.Recovery", "Native navigation"),
-            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Thickness(0, 8, 8, 0), Visibility = Visibility.Collapsed,
-            MinHeight = 32,
-        };
-        _navigationRecovery.Click += (_, _) => ToggleNativeNavigation();
-        _navigationRecovery.Tip("F10");
-        _shell.Children.Add(_navigationRecovery.At(2, 1));
         Children.Add(_shell);
         ApplyNavigationScene();
 
@@ -376,7 +366,6 @@ public sealed class ProductRoot : Grid
             _navigationContainer.Margin = new Thickness(Math.Max(0, (areaWidth - stageWidth) / 2 + stageWidth * 0.025),
                 Math.Max(0, (areaHeight - stageHeight) / 2), 0, 0);
         }
-        _navigationRecovery.VerticalAlignment = overlay ? VerticalAlignment.Bottom : VerticalAlignment.Top;
         if (plan is not null)
         {
             var compact = side || (overlay ? _navigationContainer.Width < 900 : ActualWidth < 900);
@@ -387,17 +376,36 @@ public sealed class ProductRoot : Grid
         else UpdateResponsiveTopBar(ActualWidth);
         _navigationRecovery.Visibility = authored is not null && safeRoute && _customization is null
             ? Visibility.Visible : Visibility.Collapsed;
-        _navigationRecovery.Content = _nativeNavigation
+        var label = _nativeNavigation
             ? UI.T("Nav.CustomNavigation", "Custom navigation") : UI.T("Nav.Recovery", "Native navigation");
+        if (!Equals(_navigationRecovery.Content, label)) _navigationRecovery.Content = label;
+        UpdateBreadcrumbVisibility();
     }
 
     private FrameworkElement BuildBreadcrumb()
     {
         var theme = ThemeRuntime.Current;
         var stripes = new BreadcrumbStripeView { IsHitTestVisible = false, Visibility = Visibility.Collapsed };
-        var stage = new Grid();
+        var stage = UI.Grid("*", "*,auto");
+        Grid.SetColumnSpan(stripes, 2);
         stage.Children.Add(stripes);
-        stage.Children.Add(_breadcrumb);
+        stage.Children.Add(_breadcrumb.At(0, 0));
+        _navigationRecovery = new Button
+        {
+            Content = UI.T("Nav.Recovery", "Native navigation"),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(8, 0, 0, 0),
+            Visibility = Visibility.Collapsed,
+            MinHeight = 24,
+            Height = 24,
+            Padding = new Thickness(8, 0, 8, 0),
+            FontSize = 11,
+            VerticalContentAlignment = VerticalAlignment.Center,
+        };
+        _navigationRecovery.Click += (_, _) => ToggleNativeNavigation();
+        _navigationRecovery.Tip("F10");
+        stage.Children.Add(_navigationRecovery.At(0, 1));
         _breadcrumbHost.Child = stage;
         _breadcrumb.Visibility = Visibility.Collapsed;
         _breadcrumbHost.Visibility = Visibility.Collapsed;
@@ -407,8 +415,8 @@ public sealed class ProductRoot : Grid
             var skin = current.ControlSkin?.Families.GetValueOrDefault("breadcrumb");
             host.Padding = skin is null ? new Thickness(10, 0, 10, 0)
                 : new Thickness(skin.HorizontalPadding, skin.VerticalPadding, skin.HorizontalPadding, skin.VerticalPadding);
-            host.Height = skin is null ? current.Tokens.Number("breadcrumbHeight", 36)
-                : Math.Max(skin.Height, current.ControlFamily("button").Height + 2 * skin.VerticalPadding);
+            host.Height = skin is null ? Math.Max(36, current.Tokens.Number("breadcrumbHeight", 36))
+                : Math.Max(skin.Height, 24 + 2 * skin.VerticalPadding + 2 * skin.BorderWidth);
             host.CornerRadius = new CornerRadius(skin?.Radius ?? 0);
             host.Background = skin is null ? current.Brush("surface2") : current.ControlFill(skin, skin.Fill);
             host.BorderBrush = current.Brush(skin?.Border ?? "borderSubtle");
@@ -416,7 +424,7 @@ public sealed class ProductRoot : Grid
             _breadcrumb.Spacing = skin?.HorizontalPadding ?? 4;
             stripes.SetPattern(current.ControlSkin?.BreadcrumbStripeOpacity ?? 0);
         });
-        _breadcrumbHost.SizeChanged += (_, _) => FitBreadcrumb();
+        _breadcrumb.SizeChanged += (_, _) => FitBreadcrumb();
         return _breadcrumbHost;
     }
 
@@ -424,15 +432,6 @@ public sealed class ProductRoot : Grid
     {
         _breadcrumb.Children.Clear();
         var items = NavigationContextResolver.Breadcrumb(route);
-        if (items.Count <= 1)
-        {
-            _breadcrumb.Visibility = Visibility.Collapsed;
-            _breadcrumbHost.Visibility = Visibility.Collapsed;
-            return;
-        }
-
-        _breadcrumbHost.Visibility = Visibility.Visible;
-        _breadcrumb.Visibility = Visibility.Visible;
         for (var index = 0; index < items.Count; index++)
         {
             if (index > 0)
@@ -448,22 +447,33 @@ public sealed class ProductRoot : Grid
             }
             if (item.Target is null)
             {
-                _breadcrumb.Children.Add(UI.Text(item.Label, "caption", "textPrimary").Tip(item.Label).Align(vertical: VerticalAlignment.Center));
+                _breadcrumb.Children.Add(UI.Text(item.Label, "caption", "textPrimary", 1).Tip(item.Label).Align(vertical: VerticalAlignment.Center));
             }
             else
             {
-                _breadcrumb.Children.Add(UI.Button(item.Label, () => _services.Navigation.Navigate(item.Target), ButtonKind.Ghost));
+                var link = UI.Button(item.Label, () => _services.Navigation.Navigate(item.Target), ButtonKind.Ghost);
+                link.SizeChanged += (_, _) => FitBreadcrumb();
+                _breadcrumb.Children.Add(link);
             }
         }
+        UpdateBreadcrumbVisibility();
         FitBreadcrumb();
+    }
+
+    private void UpdateBreadcrumbVisibility()
+    {
+        var visible = _breadcrumb.Children.Count > 1 || _navigationRecovery?.Visibility == Visibility.Visible;
+        var visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        if (_breadcrumbHost.Visibility != visibility) _breadcrumbHost.Visibility = visibility;
+        if (_breadcrumb.Visibility != visibility) _breadcrumb.Visibility = visibility;
     }
 
     private void FitBreadcrumb()
     {
-        if (_breadcrumbHost.ActualWidth <= 0 || _breadcrumb.Children.LastOrDefault() is not TextBlock current) return;
+        if (_breadcrumb.ActualWidth <= 0 || _breadcrumb.Children.LastOrDefault() is not TextBlock current) return;
         var used = _breadcrumb.Children.OfType<FrameworkElement>().Where(child => !ReferenceEquals(child, current))
             .Sum(child => child.ActualWidth + _breadcrumb.Spacing);
-        current.MaxWidth = Math.Max(40, _breadcrumbHost.ActualWidth - used - _breadcrumbHost.Padding.Left - _breadcrumbHost.Padding.Right - 4);
+        current.MaxWidth = Math.Max(0, _breadcrumb.ActualWidth - used - 4);
     }
 
     private void ObserveBreadcrumbProfile()
@@ -900,6 +910,7 @@ public sealed class ProductRoot : Grid
 
         if (_activityPill is not null) _activityPill.IsHitTestVisible = !locked;
         _breadcrumbHost.IsHitTestVisible = !locked;
+        if (_navigationRecovery is not null) _navigationRecovery.IsEnabled = !locked;
     }
 
     private void UpdatePreviewMedia(ImageRef? cover, string? bannerPath, ImageRef? bannerPoster)

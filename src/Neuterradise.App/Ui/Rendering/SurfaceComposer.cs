@@ -37,11 +37,28 @@ public static class SurfaceComposer
 
     private static FrameworkElement? Compose(SurfaceNode node, Func<string, FrameworkElement?> semantic, double width)
     {
+        var content = ComposeCore(node, semantic, width);
+        if (content is null || node.ButtonStyle is not { } style) return content;
+        var scope = new Border { Child = content };
+        ThemeRuntime.Current.SetButtonScope(scope, style);
+        return scope;
+    }
+
+    private static FrameworkElement? ComposeCore(SurfaceNode node, Func<string, FrameworkElement?> semantic, double width)
+    {
         if (node.Kind == "semantic")
         {
             var element = semantic(node.Semantic!);
             if (element is null) return null;
             Detach(element);
+            if (element is ProfileBannerFrame banner)
+                banner.UseSceneGeometry(node.CanvasPlacement is not null || node.Placement.Height is not null || node.BannerAspect is not null);
+            if (node.BannerAspect is { } aspect)
+            {
+                var region = new BannerAspectRegion(aspect, width) { MaxWidth = node.Placement.Width ?? double.PositiveInfinity };
+                region.Children.Add(element);
+                return region;
+            }
             return node.CanvasPlacement is not null ? element : RegionHost(node.Semantic!, element, node.Placement);
         }
         if (node.Kind is "image" or "shape")
@@ -131,6 +148,31 @@ public static class SurfaceComposer
         var used = new bool[count];
         foreach (var (start, span) in placements) Array.Fill(used, true, start, span);
         return Enumerable.Range(0, count).Where(index => used[index]).ToArray();
+    }
+
+    private sealed class BannerAspectRegion(double aspect, double fallbackWidth) : Panel
+    {
+        private Size Extent(Size available)
+        {
+            var width = Math.Clamp(double.IsFinite(available.Width) ? available.Width : fallbackWidth, 0, 4096);
+            var height = Math.Min(4096, width / aspect);
+            if (double.IsFinite(available.Height)) height = Math.Min(height, Math.Max(0, available.Height));
+            return new Size(Math.Min(width, height * aspect), height);
+        }
+
+        protected override Size MeasureOverride(Size availableSize)
+        {
+            var size = Extent(availableSize);
+            if (Children.Count != 0) Children[0].Measure(size);
+            return size;
+        }
+
+        protected override Size ArrangeOverride(Size finalSize)
+        {
+            var size = Extent(finalSize);
+            if (Children.Count != 0) Children[0].Arrange(new Rect((finalSize.Width - size.Width) / 2, (finalSize.Height - size.Height) / 2, size.Width, size.Height));
+            return finalSize;
+        }
     }
 
     internal sealed class AdaptiveCanvas(double aspect, double fallbackWidth) : Panel

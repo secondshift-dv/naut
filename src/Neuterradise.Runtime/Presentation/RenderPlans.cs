@@ -28,6 +28,7 @@ public sealed record CompiledDefinition(
     object Plan,
     IReadOnlyList<PackDiagnostic> Diagnostics)
 {
+    public string? ContentIdentity { get; init; }
     public T PlanAs<T>() where T : class => (T)Plan;
 }
 
@@ -89,7 +90,8 @@ public sealed record BackdropLayer(
     string ParticleShape = "dot",
     double Drift = 0.015,
     double Twinkle = 0.45,
-    string SpawnRegion = "all");
+    string SpawnRegion = "all",
+    string? AssetIdentity = null);
 
 public sealed record BackdropVariant(IReadOnlyList<BackdropLayer> Layers, bool Static = false)
 {
@@ -123,7 +125,42 @@ public sealed record BackdropPlan(IReadOnlyDictionary<VisualTier, BackdropVarian
 
 // ------------------------------------------------------------------ structure
 
-public sealed record HomeRailPlan(string Id, bool Visible, string Style, int MaxItems);
+public sealed record HomeRailPlan(string Id, bool Visible, string Style, int MaxItems)
+{
+    public double CoverScale { get; init; } = 1;
+    public string Motion { get; init; } = "static";
+    public double ReelSpeed { get; init; } = 24;
+
+    public bool CanReel(int count, double itemWidth, double gap, double viewport) =>
+        Motion == "reel" && count > 1 && double.IsFinite(viewport) && viewport > 0
+        && count * (itemWidth + gap) - gap > viewport + 1;
+
+}
+
+/// <summary>A stable logical card index and sub-card translation, independent of the loop period.</summary>
+public readonly record struct HomeReelPosition(long First, double Phase)
+{
+    public double Offset(double pitch) => First * pitch + Phase;
+
+    public HomeReelPosition Advance(double delta, double pitch)
+    {
+        var offset = Phase + delta;
+        var step = (long)Math.Floor(offset / pitch);
+        return new(First + step, offset - step * pitch);
+    }
+
+    public static HomeReelPosition FromOffset(double offset, double pitch) => default(HomeReelPosition).Advance(offset, pitch);
+
+    public static int ItemIndex(long logicalIndex, int count) => (int)((logicalIndex % count + count) % count);
+
+    public (long Start, long End) Window(int count, double pitch, double viewport, bool loop)
+    {
+        var visible = (int)Math.Min(count, Math.Ceiling(viewport / pitch));
+        var start = First - 1;
+        var end = First + visible + 2;
+        return loop ? (start, end) : (Math.Max(0, start), Math.Min(count, end));
+    }
+}
 
 public sealed record HomeLayoutPlan(
     string HeroPlacement,
@@ -149,6 +186,16 @@ public sealed record ArtworkPlan(string? MaskPath, ArtworkRotation? Rotation, IR
 
 public enum SpotlightGeometry { FullBleed, ArtworkLeft, IdentityLeft, ArtworkAbove, IdentityAbove }
 
+public sealed record MarqueePlan(double Angle = 0, double Spacing = 0, double Inset = 0,
+    bool ShowMetadata = true, string TextColor = "token:textInverse")
+{
+    public double FitScale(double width, double height)
+    {
+        if (!double.IsFinite(width) || !double.IsFinite(height)) return 1;
+        return Math.Clamp(Math.Min(width / (180 + 2 * Inset + 3 * Spacing), height / (ShowMetadata ? 32 : 24)), 0.25, 1);
+    }
+}
+
 public sealed record SpotlightPlan(
     string Composition,
     string Motion,
@@ -159,6 +206,8 @@ public sealed record SpotlightPlan(
     string Pagination,
     double ScrimStrength, ArtworkPlan? Artwork = null, string IdentityPlacement = "legacy", SurfaceNode? Surface = null)
 {
+    public MarqueePlan Marquee { get; init; } = new();
+
     public SpotlightGeometry GeometryFor(double width, string homePlacement) => IdentityPlacement switch
     {
         "below" => SpotlightGeometry.ArtworkAbove,
@@ -235,9 +284,16 @@ public sealed record GalleryScenePlan(BackdropPlan? Background, BackdropPlan? Fo
     }
 }
 
-public sealed record ProfilePaperPlan(string Background, string Ink, string Accent);
+public sealed record ProfilePaperPlan(string Background, string Ink, string Accent)
+{
+    public bool ShowBackdrop { get; init; }
+    public double SurfaceOpacity { get; init; } = 1;
+}
 public sealed record ProfileLayoutPlan(ProfileLayoutDefinition Layout, SurfaceNode? Surface = null, ArtworkPlan? BannerArtwork = null,
-    ProfilePaperPlan? Paper = null);
+    ProfilePaperPlan? Paper = null)
+{
+    public IReadOnlyDictionary<string, ComponentVisualStyle>? Visuals { get; init; }
+}
 
 public sealed record FramePlan(CoverFrameDefinition Frame, string? OverlayAssetPath, double? CoverInsetFraction = null, string? OverlayAssetIdentity = null);
 
@@ -281,7 +337,11 @@ public sealed record GridNode(NodeLayout Layout, IReadOnlyList<string> Rows, IRe
 
 public sealed record OverlayNode(NodeLayout Layout, IReadOnlyList<CompositionNode> Children) : CompositionNode(Layout);
 
-public sealed record TextNode(NodeLayout Layout, string? Slot, string? TextKey, string TypeRole, string Color, int MaxLines, string TextAlignment, bool OnMedia) : CompositionNode(Layout);
+public sealed record TextNode(NodeLayout Layout, string? Slot, string? TextKey, string TypeRole, string Color, int MaxLines, string TextAlignment, bool OnMedia) : CompositionNode(Layout)
+{
+    public string? OutlineColor { get; init; }
+    public double OutlineWidth { get; init; } = 1;
+}
 
 public sealed record ImageNode(NodeLayout Layout, string Slot, string Stretch, string? CornerRadius, string Shape, bool Ambient, string Fallback = "identity") : CompositionNode(Layout);
 

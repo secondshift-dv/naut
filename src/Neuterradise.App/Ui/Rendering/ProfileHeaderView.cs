@@ -38,7 +38,8 @@ public static class ProfileIdentityView
         ProfileLayoutIdentityAlignment alignment, Action<int>? onRating = null, ICommand? favoriteCommand = null,
         string? favoriteTooltip = null,
         FrameworkElement? actions = null, FrameworkElement? status = null,
-        IReadOnlyList<ProfileTagAssignment>? assignedTags = null, bool showTags = true, bool paper = false)
+        IReadOnlyList<ProfileTagAssignment>? assignedTags = null, bool showTags = true, bool paper = false,
+        IReadOnlyDictionary<string, ComponentVisualStyle>? visuals = null)
     {
         var nameView = UI.Text(name, "hero", paper ? "accent" : null, maxLines: 2).Tip(name);
         var taxonomy = new VariableWrap(6);
@@ -57,15 +58,17 @@ public static class ProfileIdentityView
         }
 
         if (showTags && assignedTags is { Count: > 0 }) taxonomy.Children.Add(TagCapsules.Create(assignedTags));
+        var ratingStyle = visuals?.GetValueOrDefault("rating");
+        var favoriteStyle = visuals?.GetValueOrDefault("favorite");
         var stars = UI.H(3);
         for (var i = 1; i <= 5; i++)
         {
             if (onRating is null)
             {
-                stars.Children.Add(new IconView(
-                    "icon.profile.rating",
-                    18,
-                    (rating ?? 0) >= i ? "warning" : "textMuted") { Selected = (rating ?? 0) >= i });
+                var glyph = new IconView("icon.profile.rating", 18,
+                    (rating ?? 0) >= i ? "warning" : "textMuted") { Selected = (rating ?? 0) >= i };
+                glyph.ApplyComponentStyle(ratingStyle, 18);
+                stars.Children.Add(glyph);
                 continue;
             }
 
@@ -73,6 +76,8 @@ public static class ProfileIdentityView
             var star = UI.IconButton("icon.profile.rating", UI.F("Profile.RateN", "Rate {0} of 5", value), () => onRating(value), 28);
             ((IconView)star.Content).ColorToken = (rating ?? 0) >= value ? "warning" : "textMuted";
             ((IconView)star.Content).Selected = (rating ?? 0) >= value;
+            if (ratingStyle is not null)
+                ((IconView)star.Content).ApplyComponentStyle(ratingStyle, ((IconView)star.Content).Width);
             stars.Children.Add(star);
         }
 
@@ -87,6 +92,11 @@ public static class ProfileIdentityView
             ((IconView)favoriteButton.Content).ColorToken = isFavorite ? "danger" : "textMuted";
             ((IconView)favoriteButton.Content).Selected = isFavorite;
             favorite = favoriteButton;
+        }
+        if (favoriteStyle is not null)
+        {
+            var glyph = favorite is Button button ? (IconView)button.Content : (IconView)favorite;
+            glyph.ApplyComponentStyle(favoriteStyle, glyph.Width);
         }
         stars.VerticalAlignment = VerticalAlignment.Center;
         favorite.VerticalAlignment = VerticalAlignment.Center;
@@ -129,9 +139,27 @@ public static class ProfileIdentityView
     }
 }
 
+internal sealed class ProfileBannerFrame : Border
+{
+    private double _defaultHeight;
+    private bool _sceneGeometry;
+
+    public void SetDefaultHeight(double height)
+    {
+        _defaultHeight = height;
+        Height = _sceneGeometry ? double.NaN : height;
+    }
+
+    public void UseSceneGeometry(bool enabled)
+    {
+        _sceneGeometry = enabled;
+        Height = enabled ? double.NaN : _defaultHeight;
+    }
+}
+
 public sealed class ProfileHeaderView : Grid, IDisposable
 {
-    private readonly Border _bannerFrame = new();
+    private readonly ProfileBannerFrame _bannerFrame = new();
     private readonly Grid _bannerRegion = new();
     private readonly SkImageView _bannerPoster = new() { PlaceholderToken = "surface1" };
     private readonly Border _bannerScrim = new() { IsHitTestVisible = false };
@@ -301,7 +329,11 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         if (layoutChanged)
         {
             SurfaceComposer.Detach(_bannerFrame);
-            if (!state.IndependentModules) Children.Insert(0, _bannerFrame);
+            _bannerFrame.UseSceneGeometry(false);
+            if (!state.IndependentModules)
+            {
+                Children.Insert(0, _bannerFrame);
+            }
         }
         if (figureChanged && previousState?.FigureView is ProfileFigureView previous)
         {
@@ -436,7 +468,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
 
             _bannerFrame.MinHeight = 0;
             _identityHost.MinHeight = 0;
-            _bannerFrame.Height = showBanner ? (state.Paper && state.IndependentModules ? double.NaN : height) : 0;
+            _bannerFrame.SetDefaultHeight(showBanner ? (state.Paper && state.IndependentModules ? double.NaN : height) : 0);
             var contained = layout.BannerMode == ProfileLayoutBannerMode.Contained
                 || (layout.BannerMode == ProfileLayoutBannerMode.Split && width < 960);
             _bannerFrame.Margin = contained && !state.IndependentModules

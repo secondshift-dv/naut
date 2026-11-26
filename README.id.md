@@ -10,7 +10,7 @@
 <p align="center">Koleksi media lokal untuk Windows — pengenalan wajah offline, Figure 3D interaktif, dan Vault portabel milikmu sendiri.</p>
 
 <p align="center">
-  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.40"><strong>Download Naut v0.0.40</strong></a>
+  <a href="https://github.com/secondshift-dv/naut/releases/tag/v0.0.41"><strong>Download Naut v0.0.41</strong></a>
   ·
   <a href="https://secondshift-dv.github.io/naut/"><strong>Lihat Live Demo</strong></a>
   ·
@@ -112,7 +112,7 @@ Paket aplikasi portabel dan Vault adalah batas yang terpisah. Import menyalin fi
 
 ## Mulai cepat
 
-1. Buka [unduhan resmi Naut v0.0.40](https://github.com/secondshift-dv/naut/releases/tag/v0.0.40), lalu pilih **`naut-v0.0.40-win-x64.zip`** pada bagian Assets.
+1. Buka [unduhan resmi Naut v0.0.41](https://github.com/secondshift-dv/naut/releases/tag/v0.0.41), lalu pilih **`naut-v0.0.41-win-x64.zip`** pada bagian Assets.
 2. Extract seluruh ZIP ke folder biasa.
 3. Jalankan `naut.exe`.
 4. Pilih **lokasi penyimpanan** Vault.
@@ -133,7 +133,7 @@ Pengalaman koleksi Naut normal sengaja dibuat lebih ringan daripada workload Fig
 | **Display** | 1280 × 720 | 1920 × 1080 atau lebih |
 | **Ruang app/update** | 3 GB | 3 GB+ pada SSD |
 
-Storage Vault terpisah dan bergantung pada ukuran koleksi. Lihat [Naut v0.0.40 System Requirements](docs/system-requirements.md) lengkap.
+Storage Vault terpisah dan bergantung pada ukuran koleksi. Lihat [Naut v0.0.41 System Requirements](docs/system-requirements.md) lengkap.
 
 ## Dokumentasi
 

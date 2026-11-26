@@ -114,7 +114,7 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
     {
         var layoutDefinition = ResolvePresentation(PresentationSlots.GalleryLayout, Context);
         _layout = layoutDefinition.PlanAs<GalleryLayoutPlan>();
-        UpdateScene();
+        UpdateScene(layoutDefinition.ContentIdentity);
         _pager?.SetOverlayStyle(_layout.Scene?.ViewportArtwork is not null);
         ApplyPadding();
         _measurePinboardByCardAspect = layoutDefinition.Origin == PackOrigin.BuiltIn
@@ -132,7 +132,7 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         ApplyLayout();
     }
 
-    private void UpdateScene()
+    private void UpdateScene(string? contentIdentity)
     {
         void Update(ref BackdropView? view, BackdropPlan? plan, bool foreground)
         {
@@ -164,7 +164,7 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
                 Grid.SetRowSpan(_viewportArtwork, 3);
                 _root.Children.Insert(0, _viewportArtwork);
             }
-            _viewportArtwork.Source = ImageRef.FromPath(path, 1920);
+            _viewportArtwork.Source = ImageRef.FromPath(path, 1920, contentIdentity);
         }
         else if (_viewportArtwork is not null)
         {

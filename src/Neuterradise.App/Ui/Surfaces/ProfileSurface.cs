@@ -37,6 +37,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
     private readonly MediaGridPanel _media;
     private ProfileLayoutDefinition _layout;
     private SurfaceNode? _surface;
+    private IReadOnlyDictionary<string, ComponentVisualStyle>? _componentVisuals;
     private ProfilePaperPlan? _paper;
     private readonly VariableWrap _paperTags = new(6);
     private readonly ContentControl _profileTools = new() { HorizontalContentAlignment = HorizontalAlignment.Stretch };
@@ -47,10 +48,11 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         if (_paper == paper) return;
         _paper = paper;
         ThemeRuntime.Current.SetPaperScope(_page, paper);
-        _page.Background = paper is null ? null : ThemeRuntime.Current.Brush(paper.Background);
+        var showBackdrop = paper is null || paper.ShowBackdrop;
+        _page.Background = showBackdrop ? null : ThemeRuntime.Current.Brush(paper!.Background);
         _pageScroll.Background = _page.Background;
-        _backdrop.Visibility = paper is null ? Visibility.Visible : Visibility.Collapsed;
-        _backdrop.IsSurfaceActive = paper is null && IsActive;
+        _backdrop.Visibility = showBackdrop ? Visibility.Visible : Visibility.Collapsed;
+        _backdrop.IsSurfaceActive = showBackdrop && IsActive;
     }
     private readonly BackdropView _backdrop = new() { ReadabilityGuard = true };
     private Disposables _inspectorBag = new();
@@ -240,6 +242,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             }
         }
         var previousLayout = _layout;
+        var previousVisuals = _componentVisuals;
         var previousSurface = _surface;
         if (Preview is null) _hasPreviewMedia = false;
         if (Preview is not null) _inspectorHost.Visibility = Visibility.Collapsed;
@@ -249,7 +252,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         // header. A real layout change still forces identity geometry through UpdateProfileHeader.
         UpdateProfileHeader(forceIdentity: Preview is null);
         _media.RefreshLayout();
-        if (Preview is null || previousLayout != _layout || !ReferenceEquals(previousSurface, _surface))
+        if (Preview is null || previousLayout != _layout || previousVisuals != _componentVisuals || !ReferenceEquals(previousSurface, _surface))
         {
             QueueModulesRefresh();
         }
@@ -275,7 +278,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         }
 
         SetHeaderActive(true);
-        _backdrop.IsSurfaceActive = _paper is null;
+        _backdrop.IsSurfaceActive = _paper is null || _paper.ShowBackdrop;
     }
 
     public void SetFigureOccluded(bool occluded) => _figureView.SetOccluded(occluded);
@@ -332,6 +335,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         var plan = ResolvePresentation(PresentationSlots.ProfileLayout, Context).PlanAs<ProfileLayoutPlan>();
         _layout = plan.Layout;
         _surface = plan.Surface;
+        _componentVisuals = plan.Visuals;
         ApplyPaper(plan.Paper);
         _backdrop.Plan = ResolvePresentation(PresentationSlots.ProfileBackdrop, Context).PlanAs<BackdropPlan>();
         _backdrop.AmbientImagePath = Preview is not null && _hasPreviewMedia ? _previewCover?.Path : _vm.CoverSource?.Path;
@@ -358,9 +362,11 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         }
 
         var previousLayout = _layout;
+        var previousVisuals = _componentVisuals;
         var plan = ResolvePresentation(PresentationSlots.ProfileLayout, Context).PlanAs<ProfileLayoutPlan>();
         _layout = plan.Layout;
         _surface = plan.Surface;
+        _componentVisuals = plan.Visuals;
         ApplyPaper(plan.Paper);
         if (IndependentTags) TagCapsules.Update(_paperTags, _vm.AssignedTags);
         if (Preview is null)
@@ -390,7 +396,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
              IndependentModules: _surface?.Modular == true, BannerArtwork: plan.BannerArtwork,
             BannerAuthority: Services.Runtime.MediaResources,
             BannerPrimaryMediaId: Preview is not null && _hasPreviewMedia ? Context.Profile?.Sources?.BannerMediaId : _vm.BannerMediaId, Paper: _paper is not null),
-            rebuildIdentity: forceIdentity || previousLayout != _layout);
+            rebuildIdentity: forceIdentity || previousLayout != _layout || previousVisuals != _componentVisuals);
         SetHeaderActive(IsActive);
     }
 
@@ -454,7 +460,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             _vm.DisplayName, _vm.CategoryName, _vm.Tags, _vm.Rating, _vm.IsFavorite, alignment,
             actions: IndependentTools ? null : actions,
             status: IndependentTools ? null : status, assignedTags: _vm.AssignedTags,
-            showTags: !IndependentTags && (_layout.Id != "portrait" || (string.IsNullOrWhiteSpace(_vm.BannerVideoPath) && string.IsNullOrWhiteSpace(_vm.BannerPosterPath))), paper: _paper is not null);
+            showTags: !IndependentTags && (_layout.Id != "portrait" || (string.IsNullOrWhiteSpace(_vm.BannerVideoPath) && string.IsNullOrWhiteSpace(_vm.BannerPosterPath))), paper: _paper is not null, visuals: _componentVisuals);
     }
     private void QueueModulesRefresh() => QueueModulesRefresh(force: true);
 
@@ -597,7 +603,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         if (overviewEnabled)
         {
             var overview = UI.V(8,
-                DetailLayout.Heading(UI.T("Profile.Overview", "Overview"), null, "icon.status.info"),
+                DetailLayout.Heading(UI.T("Profile.Overview", "Overview"), null, "icon.status.info", _componentVisuals?.GetValueOrDefault("overview")),
                 string.IsNullOrWhiteSpace(_vm.Overview)
                     ? UI.Text(UI.T("Profile.Overview.EmptyDetail", "Use Edit details to add a short description for this Profile."), "caption", "textMuted", 3)
                     : UI.Text(_vm.Overview, "body", maxLines: 6));
@@ -660,14 +666,14 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
                 content = module.Id switch
                 {
                     ProfileLayoutModuleId.Overview => UI.V(10,
-                        DetailLayout.Heading(UI.T("Profile.Overview", "Overview"), null, "icon.status.info"),
+                        DetailLayout.Heading(UI.T("Profile.Overview", "Overview"), null, "icon.status.info", _componentVisuals?.GetValueOrDefault("overview")),
                         string.IsNullOrWhiteSpace(_vm.Overview)
                             ? UI.Text(UI.T("Profile.Overview.EmptyDetail", "Use Edit details to add a short description for this Profile."), "caption", "textMuted", 3)
                             : UI.Text(_vm.Overview, "body", maxLines: 8)),
                     ProfileLayoutModuleId.Related => Related(),
                     ProfileLayoutModuleId.Faces => _vm.HasFaces ? Faces() : null,
                     ProfileLayoutModuleId.RecentMedia => _vm.RecentMedia.Count > 0 ? RecentMedia() : null,
-                    ProfileLayoutModuleId.Media => UI.V(10, DetailLayout.Heading(UI.T("Profile.Media", "Media"), null, "icon.media.image"), _media.View),
+                    ProfileLayoutModuleId.Media => UI.V(10, DetailLayout.Heading(UI.T("Profile.Media", "Media"), null, "icon.media.image", _componentVisuals?.GetValueOrDefault("media")), _media.View),
                     _ => null,
                 };
             }
@@ -715,7 +721,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             if (IndependentTags)
             {
                 SurfaceComposer.Detach(_paperTags);
-                regions["tags"] = UI.V(8, DetailLayout.Heading(UI.T("Profile.Tags", "Tags"), null, "icon.profile.tag"), _paperTags).Margin(14, 4, 14, 4);
+                regions["tags"] = UI.V(8, DetailLayout.Heading(UI.T("Profile.Tags", "Tags"), null, "icon.profile.tag", _componentVisuals?.GetValueOrDefault("tags")), _paperTags).Margin(14, 4, 14, 4);
             }
             foreach (var region in regions.Values) region.Width = double.NaN;
             // The surface owns the inset content allocation. Descendant desired sizes (including
@@ -846,7 +852,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
             : null;
         var add = UI.Button(UI.T("Profile.Related.Add", "Add related Profile"), null, ButtonKind.Ghost, "icon.action.add", _vm.Related.OpenAddRelationPickerCommand);
         return UI.V(10,
-            DetailLayout.Heading(UI.T("Profile.Related", "Related"), null, "icon.profile.related"),
+            DetailLayout.Heading(UI.T("Profile.Related", "Related"), null, "icon.profile.related", _componentVisuals?.GetValueOrDefault("related")),
             row, status, add.Align(HorizontalAlignment.Left));
     }
 

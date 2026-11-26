@@ -39,9 +39,11 @@ public sealed partial class PresentationCompiler
     public CompiledDefinition? Compile(InstalledPack pack, PresentationDefinition definition) =>
         _cache.GetOrAdd((pack.PackId, definition.Id, pack.ContentHash), cacheKey =>
         {
-            var compiled = CompileCore(pack.Manifest, pack.Origin, definition, _assets, _themes, out _);
+            var compiled = CompileCore(pack.Manifest, pack.Origin, definition, _assets, _themes, out _, pack.ContentHash);
             var identity = $"pack-art:{pack.PackId}:{cacheKey.Hash}:{definition.Id}";
-            return compiled?.Plan switch
+            if (compiled is null) return null;
+            compiled = compiled with { ContentIdentity = identity };
+            return compiled.Plan switch
             {
                 ThemePlan theme => compiled with { Plan = theme with { ArtworkIdentity = identity } },
                 FramePlan frame => compiled with { Plan = frame with { OverlayAssetIdentity = identity } },
@@ -77,9 +79,9 @@ public sealed partial class PresentationCompiler
         PresentationDefinition definition,
         IPresentationAssetStore? assets,
         ThemeLoader themes,
-        out IReadOnlyList<PackDiagnostic> diagnostics)
+        out IReadOnlyList<PackDiagnostic> diagnostics, string? contentHash = null)
     {
-        var context = new SpecContext(manifest, definition, assets);
+        var context = new SpecContext(manifest, definition, assets, contentHash);
         diagnostics = context.Diagnostics;
         try
         {
@@ -326,7 +328,8 @@ public sealed partial class PresentationCompiler
             ParticleShape: context.Enum(layer, "particleShape", ["dot", "ring", "line", "petal", "leaf", "diamond", "pixel", "sparkle", "bokeh"], "dot"),
             Drift: context.Number(layer, "drift", 0.015, 0, 0.2),
             Twinkle: context.Number(layer, "twinkle", 0.45, 0, 0.5),
-            SpawnRegion: context.Enum(layer, "spawnRegion", ["all", "upper", "lower", "edges"], "all"));
+            SpawnRegion: context.Enum(layer, "spawnRegion", ["all", "upper", "lower", "edges"], "all"),
+            AssetIdentity: assetPath is null ? null : context.ContentHash);
     }
 
     // ---------------------------------------------------------------- structure
@@ -341,13 +344,24 @@ public sealed partial class PresentationCompiler
         {
             foreach (var rail in railArray.EnumerateArray().Take(12))
             {
-                rails.Add(new HomeRailPlan(
+                var plan = new HomeRailPlan(
                     context.Enum(rail, "id", RailIds, "recent"),
                     context.Bool(rail, "visible", true),
                     context.Enum(rail, "style", context.ContractVersion >= 4
                         ? ["poster", "tile", "compact", "strip", "cover-only", "hud"]
                         : ["poster", "tile", "compact", "strip"], "tile"),
-                    (int)context.Number(rail, "maxItems", 12, 3, 24)));
+                    (int)context.Number(rail, "maxItems", 12, 3, 24))
+                {
+                    CoverScale = context.ContractVersion >= 4
+                        ? context.Number(rail, "coverScale", 1, 0.5, 1) : 1,
+                    Motion = context.ContractVersion >= 4
+                        ? context.Enum(rail, "motion", ["static", "reel"], "static") : "static",
+                    ReelSpeed = context.ContractVersion >= 4
+                        ? context.Number(rail, "reelSpeed", 24, 8, 60) : 24,
+                };
+                if (plan.Motion == "reel" && (plan.Id != "favorites" || plan.Style != "cover-only"))
+                    context.Error("rails.motion", "Reel motion requires the cover-only Favorites rail.");
+                rails.Add(plan);
             }
         }
 
@@ -375,7 +389,25 @@ public sealed partial class PresentationCompiler
         context.Enum(spec, "pagination", ["counter-rail", "counter", "none"], "counter-rail"),
         context.Number(spec, "scrimStrength", 0.65, 0.3, 1),
         CompileArtwork(spec, context, "artwork"), ReadIdentityPlacement(spec, context),
-        CompileSurface(spec, context, DefinitionKinds.SpotlightStyle));
+        CompileSurface(spec, context, DefinitionKinds.SpotlightStyle))
+        { Marquee = ReadMarquee(spec, context) };
+
+    private static MarqueePlan ReadMarquee(JsonElement spec, SpecContext context)
+    {
+        if (!spec.TryGetProperty("marquee", out var marquee)) return new();
+        if (context.ContractVersion < 4 || marquee.ValueKind != JsonValueKind.Object
+            || !string.Equals(context.String(spec, "composition", ""), "marquee", StringComparison.OrdinalIgnoreCase))
+        {
+            context.Error("marquee", "Marquee options require a Contract 4 marquee composition.");
+            return new();
+        }
+        return new(
+            context.Number(marquee, "angle", 0, -12, 12),
+            context.Number(marquee, "spacing", 0, 0, 24),
+            context.Number(marquee, "inset", 0, 0, 24),
+            context.Bool(marquee, "showMetadata", true),
+            context.Color(marquee, "textColor", "token:textInverse"));
+    }
 
     private static GalleryLayoutPlan? CompileGalleryLayout(JsonElement spec, SpecContext context)
     {
@@ -479,7 +511,11 @@ public sealed partial class PresentationCompiler
                         context.Error("paper." + key, "Paper colors must be opaque #AARRGGBB literals.");
                     return color;
                 }
-                paper = new(Solid("background", "#FFF8F4F4"), Solid("ink", "#FF21182C"), Solid("accent", "#FFC51B68"));
+                paper = new(Solid("background", "#FFF8F4F4"), Solid("ink", "#FF21182C"), Solid("accent", "#FFC51B68"))
+                {
+                    ShowBackdrop = context.Bool(paperSpec, "showBackdrop", false),
+                    SurfaceOpacity = context.Number(paperSpec, "surfaceOpacity", 1, 0, 1),
+                };
             }
         }
         ProfileLayoutPlan Compile(ProfileLayoutDefinition layout)
@@ -487,7 +523,8 @@ public sealed partial class PresentationCompiler
             var scene = CompileSurface(spec, context, DefinitionKinds.ProfileLayout);
             if (paper is not null && scene is not { Modular: true })
                 context.Error("paper", "Paper surfaces require a modular scene.");
-            return new(layout, scene, CompileArtwork(spec, context, "bannerArtwork"), paper);
+            return new(layout, scene, CompileArtwork(spec, context, "bannerArtwork"), paper)
+            { Visuals = ReadComponentVisuals(spec, context, media: false) };
         }
         if (spec.TryGetProperty("preset", out var preset) && preset.ValueKind == JsonValueKind.String)
         {
@@ -585,7 +622,8 @@ public sealed partial class PresentationCompiler
             context.Color(spec, "selectedFrameColor", "token:borderSelected"),
             context.Number(spec, "frameGlow", 0, 0, 1),
             context.Enum(spec, "hoverStyle", ["lift", "spotlight", "none"], "lift"),
-            context.Bool(spec, "showTypeBadge", true)),
+            context.Bool(spec, "showTypeBadge", true))
+            { Visuals = ReadComponentVisuals(spec, context, media: true) },
             browse, collection);
     }
 
@@ -791,7 +829,12 @@ public sealed partial class PresentationCompiler
                 context.Color(node, "color", "token:textPrimary"),
                 (int)context.Number(node, "maxLines", 1, 1, 6),
                 context.Enum(node, "align", ["left", "center", "right"], "left"),
-                context.Bool(node, "onMedia", false)),
+                context.Bool(node, "onMedia", false))
+            {
+                OutlineColor = node.TryGetProperty("outlineColor", out _) && context.ContractVersion >= 4
+                    ? context.Color(node, "outlineColor", "#FF000000") : null,
+                OutlineWidth = context.ContractVersion >= 4 ? context.Number(node, "outlineWidth", 1, 0.5, 2) : 1,
+            },
             "image" => new ImageNode(layout,
                 context.Slot(node, "slot", at),
                 context.Enum(node, "stretch", ["fill", "uniform", "uniform-to-fill"], "uniform-to-fill"),
@@ -850,9 +893,10 @@ public sealed partial class PresentationCompiler
 
     // ---------------------------------------------------------------- spec reading context
 
-    private sealed class SpecContext(PresentationPackManifest manifest, PresentationDefinition definition, IPresentationAssetStore? assets)
+    private sealed class SpecContext(PresentationPackManifest manifest, PresentationDefinition definition, IPresentationAssetStore? assets, string? contentHash)
     {
         public int ContractVersion => Manifest.MinContractVersion;
+        public string? ContentHash { get; } = contentHash;
         private readonly List<PackDiagnostic> _diagnostics = [];
 
         public PresentationPackManifest Manifest { get; } = manifest;

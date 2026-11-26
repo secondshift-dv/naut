@@ -54,6 +54,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     private readonly DispatcherTimer _rotation = new();
     private readonly Dictionary<Guid, ProfileAppearanceOverrides> _appearance = [];
     private readonly List<WeakReference<HomeProfileTile>> _profileTiles = [];
+    private HomeRailReel? _favoriteReel;
     private int _railAppearanceGeneration;
     private CoverFrameView? _heroCover;
     private TextBlock? _heroName;
@@ -116,7 +117,11 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
 
         _notice.Visibility = Visibility.Collapsed;
         _scroll = UI.Scroll(_page);
-        _scroll.ViewChanged += (_, _) => HoverVideoCoordinator.Shared.NotifyScroll();
+        _scroll.ViewChanged += (_, _) =>
+        {
+            HoverVideoCoordinator.Shared.NotifyScroll();
+            RefreshReelActivity();
+        };
         _root.Children.Add(_scroll);
         _root.Children.Add(_stageHost);
 
@@ -221,7 +226,9 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
 
     private void ResolvePlans()
     {
-        _layout = ResolvePresentation(PresentationSlots.HomeLayout, Context).PlanAs<HomeLayoutPlan>();
+        var layout = ResolvePresentation(PresentationSlots.HomeLayout, Context).PlanAs<HomeLayoutPlan>();
+        if (!ReferenceEquals(_layout, layout)) RetireReel();
+        _layout = layout;
         var favoritesChanged = _vm.FavoriteRailEnabled != _layout.Rails.Any(r => r.Id == "favorites" && r.Visible && r.Style == "cover-only");
         _vm.FavoriteRailEnabled = _layout.Rails.Any(r => r.Id == "favorites" && r.Visible && r.Style == "cover-only");
         if (favoritesChanged && IsActive && _vm.FavoriteRailEnabled)
@@ -236,6 +243,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     protected override void OnActivated(AppRoute route)
     {
         _backdrop.IsSurfaceActive = true;
+        RefreshReelActivity();
         _rotation.Start();
         _heroArtwork?.SetActive(true);
         StartSpotlightMotion();
@@ -249,6 +257,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     protected override void OnSuspended()
     {
         _backdrop.IsSurfaceActive = false;
+        _favoriteReel?.Stop();
         _rotation.Stop();
         _heroArtwork?.SetActive(false);
         _kenBurns?.Stop();
@@ -843,7 +852,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
     {
         Services.ProfileSnapshots.Warm(spotlight.ProfileId);
         if (_spotlight.Composition == "marquee")
-            return Marquee(spotlight.DisplayName, string.Join(" ? ", new[] { spotlight.CategoryName, spotlight.MediaCountText }
+            return Marquee(spotlight.DisplayName, string.Join(" \u00b7 ", new[] { spotlight.CategoryName, spotlight.MediaCountText }
                 .Where(value => !string.IsNullOrWhiteSpace(value))),
                 () => Services.Navigation.Navigate(new ProfileRoute(spotlight.ProfileId)));
         var name = UI.Text(spotlight.DisplayName, "section-title", "textPrimary", 2);
@@ -911,44 +920,81 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         return identity;
     }
 
-    private FrameworkElement Marquee(string? name, string? info, Action open)
+    private FrameworkElement Marquee(string? name, string? info, Action open) =>
+        BuildMarquee(_spotlight.Marquee, name, info, _vm.HasMultipleSpotlightCandidates, open,
+            () => _vm.PreviousSpotlightCommand.Execute(null), () => _vm.NextSpotlightCommand.Execute(null));
+
+    internal static FrameworkElement BuildMarquee(MarqueePlan plan, string? name, string? info,
+        bool canNavigate, Action? open = null, Action? previous = null, Action? next = null)
     {
         var theme = ThemeRuntime.Current;
-        Button Arrow(string label, bool next)
+        var color = plan.TextColor;
+        Button Arrow(string label, bool isNext, Action? navigate)
         {
-            var icon = new IconView("icon.action.back", 14, "textInverse");
-            if (next) icon.RenderTransform = new ScaleTransform { ScaleX = -1, CenterX = 7 };
+            var icon = new IconView("icon.action.back", 14, color);
+            if (isNext) icon.RenderTransform = new ScaleTransform { ScaleX = -1, CenterX = 7 };
             var button = new Button
             {
                 Content = icon, Width = 24, Height = 24, MinHeight = 0, MinWidth = 0,
                 Padding = new Thickness(0), Background = theme.Brush("transparent"),
                 BorderThickness = new Thickness(0), VerticalAlignment = VerticalAlignment.Center,
-                IsEnabled = _vm.HasMultipleSpotlightCandidates,
+                IsEnabled = canNavigate,
             };
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, label);
             button.Tip(label);
-            button.Click += (_, _) => { if (next) _vm.NextSpotlightCommand.Execute(null); else _vm.PreviousSpotlightCommand.Execute(null); };
+            theme.TrackArtworkButton(button, color);
+            if (navigate is not null) button.Click += (_, _) => navigate();
             return button;
         }
 
-        var label = UI.Text(name ?? UI.T("Home.Empty.Title", "Your collection"), "control", "textInverse", 1);
+        var label = UI.Text(name ?? UI.T("Home.Empty.Title", "Your collection"), "control", color, 1);
         label.FontWeight = new Windows.UI.Text.FontWeight(700);
-        var detail = UI.Text(info, "micro", "textInverse", 1);
+        label.Tip(label.Text);
+        var identity = UI.V(0, label);
+        if (plan.ShowMetadata && !string.IsNullOrWhiteSpace(info))
+            identity.Children.Add(UI.Text(info, "micro", color, 1));
+
         var action = new Button
         {
             Content = name is null ? UI.T("Nav.Import", "Import") : UI.T("Home.OpenProfile", "Open Profile"),
             FontSize = 10, MinHeight = 0, Height = 24, Padding = new Thickness(5, 0, 5, 0),
-            Background = theme.Brush("transparent"), Foreground = theme.Brush("textInverse"),
+            Background = theme.Brush("transparent"), Foreground = theme.Brush(color),
             BorderThickness = new Thickness(0), VerticalAlignment = VerticalAlignment.Center,
         };
-        action.Click += (_, _) => open();
-        var center = UI.Grid("*", "*,auto");
-        center.Children.Add(UI.V(0, label, detail).Align(HorizontalAlignment.Center, VerticalAlignment.Center).At(0, 0));
-        center.Children.Add(action.At(0, 1));
-        var panel = UI.Grid("*", "auto,*,auto");
-        panel.Children.Add(Arrow(UI.T("Home.Previous", "Previous"), false).At(0, 0));
-        panel.Children.Add(center.At(0, 1));
-        panel.Children.Add(Arrow(UI.T("Home.Next", "Next"), true).At(0, 2));
+        theme.TrackArtworkButton(action, color);
+        if (open is not null) action.Click += (_, _) => open();
+        var panel = UI.Grid("*", "auto,*,auto,auto");
+        panel.ColumnSpacing = plan.Spacing;
+        panel.Padding = new Thickness(plan.Inset, 0, plan.Inset, 0);
+        var left = Arrow(UI.T("Home.Previous", "Previous"), false, previous);
+        var right = Arrow(UI.T("Home.Next", "Next"), true, next);
+        panel.Children.Add(left.At(0, 0));
+        panel.Children.Add(identity.Align(HorizontalAlignment.Center, VerticalAlignment.Center).At(0, 1));
+        panel.Children.Add(action.At(0, 2));
+        panel.Children.Add(right.At(0, 3));
+        if (plan.Angle != 0)
+        {
+            panel.RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5);
+            panel.RenderTransform = new RotateTransform { Angle = plan.Angle };
+        }
+        var labelSize = label.FontSize;
+        var metadata = identity.Children.OfType<TextBlock>().Skip(1).FirstOrDefault();
+        var metadataSize = metadata?.FontSize ?? 10;
+        panel.SizeChanged += (_, args) =>
+        {
+            var scale = plan.FitScale(args.NewSize.Width, args.NewSize.Height);
+            left.Width = left.Height = right.Width = right.Height = action.Height = 24 * scale;
+            foreach (var button in new[] { left, right })
+                if (button.Content is IconView icon) icon.Width = icon.Height = 14 * scale;
+            action.MaxWidth = Math.Max(0, args.NewSize.Width * 0.42);
+            action.FontSize = 10 * scale;
+            action.Padding = new Thickness(5 * scale, 0, 5 * scale, 0);
+            panel.ColumnSpacing = plan.Spacing * scale;
+            panel.Padding = new Thickness(plan.Inset * scale, 0, plan.Inset * scale, 0);
+            label.FontSize = labelSize * scale;
+            if (metadata is not null) metadata.FontSize = metadataSize * scale;
+        };
+        panel.IsHitTestVisible = open is not null;
         return panel;
     }
 
@@ -1173,9 +1219,16 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         SizeStage();
         var favorites = _layout.Rails.FirstOrDefault(r => r.Id == "favorites") ?? new HomeRailPlan("favorites", true, "cover-only", 24);
         var stats = _layout.Rails.FirstOrDefault(r => r.Id == "statistics") ?? new HomeRailPlan("statistics", true, "hud", 4);
-        _stageFavorites.Children.Clear();
-        if (favorites.Visible && ProfileRail(0, favorites, true, UI.T("Gallery.Favorites", "Favorites")) is { } rail)
-            _stageFavorites.Children.Add(rail);
+        var railView = favorites.Visible ? ProfileRail(0, favorites, true, UI.T("Gallery.Favorites", "Favorites")) : null;
+        if (_stageFavorites.Children.Count != 1 || !ReferenceEquals(_stageFavorites.Children[0], railView))
+        {
+            _stageFavorites.Children.Clear();
+            if (railView is not null)
+            {
+                SurfaceComposer.Detach(railView);
+                _stageFavorites.Children.Add(railView);
+            }
+        }
         _stageStatistics.Children.Clear();
         if (stats.Visible) _stageStatistics.Children.Add(PulseBar(0, stats));
         if (!ReferenceEquals(_stageScene, scene))
@@ -1397,27 +1450,50 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         var candidates = favoritesOnly
             ? rail.Style == "cover-only" ? _vm.FavoriteProfiles : _vm.RecentlyActive.Where(static item => item.IsFavorite)
             : _vm.RecentlyActive;
-        var items = candidates
-            .Take(Math.Max(1, rail.MaxItems))
-            .Select(t => (t.ProfileId, t.DisplayName, t.CoverImagePath, t.MediaCountText, t.IsFavorite))
-            .ToList();
-        if (items.Count == 0)
+        var selected = candidates.Take(Math.Max(1, rail.MaxItems)).ToList();
+        if (selected.Count == 0)
         {
+            if (rail.Id == "favorites" && rail.Motion == "reel") RetireReel();
             return null;
         }
-
+        List<(Guid ProfileId, string DisplayName, string? CoverImagePath, string MediaCountText, bool IsFavorite)> Items() =>
+            selected.Select(t => (t.ProfileId, t.DisplayName, t.CoverImagePath, t.MediaCountText, t.IsFavorite)).ToList();
+        if (rail.Style == "cover-only")
+        {
+            var stageHeight = _stageHost.Height > 0 ? _stageHost.Height : 720;
+            var size = Math.Clamp(stageHeight * 0.19, 66, 142) * rail.CoverScale;
+            if (_layout is { ViewportStage: true, Surface: { } stage })
+            {
+                var region = stage.Children.FirstOrDefault(child => child.HasRegion("favorites"));
+                if (region?.CanvasPlacement is { } placement)
+                {
+                    var gutter = ThemeRuntime.Current.Tokens.Number("scrollbarContentGutter", 16);
+                    size = Math.Max(1, Math.Min(size, Math.Floor((stageHeight * placement.Height - gutter - 2) / 1.2)));
+                }
+            }
+            if (rail is { Motion: "reel", Id: "favorites" })
+            {
+                var gap = 10 * rail.CoverScale;
+                if (_favoriteReel?.Matches(selected, selected.Count, rail, size, gap) != true)
+                {
+                    RetireReel();
+                    _favoriteReel = new HomeRailReel(selected, rail, size, gap, () => IsActive && !_retired, _scroll,
+                        id => Services.Navigation.Navigate(new ProfileRoute(id)),
+                        id => { if (!Services.ProfileSnapshots.TryGetReady(id, out _)) Services.ProfileSnapshots.Warm(id); });
+                }
+                RefreshReelPreview();
+                if (_favoriteReel!.Parent != _stageFavorites) SurfaceComposer.Detach(_favoriteReel);
+                return _favoriteReel;
+            }
+            return ProfileCarousel(Items(), size, size, rail.Style, rail.CoverScale);
+        }
         var title = UI.H(8,
             HomeReadability.Heading(titleText),
             HomeReadability.Heading(
-                UI.F("Home.Rail.Recent.Count", "{0} Profiles", items.Count),
+                UI.F("Home.Rail.Recent.Count", "{0} Profiles", selected.Count),
                 "micro", 6).Align(vertical: VerticalAlignment.Center));
         var (itemWidth, itemHeight) = ProfileRailGeometry(rail.Style);
-        if (rail.Style == "cover-only")
-        {
-            var size = Math.Clamp((_stageHost.Height > 0 ? _stageHost.Height : 720) * 0.19, 66, 142);
-            return ProfileCarousel(items, size, size, rail.Style);
-        }
-        return UI.V(6, title, ProfileCarousel(items, itemWidth, itemHeight, rail.Style))
+        return UI.V(6, title, ProfileCarousel(Items(), itemWidth, itemHeight, rail.Style))
             .Margin(padding, 10, padding, 0);
     }
 
@@ -1431,7 +1507,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
 
     private FrameworkElement ProfileCarousel(
         IReadOnlyList<(Guid ProfileId, string DisplayName, string? CoverImagePath, string MediaCountText, bool IsFavorite)> items,
-        double width, double height, string style)
+        double width, double height, string style, double spacingScale = 1)
     {
         var theme = ThemeRuntime.Current;
         var source = new ObservableCollection<object>(items.Select(i => (object)i));
@@ -1457,7 +1533,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
                 Services.ProfileSnapshots.Warm(item.Item1);
                 RefreshRailTile(tile);
             }, element => ((HomeProfileTile)element).Clear());
-        const double gap = 10;
+        var gap = 10 * spacingScale;
         var (scroll, repeater) = Repeaters.Virtualized(factory, Repeaters.Stack(true, gap), horizontal: true);
         repeater.ItemsSource = source;
         var hoverInset = Math.Ceiling(height * (style == "cover-only" ? 0.10 : 0.02));
@@ -1473,6 +1549,16 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         scroll.SizeChanged += (_, _) => UpdateEnvelope();
         UpdateEnvelope();
         return scroll;
+    }
+
+    private void RefreshReelActivity() => _favoriteReel?.RefreshActivity();
+
+    private void RetireReel()
+    {
+        if (_favoriteReel is not { } reel) return;
+        _favoriteReel = null;
+        reel.Retire();
+        SurfaceComposer.Detach(reel);
     }
 
     private void RefreshRailTile(HomeProfileTile tile)
@@ -1500,8 +1586,15 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
             Services.Presentation.ResolveMedia(state).Cover);
     }
 
+    private void RefreshReelPreview()
+    {
+        var preview = Preview?.ProfileWorking;
+        _favoriteReel?.SetPreviewCover(preview?.ProfileId, preview?.Media.Cover);
+    }
+
     private void RefreshRailFrames()
     {
+        RefreshReelPreview();
         _railAppearanceGeneration++;
         _profileTiles.RemoveAll(reference => !reference.TryGetTarget(out _));
         foreach (var reference in _profileTiles)
@@ -1660,6 +1753,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         _retired = true;
         _railRenderQueued = false;
         OnSuspended();
+        RetireReel();
         _heroVideo.Dispose();
         base.Dispose();
     }

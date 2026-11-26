@@ -8,20 +8,18 @@ namespace Neuterradise.App.Ui;
 /// <summary>A pooled portrait with a square frame allocation and a separate readable caption.</summary>
 public sealed class HomeProfileTile : Button
 {
-    private readonly CoverFrameView _cover = new() { FrameMode = "lite" };
-    private readonly bool _coverOnly;
+    private readonly CoverFrameView? _cover;
     private readonly SkImageView? _flatCover;
     private Border? _hoverCaption;
     private ScaleTransform? _hoverScale;
     private readonly TextBlock _name = UI.Text(null, "control", maxLines: 1);
     private readonly TextBlock _count = UI.Text(null, "micro", "textMuted", 1);
-    private readonly IconView _favorite = new("icon.profile.favorite", 12, "warning");
+    private readonly IconView? _favorite;
     public Guid ProfileId { get; private set; }
     public int BindingVersion { get; private set; }
 
     public HomeProfileTile(string style, double width, double height, Action<Guid>? navigate = null)
     {
-        _coverOnly = style == "cover-only";
         Width = width;
         Height = height;
         Padding = new Thickness(4);
@@ -29,9 +27,10 @@ public sealed class HomeProfileTile : Button
         VerticalContentAlignment = VerticalAlignment.Stretch;
         Background = ThemeRuntime.Current.Brush("transparent");
         BorderThickness = new Thickness(0);
-        if (_coverOnly)
+        if (style == "cover-only")
         {
             Padding = new Thickness(0);
+            MinWidth = MinHeight = 0;
             _flatCover = new SkImageView { PlaceholderToken = "surface2", CornerRadiusValue = 5 };
             _flatCover.IsHitTestVisible = false;
             var labelsOnly = UI.V(1, _name, _count);
@@ -55,6 +54,8 @@ public sealed class HomeProfileTile : Button
             Click += (_, _) => { if (ProfileId != Guid.Empty) navigate?.Invoke(ProfileId); };
             return;
         }
+        _cover = new CoverFrameView { FrameMode = "lite" };
+        _favorite = new IconView("icon.profile.favorite", 12, "warning");
         var portrait = style is "strip" or "compact";
         var size = portrait ? height - 8 : Math.Min(width - 8, height - 48);
         _cover.Width = _cover.Height = Math.Max(16, size);
@@ -77,7 +78,7 @@ public sealed class HomeProfileTile : Button
         Click += (_, _) => { if (ProfileId != Guid.Empty) navigate?.Invoke(ProfileId); };
     }
 
-    public void Bind(Guid id, string name, string? cover, string count, bool favorite)
+    public void Bind(Guid id, string name, string? cover, string count, bool favorite, MediaTransformState? coverTransform = null)
     {
         BindingVersion++;
         ProfileId = id;
@@ -85,19 +86,22 @@ public sealed class HomeProfileTile : Button
         _name.Text = name;
         _name.Tip(name);
         _count.Text = count;
-        _favorite.Selected = favorite;
-        _favorite.Visibility = favorite ? Visibility.Visible : Visibility.Collapsed;
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(this, name);
-        _cover.Plan = null;
-        _cover.Appearance = null;
-        _cover.Transform = MediaTransformState.Default;
         if (_flatCover is { } flat)
         {
             SetCoverFocus(false);
-            flat.Transform = MediaTransformState.Default;
+            flat.Transform = coverTransform ?? MediaTransformState.Default;
             flat.Source = ImageRef.FromPath(cover, 320);
         }
-        else _cover.Source = ImageRef.FromPath(cover, 320);
+        else if (_cover is { } frame && _favorite is { } badge)
+        {
+            badge.Selected = favorite;
+            badge.Visibility = favorite ? Visibility.Visible : Visibility.Collapsed;
+            frame.Plan = null;
+            frame.Appearance = null;
+            frame.Transform = coverTransform ?? MediaTransformState.Default;
+            frame.Source = ImageRef.FromPath(cover, 320);
+        }
     }
 
     private void SetCoverFocus(bool active)
@@ -110,15 +114,19 @@ public sealed class HomeProfileTile : Button
 
     public void Clear() => Bind(Guid.Empty, string.Empty, null, string.Empty, false);
 
+    internal void ApplyCoverTransform(MediaTransformState transform)
+    {
+        if (_flatCover is { } flat) flat.Transform = transform;
+        else if (_cover is { } cover) cover.Transform = transform;
+    }
+
     public void Apply(FramePlan frame, Neuterradise.App.Design.CoverFrames.CoverAppearance appearance, MediaTransformState transform)
     {
-        if (_flatCover is { } flat)
+        if (_cover is { } cover)
         {
-            flat.Transform = transform;
-            return;
+            cover.Plan = frame;
+            cover.Appearance = appearance;
         }
-        _cover.Plan = frame;
-        _cover.Appearance = appearance;
-        _cover.Transform = transform;
+        ApplyCoverTransform(transform);
     }
 }

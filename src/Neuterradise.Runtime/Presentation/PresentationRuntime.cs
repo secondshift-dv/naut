@@ -10,6 +10,7 @@ using Neuterradise.App.Profiles;
 using Neuterradise.App.Media;
 using Neuterradise.App.Settings;
 using Neuterradise.App.SystemServices.Database;
+using Neuterradise.App.SystemServices.Cache;
 using Neuterradise.App.SystemServices.Database.Writes;
 
 namespace Neuterradise.App.Presentation;
@@ -633,6 +634,7 @@ public sealed class PresentationRuntime
                 _store.RecordPackAsync, cancellationToken, standaloneAsset, official).ConfigureAwait(false);
             if (result.Succeeded && result.Pack is { } pack)
             {
+                if (pack.RootPath is { } root) DerivedImageLoader.Shared.InvalidateDirectory(root);
                 _compiler.Invalidate(pack.PackId);
                 RebuildCatalog();
                 Changed?.Invoke(this, new PresentationChangedEventArgs([], packsChanged: true));
@@ -730,6 +732,7 @@ public sealed class PresentationRuntime
             _committed = _committed.Apply(usages);
         }
         _packs.CompleteRemoval(stage);
+        if (pack.RootPath is { } root) DerivedImageLoader.Shared.InvalidateDirectory(root);
         _compiler.Invalidate(packId);
         RebuildCatalog();
         Changed?.Invoke(this, new PresentationChangedEventArgs(usages.Select(u => u.Slot).ToHashSet(), packsChanged: true));

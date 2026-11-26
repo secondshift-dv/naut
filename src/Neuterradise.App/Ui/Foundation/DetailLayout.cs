@@ -1,23 +1,28 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Neuterradise.App.Presentation;
 
 namespace Neuterradise.App.Ui;
 
 internal static class DetailLayout
 {
-    public static FrameworkElement Heading(string title, string? description, string icon)
+    public static FrameworkElement Heading(string title, string? description, string icon, ComponentVisualStyle? style = null)
     {
         var theme = ThemeRuntime.Current;
+        var symbol = new IconView(icon, 18, "textAccent");
+        symbol.ApplyComponentStyle(style, 18);
         var glyph = new Border
         {
-            Child = new IconView(icon, 18, "textAccent"),
+            Child = symbol,
             Width = 32,
             Height = 32,
             Background = theme.Brush("surface2"),
             CornerRadius = new CornerRadius(8),
             VerticalAlignment = VerticalAlignment.Top,
         };
-        var text = UI.V(2, UI.Text(title, "body-strong"),
+        var label = UI.Text(title, "body-strong");
+        if (style is not null) theme.ApplyType(label, "body-strong", style.TextColor, style.TextSize);
+        var text = UI.V(2, label,
             string.IsNullOrWhiteSpace(description) ? null : UI.WrappedText(description, "caption", "textSecondary"));
         text.VerticalAlignment = string.IsNullOrWhiteSpace(description)
             ? VerticalAlignment.Center

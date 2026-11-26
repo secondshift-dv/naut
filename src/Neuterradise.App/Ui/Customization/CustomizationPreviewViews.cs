@@ -262,7 +262,8 @@ public sealed partial class CustomizationCenter
                 model?.Rating ?? _subject?.Detail.Rating,
                 model?.IsFavorite ?? _subject?.Detail.IsFavorite ?? false,
                 layout.IdentityAlignment, assignedTags: _subject?.Detail.AssignedTags,
-                showTags: layout.Id != "portrait" || string.IsNullOrWhiteSpace(_bannerVideoPath));
+                showTags: layout.Id != "portrait" || string.IsNullOrWhiteSpace(_bannerVideoPath),
+                visuals: profilePlan.Visuals);
         }
 
         var figurePreview = UpdateFigurePreviewSource();

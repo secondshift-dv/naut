@@ -1,3 +1,5 @@
+using Neuterradise.App.Presentation;
+
 namespace Neuterradise.App.Design.MediaLayouts;
 
 public enum MediaMetadataPlacement
@@ -43,6 +45,8 @@ public sealed record MediaLayoutDefinition(
     string HoverStyle,
     bool ShowTypeBadge)
 {
+    public IReadOnlyDictionary<string, ComponentVisualStyle>? Visuals { get; init; }
+
     public double MediaWidth => CardWidth * MediaWidthFraction;
 
     public double CardHeight => MetadataPlacement switch

@@ -51,6 +51,7 @@ public sealed class MediaCardView : Grid, IDisposable
     private readonly Action<MediaGridCardViewModel>? _onInspect;
     private MediaGridCardViewModel? _card;
     private MediaLayoutDefinition _layout;
+    private IReadOnlyDictionary<string, ComponentVisualStyle>? _appliedVisuals;
     private PropertyChangedEventHandler? _observer;
 
     public MediaCardView(
@@ -220,6 +221,7 @@ public sealed class MediaCardView : Grid, IDisposable
         Grid.SetColumnSpan(_frame, side ? 1 : 2);
         ConfigureMetadata(layout.MetadataPlacement);
         ConfigureLiveChrome(layout.MetadataPlacement == MediaMetadataPlacement.LiveOverlay);
+        ApplyControlVisuals(layout.Visuals);
         _selectionOutline.CornerRadius = new CornerRadius(_live ? 0 : Math.Max(0, layout.FrameRadius - layout.FrameThickness));
 
         var below = layout.MetadataPlacement == MediaMetadataPlacement.Below;
@@ -249,6 +251,25 @@ public sealed class MediaCardView : Grid, IDisposable
         }
 
         UpdateVisual();
+    }
+
+    private void ApplyControlVisuals(IReadOnlyDictionary<string, ComponentVisualStyle>? visuals)
+    {
+        if (ReferenceEquals(_appliedVisuals, visuals)) return;
+        var theme = ThemeRuntime.Current;
+        void Apply(Button button, string id, double fallback)
+        {
+            var style = visuals?.GetValueOrDefault(id);
+            if (style is null && _appliedVisuals?.GetValueOrDefault(id) is null) return;
+            if (button.Content is IconView icon)
+                icon.ApplyComponentStyle(style, theme.ControlFamily("icon-button").IconButtonSize is { } size
+                    ? Math.Round(size * 0.5) : fallback);
+        }
+        Apply(_open, "open", 14);
+        Apply(_inspect, "info", 14);
+        Apply(_favorite, "favorite", 13);
+        _liveHeart.ApplyComponentStyle(visuals?.GetValueOrDefault("favorite"), 14);
+        _appliedVisuals = visuals;
     }
 
     private void ConfigureLiveChrome(bool live)
@@ -402,6 +423,7 @@ public sealed class MediaCardView : Grid, IDisposable
         if (_live)
         {
             _liveHeart.Filled = card.IsFavorite;
+            _liveHeart.Selected = _layout.Visuals?.GetValueOrDefault("favorite") is not null && card.IsFavorite;
             _liveHeart.ColorToken = card.IsFavorite ? "#FFFF729B" : "onMediaSecondary";
         }
         var favoriteLabel = card.IsFavorite

@@ -361,16 +361,20 @@ public sealed class CardVisual : Grid
                     block.TextWrapping = TextWrapping.NoWrap;
                 }
 
-                if (Plan.Hover == "sheen" && text.OnMedia
-                    && text.Slot is SemanticSlots.ProfileName or SemanticSlots.ProfileCategory)
+                if (text.OutlineColor is not null || (Plan.Hover == "sheen" && text.OnMedia
+                    && text.Slot is SemanticSlots.ProfileName or SemanticSlots.ProfileCategory))
                 {
                     var outlined = new Grid();
                     var strokes = new List<TextBlock>(4);
-                    foreach (var (x, y) in new[] { (-0.9, 0.0), (0.9, 0.0), (0.0, -0.9), (0.0, 0.9) })
+                    var width = text.OutlineColor is null ? 0.9 : text.OutlineWidth;
+                    foreach (var (x, y) in new[] { (-width, 0.0), (width, 0.0), (0.0, -width), (0.0, width) })
                     {
-                        var stroke = UI.Text(null, text.TypeRole, "warning", text.MaxLines);
+                        var stroke = UI.Text(block.Text, text.TypeRole, text.OutlineColor is { } color ? TokenName(color) : "warning", text.MaxLines);
                         stroke.TextAlignment = block.TextAlignment;
-                        stroke.Opacity = 0.7;
+                        stroke.TextWrapping = block.TextWrapping;
+                        stroke.VerticalAlignment = block.VerticalAlignment;
+                        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAccessibilityView(stroke, Microsoft.UI.Xaml.Automation.Peers.AccessibilityView.Raw);
+                        stroke.Opacity = text.OutlineColor is null ? 0.7 : 1;
                         stroke.IsHitTestVisible = false;
                         stroke.RenderTransform = new TranslateTransform { X = x, Y = y };
                         outlined.Children.Add(stroke);

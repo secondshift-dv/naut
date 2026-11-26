@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
+using Neuterradise.App.Presentation;
 
 namespace Neuterradise.App.Ui;
 
@@ -40,6 +41,13 @@ internal sealed class LivingNavigationButton : Button
     private bool _selected;
     private bool _pointerOver;
     private bool _compact;
+    private SceneButtonStyle? _appliedScope;
+    private static readonly string[] ScopedResourceKeys =
+    [
+        "ButtonBackground", "ButtonBackgroundPointerOver", "ButtonBackgroundPressed", "ButtonBackgroundDisabled",
+        "ButtonForeground", "ButtonForegroundPointerOver", "ButtonForegroundPressed", "ButtonForegroundDisabled",
+        "ButtonBorderBrush", "ButtonBorderBrushPointerOver", "ButtonBorderBrushPressed", "ButtonBorderBrushDisabled",
+    ];
 
     public LivingNavigationButton(
         LivingNavigationRole role,
@@ -210,17 +218,14 @@ internal sealed class LivingNavigationButton : Button
 
     private void ApplyPadding()
     {
-        if (ThemeRuntime.Current.ControlSkin?.Families.GetValueOrDefault("navigation") is { } skin)
-        {
-            Padding = new Thickness(skin.HorizontalPadding, skin.VerticalPadding, skin.HorizontalPadding, skin.VerticalPadding);
-            return;
-        }
-        Padding = _compact ? new Thickness(8, 0, 8, 0) : _role switch
-        {
-            LivingNavigationRole.Vault => new Thickness(8, 0, 10, 0),
-            LivingNavigationRole.Customize => new Thickness(10, 0, 10, 0),
-            _ => new Thickness(10, 0, 10, 0),
-        };
+        var theme = ThemeRuntime.Current;
+        var skin = theme.ControlSkin?.Families.GetValueOrDefault("navigation");
+        var baseline = skin is not null ? new Thickness(skin.HorizontalPadding, skin.VerticalPadding, skin.HorizontalPadding, skin.VerticalPadding)
+            : _compact ? new Thickness(8, 0, 8, 0) : _role == LivingNavigationRole.Vault
+                ? new Thickness(8, 0, 10, 0) : new Thickness(10, 0, 10, 0);
+        var scene = theme.SceneButtonFor(this);
+        Padding = new Thickness(scene?.HorizontalPadding ?? baseline.Left, scene?.VerticalPadding ?? baseline.Top,
+            scene?.HorizontalPadding ?? baseline.Right, scene?.VerticalPadding ?? baseline.Bottom);
     }
 
     private Border Bubble(double size, HorizontalAlignment horizontal, VerticalAlignment vertical, Thickness margin)
@@ -264,6 +269,7 @@ internal sealed class LivingNavigationButton : Button
             Opacity = _pointerOver ? 1 : 0.94;
             _baseIcon.ColorToken = "signatureGold";
             _detailIcon.ColorToken = "signatureGold";
+            ApplyScopedStyle();
             return;
         }
 
@@ -312,6 +318,48 @@ internal sealed class LivingNavigationButton : Button
         {
             _secondaryLabel.Foreground = theme.Brush("textPrimary");
         }
+        ApplyScopedStyle();
+    }
+
+    private void ApplyScopedStyle()
+    {
+        var theme = ThemeRuntime.Current;
+        var scene = theme.SceneButtonFor(this);
+        var previous = _appliedScope;
+        _appliedScope = scene;
+        if (scene is null)
+        {
+            if (previous is null) return;
+            foreach (var key in ScopedResourceKeys) Resources.Remove(key);
+            FocusVisualPrimaryBrush = theme.Brush("focus");
+            theme.RefreshButtonContent(this);
+            return;
+        }
+        if (previous != scene) theme.RefreshButtonContent(this);
+        var fill = _selected ? scene.SelectedFill ?? scene.Fill : _pointerOver ? scene.HoverFill ?? scene.Fill : scene.Fill;
+        if (fill is not null) Background = theme.Brush(fill);
+        if (scene.Border is { } border) BorderBrush = theme.Brush(border);
+        if (scene.Radius is { } radius) CornerRadius = new CornerRadius(radius);
+        if (scene.BorderWidth is { } borderWidth) BorderThickness = new Thickness(borderWidth);
+        FocusVisualPrimaryBrush = theme.Brush(scene.Focus ?? "focus");
+        if ((IsEnabled ? scene.Foreground : scene.DisabledForeground ?? scene.Foreground) is { } foreground)
+        {
+            _baseIcon.ColorToken = _detailIcon.ColorToken = foreground;
+            _label.Foreground = theme.Brush(foreground);
+            if (_secondaryLabel is not null) _secondaryLabel.Foreground = theme.Brush(foreground);
+        }
+        Resources["ButtonBackground"] = Background;
+        Resources["ButtonBackgroundPointerOver"] = scene.HoverFill is { } hover ? theme.Brush(hover) : Background;
+        Resources["ButtonBackgroundPressed"] = scene.PressedFill is { } pressed ? theme.Brush(pressed) : Background;
+        Resources["ButtonBackgroundDisabled"] = theme.Brush(scene.DisabledFill ?? "surface2");
+        Resources["ButtonForeground"] = _label.Foreground;
+        Resources["ButtonForegroundPointerOver"] = _label.Foreground;
+        Resources["ButtonForegroundPressed"] = _label.Foreground;
+        Resources["ButtonForegroundDisabled"] = theme.Brush(scene.DisabledForeground ?? "textDisabled");
+        Resources["ButtonBorderBrush"] = BorderBrush;
+        Resources["ButtonBorderBrushPointerOver"] = BorderBrush;
+        Resources["ButtonBorderBrushPressed"] = BorderBrush;
+        Resources["ButtonBorderBrushDisabled"] = BorderBrush;
     }
 
     public void SetVaultLogo(ImageRef? source)
