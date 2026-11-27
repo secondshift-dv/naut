@@ -221,6 +221,8 @@ public sealed class MediaCardView : Grid, IDisposable
         Grid.SetColumnSpan(_frame, side ? 1 : 2);
         ConfigureMetadata(layout.MetadataPlacement);
         ConfigureLiveChrome(layout.MetadataPlacement == MediaMetadataPlacement.LiveOverlay);
+        _hearts.ShowDecorativeHeart = layout.ShowDecorativeHeart;
+        _liveHeart.Visibility = _live && layout.ShowDecorativeHeart ? Visibility.Visible : Visibility.Collapsed;
         ApplyControlVisuals(layout.Visuals);
         _selectionOutline.CornerRadius = new CornerRadius(_live ? 0 : Math.Max(0, layout.FrameRadius - layout.FrameThickness));
 

@@ -46,6 +46,7 @@ public sealed record MediaLayoutDefinition(
     bool ShowTypeBadge)
 {
     public IReadOnlyDictionary<string, ComponentVisualStyle>? Visuals { get; init; }
+    public bool ShowDecorativeHeart { get; init; } = true;
 
     public double MediaWidth => CardWidth * MediaWidthFraction;
 

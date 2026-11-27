@@ -25,6 +25,19 @@ internal sealed class LiveHeartOverlay : SKCanvasElement
         [(0.89f, 0.57f, 11, 105), (0.94f, 0.65f, 8, 68), (0.87f, 0.72f, 14, 115),
          (0.94f, 0.80f, 9, 85), (0.88f, 0.88f, 12, 98)];
 
+    private bool _showDecorativeHeart = true;
+
+    public bool ShowDecorativeHeart
+    {
+        get => _showDecorativeHeart;
+        set
+        {
+            if (_showDecorativeHeart == value) return;
+            _showDecorativeHeart = value;
+            Invalidate();
+        }
+    }
+
     protected override void RenderOverride(SKCanvas canvas, Size area)
     {
         if (area.Width <= 0 || area.Height <= 0) return;
@@ -35,6 +48,7 @@ internal sealed class LiveHeartOverlay : SKCanvasElement
             [SKColors.Transparent, new SKColor(0, 0, 0, 164)], null, SKShaderTileMode.Clamp);
         using var scrim = new SKPaint { Shader = shader };
         canvas.DrawRect(SKRect.Create(0, h - bottom, w, bottom), scrim);
+        if (!ShowDecorativeHeart) return;
         using var heart = SKPath.ParseSvgPathData("M12 21 C10 19 3 14 3 8 C3 2 10 1 12 6 C14 1 21 2 21 8 C21 14 14 19 12 21 Z");
         using var paint = new SKPaint { IsAntialias = true };
         foreach (var (x, y, size, alpha) in Hearts)

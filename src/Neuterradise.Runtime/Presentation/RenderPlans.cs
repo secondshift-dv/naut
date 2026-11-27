@@ -325,7 +325,8 @@ public sealed record ProfileLayoutPlan(ProfileLayoutDefinition Layout, SurfaceNo
 
 public sealed record FramePlan(CoverFrameDefinition Frame, string? OverlayAssetPath, double? CoverInsetFraction = null, string? OverlayAssetIdentity = null);
 
-public sealed record MediaCollectionPlan(string Layout, int MaxColumns, double RowSpacing, double ColumnSpacing);
+public sealed record MediaCollectionPlan(string Layout, int MaxColumns, double RowSpacing, double ColumnSpacing,
+    string? Justification = null);
 
 public sealed record ProfileMediaLayoutPlan(Neuterradise.App.Design.MediaLayouts.MediaLayoutDefinition Layout, string Browse = "wall",
     MediaCollectionPlan? Collection = null);

@@ -7,7 +7,7 @@ namespace Neuterradise.App.Ui;
 
 /// <summary>Roomy caption-first media pages, distinct from the dense square Mosaic.</summary>
 public sealed class EditorialGridLayout(double minimumWidth, double cardHeight, double spacing,
-    int maximumColumns = 3, double? rowSpacing = null, bool authoredSizing = false) : VirtualizingLayout
+    int maximumColumns = 3, double? rowSpacing = null, bool authoredSizing = false, string? justification = null) : VirtualizingLayout
 {
     private sealed class State
     {
@@ -22,7 +22,7 @@ public sealed class EditorialGridLayout(double minimumWidth, double cardHeight, 
         var ideal = authoredSizing ? minimumWidth : Math.Clamp(minimumWidth, 180, 260);
         var columns = Math.Clamp((int)Math.Floor((width + spacing) / (ideal + spacing)), 1, maximumColumns);
         var unit = Math.Min(ideal, Math.Max(1, (width - spacing * (columns - 1)) / columns));
-        var inset = Math.Max(0, (width - (columns * unit + spacing * (columns - 1))) / 2);
+        var legacyInset = Math.Max(0, (width - (columns * unit + spacing * (columns - 1))) / 2);
         var verticalSpacing = rowSpacing ?? spacing;
         var stride = cardHeight + verticalSpacing;
         var state = context.LayoutState as State ?? new State();
@@ -31,6 +31,15 @@ public sealed class EditorialGridLayout(double minimumWidth, double cardHeight, 
         var window = context.RealizationRect;
         for (var index = 0; index < context.ItemCount; index++)
         {
+            var rowCount = Math.Min(columns, context.ItemCount - index / columns * columns);
+            var remaining = Math.Max(0, width - (rowCount * unit + spacing * (rowCount - 1)));
+            var inset = justification switch
+            {
+                "start" => 0,
+                "center" => remaining / 2,
+                "end" => remaining,
+                _ => legacyInset,
+            };
             var x = inset + index % columns * (unit + spacing);
             var y = index / columns * stride;
             var bounds = new Rect(x, y, unit, cardHeight);

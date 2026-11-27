@@ -607,8 +607,15 @@ public sealed partial class PresentationCompiler
             else collection = new(context.Enum(collectionSpec, "layout", ["grid", "editorial"], "grid"),
                 (int)context.Number(collectionSpec, "maxColumns", 12, 1, 12),
                 context.Number(collectionSpec, "rowSpacing", 10, 0, 48),
-                context.Number(collectionSpec, "columnSpacing", 10, 0, 48));
+                context.Number(collectionSpec, "columnSpacing", 10, 0, 48),
+                collectionSpec.TryGetProperty("justification", out _)
+                    ? context.Enum(collectionSpec, "justification", ["start", "center", "end"], "start")
+                    : null);
         }
+
+        if (spec.TryGetProperty("showDecorativeHeart", out var decorativeHeart)
+            && (context.ContractVersion < 4 || decorativeHeart.ValueKind is not (JsonValueKind.True or JsonValueKind.False)))
+            context.Error("showDecorativeHeart", "Expected a boolean on a Contract 4 Media Layout.");
 
         return new ProfileMediaLayoutPlan(new MediaLayoutDefinition(
             layoutId,
@@ -644,7 +651,10 @@ public sealed partial class PresentationCompiler
             context.Number(spec, "frameGlow", 0, 0, 1),
             context.Enum(spec, "hoverStyle", ["lift", "spotlight", "none"], "lift"),
             context.Bool(spec, "showTypeBadge", true))
-            { Visuals = ReadComponentVisuals(spec, context, media: true) },
+            {
+                Visuals = ReadComponentVisuals(spec, context, media: true),
+                ShowDecorativeHeart = context.Bool(spec, "showDecorativeHeart", true),
+            },
             browse, collection);
     }
 

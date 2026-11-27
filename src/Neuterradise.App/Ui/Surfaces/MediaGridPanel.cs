@@ -128,15 +128,7 @@ public sealed class MediaGridPanel : IDisposable
     {
         if (_collection is { } authored)
         {
-            _repeater.Layout = authored.Layout == "editorial"
-                ? new EditorialGridLayout(_layout.CardWidth, _layout.CardHeight, authored.ColumnSpacing,
-                    authored.MaxColumns, authored.RowSpacing, authoredSizing: true)
-                : new UniformGridLayout
-                {
-                    MinItemWidth = _layout.CardWidth, MinItemHeight = _layout.CardHeight,
-                    MinColumnSpacing = authored.ColumnSpacing, MinRowSpacing = authored.RowSpacing,
-                    ItemsStretch = UniformGridLayoutItemsStretch.None, MaximumRowsOrColumns = authored.MaxColumns,
-                };
+            _repeater.Layout = CreateAuthoredLayout(_layout, authored);
             return;
         }
         _repeater.Layout = _browse switch
@@ -146,6 +138,23 @@ public sealed class MediaGridPanel : IDisposable
             _ => CompactGrid(10),
         };
     }
+
+    internal static VirtualizingLayout CreateAuthoredLayout(MediaLayoutDefinition layout, MediaCollectionPlan authored) =>
+        authored.Layout == "editorial"
+            ? new EditorialGridLayout(layout.CardWidth, layout.CardHeight, authored.ColumnSpacing,
+                authored.MaxColumns, authored.RowSpacing, authoredSizing: true, justification: authored.Justification)
+            : new UniformGridLayout
+            {
+                MinItemWidth = layout.CardWidth, MinItemHeight = layout.CardHeight,
+                MinColumnSpacing = authored.ColumnSpacing, MinRowSpacing = authored.RowSpacing,
+                ItemsStretch = UniformGridLayoutItemsStretch.None, MaximumRowsOrColumns = authored.MaxColumns,
+                ItemsJustification = authored.Justification switch
+                {
+                    "center" => UniformGridLayoutItemsJustification.Center,
+                    "end" => UniformGridLayoutItemsJustification.End,
+                    _ => UniformGridLayoutItemsJustification.Start,
+                },
+            };
 
     private UniformGridLayout CompactGrid(double spacing) => new()
     {
