@@ -19,6 +19,7 @@ using Neuterradise.App.Profiles;
 using Neuterradise.App.Settings;
 using Neuterradise.App.Shell;
 using Neuterradise.App.SystemServices.Resources;
+using Neuterradise.App.SystemServices.Storage;
 using Neuterradise.App.SystemServices.Cache;
 using Neuterradise.App.Trash;
 using Windows.System;
@@ -61,8 +62,10 @@ public sealed class ProductRoot : Grid
     private StackPanel? _legacyUtilities;
     private FrameworkElement? _authoredNavigation;
     private NavigationScenePlan? _activeNavigation;
-    private bool _nativeNavigation;
-    private bool _immersiveHidden;
+    private ShellNavigationConfiguration _shellNavigation;
+    private bool _revealChrome, _navigatorEdge, _breadcrumbEdge, _savingShellNavigation;
+    private string _navigatorDock = "top";
+    public ShellNavigationConfiguration ShellNavigation => _shellNavigation;
     private Button? _navigationRecovery;
     private readonly StackPanel _breadcrumb = UI.H(4);
     private readonly Border _breadcrumbHost = new();
@@ -78,8 +81,9 @@ public sealed class ProductRoot : Grid
     private readonly Timer _dispatcherPulse;
     private int _dispatcherPulsePending;
 
-    public ProductRoot(AppServices services)
+    public ProductRoot(AppServices services, ShellNavigationConfiguration? shellNavigation = null)
     {
+        _shellNavigation = (shellNavigation ?? new()).Normalize();
         _dispatcherPulse = new Timer(_ =>
         {
             if (Interlocked.Exchange(ref _dispatcherPulsePending, 1) != 0) return;
@@ -147,6 +151,8 @@ public sealed class ProductRoot : Grid
                 && _overlayLayer.Visibility != Visibility.Visible && !customization.ContainsPointer(point, this);
         }, () => _customization?.RequestClose());
         AddHandler(KeyDownEvent, new KeyEventHandler(OnKeyDown), true);
+        AddHandler(PointerMovedEvent, new PointerEventHandler(OnChromePointerMoved), true);
+        PointerExited += (_, _) => SetChromeEdges(false, false);
         SizeChanged += (_, _) =>
         {
             ResourceGovernor.Shared.NotifyInteraction(InteractionSignal.Resize);
@@ -269,8 +275,63 @@ public sealed class ProductRoot : Grid
 
     private void ToggleNativeNavigation()
     {
-        _nativeNavigation = !_nativeNavigation;
-        _immersiveHidden = false;
+        if (_navigationContainer.Visibility == Visibility.Collapsed)
+        {
+            _revealChrome = true;
+            ApplyNavigationScene();
+        }
+        else if (_activeNavigation is not null)
+            _services.RunUserAction(SetShellNavigationAsync(_shellNavigation with { Native = !_shellNavigation.Native }, preserveReveal: true),
+                "ProductRoot.SetShellNavigation", UI.T("Customize.ApplyFailed", "Could not apply. Nothing was changed."));
+    }
+
+    public async Task SetShellNavigationAsync(ShellNavigationConfiguration configuration, bool preserveReveal = false)
+    {
+        if (_savingShellNavigation) return;
+        _savingShellNavigation = true;
+        try
+        {
+            configuration = configuration.Normalize();
+            var result = await _services.Configuration.UpdateAsync(current => current with { ShellNavigation = configuration });
+            if (!result.IsSaved) throw new InvalidOperationException(result.SafeErrorDetail);
+            _shellNavigation = configuration;
+            if (!preserveReveal) _revealChrome = false;
+            _navigatorEdge = _breadcrumbEdge = false;
+            ApplyNavigationScene();
+        }
+        finally { _savingShellNavigation = false; }
+    }
+
+    private static bool ChromeVisible(ShellVisibility visibility, bool edge, bool reveal) =>
+        reveal || visibility == ShellVisibility.Visible || visibility == ShellVisibility.AutoHide && edge;
+
+    private void OnChromePointerMoved(object sender, PointerRoutedEventArgs args)
+    {
+        if (_shellNavigation.Navigator != ShellVisibility.AutoHide && _shellNavigation.Breadcrumb != ShellVisibility.AutoHide) return;
+        var point = args.GetCurrentPoint(this).Position;
+        var navigator = _navigatorDock switch
+        {
+            "left" => point.X <= 12,
+            "right" => point.X >= ActualWidth - 12,
+            "bottom" => point.Y >= ActualHeight - 12,
+            _ => point.Y <= 12,
+        };
+        bool Contains(FrameworkElement element)
+        {
+            if (element.Visibility != Visibility.Visible || element.ActualWidth <= 0 || element.ActualHeight <= 0) return false;
+            var origin = element.TransformToVisual(this).TransformPoint(new Windows.Foundation.Point());
+            return point.X >= origin.X && point.X <= origin.X + element.ActualWidth
+                && point.Y >= origin.Y && point.Y <= origin.Y + element.ActualHeight;
+        }
+        SetChromeEdges(navigator || Contains(_navigationContainer),
+            point.Y <= 12 || Contains(_navigationContainer) || Contains(_breadcrumbHost));
+    }
+
+    private void SetChromeEdges(bool navigator, bool breadcrumb)
+    {
+        if (_navigatorEdge == navigator && _breadcrumbEdge == breadcrumb) return;
+        _navigatorEdge = navigator;
+        _breadcrumbEdge = breadcrumb;
         ApplyNavigationScene();
     }
 
@@ -309,14 +370,11 @@ public sealed class ProductRoot : Grid
         if (!ReferenceEquals(_activeNavigation, authored))
         {
             _activeNavigation = authored;
-            _nativeNavigation = false;
-            _immersiveHidden = authored?.Immersive == true;
             RestoreLegacyNavigation();
         }
         var route = _services.Navigation.CurrentRoute;
-        var safeRoute = route is HomeRoute or GalleryRoute or ProfileRoute;
-        var plan = !_nativeNavigation && safeRoute && ActualWidth >= 640
-            && (authored?.OverlayHome != true || route is HomeRoute) ? authored : null;
+        var safeRoute = NavigationScenePlan.SupportsRoute(route);
+        var plan = !_shellNavigation.Native && safeRoute && ActualWidth >= 640 ? authored : null;
         if (plan is null)
         {
             RestoreLegacyNavigation();
@@ -341,9 +399,10 @@ public sealed class ProductRoot : Grid
 
         var side = plan?.Dock is "left" or "right";
         var stageAspect = (_current as HomeSurface)?.StageAspect;
-        var overlay = plan is { OverlayHome: true, Dock: "top" } && route is HomeRoute
-            && stageAspect is > 0 && _customization is null;
-        var hidden = plan?.Immersive == true && _immersiveHidden && _customization is null;
+        var overlay = plan?.UsesOverlay(route) == true && _customization is null
+            && (route is not HomeRoute || stageAspect is > 0);
+        _navigatorDock = plan?.Dock ?? "top";
+        var hidden = safeRoute && _customization is null && !ChromeVisible(_shellNavigation.Navigator, _navigatorEdge, _revealChrome);
         _navigationContainer.Visibility = hidden ? Visibility.Collapsed : Visibility.Visible;
         _navigationContainer.Height = plan is not null && !side ? plan.Extent : double.NaN;
         _navigationContainer.Width = side ? plan!.Extent : double.NaN;
@@ -359,24 +418,33 @@ public sealed class ProductRoot : Grid
             Grid.SetRow(_navigationContainer, 2);
             var areaWidth = Math.Max(0, _presentationWorkspace.ActualWidth);
             var areaHeight = Math.Max(0, _presentationWorkspace.ActualHeight);
-            var stageWidth = areaWidth > 0 && areaHeight > 0
-                ? Math.Min(areaWidth, areaHeight * stageAspect!.Value) : ActualWidth;
-            var stageHeight = stageWidth / stageAspect!.Value;
-            _navigationContainer.Width = Math.Max(0, stageWidth * 0.82);
-            _navigationContainer.Margin = new Thickness(Math.Max(0, (areaWidth - stageWidth) / 2 + stageWidth * 0.025),
-                Math.Max(0, (areaHeight - stageHeight) / 2), 0, 0);
+            if (route is HomeRoute && stageAspect is > 0)
+            {
+                var stageWidth = areaWidth > 0 && areaHeight > 0
+                    ? Math.Min(areaWidth, areaHeight * stageAspect.Value) : ActualWidth;
+                var stageHeight = stageWidth / stageAspect.Value;
+                _navigationContainer.Width = Math.Max(0, stageWidth * 0.82);
+                _navigationContainer.Margin = new Thickness(Math.Max(0, (areaWidth - stageWidth) / 2 + stageWidth * 0.025),
+                    Math.Max(0, (areaHeight - stageHeight) / 2), 0, 0);
+            }
+            else
+            {
+                _navigationContainer.HorizontalAlignment = HorizontalAlignment.Stretch;
+                _navigationContainer.Width = double.NaN;
+            }
         }
         if (plan is not null)
         {
-            var compact = side || (overlay ? _navigationContainer.Width < 900 : ActualWidth < 900);
+            var compact = side || (overlay && double.IsFinite(_navigationContainer.Width)
+                ? _navigationContainer.Width < 900 : ActualWidth < 900);
             foreach (var item in _navButtons) item.Button.SetCompact(compact);
             _vaultButton?.SetCompact(compact);
             _customizeButton?.SetCompact(compact);
         }
         else UpdateResponsiveTopBar(ActualWidth);
-        _navigationRecovery.Visibility = authored is not null && safeRoute && _customization is null
+        _navigationRecovery.Visibility = authored is not null && safeRoute && _customization is null && !_shellNavigation.HideSwitch
             ? Visibility.Visible : Visibility.Collapsed;
-        var label = _nativeNavigation
+        var label = _shellNavigation.Native
             ? UI.T("Nav.CustomNavigation", "Custom navigation") : UI.T("Nav.Recovery", "Native navigation");
         if (!Equals(_navigationRecovery.Content, label)) _navigationRecovery.Content = label;
         UpdateBreadcrumbVisibility();
@@ -462,7 +530,9 @@ public sealed class ProductRoot : Grid
 
     private void UpdateBreadcrumbVisibility()
     {
-        var visible = _breadcrumb.Children.Count > 1 || _navigationRecovery?.Visibility == Visibility.Visible;
+        var protectedRoute = _services.Navigation.CurrentRoute is not (HomeRoute or GalleryRoute or ProfileRoute);
+        var visible = (_breadcrumb.Children.Count > 1 || _navigationRecovery?.Visibility == Visibility.Visible)
+            && (protectedRoute || _customization is not null || ChromeVisible(_shellNavigation.Breadcrumb, _breadcrumbEdge, _revealChrome));
         var visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         if (_breadcrumbHost.Visibility != visibility) _breadcrumbHost.Visibility = visibility;
         if (_breadcrumb.Visibility != visibility) _breadcrumb.Visibility = visibility;
@@ -1084,35 +1154,52 @@ public sealed class ProductRoot : Grid
     private void OnKeyDown(object sender, KeyRoutedEventArgs e)
     {
         ResourceGovernor.Shared.NotifyInteraction(InteractionSignal.Keyboard);
-        if (e.Key == VirtualKey.F10 && _activeNavigation is not null && _customization is null
-            && !Dialogs.HasOpenDialog && !_services.Overlay.HasOverlay)
-        {
-            ToggleNativeNavigation();
-            e.Handled = true;
-            return;
-        }
-        if (e.Key != VirtualKey.Escape) return;
+        if (TryHandleShellShortcut(e.Key, settingsShortcut: false)) e.Handled = true;
+    }
 
-        if (Dialogs.TryDismissTop())
+    internal bool TryHandleShellShortcut(VirtualKey key, bool settingsShortcut)
+    {
+        if (key == VirtualKey.Escape && !settingsShortcut)
         {
-            e.Handled = true;
+            if (Dialogs.TryDismissTop()) return true;
+            if (Dialogs.HasOpenDialog) return false;
+            if (_services.Overlay.HasOverlay)
+            {
+                _services.Overlay.RequestEscapeClose();
+                return true;
+            }
+            if (_customization is not null)
+            {
+                _customization.RequestClose();
+                return true;
+            }
+            if (NavigationScenePlan.SupportsRoute(_services.Navigation.CurrentRoute)
+                && (_shellNavigation.Navigator != ShellVisibility.Visible || _shellNavigation.Breadcrumb != ShellVisibility.Visible))
+            {
+                _revealChrome = !_revealChrome;
+                ApplyNavigationScene();
+                return true;
+            }
+            return false;
         }
-        else if (_services.Overlay.HasOverlay)
+
+        if (_customization is not null || Dialogs.HasOpenDialog || _services.Overlay.HasOverlay) return false;
+        if (settingsShortcut)
         {
-            _services.Overlay.RequestEscapeClose();
-            e.Handled = true;
+            NavigateTop(new SettingsRoute(SettingsSection.Appearance));
+            return true;
         }
-        else if (_customization is not null)
+        if (key != VirtualKey.F10) return false;
+
+        if (NavigationScenePlan.SupportsRoute(_services.Navigation.CurrentRoute)
+            && (_navigationContainer.Visibility == Visibility.Collapsed
+                || _shellNavigation.Breadcrumb != ShellVisibility.Visible && !_revealChrome))
         {
-            _customization.RequestClose();
-            e.Handled = true;
-        }
-        else if (_activeNavigation?.Immersive == true && !_nativeNavigation)
-        {
-            _immersiveHidden = !_immersiveHidden;
+            _revealChrome = true;
             ApplyNavigationScene();
-            e.Handled = true;
         }
+        else ToggleNativeNavigation();
+        return true;
     }
 }
 

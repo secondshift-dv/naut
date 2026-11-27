@@ -1056,7 +1056,7 @@
     <sys:String x:Key="Nav.Settings">Pengaturan</sys:String>
     <sys:String x:Key="Nav.Recovery">Navigasi native</sys:String>
     <sys:String x:Key="Nav.CustomNavigation">Navigasi kustom</sys:String>
-    <sys:String x:Key="Banner.SceneEffects">Efek Scene</sys:String>
+    <sys:String x:Key="Banner.SceneEffects">Efek scene banner</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset">Preset Global</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset.Desc">Terapkan tampilan global terkoordinasi tanpa mengubah override dan media setiap Profile.</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset.Confirm">Terapkan {0} pada tampilan global, Home, Gallery, dan default Profile?</sys:String>
@@ -2201,7 +2201,7 @@
     <sys:String x:Key="Banner.Add">Tambahkan sebagai Banner</sys:String>
     <sys:String x:Key="Banner.PickerEmpty">Belum ada video siap pakai untuk Profile ini.</sys:String>
     <sys:String x:Key="Banner.Member">Sudah dalam koleksi</sys:String>
-    <sys:String x:Key="Banner.Effects">Efek Banner</sys:String>
+    <sys:String x:Key="Banner.Effects">Efek media banner</sys:String>
     <sys:String x:Key="Banner.Intensity">Intensitas Efek</sys:String>
     <sys:String x:Key="Banner.Effect.none">Tanpa efek</sys:String>
     <sys:String x:Key="Banner.Effect.film">Film</sys:String>
@@ -2238,4 +2238,14 @@
     <sys:String x:Key="Health.BulkConfirm">Konfirmasi {0} catatan integritas original. Setiap original diperiksa ulang; tidak ada file yang diubah.</sys:String>
     <sys:String x:Key="Health.BulkOutcome">Rekonsiliasi integritas: {0} selesai, {1} belum terselesaikan, {2} belum diproses.</sys:String>
     <sys:String x:Key="Health.PlacementStale">Ditemukan kemungkinan lokasi canonical. Verifikasi sebelum memperbarui path katalog.</sys:String>
+    <sys:String x:Key="Settings.Appearance.Navigation">Navigasi</sys:String>
+    <sys:String x:Key="Settings.Navigation.Mode">Mode navigator</sys:String>
+    <sys:String x:Key="Settings.Navigation.Navigator">Visibilitas navigator</sys:String>
+    <sys:String x:Key="Settings.Navigation.Switch">Visibilitas tombol mode navigator</sys:String>
+    <sys:String x:Key="Settings.Navigation.Breadcrumb">Visibilitas breadcrumb</sys:String>
+    <sys:String x:Key="Settings.Navigation.Visible">Tampil</sys:String>
+    <sys:String x:Key="Settings.Navigation.AutoHide">Sembunyi otomatis</sys:String>
+    <sys:String x:Key="Settings.Navigation.Hidden">Tersembunyi</sys:String>
+    <sys:String x:Key="Settings.Navigation.Recovery">Arahkan penunjuk ke tepi navigator untuk sembunyi otomatis. F10 menampilkan navigasi; Escape mengubah visibilitas sementara. Pengaturan dan Impor tetap menyediakan navigasi native. Ctrl + , membuka Pengaturan.</sys:String>
+    <sys:String x:Key="Customize.ProfileLayout.PreserveComposition">Pertahankan komposisi</sys:String>
 </ResourceDictionary>

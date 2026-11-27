@@ -1056,7 +1056,7 @@
     <sys:String x:Key="Nav.Settings">Einstellungen</sys:String>
     <sys:String x:Key="Nav.Recovery">Native Navigation</sys:String>
     <sys:String x:Key="Nav.CustomNavigation">Benutzerdefinierte Navigation</sys:String>
-    <sys:String x:Key="Banner.SceneEffects">Szeneneffekte</sys:String>
+    <sys:String x:Key="Banner.SceneEffects">Banner-Szeneneffekt</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset">Globale Vorgaben</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset.Desc">Globale Darstellungsvorgaben anwenden und individuelle Profileinstellungen und Medien beibehalten.</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset.Confirm">{0} auf Darstellung, Startseite, Galerie und Profilvorgaben anwenden?</sys:String>
@@ -2201,7 +2201,7 @@
     <sys:String x:Key="Banner.Add">Als Banner hinzufügen</sys:String>
     <sys:String x:Key="Banner.PickerEmpty">Für dieses Profil sind keine vorbereiteten Videos verfügbar.</sys:String>
     <sys:String x:Key="Banner.Member">Bereits in der Sammlung</sys:String>
-    <sys:String x:Key="Banner.Effects">Banner-Effekte</sys:String>
+    <sys:String x:Key="Banner.Effects">Banner-Medieneffekt</sys:String>
     <sys:String x:Key="Banner.Intensity">Effektstärke</sys:String>
     <sys:String x:Key="Banner.Effect.none">Keiner</sys:String>
     <sys:String x:Key="Banner.Effect.film">Film</sys:String>
@@ -2238,4 +2238,14 @@
     <sys:String x:Key="Health.BulkConfirm">{0} Integritätseinträge bestätigen. Jedes Original wird erneut geprüft; keine Dateien werden geändert.</sys:String>
     <sys:String x:Key="Health.BulkOutcome">Integritätsabgleich: {0} abgeschlossen, {1} offen, {2} nicht verarbeitet.</sys:String>
     <sys:String x:Key="Health.PlacementStale">Ein möglicher kanonischer Speicherort wurde gefunden. Vor Übernahme des Katalogpfads prüfen.</sys:String>
+    <sys:String x:Key="Settings.Appearance.Navigation">Navigation</sys:String>
+    <sys:String x:Key="Settings.Navigation.Mode">Navigationsmodus</sys:String>
+    <sys:String x:Key="Settings.Navigation.Navigator">Sichtbarkeit der Navigation</sys:String>
+    <sys:String x:Key="Settings.Navigation.Switch">Sichtbarkeit des Navigationsmodus-Schalters</sys:String>
+    <sys:String x:Key="Settings.Navigation.Breadcrumb">Sichtbarkeit des Navigationspfads</sys:String>
+    <sys:String x:Key="Settings.Navigation.Visible">Sichtbar</sys:String>
+    <sys:String x:Key="Settings.Navigation.AutoHide">Automatisch ausblenden</sys:String>
+    <sys:String x:Key="Settings.Navigation.Hidden">Ausgeblendet</sys:String>
+    <sys:String x:Key="Settings.Navigation.Recovery">Für automatisches Ausblenden den Zeiger zum angedockten Rand bewegen. F10 blendet die Navigation ein; Escape schaltet die vorübergehende Sichtbarkeit um. Einstellungen und Import behalten die native Navigation. Strg + , öffnet die Einstellungen.</sys:String>
+    <sys:String x:Key="Customize.ProfileLayout.PreserveComposition">Komposition beibehalten</sys:String>
 </ResourceDictionary>

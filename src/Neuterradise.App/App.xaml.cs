@@ -886,7 +886,8 @@ public partial class App : Application
         status.ApplyProfiling(runtime.ProfilingState, runtime.ProfilingStateReason);
         _context = context;
         _services = services;
-        var productRoot = new ProductRoot(services);
+        var shellConfiguration = (await services.Configuration.LoadAsync(cancellationToken)).Configuration.ShellNavigation;
+        var productRoot = new ProductRoot(services, shellConfiguration);
         _window!.Content = productRoot;
         if (_acceptanceRoots is not null)
             AcceptanceMeasurements.Observe(productRoot, _window, _acceptanceRoots.AppState.Root);

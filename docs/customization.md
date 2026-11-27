@@ -8,7 +8,11 @@ Naut separates collection data from presentation choices. You can change how Hom
 
 Use the contextual **Customize** action on Home, Gallery, Cards or Profiles to apply layout, frame, backdrop and effect choices to the relevant surface. The built-in Home, Spotlight, Profile, Card, Media and Gallery categories each offer three curated alternatives. Saved legacy selections resolve through compatibility mappings; installed-pack selections remain independent when their definitions are available.
 
-Presentation Contract 4 adds layered Gallery scenes, responsive navigation and coordinated Global Presets in Appearance. Compatible installed collections can be applied as a single transaction; individual components remain separately selectable. Explicit Profile choices retain priority. Home and Profile support multiple Banner slots with bounded playback. Compatible packs using Naut v0.0.40 can also compose immersive Home stages, paper-style Profiles, fixed Gallery slots, independent Card hover canvases, live media overlays, and themed Import and Inspector surfaces. Naut v0.0.41 adds a looping Favorites reel, compact breadcrumb navigation switch, local native button styling, flexible Profile Banner geometry, bounded section-header and rating/Favorite icon styling, Media Card control icons, translucent paper panels and Card text outlines. These options are pack-defined; existing components retain their appearance when the options are omitted.
+Presentation Contract 4 adds layered Gallery scenes, responsive navigation and coordinated Global Presets in Appearance. Compatible installed collections can be applied as a single transaction; individual components remain separately selectable. Explicit Profile choices retain priority. Home and Profile support multiple Banner slots with bounded playback. Compatible packs using Naut v0.0.40 can also compose immersive Home stages, paper-style Profiles, fixed Gallery slots, independent Card hover canvases, live media overlays, and themed Import and Inspector surfaces. Naut v0.0.41 adds a looping Favorites reel, compact breadcrumb navigation switch, local native button styling, flexible Profile Banner geometry, bounded section-header and rating/Favorite icon styling, Media Card control icons, translucent paper panels and Card text outlines. These options are pack-defined; existing components retain their appearance when the options are omitted. Naut v0.0.42 adds independently configurable Paper palette colors, full-viewport Home backdrops, optional Maintain composition for modular Profiles, independent Gallery effects, numbered Banner slots and separate Banner media and scene effect controls. Custom navigation can overlay Home, Gallery and Profile independently.
+
+## Navigation
+
+Open **Settings > Appearance > Navigation** to select Native or Custom mode, set Navigator and Breadcrumb visibility (Visible, Auto-hide or Hidden), and show or hide the Navigator switch independently. F10 reveals hidden chrome; Esc toggles temporary visibility; Ctrl + , opens Settings directly. Import and Settings retain native navigation. Dialogs and editors have priority over recovery shortcuts.
 
 ## Select from pack
 
@@ -17,7 +21,7 @@ Open **Customize Home** or **Customize Profile**, choose **Select from pack**, a
 - **Home** fills Layout, Spotlight Layout, Backdrop and Effect.
 - **Profile** fills Profile Layout, Media Layout, Backdrop, Profile Effect, Frame, Banner Effect, Card Layout and Card Effect for the Profile being edited.
 
-Naut uses the first compatible definition for each slot. A missing slot keeps its current selection. Try another pack or edit any component individually before choosing **Save Changes**. **Cancel** returns to the saved appearance. Gallery has its own layout picker, and each of its cards follows its Profile's Card choices.
+Naut uses the first compatible definition for each slot. A missing slot keeps its current selection. Try another pack or edit any component individually before choosing **Save Changes**. **Cancel** returns to the saved appearance. Gallery has its own layout and surface effect pickers, and each of its cards follows its Profile's Card choices.
 
 ## Home and Gallery
 

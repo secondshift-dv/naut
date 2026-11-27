@@ -1056,7 +1056,7 @@
     <sys:String x:Key="Nav.Settings">설정</sys:String>
     <sys:String x:Key="Nav.Recovery">기본 탐색</sys:String>
     <sys:String x:Key="Nav.CustomNavigation">사용자 지정 탐색</sys:String>
-    <sys:String x:Key="Banner.SceneEffects">장면 효과</sys:String>
+    <sys:String x:Key="Banner.SceneEffects">배너 장면 효과</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset">전역 프리셋</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset.Desc">개별 프로필 설정과 미디어를 유지하며 전역 모양 기본값을 적용합니다.</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset.Confirm">{0}을(를) 전체 모양, 홈, 갤러리 및 프로필 기본값에 적용하시겠습니까?</sys:String>
@@ -2201,7 +2201,7 @@
     <sys:String x:Key="Banner.Add">배너로 추가</sys:String>
     <sys:String x:Key="Banner.PickerEmpty">이 프로필에 준비된 동영상이 없습니다.</sys:String>
     <sys:String x:Key="Banner.Member">이미 컬렉션에 있음</sys:String>
-    <sys:String x:Key="Banner.Effects">배너 효과</sys:String>
+    <sys:String x:Key="Banner.Effects">배너 미디어 효과</sys:String>
     <sys:String x:Key="Banner.Intensity">효과 강도</sys:String>
     <sys:String x:Key="Banner.Effect.none">없음</sys:String>
     <sys:String x:Key="Banner.Effect.film">필름</sys:String>
@@ -2238,4 +2238,14 @@
     <sys:String x:Key="Health.BulkConfirm">원본 무결성 기록 {0}개를 확인합니다. 각 원본을 다시 검사하며 파일은 변경하지 않습니다.</sys:String>
     <sys:String x:Key="Health.BulkOutcome">무결성 조정: 완료 {0}개, 미해결 {1}개, 미처리 {2}개.</sys:String>
     <sys:String x:Key="Health.PlacementStale">가능한 정식 저장 위치가 있습니다. 카탈로그 경로를 채택하기 전에 검증하세요.</sys:String>
+    <sys:String x:Key="Settings.Appearance.Navigation">탐색</sys:String>
+    <sys:String x:Key="Settings.Navigation.Mode">탐색 모드</sys:String>
+    <sys:String x:Key="Settings.Navigation.Navigator">탐색 표시</sys:String>
+    <sys:String x:Key="Settings.Navigation.Switch">탐색 전환 버튼 표시</sys:String>
+    <sys:String x:Key="Settings.Navigation.Breadcrumb">이동 경로 표시</sys:String>
+    <sys:String x:Key="Settings.Navigation.Visible">표시</sys:String>
+    <sys:String x:Key="Settings.Navigation.AutoHide">자동 숨김</sys:String>
+    <sys:String x:Key="Settings.Navigation.Hidden">숨김</sys:String>
+    <sys:String x:Key="Settings.Navigation.Recovery">자동 숨김에서는 포인터를 도킹 가장자리로 이동합니다. F10으로 숨겨진 탐색을 표시하고 Escape로 임시 표시를 전환합니다. 설정과 가져오기에서는 기본 탐색을 사용할 수 있습니다. Ctrl + ,로 설정을 엽니다.</sys:String>
+    <sys:String x:Key="Customize.ProfileLayout.PreserveComposition">구성 유지</sys:String>
 </ResourceDictionary>

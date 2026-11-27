@@ -6,6 +6,7 @@ using Neuterradise.App.Shell;
 using Neuterradise.App.SystemServices.Resources;
 using Neuterradise.App.SystemServices.Storage;
 using Windows.Graphics;
+using Windows.System;
 using NeutralRect = Neuterradise.App.SystemServices.Rect;
 
 namespace Neuterradise.App.Ui;
@@ -67,6 +68,7 @@ public sealed class UnoWindowPlacement : IDisposable
     private readonly WindowStateProjection _windowState;
     private IntPtr _nativeHandle;
     private readonly SubclassProcedure _subclass;
+    private readonly HashSet<uint> _handledShortcutKeys = [];
 
     public UnoWindowPlacement(AppConfigurationStore? store, WindowStateProjection? windowState = null)
     {
@@ -174,6 +176,7 @@ public sealed class UnoWindowPlacement : IDisposable
         window.AppWindow.Changed -= OnChanged;
         if (_nativeHandle != IntPtr.Zero) RemoveWindowSubclass(_nativeHandle, _subclass, 1);
         _nativeHandle = IntPtr.Zero;
+        _handledShortcutKeys.Clear();
         _window = null;
     }
 
@@ -226,6 +229,7 @@ public sealed class UnoWindowPlacement : IDisposable
 
     private IntPtr OnNativeMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam, nuint id, nuint data)
     {
+        if (HandleShellKeyboardMessage(message, wParam, lParam)) return IntPtr.Zero;
         if (message == 0x02E0 && lParam != IntPtr.Zero) // WM_DPICHANGED supplies an outer rectangle in the new DPI.
         {
             var suggested = Marshal.PtrToStructure<NativeRect>(lParam);
@@ -265,6 +269,35 @@ public sealed class UnoWindowPlacement : IDisposable
         return result;
     }
 
+    private bool HandleShellKeyboardMessage(uint message, IntPtr wParam, IntPtr lParam)
+    {
+        if (message == 0x0008) _handledShortcutKeys.Clear(); // WM_KILLFOCUS
+        if (message is not (0x0100 or 0x0101 or 0x0104 or 0x0105)) return false;
+        var key = (uint)wParam.ToInt64();
+        if (message is 0x0101 or 0x0105) return _handledShortcutKeys.Remove(key);
+        if (_handledShortcutKeys.Contains(key)) return true;
+        if (_window?.Content is not ProductRoot root) return false;
+        var control = GetKeyState(0x11) < 0;
+        var alt = GetKeyState(0x12) < 0;
+        var shift = GetKeyState(0x10) < 0;
+        var settingsShortcut = key == 0xBC && control && !alt && !shift; // VK_OEM_COMMA
+        if (!settingsShortcut && (control || alt || shift || key is not (0x79 or 0x1B))) return false;
+        if ((lParam.ToInt64() & (1L << 30)) != 0) return false;
+
+        try
+        {
+            if (!root.TryHandleShellShortcut((VirtualKey)key, settingsShortcut)) return false;
+            _handledShortcutKeys.Add(key);
+            ResourceGovernor.Shared.NotifyInteraction(InteractionSignal.Keyboard);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Trace.TraceWarning("Shell keyboard recovery failed: {0}", exception.GetType().Name);
+            return false;
+        }
+    }
+
     private void ReconcileBounds(AppWindow sender)
     {
         if (_adjusting || sender.Presenter is OverlappedPresenter { State: not OverlappedPresenterState.Restored })
@@ -290,6 +323,9 @@ public sealed class UnoWindowPlacement : IDisposable
             _restoreBoundsKnown = true;
         }
     }
+
+    [DllImport("user32.dll")]
+    private static extern short GetKeyState(int virtualKey);
 
     [DllImport("user32.dll")]
     private static extern uint GetDpiForSystem();

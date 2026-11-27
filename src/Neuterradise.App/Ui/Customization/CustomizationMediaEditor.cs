@@ -111,11 +111,10 @@ public sealed partial class CustomizationCenter
                     RenderEditor();
                 }
                 slots.Children.Add(UI.Tab(UI.T("Customize.Role.Banner", "Banner") + " 1", _additionalBannerSlotId is null, () => Select(null)));
-                foreach (var layer in layers)
+                for (var index = 0; index < layers.Count; index++)
                 {
-                    var id = layer.BannerSlotId;
-                    slots.Children.Add(UI.Tab(id == $"banner-{layer.BannerIndex}"
-                        ? UI.T("Customize.Role.Banner", "Banner") + " " + (layer.BannerIndex + 1) : id,
+                    var id = layers[index].BannerSlotId;
+                    slots.Children.Add(UI.Tab(UI.T("Customize.Role.Banner", "Banner") + " " + (index + 2),
                         _additionalBannerSlotId == id, () => Select(id)));
                 }
                 editor.Children.Insert(0, slots);
@@ -327,7 +326,7 @@ public sealed partial class CustomizationCenter
         if (banner)
         {
             root.Children.Add(BannerEffectsEditor(false));
-            if (_additionalBannerSlotId is null) root.Children.Add(BannerEffectsEditor(true));
+            root.Children.Add(BannerEffectsEditor(true));
             root.Children.Add(UI.Button(UI.T("Banner.Add", "Add as Banner"), ShowBannerPicker, ButtonKind.Primary));
         }
         return root;
@@ -344,8 +343,9 @@ public sealed partial class CustomizationCenter
                 BannerSlotsJson = BannerSlotState.Write(appearance.BannerSlotsJson, slotId,
                     edit(BannerSlotState.Get(appearance.BannerSlotsJson, slotId))),
             });
-        var selectedEffect = scene ? _session.Resolve(PresentationSlots.BannerEffect).Definition
-            : slotState.Effect ?? DefinitionRef.BuiltIn("builtin.neuterradise.effect.none");
+        DefinitionRef? SelectedEffect() => scene ? _session.Resolve(PresentationSlots.BannerEffect).Definition
+            : BannerSlotState.Get(_session.ProfileWorking?.Overrides.BannerSlotsJson, slotId).Effect
+                ?? DefinitionRef.BuiltIn("builtin.neuterradise.effect.none");
         var builtIns = new[] { "none", "film", "glitter", "shimmer" };
         var choices = builtIns.Select(id => (Reference: DefinitionRef.BuiltIn("builtin.neuterradise.effect." + id),
             Label: UI.T("Banner.Effect." + id, id)))
@@ -353,16 +353,28 @@ public sealed partial class CustomizationCenter
                 .Where(definition => definition.Origin != PackOrigin.BuiltIn
                     && PresentationRuntime.SupportsBannerEffect(definition))
                 .Select(definition => (Reference: definition.Ref, Label: definition.Name)));
-        foreach (var (reference, label) in choices)
+        void RenderChoices()
         {
-            var selected = selectedEffect == reference;
-            row.Children.Add(UI.Tab((selected ? "\u2713 " : string.Empty) + label, selected, () =>
+            row.Children.Clear();
+            var selectedEffect = SelectedEffect();
+            foreach (var (reference, label) in choices)
             {
-                if (!scene)
-                    EditSlot(value => value with { EffectPackId = reference.PackId, EffectDefinitionId = reference.DefinitionId });
-                else _session.Select(PresentationSlots.BannerEffect, ScopeKind.Profile, reference);
-            }));
+                var selected = selectedEffect == reference;
+                row.Children.Add(UI.Tab((selected ? "\u2713 " : string.Empty) + label, selected, () =>
+                {
+                    _framingEdit = true;
+                    try
+                    {
+                        if (!scene)
+                            EditSlot(value => value with { EffectPackId = reference.PackId, EffectDefinitionId = reference.DefinitionId });
+                        else _session.Select(PresentationSlots.BannerEffect, ScopeKind.Profile, reference);
+                    }
+                    finally { _framingEdit = false; }
+                    RenderChoices();
+                }));
+            }
         }
+        RenderChoices();
         var intensity = new Slider { Minimum = 0, Maximum = 100, StepFrequency = 1,
             Value = (scene ? _session.ProfileWorking?.Overrides.BannerEffectIntensity ?? .2 : slotState.EffectIntensity) * 100 };
         intensity.ValueChanged += (_, args) =>
@@ -375,7 +387,7 @@ public sealed partial class CustomizationCenter
             }
             finally { _framingEdit = false; }
         };
-        return UI.V(6, UI.Text(scene ? UI.T("Banner.SceneEffects", "Scene Effects") : UI.T("Banner.Effects", "Banner Effects"), "caption"), row,
+        return UI.V(6, UI.Text(scene ? UI.T("Banner.SceneEffects", "Banner Scene Effect") : UI.T("Banner.Effects", "Banner Media Effect"), "caption"), row,
             UI.Text(UI.T("Banner.Intensity", "Effect Intensity"), "caption"), intensity);
     }
 

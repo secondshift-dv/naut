@@ -736,7 +736,7 @@ public sealed record ProfileAppearanceOverrides(
     double CoverRotation = 0,
     string? MediaLayoutId = null,
     bool ShowRecentMedia = false,
-    string BannerEffect = "none", double BannerEffectIntensity = .2, string? BannerSlotsJson = null)
+    string BannerEffect = "none", double BannerEffectIntensity = .2, string? BannerSlotsJson = null, bool PreserveProfileComposition = false)
 {
     // First canonical Profile appearance contract. The fresh v1 catalog has no appearance migrations.
     public const int SchemaVersion = 1;
@@ -815,6 +815,7 @@ public sealed record ProfileAppearanceOverrides(
             writer.WriteNumber("coverRotation", CoverRotation);
             WriteOptionalString(writer, "mediaLayoutId", MediaLayoutId);
             writer.WriteBoolean("showRecentMedia", ShowRecentMedia);
+            writer.WriteBoolean("preserveProfileComposition", PreserveProfileComposition);
             writer.WriteString("bannerEffect", BannerEffect);
             writer.WriteNumber("bannerEffectIntensity", BannerEffectIntensity);
             if (BannerSlotsJson is not null)
@@ -876,7 +877,8 @@ public sealed record ProfileAppearanceOverrides(
                 ReadBoolean(root, "showRecentMedia", Default.ShowRecentMedia),
                 ReadString(root, "bannerEffect") ?? "none", ReadNumber(root, "bannerEffectIntensity", .2),
                 root.TryGetProperty("bannerSlots", out var slots) && BannerSlotState.TryRead(slots.GetRawText(), out _)
-                    ? slots.GetRawText() : null);
+                    ? slots.GetRawText() : null,
+                ReadBoolean(root, "preserveProfileComposition", Default.PreserveProfileComposition));
         }
         catch (JsonException)
         {

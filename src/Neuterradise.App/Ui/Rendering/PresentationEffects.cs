@@ -46,7 +46,7 @@ public static class PresentationEffects
     public static EffectView Preview(EffectPlan plan, double height,
         PresentationVisualPriority priority = PresentationVisualPriority.SettingsPreview)
     {
-        var target = new[] { PresentationSlots.HomeEffect, PresentationSlots.ProfileEffect, PresentationSlots.CardEffect }
+        var target = new[] { PresentationSlots.HomeEffect, PresentationSlots.ProfileEffect, PresentationSlots.CardEffect, PresentationSlots.GalleryEffect }
             .FirstOrDefault(plan.Supports) ?? PresentationSlots.HomeEffect;
         return new EffectView(target, () => PresentationContext.Global, null, () => plan) { Height = height, VisualPriority = priority };
     }

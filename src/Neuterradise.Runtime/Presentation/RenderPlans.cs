@@ -288,6 +288,34 @@ public sealed record ProfilePaperPlan(string Background, string Ink, string Acce
 {
     public bool ShowBackdrop { get; init; }
     public double SurfaceOpacity { get; init; } = 1;
+    public IReadOnlyDictionary<string, string> Colors { get; init; } = new Dictionary<string, string>(StringComparer.Ordinal);
+
+    public string ResolveReference(string reference)
+    {
+        var token = reference.StartsWith("token:", StringComparison.Ordinal) ? reference[6..] : reference;
+        if (Colors.TryGetValue(token, out var color)) return color;
+        return token switch
+        {
+            "canvas" or "surface1" => Background,
+            "surface2" or "surface3" or "surfaceElevated" => "#FFF2E8EE",
+            "surfaceOverlay" or "surfaceSelected" or "surfaceHover" or "surfacePressed" => "#FFF1D7E5",
+            "textPrimary" or "textInverse" => Ink,
+            "textSecondary" or "textMuted" => "#FF604D65",
+            "textDisabled" => "#FF807484",
+            "textOnAccent" => "#FFFFFFFF",
+            "accent" or "accentHover" or "accentPressed" or "accentSecondary" or "textLink" or "focus" or "borderSelected" or "borderInteractive" => Accent,
+            "accentSoft" or "selection" or "selectionHover" => "#FFF1D7E5",
+            "borderDefault" or "borderSubtle" or "borderStrong" => "#FFCCBCCB",
+            "danger" or "dangerHover" or "textDanger" => "#FFBB1957",
+            "warning" => "#FFB77900",
+            "success" => "#FF23794C",
+            "info" => "#FF256478",
+            _ => reference,
+        };
+    }
+
+    public string SurfaceColor(bool raised) =>
+        Colors.GetValueOrDefault(raised ? "surfaceElevated" : "surface1") ?? ResolveReference("canvas");
 }
 public sealed record ProfileLayoutPlan(ProfileLayoutDefinition Layout, SurfaceNode? Surface = null, ArtworkPlan? BannerArtwork = null,
     ProfilePaperPlan? Paper = null)

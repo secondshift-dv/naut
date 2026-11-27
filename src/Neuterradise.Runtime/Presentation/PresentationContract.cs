@@ -273,7 +273,7 @@ public static class PresentationSlots
 
 /// <summary>
 /// Engine effect attachment points are deliberately broader than the built-in customization UI.
-/// Third-party packs may target any engine slot here; Naut exposes Home, Profile and independent Card effect pickers.
+/// Third-party packs may target any engine slot here; Naut exposes Home, Gallery, Profile and independent Card effect pickers.
 /// </summary>
 public static class PresentationEffectTargets
 {
@@ -285,6 +285,7 @@ public static class PresentationEffectTargets
     public static IReadOnlySet<string> BuiltInUserFacing { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
         PresentationSlots.HomeEffect,
+        PresentationSlots.GalleryEffect,
         PresentationSlots.ProfileEffect,
         PresentationSlots.CardEffect,
     };

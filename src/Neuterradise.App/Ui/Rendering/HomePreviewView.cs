@@ -42,7 +42,8 @@ public sealed class HomePreviewView : Grid
         if (layout.ViewportStage && layout.Surface is { } stage)
         {
             var view = new Grid { Width = 1000, Height = 1000 / stage.CanvasAspect };
-            view.Children.Add(backdrop);
+            backdrop.StageAspect = stage.CanvasAspect;
+            Children.Add(backdrop);
             view.Children.Add(SurfaceComposer.Build(stage, id => id == "featured" ? BuildHero()
                 : BuildRail(layout.Rails.FirstOrDefault(r => r.Id == id) ?? new HomeRailPlan(id, true, "compact", 3)), 1000));
             Children.Add(new Viewbox { Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform, Child = view });

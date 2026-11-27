@@ -81,6 +81,10 @@ Managed NORMAL Profiles can mirror these fields to readable UTF-8 files inside t
 
 Official builds use signed update metadata from the official `secondshift-dv/naut` GitHub Releases channel. Download releases only from the official repository.
 
+## Navigator and Breadcrumb are hidden
+
+Press F10 to reveal hidden navigation or Esc to toggle temporary visibility. Ctrl + , opens Settings directly. In Settings > Appearance > Navigation, select Visible for Navigator; Breadcrumb and the Navigator switch can remain hidden. Close any open dialog or editor first.
+
 ## Something still fails
 
 Check the current [GitHub Issues](https://github.com/secondshift-dv/naut/issues) before filing a new bug report. For security-sensitive findings, use the repository's private vulnerability reporting rather than a public issue.

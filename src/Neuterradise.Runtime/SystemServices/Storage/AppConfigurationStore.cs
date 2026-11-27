@@ -83,6 +83,17 @@ public sealed record UpdateConfiguration(
 /// <c>VaultRoot</c> is null until the user completes onboarding; it is never defaulted to the
 /// application folder or the working directory.
 /// </summary>
+public sealed record ShellNavigationConfiguration(bool Native = false, ShellVisibility Navigator = ShellVisibility.Visible, ShellVisibility Breadcrumb = ShellVisibility.Visible, bool HideSwitch = false)
+{
+    public ShellNavigationConfiguration Normalize() => this with
+    {
+        Navigator = Enum.IsDefined(Navigator) ? Navigator : ShellVisibility.Visible,
+        Breadcrumb = Enum.IsDefined(Breadcrumb) ? Breadcrumb : ShellVisibility.Visible,
+    };
+}
+
+public enum ShellVisibility { Visible, AutoHide, Hidden }
+
 public sealed record AppConfiguration(
     string? VaultRoot,
     string UiLanguage,
@@ -91,6 +102,7 @@ public sealed record AppConfiguration(
     WindowPlacementConfiguration? WindowPlacement)
 {
     public const int CurrentSchemaVersion = 1;
+    public ShellNavigationConfiguration ShellNavigation { get; init; } = new();
 
     public static AppConfiguration CreateDefault() =>
         new(
@@ -419,6 +431,7 @@ public sealed class AppConfigurationStore
             UiLanguage = language,
             Updates = updates,
             WindowPlacement = placement,
+            ShellNavigation = configuration.ShellNavigation?.Normalize() ?? new(),
         };
     }
 
@@ -471,6 +484,7 @@ public sealed class AppConfigurationStore
         public UpdateDocument? Updates { get; init; }
 
         public WindowPlacementDocument? WindowPlacement { get; init; }
+        public ShellNavigationConfiguration? ShellNavigation { get; init; }
 
         public static ConfigurationDocument FromConfiguration(AppConfiguration configuration) => new()
         {
@@ -478,6 +492,7 @@ public sealed class AppConfigurationStore
             VaultRoot = configuration.VaultRoot,
             UiLanguage = configuration.UiLanguage,
             ThemeId = configuration.LegacyThemeId,
+            ShellNavigation = configuration.ShellNavigation,
             Updates = new UpdateDocument
             {
                 FeedUrl = configuration.Updates.FeedUrl,
@@ -513,7 +528,8 @@ public sealed class AppConfigurationStore
                     WindowPlacement.Top ?? 0,
                     WindowPlacement.Width ?? 0,
                     WindowPlacement.Height ?? 0,
-                    WindowPlacement.IsMaximized ?? false));
+                    WindowPlacement.IsMaximized ?? false))
+            { ShellNavigation = ShellNavigation ?? defaults.ShellNavigation };
     }
 
     private sealed record UpdateDocument

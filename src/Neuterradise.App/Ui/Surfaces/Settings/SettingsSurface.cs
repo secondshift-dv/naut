@@ -246,6 +246,7 @@ public sealed class SettingsSurface : Surface
             ("theme", "Settings.Appearance.Theme", "Theme"),
             ("typography", "Settings.Presentation.Fonts", "Font"),
             ("control-style", "Settings.Presentation.ControlStyles", "Control Styles"),
+            ("navigation", "Settings.Appearance.Navigation", "Navigation"),
         })
         {
             var tab = id;
@@ -266,10 +267,57 @@ public sealed class SettingsSurface : Surface
             "global-preset" => GlobalPresets(),
             "typography" => AppearanceDefinitionSection(PresentationSlots.Typography),
             "control-style" => AppearanceDefinitionSection(PresentationSlots.ControlSkin),
+            "navigation" => NavigationSettings(),
             _ => AppearanceDefinitionSection(PresentationSlots.Theme),
         };
 
         return UI.V(12, tabs, section);
+    }
+
+    private FrameworkElement NavigationSettings()
+    {
+        var root = Services.Root!;
+        var current = root.ShellNavigation;
+        var panel = UI.V(12);
+        var saving = false;
+        async Task Select(ShellNavigationConfiguration next)
+        {
+            if (saving) return;
+            saving = true;
+            panel.IsHitTestVisible = false;
+            try { await root.SetShellNavigationAsync(next); Render(); }
+            finally { saving = false; panel.IsHitTestVisible = true; }
+        }
+        FrameworkElement Choice(string title, IEnumerable<(string Label, bool Selected, ShellNavigationConfiguration Value)> options)
+        {
+            var row = UI.Wrap(6);
+            foreach (var option in options)
+                row.Children.Add(UI.Tab(option.Label, option.Selected, () => Services.RunUserAction(
+                    Select(option.Value), "SettingsSurface.Navigation", UI.T("Customize.ApplyFailed", "Could not apply. Nothing was changed."))));
+            return UI.V(4, UI.Text(title, "control"), row);
+        }
+        panel.Children.Add(Choice(UI.T("Settings.Navigation.Mode", "Navigator mode"), new[]
+        {
+            (UI.T("Nav.Recovery", "Native navigation"), current.Native, current with { Native = true }),
+            (UI.T("Nav.CustomNavigation", "Custom navigation"), !current.Native, current with { Native = false }),
+        }));
+        string Label(ShellVisibility value) => value switch
+        {
+            ShellVisibility.AutoHide => UI.T("Settings.Navigation.AutoHide", "Auto-hide"),
+            ShellVisibility.Hidden => UI.T("Settings.Navigation.Hidden", "Hidden"),
+            _ => UI.T("Settings.Navigation.Visible", "Visible"),
+        };
+        panel.Children.Add(Choice(UI.T("Settings.Navigation.Navigator", "Navigator visibility"),
+            Enum.GetValues<ShellVisibility>().Select(value => (Label(value), current.Navigator == value, current with { Navigator = value }))));
+        panel.Children.Add(Choice(UI.T("Settings.Navigation.Breadcrumb", "Breadcrumb visibility"),
+            Enum.GetValues<ShellVisibility>().Select(value => (Label(value), current.Breadcrumb == value, current with { Breadcrumb = value }))));
+        panel.Children.Add(Choice(UI.T("Settings.Navigation.Switch", "Navigator switch visibility"), new[]
+        {
+            (Label(ShellVisibility.Visible), !current.HideSwitch, current with { HideSwitch = false }),
+            (Label(ShellVisibility.Hidden), current.HideSwitch, current with { HideSwitch = true }),
+        }));
+        panel.Children.Add(UI.WrappedText(UI.T("Settings.Navigation.Recovery", "Move the pointer to the dock edge for Auto-hide. F10 reveals hidden navigation; Escape toggles temporary visibility. Ctrl + , opens Settings. Settings and Import keep native navigation accessible."), "caption"));
+        return panel;
     }
 
     private FrameworkElement GlobalPresets()

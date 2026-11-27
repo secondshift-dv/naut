@@ -1011,6 +1011,7 @@ public sealed class PreviewSession
                 Overrides = layoutProfile.Overrides with
                 {
                     ShowRecentMedia = ProfileAppearanceOverrides.Default.ShowRecentMedia,
+                    PreserveProfileComposition = ProfileAppearanceOverrides.Default.PreserveProfileComposition,
                 },
             };
         }

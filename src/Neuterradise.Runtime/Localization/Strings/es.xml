@@ -1056,7 +1056,7 @@
     <sys:String x:Key="Nav.Settings">Configuración</sys:String>
     <sys:String x:Key="Nav.Recovery">Navegación nativa</sys:String>
     <sys:String x:Key="Nav.CustomNavigation">Navegación personalizada</sys:String>
-    <sys:String x:Key="Banner.SceneEffects">Efectos de escena</sys:String>
+    <sys:String x:Key="Banner.SceneEffects">Efecto de escena del banner</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset">Preajustes globales</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset.Desc">Aplica valores de apariencia global conservando los ajustes individuales y los medios de cada perfil.</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset.Confirm">¿Aplicar {0} a la apariencia global, inicio, galería y valores de perfil?</sys:String>
@@ -2201,7 +2201,7 @@
     <sys:String x:Key="Banner.Add">Añadir como banner</sys:String>
     <sys:String x:Key="Banner.PickerEmpty">No hay vídeos preparados para este perfil.</sys:String>
     <sys:String x:Key="Banner.Member">Ya está en la colección</sys:String>
-    <sys:String x:Key="Banner.Effects">Efectos del banner</sys:String>
+    <sys:String x:Key="Banner.Effects">Efecto del medio del banner</sys:String>
     <sys:String x:Key="Banner.Intensity">Intensidad del efecto</sys:String>
     <sys:String x:Key="Banner.Effect.none">Ninguno</sys:String>
     <sys:String x:Key="Banner.Effect.film">Película</sys:String>
@@ -2238,4 +2238,14 @@
     <sys:String x:Key="Health.BulkConfirm">Confirma {0} registros de integridad. Se vuelve a comprobar cada original; no se modifican archivos.</sys:String>
     <sys:String x:Key="Health.BulkOutcome">Conciliación de integridad: {0} completados, {1} pendientes, {2} sin procesar.</sys:String>
     <sys:String x:Key="Health.PlacementStale">Existe una posible ubicación canónica. Verifícala antes de adoptar la ruta en el catálogo.</sys:String>
+    <sys:String x:Key="Settings.Appearance.Navigation">Navegación</sys:String>
+    <sys:String x:Key="Settings.Navigation.Mode">Modo de navegación</sys:String>
+    <sys:String x:Key="Settings.Navigation.Navigator">Visibilidad del navegador</sys:String>
+    <sys:String x:Key="Settings.Navigation.Switch">Visibilidad del selector de navegación</sys:String>
+    <sys:String x:Key="Settings.Navigation.Breadcrumb">Visibilidad de la ruta</sys:String>
+    <sys:String x:Key="Settings.Navigation.Visible">Visible</sys:String>
+    <sys:String x:Key="Settings.Navigation.AutoHide">Ocultar automáticamente</sys:String>
+    <sys:String x:Key="Settings.Navigation.Hidden">Oculto</sys:String>
+    <sys:String x:Key="Settings.Navigation.Recovery">Mueve el puntero al borde de anclaje para mostrar la navegación automática. F10 muestra la navegación oculta; Escape alterna la visibilidad temporal. Ajustes e Importación conservan la navegación nativa. Ctrl + , abre Ajustes.</sys:String>
+    <sys:String x:Key="Customize.ProfileLayout.PreserveComposition">Mantener la composición</sys:String>
 </ResourceDictionary>

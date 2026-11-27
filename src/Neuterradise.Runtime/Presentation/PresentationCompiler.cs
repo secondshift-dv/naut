@@ -511,8 +511,29 @@ public sealed partial class PresentationCompiler
                         context.Error("paper." + key, "Paper colors must be opaque #AARRGGBB literals.");
                     return color;
                 }
+                var colors = new Dictionary<string, string>(StringComparer.Ordinal);
+                if (paperSpec.TryGetProperty("colors", out var colorSpec))
+                {
+                    if (colorSpec.ValueKind != JsonValueKind.Object)
+                        context.Error("paper.colors", "Paper colors must be an object of semantic color tokens.");
+                    else
+                    {
+                        foreach (var property in colorSpec.EnumerateObject())
+                        {
+                            var color = property.Value.ValueKind == JsonValueKind.String ? property.Value.GetString() : null;
+                            if (!TokenAuthority.ColorTokenNames.Contains(property.Name) && property.Name != "accentSoft")
+                                context.Error("paper.colors." + property.Name, "Unknown semantic color token.");
+                            else if (color is null || color.Length != 9 || !color.StartsWith("#FF", StringComparison.OrdinalIgnoreCase)
+                                || !TokenAuthority.TryParseLiteral(color, out _))
+                                context.Error("paper.colors." + property.Name, "Paper colors must be opaque #AARRGGBB literals.");
+                            else if (!colors.TryAdd(property.Name, color))
+                                context.Error("paper.colors." + property.Name, "Duplicate semantic color token.");
+                        }
+                    }
+                }
                 paper = new(Solid("background", "#FFF8F4F4"), Solid("ink", "#FF21182C"), Solid("accent", "#FFC51B68"))
                 {
+                    Colors = new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(colors),
                     ShowBackdrop = context.Bool(paperSpec, "showBackdrop", false),
                     SurfaceOpacity = context.Number(paperSpec, "surfaceOpacity", 1, 0, 1),
                 };

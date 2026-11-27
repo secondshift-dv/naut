@@ -1056,7 +1056,7 @@
     <sys:String x:Key="Nav.Settings">Paramètres</sys:String>
     <sys:String x:Key="Nav.Recovery">Navigation native</sys:String>
     <sys:String x:Key="Nav.CustomNavigation">Navigation personnalisée</sys:String>
-    <sys:String x:Key="Banner.SceneEffects">Effets de scène</sys:String>
+    <sys:String x:Key="Banner.SceneEffects">Effet de scène de bannière</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset">Préréglages globaux</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset.Desc">Applique des réglages d’apparence globaux tout en conservant les réglages individuels et les médias des profils.</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset.Confirm">Appliquer {0} à l’apparence globale, à l’accueil, à la galerie et aux valeurs de profil ?</sys:String>
@@ -2201,7 +2201,7 @@
     <sys:String x:Key="Banner.Add">Ajouter comme bannière</sys:String>
     <sys:String x:Key="Banner.PickerEmpty">Aucune vidéo préparée pour ce profil.</sys:String>
     <sys:String x:Key="Banner.Member">Déjà dans la collection</sys:String>
-    <sys:String x:Key="Banner.Effects">Effets de bannière</sys:String>
+    <sys:String x:Key="Banner.Effects">Effet média de bannière</sys:String>
     <sys:String x:Key="Banner.Intensity">Intensité de l’effet</sys:String>
     <sys:String x:Key="Banner.Effect.none">Aucun</sys:String>
     <sys:String x:Key="Banner.Effect.film">Film</sys:String>
@@ -2238,4 +2238,14 @@
     <sys:String x:Key="Health.BulkConfirm">Confirmer {0} enregistrements d’intégrité. Chaque original est revérifié ; aucun fichier ne sera modifié.</sys:String>
     <sys:String x:Key="Health.BulkOutcome">Réconciliation : {0} terminés, {1} non résolus, {2} non traités.</sys:String>
     <sys:String x:Key="Health.PlacementStale">Un emplacement canonique possible existe. Vérifiez-le avant d’adopter le chemin dans le catalogue.</sys:String>
+    <sys:String x:Key="Settings.Appearance.Navigation">Navigation</sys:String>
+    <sys:String x:Key="Settings.Navigation.Mode">Mode de navigation</sys:String>
+    <sys:String x:Key="Settings.Navigation.Navigator">Visibilité de la navigation</sys:String>
+    <sys:String x:Key="Settings.Navigation.Switch">Visibilité du sélecteur de navigation</sys:String>
+    <sys:String x:Key="Settings.Navigation.Breadcrumb">Visibilité du fil d’Ariane</sys:String>
+    <sys:String x:Key="Settings.Navigation.Visible">Visible</sys:String>
+    <sys:String x:Key="Settings.Navigation.AutoHide">Masquage automatique</sys:String>
+    <sys:String x:Key="Settings.Navigation.Hidden">Masqué</sys:String>
+    <sys:String x:Key="Settings.Navigation.Recovery">Déplacez le pointeur vers le bord d’ancrage. F10 affiche la navigation masquée ; Échap bascule sa visibilité temporaire. Paramètres et Import conservent la navigation native. Ctrl + , ouvre les Paramètres.</sys:String>
+    <sys:String x:Key="Customize.ProfileLayout.PreserveComposition">Conserver la composition</sys:String>
 </ResourceDictionary>

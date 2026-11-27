@@ -73,6 +73,11 @@ internal sealed class ArtworkCompositionView : Grid
         }
 
         if (positioned) _layers.Children.Add(_positionedLayers);
+        if (!plan.Layers.Any(layer => layer.Kind == "effect") && role("effect") is { } defaultEffect)
+        {
+            SurfaceComposer.Detach(defaultEffect);
+            _layers.Children.Add(defaultEffect);
+        }
         _sourceHost.Children.Add(_layers);
         _stage.Children.Add(_sourceHost);
         if (plan.MaskPath is not null)

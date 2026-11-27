@@ -1,5 +1,6 @@
 using System.Text.Json;
 using SkiaSharp;
+using Neuterradise.App.Shell;
 
 namespace Neuterradise.App.Presentation;
 
@@ -45,6 +46,18 @@ public sealed record ComponentVisualStyle(SemanticIconSkin? Icon, double? IconSi
 public sealed record NavigationScenePlan(SurfaceNode Scene, string Dock, double Extent, bool Immersive)
 {
     public bool OverlayHome { get; init; }
+    public bool OverlayGallery { get; init; }
+    public bool OverlayProfile { get; init; }
+
+    public static bool SupportsRoute(AppRoute route) => route is HomeRoute or GalleryRoute or ProfileRoute;
+
+    public bool UsesOverlay(AppRoute route) => Dock == "top" && (route switch
+    {
+        HomeRoute => OverlayHome,
+        GalleryRoute => OverlayGallery,
+        ProfileRoute => OverlayProfile,
+        _ => false,
+    });
 }
 
 public sealed record ControlSkinPlan(double Radius, double BorderWidth, double HorizontalPadding, double VerticalPadding,
@@ -478,7 +491,11 @@ public sealed partial class PresentationCompiler
             else if (CompileSurface(nav, context, DefinitionKinds.ControlSkin) is { } scene)
                 navigation = new(scene, context.Enum(nav, "dock", ["top", "bottom", "left", "right"], "top"),
                     context.Number(nav, "extent", 120, 48, 240), context.Bool(nav, "immersive", false))
-                { OverlayHome = context.Bool(nav, "overlayHome", false) };
+                {
+                    OverlayHome = context.Bool(nav, "overlayHome", false),
+                    OverlayGallery = context.Bool(nav, "overlayGallery", false),
+                    OverlayProfile = context.Bool(nav, "overlayProfile", false),
+                };
             else context.Error("navigation", "Navigation requires a scene.");
         }
         var stripeOpacity = 0.0;

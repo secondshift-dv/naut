@@ -133,13 +133,26 @@ public sealed partial class CustomizationCenter
         var candidate = additional is null ? null : ActiveBannerCandidate();
         var slotAppearance = additional is null ? null : ActiveBannerAppearance();
         var focusedArtwork = plan.BannerArtwork;
-        if (focusedArtwork?.Layers.Any(layer => layer.Kind == "banner") == true)
-            focusedArtwork = focusedArtwork with { Layers = focusedArtwork.Layers.Where(layer => layer.Kind != "banner").ToArray() };
+        var context = _session.LiveContext;
+        if (additional is not null && focusedArtwork?.Layers.Any(layer => layer.Kind == "banner" && layer.BannerSlotId == additional.BannerSlotId) != true)
+        {
+            focusedArtwork = _services.Presentation.ResolveCompiled(PresentationSlots.HomeSpotlight, new PresentationContext("home"))
+                .PlanAs<SpotlightPlan>().Artwork;
+            context = context with { Surface = "home" };
+        }
+        if (focusedArtwork is not null)
+        {
+            var layers = focusedArtwork.Layers.Where(layer => additional is null
+                ? layer.Kind != "banner"
+                : layer.Kind != "artwork" && (layer.Kind != "banner" || layer.BannerSlotId == additional.BannerSlotId))
+                .Select(layer => layer.Kind == "banner" ? layer with { Kind = "artwork" } : layer).ToArray();
+            focusedArtwork = focusedArtwork with { Layers = layers };
+        }
         _profilePreviewHeader.Apply(new ProfileHeaderViewState(layout, null,
             additional is null ? _bannerVideoPath : candidate?.PlaybackPath, profile.Overrides,
-            frame, () => new Grid(), ReducedMotionAuthority.IsReduced, _session.LiveContext,
+            frame, () => new Grid(), ReducedMotionAuthority.IsReduced, context,
             BannerPoster: additional is null ? _bannerSource : ImageRef.FromPath(candidate?.PreviewPath, 1600),
-            BannerArtwork: additional is null ? focusedArtwork : null,
+            BannerArtwork: focusedArtwork,
             BannerPrimaryMediaId: profile.Sources?.BannerMediaId,
             FocusedBanner: true, FocusedTransform: slotAppearance?.Transform,
             FocusedEffect: slotAppearance is null ? null : _services.Presentation.ResolveBannerSlotEffect(slotAppearance)));

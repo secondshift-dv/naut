@@ -187,6 +187,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
     private readonly Grid _primaryBannerMedia = new();
     private readonly PrimaryBannerEffect _primaryBannerEffect;
     private readonly FrameworkElement _bannerEffect;
+    private readonly EffectView _focusedMediaEffect;
     private ArtworkCompositionView? _artwork;
     private ProfileHeaderViewState? _state;
     private int _identityLayoutBucket = -1;
@@ -215,7 +216,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         if (_state is null) return;
         _state = _state with { Appearance = appearance };
         _artwork?.UpdateSlotAppearance(appearance);
-        _primaryBannerEffect.Update(_state.FocusedTransform is null ? appearance : null);
+        UpdateBannerMediaEffect();
         if (_coverView is not null) _coverView.Transform = MediaTransformState.FromCover(appearance);
         ApplyBannerTransform();
         PresentationEffects.RefreshTree(_bannerRegion);
@@ -225,6 +226,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
     {
         if (_state is not { FocusedBanner: true } state) return;
         _state = state with { FocusedTransform = transform, FocusedEffect = effect };
+        UpdateBannerMediaEffect();
         ApplyBannerTransform();
         PresentationEffects.RefreshTree(_bannerRegion);
     }
@@ -243,7 +245,8 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         _bannerVideo.Failed += () => _bannerVideo.Visibility = Visibility.Collapsed;
         _bannerEffect = PresentationEffects.View(PresentationSlots.BannerEffect,
             () => _state?.Context is { } context && context.Profile is { } profile
-                ? context with { Profile = profile with { Overrides = _state.Appearance } } : PresentationContext.Global,
+                ? context with { Profile = profile with { Overrides = _state.Appearance } } : PresentationContext.Global);
+        _focusedMediaEffect = PresentationEffects.View(PresentationSlots.BannerEffect, () => PresentationContext.Global,
             preview: () => _state?.FocusedEffect);
         PresentationEffects.SetActivityScope(_bannerRegion, () => _active);
         ComposeBanner(null);
@@ -344,7 +347,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         if (previousState?.BannerArtwork != state.BannerArtwork) ComposeBanner(state.BannerArtwork);
         _artwork?.SetBannerContext(state.BannerAuthority, state.Context?.ProfileId, state.BannerVideoPath, state.BannerPrimaryMediaId, state.Appearance);
         _bannerPoster.Source = state.BannerPoster;
-        _primaryBannerEffect.Update(state.FocusedTransform is null ? state.Appearance : null);
+        UpdateBannerMediaEffect();
         PresentationEffects.RefreshTree(_bannerRegion);
         if (layoutChanged || figureChanged)
         {
@@ -358,6 +361,19 @@ public sealed class ProfileHeaderView : Grid, IDisposable
             || layoutChanged
             || figureChanged
             || IdentityLayoutBucket(width) != _identityLayoutBucket);
+    }
+
+    private void UpdateBannerMediaEffect()
+    {
+        var state = _state;
+        _primaryBannerEffect.Update(state?.FocusedTransform is null ? state?.Appearance : null);
+        if (state?.FocusedTransform is not null && state.FocusedEffect is not null)
+        {
+            if (!_primaryBannerMedia.Children.Contains(_focusedMediaEffect))
+                _primaryBannerMedia.Children.Add(_focusedMediaEffect);
+            _focusedMediaEffect.Refresh();
+        }
+        else _primaryBannerMedia.Children.Remove(_focusedMediaEffect);
     }
 
     public void SetActive(bool active)
@@ -388,6 +404,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
 
         if (_state?.FigureView is ProfileFigureView figure) figure.SetActive(false);
         _state = null;
+        UpdateBannerMediaEffect();
         ComposeBanner(null);
         _figureRegion.Content = null;
         _figureRegion.Visibility = Visibility.Collapsed;
@@ -421,7 +438,7 @@ public sealed class ProfileHeaderView : Grid, IDisposable
         height = Math.Min(height, width < 960 ? 180.0 : width < 1200 ? 220.0 : 280.0);
 
         var showBanner = (state.IndependentModules || layout.BannerMode != ProfileLayoutBannerMode.None)
-            && (!string.IsNullOrWhiteSpace(state.BannerVideoPath) || state.BannerPoster is not null || (state.Paper && state.BannerArtwork is not null));
+            && (!string.IsNullOrWhiteSpace(state.BannerVideoPath) || state.BannerPoster is not null || ((state.Paper || state.FocusedBanner) && state.BannerArtwork is not null));
         _tagOverlay.Visibility = showBanner && !state.IndependentModules && layout.Id == "portrait" ? Visibility.Visible : Visibility.Collapsed;
         _tagOverlay.Margin = new Thickness(pagePadding, 16, pagePadding, 16);
         _tagOverlay.MaxWidth = CanOverlayFigure(layout, showBanner, state.FigureView is not null, width)

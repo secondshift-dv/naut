@@ -1211,11 +1211,10 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
         {
             _page.Children.Clear();
             _scroll.Visibility = Visibility.Collapsed;
-            SurfaceComposer.Detach(_backdrop);
-            _stageHost.Children.Add(_backdrop);
             _stageHost.Children.Add(_stageContent);
             _stageHost.Visibility = Visibility.Visible;
         }
+        _backdrop.StageAspect = scene.CanvasAspect;
         SizeStage();
         var favorites = _layout.Rails.FirstOrDefault(r => r.Id == "favorites") ?? new HomeRailPlan("favorites", true, "cover-only", 24);
         var stats = _layout.Rails.FirstOrDefault(r => r.Id == "statistics") ?? new HomeRailPlan("statistics", true, "hud", 4);
@@ -1268,7 +1267,7 @@ public sealed class HomeSurface : Surface, ITopBarCustomizableSurface
             _stageStatistics.Children.Clear();
             _stageScene = null;
             _stageHost.Children.Clear();
-            _root.Children.Insert(0, _backdrop);
+            _backdrop.StageAspect = null;
             _scroll.Visibility = Visibility.Visible;
             SurfaceComposer.Detach(_notice);
             _notice.HorizontalAlignment = HorizontalAlignment.Stretch;

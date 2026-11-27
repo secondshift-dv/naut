@@ -385,7 +385,7 @@ public sealed partial class CustomizationCenter
         var layout = plan.Layout;
         if (plan.Paper is { } paper && plan.Surface is { } scene)
         {
-            var paperStage = new Grid { Width = 1000, Background = theme.Brush(paper.Background), IsHitTestVisible = false };
+            var paperStage = new Grid { Width = 1000, Background = theme.Brush(paper.ResolveReference("canvas")), IsHitTestVisible = false };
             theme.SetPaperScope(paperStage, paper);
             FrameworkElement? Region(string id) => id switch
             {

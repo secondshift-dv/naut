@@ -21,6 +21,18 @@ namespace Neuterradise.App.Ui;
 public sealed class BackdropView : Grid
 {
     private BackdropPlan? _plan;
+    private double? _stageAspect;
+    public double? StageAspect
+    {
+        get => _stageAspect;
+        set
+        {
+            if (_stageAspect == value) return;
+            _stageAspect = value;
+            foreach (var canvas in _canvases) canvas.Invalidate();
+            foreach (var video in _videos) video.BackdropStageAspect = value;
+        }
+    }
     private VisualTier _tier = VisualTier.Full;
     private VisualTier _scheduledTier = VisualTier.Full;
     private PresentationVisualPriority _visualPriority = PresentationVisualPriority.Surface;
@@ -40,6 +52,7 @@ public sealed class BackdropView : Grid
     }
     private ArgbColor? _mediaTint;
     private SKImage? _ambientImage;
+    internal object NativeResourceGate { get; } = new();
     private int _ambientGeneration;
     private (double X, double Y) _pointer = (0.5, 0.5);
     private readonly List<BackdropCanvas> _canvases = [];
@@ -133,7 +146,8 @@ public sealed class BackdropView : Grid
             foreach (var player in _players) player.Pause();
             RetireCanvases();
             ++_ambientGeneration;
-            Interlocked.Exchange(ref _ambientImage, null)?.Dispose();
+            lock (NativeResourceGate)
+                Interlocked.Exchange(ref _ambientImage, null)?.Dispose();
             _mediaTint = null;
         };
     }
@@ -252,16 +266,15 @@ public sealed class BackdropView : Grid
                     return;
                 }
 
-                var previous = _ambientImage;
-                _ambientImage = image;
-                _mediaTint = tint;
-                MediaTintChanged?.Invoke(tint);
-                foreach (var canvas in _canvases)
+                lock (NativeResourceGate)
                 {
-                    canvas.OnAmbientChanged();
+                    var previous = _ambientImage;
+                    _ambientImage = image;
+                    _mediaTint = tint;
+                    foreach (var canvas in _canvases) canvas.OnAmbientChanged();
+                    previous?.Dispose();
                 }
-
-                previous?.Dispose();
+                MediaTintChanged?.Invoke(tint);
             });
         }
         catch (InvalidOperationException)
@@ -304,14 +317,11 @@ public sealed class BackdropView : Grid
 
     private void OnGovernorChanged(object? sender, EventArgs e) => UiDispatch.Run(ApplyTier);
 
-    private void OnThemeChanged()
+    private void OnThemeChanged() => UiDispatch.Run(() =>
     {
-        foreach (var canvas in _canvases)
-        {
-            canvas.Prepare();
-        }
-        foreach (var canvas in _canvases) canvas.Invalidate();
-    }
+        if (!IsLoaded) return;
+        foreach (var canvas in _canvases) canvas.Prepare();
+    });
 
     private void OnMotionChanged(object? sender, EventArgs e) => UiDispatch.Run(ApplyTier);
 
@@ -401,6 +411,7 @@ public sealed class BackdropView : Grid
                     if (video is null) video = new SkVideoView { Purpose = VideoPurpose.Backdrop };
                     else previousVideos.Remove(video);
                     video.Opacity = layer.Opacity;
+                    video.BackdropStageAspect = StageAspect;
                     video.Play(videoPath, loop: true, still: _tier != VisualTier.Full || variant.Static, resourceIdentity: layer.AssetIdentity);
                     video.SetActive(_active && ResourceGovernor.Shared.Tier != PresentationTier.Suspended);
                     _videos.Add(video);
@@ -536,6 +547,48 @@ public sealed class BackdropView : Grid
     }
 }
 
+internal static class BackdropViewport
+{
+    internal static SKRect Fit(SKRect viewport, double? aspect)
+    {
+        if (aspect is not > 0) return viewport;
+        var width = Math.Min(viewport.Width, (float)(viewport.Height * aspect.Value));
+        var height = width / (float)aspect.Value;
+        return SKRect.Create(viewport.MidX - width / 2, viewport.MidY - height / 2, width, height);
+    }
+
+    // Keep the authored stage's central image geometry. Reflect only the surrounding source tiles
+    // so neither still nor video needs another decoder, texture or differently scaled composition.
+    internal static void DrawExtended<T>(SKCanvas canvas, T image, SKRect destination, SKRect viewport,
+        SKPaint paint, Action<SKCanvas, T, SKRect, SKPaint> draw)
+    {
+        if (destination.Width <= 0 || destination.Height <= 0) return;
+        var firstX = Math.Clamp((int)Math.Floor((viewport.Left - destination.Left) / destination.Width), -16, 16);
+        var lastX = Math.Clamp((int)Math.Ceiling((viewport.Right - destination.Left) / destination.Width) - 1, -16, 16);
+        var firstY = Math.Clamp((int)Math.Floor((viewport.Top - destination.Top) / destination.Height), -16, 16);
+        var lastY = Math.Clamp((int)Math.Ceiling((viewport.Bottom - destination.Top) / destination.Height) - 1, -16, 16);
+        canvas.Save();
+        canvas.ClipRect(viewport);
+        for (var y = firstY; y <= lastY; y++)
+        for (var x = firstX; x <= lastX; x++)
+        {
+            var tile = SKRect.Create(destination.Left + x * destination.Width, destination.Top + y * destination.Height,
+                destination.Width, destination.Height);
+            if ((x & 1) == 0 && (y & 1) == 0) draw(canvas, image, tile, paint);
+            else
+            {
+                canvas.Save();
+                canvas.Translate(tile.MidX, tile.MidY);
+                canvas.Scale((x & 1) == 0 ? 1 : -1, (y & 1) == 0 ? 1 : -1);
+                canvas.Translate(-tile.MidX, -tile.MidY);
+                draw(canvas, image, tile, paint);
+                canvas.Restore();
+            }
+        }
+        canvas.Restore();
+    }
+}
+
 /// <summary>Draws one contiguous run of procedural backdrop layers.</summary>
 internal sealed class BackdropCanvas : SKCanvasElement
 {
@@ -569,9 +622,12 @@ internal sealed class BackdropCanvas : SKCanvasElement
             var layers = variant.Layers.Where(layer => layer.Kind is not "video" and not "lottie").ToArray();
             if (layers.Length == 0) continue;
             var canvas = new BackdropCanvas(owner, layers);
-            canvas.RenderOverride(surface.Canvas, new Windows.Foundation.Size(192, 108));
-            surface.Canvas.Clear(SKColors.Transparent);
-            canvas.Retire();
+            try
+            {
+                canvas.RenderOverride(surface.Canvas, new Windows.Foundation.Size(192, 108));
+                surface.Canvas.Clear(SKColors.Transparent);
+            }
+            finally { canvas.Retire(); }
         }
     }
 
@@ -593,6 +649,14 @@ internal sealed class BackdropCanvas : SKCanvasElement
     /// <summary>Resolves token colours once per theme; never per frame.</summary>
     public void Prepare()
     {
+        lock (_owner.NativeResourceGate) PrepareResources();
+        if (!_retired) Invalidate();
+    }
+
+    private void PrepareResources()
+    {
+        if (_retired) return;
+        foreach (var paint in _paints) ClearPaintResources(paint);
         var tokens = ThemeRuntime.Current.Tokens;
         _colors = [.. _layers.Select(layer => new PreparedColors(
             layer.Color is null ? null : SkiaColor.From(layer.Kind == "calm-tint"
@@ -627,11 +691,17 @@ internal sealed class BackdropCanvas : SKCanvasElement
                 (float)(0.3 + random.NextDouble()), (float)(random.NextDouble() * Math.PI * 2)))];
         }
 
-        Invalidate();
     }
 
     public void OnAmbientChanged()
     {
+        lock (_owner.NativeResourceGate) InvalidateAmbientResources();
+        if (!_retired) Invalidate();
+    }
+
+    private void InvalidateAmbientResources()
+    {
+        if (_retired) return;
         foreach (var layer in _layers.Where(l => l.Source is not null))
         {
             if (_blurred.Remove(layer, out var image))
@@ -640,7 +710,6 @@ internal sealed class BackdropCanvas : SKCanvasElement
             }
         }
 
-        Invalidate();
     }
 
     private async Task LoadMediaAsync(BackdropLayer layer)
@@ -654,21 +723,16 @@ internal sealed class BackdropCanvas : SKCanvasElement
         {
             UiDispatch.Run(() =>
             {
-                if (_retired || generation != _generation)
+                lock (_owner.NativeResourceGate)
                 {
-                    lease.Dispose();
-                    return;
-                }
-
-                if (_images.Remove(layer, out var previous))
-                {
-                    previous?.Dispose();
-                }
-
-                _images[layer] = lease;
-                if (_blurred.Remove(layer, out var blurred))
-                {
-                    blurred?.Dispose();
+                    if (_retired || generation != _generation)
+                    {
+                        lease.Dispose();
+                        return;
+                    }
+                    if (_images.Remove(layer, out var previous)) previous?.Dispose();
+                    _images[layer] = lease;
+                    if (_blurred.Remove(layer, out var blurred)) blurred?.Dispose();
                 }
                 Invalidate();
             });
@@ -680,6 +744,11 @@ internal sealed class BackdropCanvas : SKCanvasElement
     }
 
     public void Retire()
+    {
+        lock (_owner.NativeResourceGate) RetireResources();
+    }
+
+    private void RetireResources()
     {
         if (_retired)
         {
@@ -700,20 +769,37 @@ internal sealed class BackdropCanvas : SKCanvasElement
 
         _blurred.Clear();
         _images.Clear();
+        foreach (var paint in _paints)
+        {
+            ClearPaintResources(paint);
+            paint.Dispose();
+        }
         foreach (var shader in _bokehShaders.Values) shader.Dispose();
         _bokehShaders.Clear();
-        foreach (var paint in _paints) paint.Dispose();
         _sparklePath?.Dispose();
         _sparklePath = null;
         _wavePath?.Dispose();
         _wavePath = null;
     }
 
+    private static void ClearPaintResources(SKPaint paint)
+    {
+        paint.Shader = null;
+        paint.ColorFilter = null;
+        paint.ImageFilter = null;
+    }
+
     protected override void RenderOverride(SKCanvas canvas, Windows.Foundation.Size area)
     {
+        lock (_owner.NativeResourceGate) RenderLayers(canvas, area);
+    }
+
+    private void RenderLayers(SKCanvas canvas, Windows.Foundation.Size area)
+    {
+        if (_retired) return;
         var w = (float)area.Width;
         var h = (float)area.Height;
-        if (w <= 0 || h <= 0)
+        if (!float.IsFinite(w) || !float.IsFinite(h) || w <= 0 || h <= 0)
         {
             return;
         }
@@ -728,9 +814,7 @@ internal sealed class BackdropCanvas : SKCanvasElement
             var layer = _layers[i];
             var colors = i < _colors.Length ? _colors[i] : default;
             var paint = _paints[i];
-            paint.Shader = null;
-            paint.ColorFilter = null;
-            paint.ImageFilter = null;
+            ClearPaintResources(paint);
             paint.IsAntialias = true;
             paint.Color = SKColors.White;
             paint.Style = SKPaintStyle.Fill;
@@ -757,7 +841,8 @@ internal sealed class BackdropCanvas : SKCanvasElement
                     using var gradientShader = SKShader.CreateLinearGradient(new SKPoint((w / 2) - dx, (h / 2) - dy), new SKPoint((w / 2) + dx, (h / 2) + dy),
                         [.. stops.Select(c => c.WithAlpha((byte)(c.Alpha * layer.Opacity)))], colors.Offsets, SKShaderTileMode.Clamp);
                     paint.Shader = gradientShader;
-                    canvas.DrawRect(rect, paint);
+                    try { canvas.DrawRect(rect, paint); }
+                    finally { ClearPaintResources(paint); }
                     break;
                 }
 
@@ -771,7 +856,8 @@ internal sealed class BackdropCanvas : SKCanvasElement
                     using var glowShader = SKShader.CreateRadialGradient(new SKPoint(cx, cy), radius,
                         [color.WithAlpha((byte)Math.Clamp(color.Alpha * layer.Opacity * pulse, 0, 255)), color.WithAlpha(0)], null, SKShaderTileMode.Clamp);
                     paint.Shader = glowShader;
-                    canvas.DrawRect(rect, paint);
+                    try { canvas.DrawRect(rect, paint); }
+                    finally { ClearPaintResources(paint); }
                     break;
                 }
 
@@ -783,14 +869,20 @@ internal sealed class BackdropCanvas : SKCanvasElement
                         break;
                     }
 
+                    var stage = BackdropViewport.Fit(rect, _owner.StageAspect);
                     var scale = (float)(layer.Scale * (1 + (layer.Amplitude * 0.5 * (1 + wave))));
-                    var baseScale = Math.Max(w / image.Width, h / image.Height) * scale;
+                    var baseScale = Math.Max(stage.Width / image.Width, stage.Height / image.Height) * scale;
                     var iw = image.Width * baseScale;
                     var ih = image.Height * baseScale;
-                    var ox = ((w - iw) / 2) + (float)(wave2 * layer.Amplitude * w * 0.5) + depthX;
-                    var oy = ((h - ih) / 2) + (float)(wave * layer.Amplitude * h * 0.3) + depthY;
+                    var ox = stage.MidX - iw / 2 + (float)(wave2 * layer.Amplitude * stage.Width * 0.5) + depthX;
+                    var oy = stage.MidY - ih / 2 + (float)(wave * layer.Amplitude * stage.Height * 0.3) + depthY;
                     paint.Color = SKColors.White.WithAlpha((byte)(255 * layer.Opacity));
-                    canvas.DrawImage(image, SKRect.Create(ox, oy, iw, ih), new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear), paint);
+                    var destination = SKRect.Create(ox, oy, iw, ih);
+                    if (_owner.StageAspect is not null)
+                        BackdropViewport.DrawExtended(canvas, image, destination, rect, paint,
+                            static (target, source, bounds, brush) => target.DrawImage(source, bounds,
+                                new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear), brush));
+                    else canvas.DrawImage(image, destination, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear), paint);
                     break;
                 }
 
@@ -804,7 +896,8 @@ internal sealed class BackdropCanvas : SKCanvasElement
                     using var fogTint = SKColorFilter.CreateBlendMode(color.WithAlpha((byte)(255 * layer.Opacity)), SKBlendMode.SrcIn);
                     paint.Shader = fogShader;
                     paint.ColorFilter = fogTint;
-                    canvas.DrawRect(rect, paint);
+                    try { canvas.DrawRect(rect, paint); }
+                    finally { ClearPaintResources(paint); }
                     break;
                 }
 
@@ -864,11 +957,17 @@ internal sealed class BackdropCanvas : SKCanvasElement
                             paint.Shader = _bokehShaders[layer];
                             paint.Color = SKColors.White.WithAlpha(paint.Color.Alpha);
                             canvas.Save();
-                            canvas.Translate(particleX, particleY);
-                            canvas.Scale(radius, radius);
-                            canvas.DrawCircle(0, 0, 1, paint);
-                            canvas.Restore();
-                            paint.Shader = null;
+                            try
+                            {
+                                canvas.Translate(particleX, particleY);
+                                canvas.Scale(radius, radius);
+                                canvas.DrawCircle(0, 0, 1, paint);
+                            }
+                            finally
+                            {
+                                canvas.Restore();
+                                ClearPaintResources(paint);
+                            }
                         }
                         else if (layer.ParticleShape == "line") canvas.DrawLine(particleX, particleY, particleX - particle.Size * 2, particleY - particle.Size * 6, paint);
                         else if (layer.ParticleShape is "petal" or "leaf" or "diamond")
@@ -898,7 +997,8 @@ internal sealed class BackdropCanvas : SKCanvasElement
                     paint.Shader = noiseShader;
                     paint.Color = SKColors.White.WithAlpha((byte)(255 * layer.Opacity));
                     paint.BlendMode = SKBlendMode.Overlay;
-                    canvas.DrawRect(rect, paint);
+                    try { canvas.DrawRect(rect, paint); }
+                    finally { ClearPaintResources(paint); }
                     break;
                 }
 
@@ -951,7 +1051,8 @@ internal sealed class BackdropCanvas : SKCanvasElement
                     using var vignetteShader = SKShader.CreateRadialGradient(new SKPoint(w / 2, h / 2), Math.Max(w, h) * 0.75f,
                         [SKColors.Black.WithAlpha(0), SKColors.Black.WithAlpha((byte)(255 * layer.Opacity))], [0.45f, 1f], SKShaderTileMode.Clamp);
                     paint.Shader = vignetteShader;
-                    canvas.DrawRect(rect, paint);
+                    try { canvas.DrawRect(rect, paint); }
+                    finally { ClearPaintResources(paint); }
                     break;
                 }
 
@@ -972,7 +1073,8 @@ internal sealed class BackdropCanvas : SKCanvasElement
                         [Math.Clamp(position - band, 0, 1), Math.Clamp(position, 0, 1), Math.Clamp(position + band, 0, 1)], SKShaderTileMode.Clamp);
                     paint.Shader = sweepShader;
                     paint.BlendMode = SKBlendMode.Plus;
-                    canvas.DrawRect(rect, paint);
+                    try { canvas.DrawRect(rect, paint); }
+                    finally { ClearPaintResources(paint); }
                     break;
                 }
 
@@ -1000,9 +1102,7 @@ internal sealed class BackdropCanvas : SKCanvasElement
                     break;
                 }
             }
-            paint.Shader = null;
-            paint.ColorFilter = null;
-            paint.ImageFilter = null;
+            ClearPaintResources(paint);
         }
     }
 

@@ -58,6 +58,9 @@ public sealed class GallerySurface : Surface, ITopBarCustomizableSurface
         _root.Children.Add(_field.At(1));
         _paginationHost = Pagination();
         _root.Children.Add(_paginationHost.At(2));
+        var galleryEffect = PresentationEffects.View(PresentationSlots.GalleryEffect, () => Context);
+        Grid.SetRowSpan(galleryEffect, 3);
+        _root.Children.Add(galleryEffect);
 
         _root.SizeChanged += (_, _) =>
         {

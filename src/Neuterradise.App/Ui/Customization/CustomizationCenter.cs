@@ -102,6 +102,7 @@ public sealed partial class CustomizationCenter : IDisposable
         _workspace = new CustomizationWorkspaceView(_subjectText, _slotTabs, _preview, _scopeBar, _editor,
             _status, _apply, RequestClose, RequestCancel, ReturnToInspector, _inspector, _cardOnly);
         _root.Children.Add(_workspace.View);
+        PresentationEffects.SetPreviewScope(_root, () => _session.IsClosed ? null : _session);
         _root.SizeChanged += (_, args) => UpdatePreviewHeight(args.NewSize.Height);
 
         _subjectText.Text = SubjectLine();
@@ -196,6 +197,7 @@ public sealed partial class CustomizationCenter : IDisposable
             return
             [
                 new("layout", "Customize.Group.Layout", "Layout", [PresentationSlots.GalleryLayout]),
+                new("effects", "Customize.Group.Effects", "Effects", [PresentationSlots.GalleryEffect]),
             ];
         }
 
@@ -218,7 +220,7 @@ public sealed partial class CustomizationCenter : IDisposable
         PresentationSlots.ProfileBanner => UI.T("Customize.Profile.Banner", "Banner"),
         PresentationSlots.ProfileFrame => UI.T("Customize.Profile.Frame", "Frame"),
         PresentationSlots.ProfileBackdrop => UI.T("Customize.Profile.Backdrop", "Backdrop"),
-        PresentationSlots.ProfileEffect => UI.T("Customize.Group.Effects", "Effects"),
+        PresentationSlots.ProfileEffect or PresentationSlots.GalleryEffect => UI.T("Customize.Group.Effects", "Effects"),
         PresentationSlots.BackdropEffect => UI.T("Customize.Effect.Target.Backdrop", "Backdrop"),
         PresentationSlots.BannerEffect => UI.T("Customize.Effect.Target.Banner", "Banner"),
         PresentationSlots.CoverEffect => UI.T("Customize.Effect.Target.Cover", "Cover"),
@@ -686,7 +688,24 @@ public sealed partial class CustomizationCenter : IDisposable
                     "Show Recent media on the Profile. This setting applies to every Profile Layout."),
                 "caption",
                 "textSecondary"),
-            toggle);
+            toggle,
+            ProfileCompositionEditor());
+    }
+
+    private FrameworkElement ProfileCompositionEditor()
+    {
+        var toggle = new ToggleSwitch
+        {
+            Header = UI.T("Customize.ProfileLayout.PreserveComposition", "Maintain composition"),
+            IsOn = _session.ProfileWorking?.Overrides.PreserveProfileComposition ?? false,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        toggle.Toggled += (_, _) =>
+        {
+            if (_session.ProfileWorking is not null)
+                _session.EditProfileLayout(appearance => appearance with { PreserveProfileComposition = toggle.IsOn });
+        };
+        return toggle;
     }
 
     // ---------------------------------------------------------------- packs

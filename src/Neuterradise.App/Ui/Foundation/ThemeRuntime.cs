@@ -38,7 +38,7 @@ public sealed class ThemeRuntime
         Tokens.Number("densityControlHeight", 30), 8, "token:surface3", "token:surfaceHover",
         "token:surfacePressed", "token:borderDefault", "token:focus")).For(family);
 
-    public void TrackControlFamily(Control control, string family, bool neutral = true, bool compact = false, ButtonKind kind = ButtonKind.Secondary, ControlSkinPlan? preview = null)
+    public void TrackControlFamily(Control control, string family, bool neutral = true, bool compact = false, ButtonKind kind = ButtonKind.Secondary, ControlSkinPlan? preview = null, bool contrastComboBox = false)
     {
         var originalWidth = control.Width;
         var originalHeight = control.Height;
@@ -48,6 +48,7 @@ public sealed class ThemeRuntime
         var originalForeground = control.ReadLocalValue(Control.ForegroundProperty);
         var hadScene = false;
         var inputPaper = false;
+        var paperInputResources = new HashSet<string>(StringComparer.Ordinal);
         TrackControl(control, value =>
         {
             var skin = preview?.For(family) ?? ControlFamily(family);
@@ -71,6 +72,8 @@ public sealed class ThemeRuntime
             }
             if (family == "input")
             {
+                foreach (var key in paperInputResources) value.Resources.Remove(key);
+                paperInputResources.Clear();
                 if (PaperFor(value) is not null || inputPaper)
                 {
                     value.Foreground = B("textPrimary");
@@ -87,6 +90,44 @@ public sealed class ThemeRuntime
                     value.Resources[prefix + "BackgroundFocused"] = F(skin, skin.Fill);
                     value.Resources[prefix + "BorderBrushFocused"] = B(skin.Focus);
                     value.Resources[prefix + "BorderBrushPointerOver"] = B(skin.Focus);
+                }
+                if (PaperFor(value) is { } paper)
+                {
+                    void OverrideResource(string key, string token)
+                    {
+                        if (!paper.Colors.ContainsKey(token)) return;
+                        value.Resources[key] = B(token);
+                        paperInputResources.Add(key);
+                    }
+                    if (value is ComboBox)
+                    {
+                        foreach (var (key, token) in new[]
+                        {
+                            ("ComboBoxBackgroundPressed", "surfacePressed"),
+                            ("ComboBoxDropDownBackground", "surfaceOverlay"),
+                            ("ComboBoxDropDownBorderBrush", "borderDefault"),
+                            ("ComboBoxItemBackgroundPointerOver", "surfaceHover"),
+                            ("ComboBoxItemBackgroundPressed", "surfacePressed"),
+                            ("ComboBoxItemBackgroundSelected", "surfaceSelected"),
+                            ("ComboBoxItemBackgroundSelectedPointerOver", "surfaceHover"),
+                            ("ComboBoxItemBackgroundSelectedPressed", "surfacePressed"),
+                            ("ComboBoxForegroundPointerOver", "textPrimary"),
+                            ("ComboBoxForegroundPressed", "textPrimary"),
+                            ("ComboBoxItemForeground", "textPrimary"),
+                            ("ComboBoxItemForegroundPointerOver", "textPrimary"),
+                            ("ComboBoxItemForegroundPressed", "textPrimary"),
+                            ("ComboBoxItemForegroundSelected", "textPrimary"),
+                            ("ComboBoxItemForegroundSelectedPointerOver", "textPrimary"),
+                            ("ComboBoxItemForegroundSelectedPressed", "textPrimary"),
+                            ("ComboBoxItemForegroundDisabled", "textDisabled"),
+                        }) OverrideResource(key, token);
+                    }
+                    else
+                    {
+                        foreach (var suffix in new[] { "", "Focused", "PointerOver" })
+                            OverrideResource("TextControlPlaceholderForeground" + suffix, "textMuted");
+                        OverrideResource("TextControlPlaceholderForegroundDisabled", "textDisabled");
+                    }
                 }
             }
             if (!compact)
@@ -195,8 +236,64 @@ public sealed class ThemeRuntime
                     value.Resources["ToggleButtonBorderBrush"] = B(scene?.Border ?? skin.Border);
                 }
             }
+            if (contrastComboBox && value is ComboBox combo) ApplyComboBoxContrast(combo);
             hadScene = scene is not null;
         });
+    }
+
+    private void ApplyComboBoxContrast(ComboBox combo)
+    {
+        SolidColorBrush Foreground(string background, string fallback, bool disabled = false)
+        {
+            var brush = combo.Resources.ContainsKey(background) ? combo.Resources[background] as Brush
+                : Application.Current.Resources.ContainsKey(background) ? Application.Current.Resources[background] as Brush : null;
+            var colors = brush switch
+            {
+                SolidColorBrush solid => new[] { solid.Color },
+                LinearGradientBrush gradient => gradient.GradientStops.Select(stop => stop.Color).ToArray(),
+                _ => new[] { ScopedBrush(combo, fallback).Color },
+            };
+            if (colors.Length == 0) colors = [ScopedBrush(combo, fallback).Color];
+            double Luminance(Windows.UI.Color color) => new ArgbColor(color.A, color.R, color.G, color.B).Luminance;
+            double Contrast(SolidColorBrush foreground)
+            {
+                var light = Luminance(foreground.Color);
+                return colors.Min(color =>
+                {
+                    var other = Luminance(color);
+                    return (Math.Max(light, other) + .05) / (Math.Min(light, other) + .05);
+                });
+            }
+            var preferred = ScopedBrush(combo, disabled ? "textDisabled" : "textPrimary");
+            if (Contrast(preferred) >= 4.5) return preferred;
+            var black = Brush("#FF000000");
+            var white = Brush("#FFFFFFFF");
+            return Contrast(black) >= Contrast(white) ? black : white;
+        }
+
+        foreach (var (suffix, fallback) in new[]
+        {
+            ("", "surface2"), ("PointerOver", "surface3"), ("Pressed", "surfacePressed"),
+            ("Focused", "surface2"), ("Disabled", "surface2"),
+        })
+        {
+            var foreground = Foreground("ComboBoxBackground" + suffix, fallback, suffix == "Disabled");
+            combo.Resources["ComboBoxForeground" + suffix] = foreground;
+            combo.Resources["ComboBoxDropDownGlyphForeground" + suffix] = foreground;
+            if (suffix.Length == 0) combo.Foreground = foreground;
+        }
+
+        foreach (var (suffix, background, fallback) in new[]
+        {
+            ("", "ComboBoxDropDownBackground", "surfaceOverlay"),
+            ("PointerOver", "ComboBoxItemBackgroundPointerOver", "surfaceHover"),
+            ("Pressed", "ComboBoxItemBackgroundPressed", "surfacePressed"),
+            ("Selected", "ComboBoxItemBackgroundSelected", "surfaceSelected"),
+            ("SelectedPointerOver", "ComboBoxItemBackgroundSelectedPointerOver", "surfaceHover"),
+            ("SelectedPressed", "ComboBoxItemBackgroundSelectedPressed", "surfacePressed"),
+            ("Disabled", "ComboBoxDropDownBackground", "surfaceOverlay"),
+        })
+            combo.Resources["ComboBoxItemForeground" + suffix] = Foreground(background, fallback, suffix == "Disabled");
     }
 
     public static Thickness ControlEdge(ControlSkinPlan skin) => skin.Edge switch
@@ -436,7 +533,7 @@ public sealed class ThemeRuntime
             var foreground = enabled ? style?.Foreground : style?.DisabledForeground ?? style?.Foreground;
             if (foreground is not null) return foreground;
         }
-        return PaperFor(element) is { } paper ? PaperReference(paper, reference) : reference;
+        return PaperFor(element) is { } paper ? paper.ResolveReference(reference) : reference;
     }
 
     private ProfilePaperPlan? PaperFor(DependencyObject element)
@@ -462,29 +559,6 @@ public sealed class ThemeRuntime
         }
     }
 
-    private static string PaperReference(ProfilePaperPlan paper, string reference)
-    {
-        var token = reference.StartsWith("token:", StringComparison.Ordinal) ? reference[6..] : reference;
-        return token switch
-        {
-            "canvas" or "surface1" => paper.Background,
-            "surface2" or "surface3" or "surfaceElevated" => "#FFF2E8EE",
-            "surfaceOverlay" or "surfaceSelected" or "surfaceHover" or "surfacePressed" => "#FFF1D7E5",
-            "textPrimary" or "textInverse" => paper.Ink,
-            "textSecondary" or "textMuted" => "#FF604D65",
-            "textDisabled" => "#FF807484",
-            "textOnAccent" => "#FFFFFFFF",
-            "accent" or "accentHover" or "accentPressed" or "accentSecondary" or "textLink" or "focus" or "borderSelected" or "borderInteractive" => paper.Accent,
-            "accentSoft" or "selection" or "selectionHover" => "#FFF1D7E5",
-            "borderDefault" or "borderSubtle" or "borderStrong" => "#FFCCBCCB",
-            "danger" or "dangerHover" or "textDanger" => "#FFBB1957",
-            "warning" => "#FFB77900",
-            "success" => "#FF23794C",
-            "info" => "#FF256478",
-            _ => reference,
-        };
-    }
-
     public SolidColorBrush ScopedBrush(DependencyObject element, string reference) =>
         Brush(ScopedReference(element, reference));
 
@@ -500,9 +574,10 @@ public sealed class ThemeRuntime
     public Brush ScopedSurfaceBrush(DependencyObject element, bool raised)
     {
         if (PaperFor(element) is not { } paper) return SurfaceBrush(raised);
-        if (paper.SurfaceOpacity >= 1) return ScopedBrush(element, "canvas");
+        var color = paper.SurfaceColor(raised);
+        if (paper.SurfaceOpacity >= 1) return Brush(color);
         var alpha = (int)Math.Round(paper.SurfaceOpacity * 255);
-        return Brush($"#{alpha:X2}{paper.Background[3..]}");
+        return Brush($"#{alpha:X2}{color[3..]}");
     }
 
     public SolidColorBrush Brush(string token)

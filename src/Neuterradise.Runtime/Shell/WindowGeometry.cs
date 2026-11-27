@@ -10,9 +10,9 @@ namespace Neuterradise.App.Shell;
 public static class WindowGeometry
 {
     /// <summary>Smallest supported outer desktop-window rectangle in device-independent units, including native chrome.</summary>
-    public const double MinimumWidth = 640;
+    public const double MinimumWidth = 800;
 
-    public const double MinimumHeight = 480;
+    public const double MinimumHeight = 500;
 
     /// <summary>Independent fraction of each work-area dimension used at fresh startup.</summary>
     public const double WorkAreaFraction = 0.5;

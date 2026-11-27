@@ -228,6 +228,8 @@ public sealed class MediaGridPanel : IDisposable
             nameof(MediaGridViewModel.IsFavoriteOnly)));
         relation.MinWidth = 120;
         sort.MinWidth = 136;
+        ThemeRuntime.Current.TrackControlFamily(relation, "input", contrastComboBox: true);
+        ThemeRuntime.Current.TrackControlFamily(sort, "input", contrastComboBox: true);
         relation.Tip(UI.T("Inspector.Associations", "Associations"));
         sort.Tip(UI.T("Gallery.Sort", "Sort"));
         var filters = UI.Wrap(6, relation, sort, favorites);

@@ -1056,7 +1056,7 @@
     <sys:String x:Key="Nav.Settings">Settings</sys:String>
     <sys:String x:Key="Nav.Recovery">Native navigation</sys:String>
     <sys:String x:Key="Nav.CustomNavigation">Custom navigation</sys:String>
-    <sys:String x:Key="Banner.SceneEffects">Scene Effects</sys:String>
+    <sys:String x:Key="Banner.SceneEffects">Banner Scene Effect</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset">Global Presets</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset.Desc">Apply coordinated global appearance defaults while preserving individual Profile overrides and media.</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset.Confirm">Apply {0} to global appearance, Home, Gallery and Profile defaults?</sys:String>
@@ -2201,7 +2201,7 @@
     <sys:String x:Key="Banner.Add">Add as Banner</sys:String>
     <sys:String x:Key="Banner.PickerEmpty">No prepared videos are available for this Profile.</sys:String>
     <sys:String x:Key="Banner.Member">Already in collection</sys:String>
-    <sys:String x:Key="Banner.Effects">Banner Effects</sys:String>
+    <sys:String x:Key="Banner.Effects">Banner Media Effect</sys:String>
     <sys:String x:Key="Banner.Intensity">Effect Intensity</sys:String>
     <sys:String x:Key="Banner.Effect.none">None</sys:String>
     <sys:String x:Key="Banner.Effect.film">Film</sys:String>
@@ -2238,4 +2238,14 @@
     <sys:String x:Key="Health.BulkConfirm">Confirm {0} original integrity records. Each original is rechecked; no files will be changed.</sys:String>
     <sys:String x:Key="Health.BulkOutcome">Integrity reconciliation: {0} completed, {1} unresolved, {2} not processed.</sys:String>
     <sys:String x:Key="Health.PlacementStale">A possible canonical placement exists. Verify it before adopting the catalog path.</sys:String>
+    <sys:String x:Key="Settings.Appearance.Navigation">Navigation</sys:String>
+    <sys:String x:Key="Settings.Navigation.Mode">Navigator mode</sys:String>
+    <sys:String x:Key="Settings.Navigation.Navigator">Navigator visibility</sys:String>
+    <sys:String x:Key="Settings.Navigation.Switch">Navigator switch visibility</sys:String>
+    <sys:String x:Key="Settings.Navigation.Breadcrumb">Breadcrumb visibility</sys:String>
+    <sys:String x:Key="Settings.Navigation.Visible">Visible</sys:String>
+    <sys:String x:Key="Settings.Navigation.AutoHide">Auto-hide</sys:String>
+    <sys:String x:Key="Settings.Navigation.Hidden">Hidden</sys:String>
+    <sys:String x:Key="Settings.Navigation.Recovery">Move the pointer to the dock edge for Auto-hide. F10 reveals hidden navigation; Escape toggles temporary visibility. Settings and Import keep native navigation accessible. Ctrl + , opens Settings.</sys:String>
+    <sys:String x:Key="Customize.ProfileLayout.PreserveComposition">Maintain composition</sys:String>
 </ResourceDictionary>

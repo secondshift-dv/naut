@@ -1056,7 +1056,7 @@
     <sys:String x:Key="Nav.Settings">设置</sys:String>
     <sys:String x:Key="Nav.Recovery">原生导航</sys:String>
     <sys:String x:Key="Nav.CustomNavigation">自定义导航</sys:String>
-    <sys:String x:Key="Banner.SceneEffects">场景效果</sys:String>
+    <sys:String x:Key="Banner.SceneEffects">横幅场景效果</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset">全局预设</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset.Desc">应用统一的全局外观默认设置，同时保留各档案的独立设置和媒体。</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset.Confirm">将 {0} 应用到全局外观、主页、图库和档案默认设置吗？</sys:String>
@@ -2201,7 +2201,7 @@
     <sys:String x:Key="Banner.Add">添加为横幅</sys:String>
     <sys:String x:Key="Banner.PickerEmpty">此个人档案没有已准备好的视频。</sys:String>
     <sys:String x:Key="Banner.Member">已在集合中</sys:String>
-    <sys:String x:Key="Banner.Effects">横幅效果</sys:String>
+    <sys:String x:Key="Banner.Effects">横幅媒体效果</sys:String>
     <sys:String x:Key="Banner.Intensity">效果强度</sys:String>
     <sys:String x:Key="Banner.Effect.none">无</sys:String>
     <sys:String x:Key="Banner.Effect.film">胶片</sys:String>
@@ -2238,4 +2238,14 @@
     <sys:String x:Key="Health.BulkConfirm">确认 {0} 条原始文件完整性记录。将重新检查每个原始文件，不会修改文件。</sys:String>
     <sys:String x:Key="Health.BulkOutcome">完整性核对：已完成 {0} 项，未解决 {1} 项，未处理 {2} 项。</sys:String>
     <sys:String x:Key="Health.PlacementStale">存在可能的规范存放位置。更新目录路径前请先验证。</sys:String>
+    <sys:String x:Key="Settings.Appearance.Navigation">导航</sys:String>
+    <sys:String x:Key="Settings.Navigation.Mode">导航模式</sys:String>
+    <sys:String x:Key="Settings.Navigation.Navigator">导航可见性</sys:String>
+    <sys:String x:Key="Settings.Navigation.Switch">导航切换按钮可见性</sys:String>
+    <sys:String x:Key="Settings.Navigation.Breadcrumb">面包屑可见性</sys:String>
+    <sys:String x:Key="Settings.Navigation.Visible">显示</sys:String>
+    <sys:String x:Key="Settings.Navigation.AutoHide">自动隐藏</sys:String>
+    <sys:String x:Key="Settings.Navigation.Hidden">隐藏</sys:String>
+    <sys:String x:Key="Settings.Navigation.Recovery">自动隐藏时，将指针移到停靠边缘。F10 显示隐藏的导航；Escape 切换临时显示。设置和导入保留原生导航。 Ctrl + , 打开设置。</sys:String>
+    <sys:String x:Key="Customize.ProfileLayout.PreserveComposition">保持构图</sys:String>
 </ResourceDictionary>

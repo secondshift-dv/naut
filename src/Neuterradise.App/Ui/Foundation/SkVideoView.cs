@@ -44,6 +44,12 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
     private static bool _stoppingAll;
     internal static int ActiveDecoderCount => Decoders.Values.Count(decoder => decoder.Running);
     public VideoPurpose Purpose { get; init; } = VideoPurpose.Primary;
+    private double? _backdropStageAspect;
+    internal double? BackdropStageAspect
+    {
+        get => _backdropStageAspect;
+        set { if (_backdropStageAspect == value) return; _backdropStageAspect = value; Invalidate(); }
+    }
     private SKBitmap? _frame;
     private bool _notifyFirstFrame;
     private readonly SKPaint _renderPaint = new() { IsAntialias = true };
@@ -794,26 +800,24 @@ public sealed class SkVideoView : SKCanvasElement, IDisposable
 
     protected override void RenderOverride(SKCanvas canvas, Size area)
     {
-        if (_frame is null || area.Width <= 0 || area.Height <= 0)
+        if (_disposed || _frame is null || area.Width <= 0 || area.Height <= 0)
         {
             return;
         }
 
-        var placement = _presentation.Place(
-            _frame.Width,
-            _frame.Height,
-            area.Width,
-            area.Height);
-        var destination = new SKRect(
-            (float)placement.TranslateX,
-            (float)placement.TranslateY,
-            (float)(placement.TranslateX + placement.Width),
-            (float)(placement.TranslateY + placement.Height));
+        var viewport = new SKRect(0, 0, (float)area.Width, (float)area.Height);
+        var stage = BackdropViewport.Fit(viewport, _backdropStageAspect);
+        var placement = _presentation.Place(_frame.Width, _frame.Height, stage.Width, stage.Height);
+        var destination = SKRect.Create(stage.Left + (float)placement.TranslateX,
+            stage.Top + (float)placement.TranslateY, (float)placement.Width, (float)placement.Height);
 
         canvas.Save();
-        canvas.ClipRect(new SKRect(0, 0, (float)area.Width, (float)area.Height));
-        if (placement.Rotation != 0) canvas.RotateDegrees((float)placement.Rotation, (float)area.Width / 2, (float)area.Height / 2);
-        canvas.DrawBitmap(_frame, destination, _renderPaint);
+        canvas.ClipRect(viewport);
+        if (placement.Rotation != 0) canvas.RotateDegrees((float)placement.Rotation, viewport.MidX, viewport.MidY);
+        if (_backdropStageAspect is not null)
+            BackdropViewport.DrawExtended(canvas, _frame, destination, viewport, _renderPaint,
+                static (target, bitmap, bounds, paint) => target.DrawBitmap(bitmap, bounds, paint));
+        else canvas.DrawBitmap(_frame, destination, _renderPaint);
         canvas.Restore();
     }
 

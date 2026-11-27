@@ -1056,7 +1056,7 @@
     <sys:String x:Key="Nav.Settings">設定</sys:String>
     <sys:String x:Key="Nav.Recovery">標準ナビゲーション</sys:String>
     <sys:String x:Key="Nav.CustomNavigation">カスタムナビゲーション</sys:String>
-    <sys:String x:Key="Banner.SceneEffects">シーンエフェクト</sys:String>
+    <sys:String x:Key="Banner.SceneEffects">バナーシーン効果</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset">グローバルプリセット</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset.Desc">各プロフィールの設定とメディアを保持したまま全体の外観の既定値を適用します。</sys:String>
     <sys:String x:Key="Settings.Appearance.GlobalPreset.Confirm">{0} を全体の外観、ホーム、ギャラリー、プロフィールの既定値に適用しますか？</sys:String>
@@ -2201,7 +2201,7 @@
     <sys:String x:Key="Banner.Add">バナーとして追加</sys:String>
     <sys:String x:Key="Banner.PickerEmpty">このプロフィールには準備済みの動画がありません。</sys:String>
     <sys:String x:Key="Banner.Member">追加済み</sys:String>
-    <sys:String x:Key="Banner.Effects">バナー効果</sys:String>
+    <sys:String x:Key="Banner.Effects">バナーメディア効果</sys:String>
     <sys:String x:Key="Banner.Intensity">効果の強さ</sys:String>
     <sys:String x:Key="Banner.Effect.none">なし</sys:String>
     <sys:String x:Key="Banner.Effect.film">フィルム</sys:String>
@@ -2238,4 +2238,14 @@
     <sys:String x:Key="Health.BulkConfirm">{0} 件の整合性記録を確定します。各オリジナルを再確認し、ファイルは変更しません。</sys:String>
     <sys:String x:Key="Health.BulkOutcome">整合性の調整：完了 {0} 件、未解決 {1} 件、未処理 {2} 件。</sys:String>
     <sys:String x:Key="Health.PlacementStale">正規の配置先の候補があります。カタログのパスを採用する前に検証してください。</sys:String>
+    <sys:String x:Key="Settings.Appearance.Navigation">ナビゲーション</sys:String>
+    <sys:String x:Key="Settings.Navigation.Mode">ナビゲーションモード</sys:String>
+    <sys:String x:Key="Settings.Navigation.Navigator">ナビゲーションの表示</sys:String>
+    <sys:String x:Key="Settings.Navigation.Switch">ナビゲーション切替ボタンの表示</sys:String>
+    <sys:String x:Key="Settings.Navigation.Breadcrumb">パンくずリストの表示</sys:String>
+    <sys:String x:Key="Settings.Navigation.Visible">表示</sys:String>
+    <sys:String x:Key="Settings.Navigation.AutoHide">自動非表示</sys:String>
+    <sys:String x:Key="Settings.Navigation.Hidden">非表示</sys:String>
+    <sys:String x:Key="Settings.Navigation.Recovery">自動非表示ではポインターをドックの端に移動します。F10で非表示のナビゲーションを表示し、Escapeで一時的な表示を切り替えます。設定とインポートでは標準ナビゲーションを利用できます。 Ctrl + , で設定を開きます。</sys:String>
+    <sys:String x:Key="Customize.ProfileLayout.PreserveComposition">構成を維持</sys:String>
 </ResourceDictionary>

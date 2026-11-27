@@ -32,19 +32,19 @@ public static class SurfaceComposer
     }
 
     public static FrameworkElement Build(SurfaceNode node, Func<string, FrameworkElement?> semantic, double width,
-        string? fallbackRegion = null) =>
-        node.Modular ? new ResponsiveSurface(node, semantic, width, fallbackRegion) : Compose(node, semantic, width) ?? new Grid();
+        string? fallbackRegion = null, bool preserveComposition = false) =>
+        node.Modular ? new ResponsiveSurface(node, semantic, width, fallbackRegion, preserveComposition) : Compose(node, semantic, width) ?? new Grid();
 
-    private static FrameworkElement? Compose(SurfaceNode node, Func<string, FrameworkElement?> semantic, double width)
+    private static FrameworkElement? Compose(SurfaceNode node, Func<string, FrameworkElement?> semantic, double width, double? canvasDesignWidth = null)
     {
-        var content = ComposeCore(node, semantic, width);
+        var content = ComposeCore(node, semantic, width, canvasDesignWidth);
         if (content is null || node.ButtonStyle is not { } style) return content;
         var scope = new Border { Child = content };
         ThemeRuntime.Current.SetButtonScope(scope, style);
         return scope;
     }
 
-    private static FrameworkElement? ComposeCore(SurfaceNode node, Func<string, FrameworkElement?> semantic, double width)
+    private static FrameworkElement? ComposeCore(SurfaceNode node, Func<string, FrameworkElement?> semantic, double width, double? canvasDesignWidth = null)
     {
         if (node.Kind == "semantic")
         {
@@ -73,7 +73,8 @@ public static class SurfaceComposer
         if (node.Kind == "divider") return UI.Divider();
         if (node.Kind == "spacer") return new Grid { Height = node.Spacing + node.Padding };
         var cells = node.Children.Select((child, index) => (Plan: child, Index: index,
-            View: Compose(child, semantic, Math.Max(0, width - node.Padding * 2))))
+            View: Compose(child, semantic, Math.Max(0, width - node.Padding * 2),
+                node.Kind is "stack" or "panel" or "overlay" ? canvasDesignWidth : null)))
             .Where(cell => cell.View is not null).ToArray();
         if (cells.Length == 0) return null;
         var children = cells.Select(cell => cell.View!).ToArray();
@@ -82,7 +83,14 @@ public static class SurfaceComposer
             var canvas = new AdaptiveCanvas(node.CanvasAspect, width);
             foreach (var (plan, _, view) in cells.OrderBy(cell => cell.Plan.CanvasPlacement!.Order))
                 canvas.Add(view!, plan.CanvasPlacement!);
-            return node.Padding > 0 ? new Border { Child = canvas, Padding = new Thickness(node.Padding) } : canvas;
+            FrameworkElement content = canvas;
+            if (canvasDesignWidth is { } designWidth && !node.HasRegion("figure"))
+            {
+                canvas.Width = designWidth;
+                canvas.Height = designWidth / node.CanvasAspect;
+                content = new Viewbox { Child = canvas, Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform };
+            }
+            return node.Padding > 0 ? new Border { Child = content, Padding = new Thickness(node.Padding) } : content;
         }
         if (node.Kind == "grid")
         {
@@ -230,7 +238,7 @@ public static class SurfaceComposer
     }
 
     private sealed class ResponsiveSurface(SurfaceNode plan, Func<string, FrameworkElement?> region, double fallbackWidth,
-        string? fallbackRegion) : Grid
+        string? fallbackRegion, bool preserveComposition) : Grid
     {
         private SurfaceNode? _arrangement;
         private bool _columns;
@@ -238,14 +246,16 @@ public static class SurfaceComposer
         protected override Size MeasureOverride(Size availableSize)
         {
             var width = double.IsFinite(availableSize.Width) ? availableSize.Width : fallbackWidth;
-            var arrangement = width < plan.Breakpoint ? plan.Narrow ?? plan : plan;
-            var columns = width >= 800;
+            var designWidth = Math.Clamp(plan.Breakpoint, 800, 1366);
+            var arrangement = !preserveComposition && width < plan.Breakpoint ? plan.Narrow ?? plan : plan;
+            var layoutWidth = preserveComposition ? Math.Max(width, designWidth) : width;
+            var columns = layoutWidth >= 800;
             if (!ReferenceEquals(_arrangement, arrangement) || _columns != columns)
             {
                 _arrangement = arrangement;
                 _columns = columns;
                 Children.Clear();
-                var content = Compose(arrangement, region, width);
+                var content = Compose(arrangement, region, layoutWidth, preserveComposition ? designWidth : null);
                 if (fallbackRegion is { } id && !arrangement.HasRegion(id) && region(id) is { } fallback)
                 {
                     Detach(fallback);

@@ -49,7 +49,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
         _paper = paper;
         ThemeRuntime.Current.SetPaperScope(_page, paper);
         var showBackdrop = paper is null || paper.ShowBackdrop;
-        _page.Background = showBackdrop ? null : ThemeRuntime.Current.Brush(paper!.Background);
+        _page.Background = showBackdrop ? null : ThemeRuntime.Current.Brush(paper!.ResolveReference("canvas"));
         _pageScroll.Background = _page.Background;
         _backdrop.Visibility = showBackdrop ? Visibility.Visible : Visibility.Collapsed;
         _backdrop.IsSurfaceActive = showBackdrop && IsActive;
@@ -735,7 +735,8 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
                 var cover = _profileHeader.CoverModule;
                 if (_paper is not null && cover is not null)
                 {
-                    var size = available < _surface.Breakpoint ? Math.Min(160, available * 0.28) : Math.Min(240, available * 0.18);
+                    var layoutWidth = appearance.PreserveProfileComposition && _surface.Modular ? Math.Max(available, Math.Clamp(_surface.Breakpoint, 800, 1366)) : available;
+                    var size = layoutWidth < _surface.Breakpoint ? Math.Min(160, layoutWidth * 0.28) : Math.Min(240, layoutWidth * 0.18);
                     cover.Width = cover.Height = size;
                 }
                 return cover;
@@ -748,7 +749,7 @@ public sealed class ProfileSurface : Surface, ITopBarCustomizableSurface
                 "profile-tools" when IndependentTools => _profileTools,
                 _ => regions.GetValueOrDefault(id),
             };
-            var composition = SurfaceComposer.Build(body, Region, available, fallbackRegion: "figure");
+            var composition = SurfaceComposer.Build(body, Region, available, fallbackRegion: "figure", preserveComposition: appearance.PreserveProfileComposition);
             composition.Width = available;
             composition.HorizontalAlignment = HorizontalAlignment.Center;
             return composition.Margin(padding, _paper is null ? 12 : 0, padding, 18);
